@@ -169,6 +169,7 @@ interface IMessageBodyProps {
   ogMetadataProps?: OGMetadataProps
   unsupportedMessage: boolean
   onInviteLinkClick?: (key: string) => void
+  ifLatestAndHasNotPreview: boolean
   collapsedCharacterLimit?: number
 }
 
@@ -301,7 +302,8 @@ const MessageBody = ({
   ogMetadataProps,
   unsupportedMessage,
   onInviteLinkClick,
-  collapsedCharacterLimit
+  collapsedCharacterLimit,
+  ifLatestAndHasNotPreview
 }: IMessageBodyProps) => {
   const {
     [THEME_COLORS.ACCENT]: accentColor,
@@ -392,10 +394,11 @@ const MessageBody = ({
   const current = useMemo(() => moment(message.createdAt).startOf('day'), [message.createdAt])
   const firstMessageInInterval = useMemo(
     () =>
+      ifLatestAndHasNotPreview ||
       !(prevMessage && current.diff(moment(prevMessage.createdAt).startOf('day'), 'days') === 0) ||
       prevMessage?.type === MESSAGE_TYPE.SYSTEM ||
       unreadMessageId === prevMessage.id,
-    [prevMessage, current, unreadMessageId]
+    [prevMessage, current, unreadMessageId, ifLatestAndHasNotPreview]
   )
   const lastMessageInInterval = useMemo(
     () =>
@@ -486,12 +489,14 @@ const MessageBody = ({
         : !message.incoming && outgoingMessageStyles?.background === 'inherit'
           ? '0px'
           : !message.incoming && ownMessageOnRightSide
-            ? prevMessageUserID && (prevMessageUserID !== messageUserID || firstMessageInInterval)
+            ? (!!prevMessageUserID || ifLatestAndHasNotPreview) &&
+              (prevMessageUserID !== messageUserID || firstMessageInInterval)
               ? '16px 16px 4px 16px'
               : nextMessageUserID !== messageUserID || lastMessageInInterval
                 ? '16px 4px 16px 16px'
                 : '16px 4px 4px 16px'
-            : prevMessageUserID && (prevMessageUserID !== messageUserID || firstMessageInInterval)
+            : (!!prevMessageUserID || ifLatestAndHasNotPreview) &&
+                (prevMessageUserID !== messageUserID || firstMessageInInterval)
               ? '16px 16px 16px 4px'
               : nextMessageUserID !== messageUserID || lastMessageInInterval
                 ? '4px 16px 16px 16px'
@@ -505,11 +510,13 @@ const MessageBody = ({
       firstMessageInInterval,
       nextMessageUserID,
       lastMessageInInterval,
-      ownMessageOnRightSide
+      ownMessageOnRightSide,
+      ifLatestAndHasNotPreview
     ]
   )
   const showMessageSenderName = useMemo(
     () =>
+      (!!prevMessageUserID || ifLatestAndHasNotPreview) &&
       (prevMessageUserID !== messageUserID || firstMessageInInterval) &&
       (channel.type === DEFAULT_CHANNEL_TYPE.DIRECT ? showSenderNameOnDirectChannel : showSenderNameOnGroupChannel) &&
       (message.incoming || showSenderNameOnOwnMessages),
@@ -521,7 +528,8 @@ const MessageBody = ({
       showSenderNameOnDirectChannel,
       showSenderNameOnGroupChannel,
       message.incoming,
-      showSenderNameOnOwnMessages
+      showSenderNameOnOwnMessages,
+      ifLatestAndHasNotPreview
     ]
   )
   const selectionIsActive = useMemo(() => selectedMessagesMap && selectedMessagesMap.size > 0, [selectedMessagesMap])
@@ -1314,6 +1322,7 @@ const MessageBodyContainer = styled.div<{
             ? ' 0'
             : '8px 12px'};
   transform-origin: right;
+  box-sizing: border-box;
 `
 
 const EmojiContainer = styled.div<any>`

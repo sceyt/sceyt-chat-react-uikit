@@ -141,6 +141,7 @@ interface MessagesProps {
     isThreadMessage?: boolean
     unsupportedMessage: boolean
     onInviteLinkClick?: (key: string) => void
+    ifLatestAndHasNotPreview: boolean
   }>
   messageReaction?: boolean
   editMessage?: boolean
@@ -746,7 +747,8 @@ const MessageList: React.FC<MessagesProps> = ({
     index,
     isUnreadMessage,
     nextMessageStartsUnreadSection,
-    isHighlighted
+    isHighlighted,
+    ifLatestAndHasNotPreview
   }: {
     message: IMessage
     prevMessage: IMessage | null
@@ -755,6 +757,7 @@ const MessageList: React.FC<MessagesProps> = ({
     isUnreadMessage: boolean
     nextMessageStartsUnreadSection: boolean
     isHighlighted: boolean
+    ifLatestAndHasNotPreview: boolean
   }) => {
     const localRef = getMessageLocalRef(message)
     messagesIndexMapRef.current[localRef] = index
@@ -793,6 +796,7 @@ const MessageList: React.FC<MessagesProps> = ({
       >
         <Message
           message={message}
+          ifLatestAndHasNotPreview={ifLatestAndHasNotPreview}
           channel={channel}
           stopScrolling={setStopScrolling}
           handleMediaItemClick={handleMediaItemClickStable}
@@ -1056,7 +1060,8 @@ const MessageList: React.FC<MessagesProps> = ({
                         isUnreadMessage: timelineItem.isUnread && !channel.backToLinkedChannel,
                         nextMessageStartsUnreadSection:
                           timelineItem.nextItemStartsUnreadSection && !channel.backToLinkedChannel,
-                        isHighlighted: timelineItem.isHighlighted
+                        isHighlighted: timelineItem.isHighlighted,
+                        ifLatestAndHasNotPreview: timelineItem.ifLatestAndHasNotPreview
                       })}
                     </div>
                   )

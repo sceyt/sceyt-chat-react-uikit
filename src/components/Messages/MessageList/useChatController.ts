@@ -135,6 +135,7 @@ type TimelineItem =
       nextItemStartsUnreadSection: boolean
       startsNewDay: boolean
       registerItemElement: (el: HTMLElement | null) => void
+      ifLatestAndHasNotPreview: boolean
     }
 
 export interface UseChatControllerParams {
@@ -681,6 +682,7 @@ export function useChatController({
       const isUnread = unreadStartIndex >= 0 && index >= unreadStartIndex && isUnreadIncomingMessage(message)
       const nextItemStartsUnreadSection = unreadStartIndex >= 0 && index + 1 === unreadStartIndex
       const result: TimelineItem[] = []
+      const ifLatestAndHasNotPreview = (!hasPrevious || messages.length < 40) && index === 0
 
       if (startsNewDay) {
         result.push({
@@ -709,6 +711,7 @@ export function useChatController({
         isUnread,
         nextItemStartsUnreadSection,
         startsNewDay,
+        ifLatestAndHasNotPreview,
         registerItemElement: (el: HTMLElement | null) => {
           if (!localRef) {
             return
@@ -723,7 +726,7 @@ export function useChatController({
 
       return result
     })
-  }, [highlightedItemId, messages, unreadMessageId])
+  }, [highlightedItemId, messages, unreadMessageId, hasPrevious])
 
   const createEdgeRequestId = useCallback(
     (direction: EdgeDirection) =>

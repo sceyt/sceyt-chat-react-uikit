@@ -84,6 +84,7 @@ interface MessagesProps {
     isThreadMessage?: boolean
     handleRetractVote?: () => void
     handleEndVote?: () => void
+    ifLatestAndHasNotPreview: boolean
   }>
   showOwnAvatar?: boolean
   messageReaction?: boolean

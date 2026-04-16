@@ -205,7 +205,8 @@ const Message = ({
   ogMetadataProps,
   showInfoMessageProps = {},
   collapsedCharacterLimit,
-  createChatOnAvatarTap = true
+  createChatOnAvatarTap = true,
+  ifLatestAndHasNotPreview
 }: IMessageProps) => {
   const getComparableUserId = (messageUser?: IUser | null) => (messageUser?.id ? String(messageUser.id) : 'deleted')
   const {
@@ -270,10 +271,11 @@ const Message = ({
   const current = moment(message.createdAt).startOf('day')
   const firstMessageInInterval = useMemo(
     () =>
+      ifLatestAndHasNotPreview ||
       !(prevMessage && current.diff(moment(prevMessage.createdAt).startOf('day'), 'days') === 0) ||
       prevMessage?.type === MESSAGE_TYPE.SYSTEM ||
       unreadMessageId === prevMessage.id,
-    [prevMessage, unreadMessageId]
+    [prevMessage, unreadMessageId, ifLatestAndHasNotPreview]
   )
 
   const nextMessageUserID = nextMessage ? getComparableUserId(nextMessage.user) : null
@@ -292,7 +294,7 @@ const Message = ({
     (showMessageStatusForEachMessage || !nextMessage)
 
   const renderAvatar =
-    !!prevMessageUserID &&
+    (!!prevMessageUserID || ifLatestAndHasNotPreview) &&
     (prevMessageUserID !== messageUserID || firstMessageInInterval) &&
     !(channel.type === DEFAULT_CHANNEL_TYPE.DIRECT && !showSenderNameOnDirectChannel) &&
     !(!message.incoming && !showOwnAvatar)
@@ -790,6 +792,7 @@ const Message = ({
         {CustomMessageItem ? (
           <CustomMessageItem
             key={message.id || message.tid}
+            ifLatestAndHasNotPreview={ifLatestAndHasNotPreview}
             channel={channel}
             message={message}
             prevMessage={prevMessage}
@@ -829,6 +832,7 @@ const Message = ({
           />
         ) : (
           <MessageBody
+            ifLatestAndHasNotPreview={ifLatestAndHasNotPreview}
             onInviteLinkClick={onInviteLinkClick}
             handleRetractVote={handleRetractVote}
             handleEndVote={handleEndVote}
@@ -1079,6 +1083,7 @@ export default React.memo(Message, (prev, next) => {
   if (prev.contactsMap !== next.contactsMap) return false
   if (prev.connectionStatus !== next.connectionStatus) return false
   if (prev.tabIsActive !== next.tabIsActive) return false
+  if (prev.ifLatestAndHasNotPreview !== next.ifLatestAndHasNotPreview) return false
 
   // Only re-render when THIS message's menu open-state changes, not when any other message opens its menu
   const prevMenuOpen = prev.openedMessageMenuId === (prev.message.id || prev.message.tid)

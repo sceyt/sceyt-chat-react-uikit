@@ -161,6 +161,7 @@ export function* handleChannelMessageEvent(args: { channel: IChannel; message: I
     ? storedChannel?.lastMessage || null
     : getResolvedChannelLastMessage(channel.id, candidateLastMessage, message)
   const shouldUpdateLastMessage = lastMessageNeedsUpdate(storedChannel?.lastMessage, resolvedLastMessage)
+  const messages = store.getState().MessageReducer.activeChannelMessages
   const lastMessageIsInActiveWindow =
     storedChannel?.lastMessage?.id || storedChannel?.lastMessage?.tid
       ? (store.getState().MessageReducer.activeChannelMessages as IMessage[])?.some(
@@ -197,7 +198,7 @@ export function* handleChannelMessageEvent(args: { channel: IChannel; message: I
 
     const messagesHasNext = store.getState().MessageReducer.messagesHasNext
 
-    if (!messagesHasNext && lastMessageIsInActiveWindow) {
+    if ((!messagesHasNext && lastMessageIsInActiveWindow) || !messages.length || !messages) {
       const existingMessage = (store.getState().MessageReducer.activeChannelMessages as IMessage[]).find(
         (m) => (message.id && m.id === message.id) || (message.tid && m.tid === message.tid)
       )

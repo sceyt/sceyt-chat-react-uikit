@@ -79,6 +79,7 @@ interface ICustomMessageItem {
   handleOpenUserProfile: (user: IUser) => void
   unsupportedMessage: boolean
   onInviteLinkClick?: (key: string) => void
+  ifLatestAndHasNotPreview: boolean
 }
 
 export interface IMessageProps {
@@ -235,4 +236,5 @@ export interface IMessageProps {
   }
   collapsedCharacterLimit?: number
   createChatOnAvatarTap?: boolean
+  ifLatestAndHasNotPreview: boolean
 }
