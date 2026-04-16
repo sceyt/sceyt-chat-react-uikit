@@ -82,7 +82,7 @@ import {
 } from '../member/actions'
 import { browserTabIsActiveSelector, contactsMapSelector } from '../user/selector'
 import { getShowOnlyContactUsers } from '../../helpers/contacts'
-import { attachmentTypes } from '../../helpers/constants'
+import { attachmentTypes, MESSAGE_STATUS } from '../../helpers/constants'
 import { MessageTextFormat } from '../../messageUtils'
 import { isJSON } from '../../helpers/message'
 import log from 'loglevel'
@@ -161,12 +161,31 @@ export function* handleChannelMessageEvent(args: { channel: IChannel; message: I
     ? storedChannel?.lastMessage || null
     : getResolvedChannelLastMessage(channel.id, candidateLastMessage, message)
   const shouldUpdateLastMessage = lastMessageNeedsUpdate(storedChannel?.lastMessage, resolvedLastMessage)
+  const lastMessageIsInActiveWindow =
+    storedChannel?.lastMessage?.id || storedChannel?.lastMessage?.tid
+      ? (store.getState().MessageReducer.activeChannelMessages as IMessage[])?.some(
+          (m) => m.id === storedChannel.lastMessage?.id || storedChannel?.lastMessage?.tid === m.tid
+        )
+      : false
+  const isSameLastMessage =
+    storedChannel?.lastMessage &&
+    resolvedLastMessage &&
+    ((resolvedLastMessage.id && storedChannel.lastMessage.id === resolvedLastMessage.id) ||
+      (resolvedLastMessage.tid && storedChannel.lastMessage.tid === resolvedLastMessage.tid))
+  const resolvedLastMessageUpdate = isSameLastMessage
+    ? {
+        ...storedChannel!.lastMessage!,
+        id: message.id,
+        deliveryStatus: message!.deliveryStatus,
+        state: MESSAGE_STATUS.UNMODIFIED
+      }
+    : resolvedLastMessage
 
   yield put(addChannelAC(channelForAdd))
   if (!channelExists) {
     setChannelInMap(channel)
   } else if (shouldUpdateLastMessage) {
-    yield put(updateChannelLastMessageAC(resolvedLastMessage!, channelForAdd))
+    yield put(updateChannelLastMessageAC(resolvedLastMessageUpdate!, channelForAdd))
   }
 
   if (channel.id === activeChannelId) {
@@ -177,14 +196,23 @@ export function* handleChannelMessageEvent(args: { channel: IChannel; message: I
       : false
 
     const messagesHasNext = store.getState().MessageReducer.messagesHasNext
-    const lastMessageIsInActiveWindow = storedChannel?.lastMessage?.id
-      ? (store.getState().MessageReducer.activeChannelMessages as IMessage[]).some(
-          (m) => m.id === storedChannel.lastMessage?.id
-        )
-      : false
 
     if (!messagesHasNext && lastMessageIsInActiveWindow) {
-      yield put(addMessagesAC([message], 'next'))
+      const existingMessage = (store.getState().MessageReducer.activeChannelMessages as IMessage[]).find(
+        (m) => (message.id && m.id === message.id) || (message.tid && m.tid === message.tid)
+      )
+      if (existingMessage) {
+        yield put(
+          updateMessageAC(existingMessage.id || existingMessage.tid!, {
+            ...existingMessage,
+            id: message.id,
+            deliveryStatus: message.deliveryStatus,
+            state: MESSAGE_STATUS.UNMODIFIED
+          })
+        )
+      } else {
+        yield put(addMessagesAC([message], 'next'))
+      }
       yield put(loadOGMetadataForLinkAC([message], true))
       if (lastMessageIsVisible) {
         navigateToLatest(true)
@@ -209,7 +237,7 @@ export function* handleChannelMessageEvent(args: { channel: IChannel; message: I
     newReactions: channelForAdd.newReactions,
     userMessageReactions: [],
     lastReactedMessage: null,
-    ...(shouldUpdateLastMessage && resolvedLastMessage ? { lastMessage: resolvedLastMessage } : {})
+    ...(shouldUpdateLastMessage && resolvedLastMessageUpdate ? { lastMessage: resolvedLastMessageUpdate } : {})
   }
   if (storedChannel?.lastMessage?.id) {
     appendMessageToLatestSegment(channel.id, message.id, storedChannel.lastMessage.id)
@@ -259,7 +287,7 @@ export function* handleChannelMessageEvent(args: { channel: IChannel; message: I
 
   updateChannelOnAllChannels(channel.id, channelDataUpdate)
   if (shouldUpdateLastMessage) {
-    updateChannelLastMessageOnAllChannels(channel.id, resolvedLastMessage!)
+    updateChannelLastMessageOnAllChannels(channel.id, resolvedLastMessageUpdate!)
   }
 }
 

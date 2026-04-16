@@ -156,7 +156,8 @@ import {
   getCachedNearMessages,
   getCachedWindowInterval,
   LOAD_MAX_MESSAGE_COUNT_PREFETCH,
-  removeMessageFromMap
+  removeMessageFromMap,
+  checkIsItSentAlready
 } from '../../helpers/messagesHalper'
 import { navigateToLatest } from '../../helpers/messageListNavigator'
 import { CONNECTION_STATUS } from '../user/constants'
@@ -748,23 +749,26 @@ const syncFailedMessageState = function* (
   message: IMessage,
   shouldKeepInMap: boolean
 ): any {
+  const shouldSkipUpdate = checkIsItSentAlready(messageId, channel.id)
   if (shouldKeepInMap) {
     updateMessageOnMap(channel.id, {
       messageId,
-      params: { state: MESSAGE_STATUS.FAILED }
+      params: { state: shouldSkipUpdate ? MESSAGE_STATUS.UNMODIFIED : MESSAGE_STATUS.FAILED }
     })
-  } else {
+  } else if (!shouldSkipUpdate) {
     removeMessageFromMap(channel.id, messageId)
   }
 
   const activeChannelId = getActiveChannelId()
-  if (activeChannelId === channel.id) {
-    yield put(updateMessageAC(messageId, { state: MESSAGE_STATUS.FAILED }))
+  if (activeChannelId === channel.id && !shouldSkipUpdate) {
+    yield put(
+      updateMessageAC(messageId, { state: shouldSkipUpdate ? MESSAGE_STATUS.UNMODIFIED : MESSAGE_STATUS.FAILED })
+    )
   }
 
   const failedMessage = {
     ...message,
-    state: MESSAGE_STATUS.FAILED
+    state: shouldSkipUpdate ? MESSAGE_STATUS.UNMODIFIED : MESSAGE_STATUS.FAILED
   }
   const resolvedLastMessage = getResolvedChannelLastMessage(channel.id, failedMessage, message)
   if (lastMessageNeedsUpdate(getStoredChannel(channel.id)?.lastMessage, resolvedLastMessage)) {

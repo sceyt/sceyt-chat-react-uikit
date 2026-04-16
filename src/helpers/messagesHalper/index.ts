@@ -495,20 +495,15 @@ export function getCachedWindowInterval(
 
   const messages = Object.values(channelMessages)
     .filter(
-      (m): m is IMessage =>
-        !!m.id && compareMessageIds(m.id, startId) >= 0 && compareMessageIds(m.id, endId) <= 0
+      (m): m is IMessage => !!m.id && compareMessageIds(m.id, startId) >= 0 && compareMessageIds(m.id, endId) <= 0
     )
     .sort(compareMessagesForList)
 
   const hasStart = messages.some((m) => compareMessageIds(m.id!, startId) === 0)
   const hasEnd = messages.some((m) => compareMessageIds(m.id!, endId) === 0)
 
-  const hasOlderSegmentBefore = segments.some(
-    (s) => compareMessageIds(s.endId, containingSegment.startId) < 0
-  )
-  const hasNewerSegmentAfter = segments.some(
-    (s) => compareMessageIds(s.startId, containingSegment.endId) > 0
-  )
+  const hasOlderSegmentBefore = segments.some((s) => compareMessageIds(s.endId, containingSegment.startId) < 0)
+  const hasNewerSegmentAfter = segments.some((s) => compareMessageIds(s.startId, containingSegment.endId) > 0)
 
   return {
     messages,
@@ -706,10 +701,48 @@ export function addMessageToMap(channelId: string, message: IMessage) {
   if (!messagesMap[channelId]) {
     messagesMap[channelId] = {}
   }
-  if (message.tid && messagesMap[channelId][message.tid]) {
-    delete messagesMap[channelId][message.tid]
+  const channelMessages = messagesMap[channelId]
+  const existingById = message.id ? channelMessages[message.id] : undefined
+  const existingByTid = message.tid ? channelMessages[message.tid] : undefined
+  const existing =
+    existingById ||
+    existingByTid ||
+    Object.values(channelMessages).find(
+      (m) => (message.id && m.id === message.id) || (message.tid && m.tid === message.tid)
+    )
+
+  if (existing) {
+    const merged = {
+      ...existing,
+      id: message.id,
+      deliveryStatus: message.deliveryStatus,
+      state: MESSAGE_STATUS.UNMODIFIED
+    }
+    if (existing.tid && channelMessages[existing.tid] && existing.tid !== (existing.id || existing.tid)) {
+      delete channelMessages[existing.tid]
+    }
+    channelMessages[existing.id || existing.tid!] = merged
+    return
   }
-  messagesMap[channelId][message.id || message.tid!] = message
+
+  channelMessages[message.id || message.tid!] = message
+}
+
+export function checkIsItSentAlready(messageId: string, channelId: string) {
+  if (messagesMap[channelId]) {
+    const messages = Object.values(messagesMap[channelId] || {})
+    const message = messages.find((m) => m.tid === messageId || m.id === messageId)
+    if (
+      message?.deliveryStatus === MESSAGE_DELIVERY_STATUS.SENT ||
+      message?.deliveryStatus === MESSAGE_DELIVERY_STATUS.DELIVERED ||
+      message?.deliveryStatus === MESSAGE_DELIVERY_STATUS.READ ||
+      message?.deliveryStatus === MESSAGE_DELIVERY_STATUS.PLAYED ||
+      message?.deliveryStatus === MESSAGE_DELIVERY_STATUS.OPENED
+    ) {
+      return true
+    }
+  }
+  return false
 }
 
 export function updateMessageOnMap(
