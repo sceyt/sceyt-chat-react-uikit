@@ -1,7 +1,7 @@
 import React, { FC, useEffect, useRef, useState } from 'react'
 import { shallowEqual } from 'react-redux'
 import { useSelector, useDispatch } from 'store/hooks'
-import styled from 'styled-components'
+import styled, { keyframes } from 'styled-components'
 // Store
 import {
   activeChannelSelector,
@@ -52,7 +52,6 @@ import {
 import { getShowOnlyContactUsers } from '../../helpers/contacts'
 import { DEFAULT_CHANNEL_TYPE, LOADING_STATE } from '../../helpers/constants'
 import { device, THEME_COLORS } from '../../UIHelper/constants'
-import { UploadingIcon } from '../../UIHelper'
 import { IChannel, IContact, IContactsMap, ICreateChannel, IMessage, IUser } from '../../types'
 // Components
 import Channel from '../Channel'
@@ -173,6 +172,23 @@ interface IChannelListProps {
   showPhoneNumber?: boolean
 }
 
+const ChannelSkeletonList = ({ color, count = 12 }: { color: string; count?: number }) => (
+  <React.Fragment>
+    {Array.from({ length: count }, (_, i) => (
+      <SkeletonItem key={i}>
+        <SkeletonAvatar color={color} size={50} />
+        <SkeletonRight>
+          <SkeletonTopRow>
+            <SkeletonLine color={color} width='55%' />
+            <SkeletonLine color={color} width='36px' height='10px' />
+          </SkeletonTopRow>
+          <SkeletonLine color={color} width='72%' height='12px' />
+        </SkeletonRight>
+      </SkeletonItem>
+    ))}
+  </React.Fragment>
+)
+
 const ChannelList: React.FC<IChannelListProps> = ({
   className,
   selectedChannelBackground,
@@ -235,8 +251,8 @@ const ChannelList: React.FC<IChannelListProps> = ({
     [THEME_COLORS.BACKGROUND]: background,
     [THEME_COLORS.TEXT_PRIMARY]: textPrimary,
     [THEME_COLORS.TEXT_SECONDARY]: textSecondary,
-    [THEME_COLORS.TEXT_FOOTNOTE]: textFootnote,
     [THEME_COLORS.BORDER]: borderColor,
+    [THEME_COLORS.SURFACE_1]: surface1,
     [THEME_COLORS.SURFACE_2]: surface2
   } = useColor()
   const dispatch = useDispatch()
@@ -546,7 +562,7 @@ const ChannelList: React.FC<IChannelListProps> = ({
           loadMoreChannels={handleLoadMoreChannels}
           searchValue={searchValue}
         >
-          {!searchValue ? (
+          {!searchValue && (channelsLoading === LOADING_STATE.LOADED || channels.length > 0) ? (
             <React.Fragment>
               {channels.map(
                 (channel: IChannel) =>
@@ -584,6 +600,9 @@ const ChannelList: React.FC<IChannelListProps> = ({
                       showPhoneNumber={showPhoneNumber}
                     />
                   ))
+              )}
+              {channelsLoading === LOADING_STATE.LOADING && channelsHasNext && (
+                <ChannelSkeletonList color={surface1} count={1} />
               )}
             </React.Fragment>
           ) : channelsLoading === LOADING_STATE.LOADED && searchValue ? (
@@ -724,59 +743,63 @@ const ChannelList: React.FC<IChannelListProps> = ({
               )}
             </React.Fragment>
           ) : (
-            <LoadingWrapper>
-              <UploadingIcon color={textFootnote} />
-            </LoadingWrapper>
+            <ChannelSkeletonList color={surface1} />
           )}
         </List>
       ) : (
         <React.Fragment>
-          {!searchValue && (
-            <ChannelsList
-              ref={channelsScrollRef}
-              onScroll={handleAllChannelsListScroll}
-              onMouseEnter={() => setIsScrolling(true)}
-              onMouseLeave={() => setIsScrolling(false)}
-              className={isScrolling ? 'show-scrollbar' : ''}
-              thumbColor={surface2}
-            >
-              {channels.map((channel: IChannel) =>
-                ListItem ? (
-                  <ListItem channel={channel} setSelectedChannel={setSelectedChannel} key={channel.id} />
-                ) : (
-                  <Channel
-                    selectedChannelLeftBorder={selectedChannelLeftBorder}
-                    selectedChannelBackground={selectedChannelBackground}
-                    selectedChannelBorderRadius={selectedChannelBorderRadius}
-                    selectedChannelPaddings={selectedChannelPaddings}
-                    channelHoverBackground={channelHoverBackground}
-                    channelSubjectFontSize={channelSubjectFontSize}
-                    channelSubjectLineHeight={channelSubjectLineHeight}
-                    channelSubjectColor={channelSubjectColor}
-                    channelLastMessageFontSize={channelLastMessageFontSize}
-                    channelLastMessageHeight={channelLastMessageHeight}
-                    channelLastMessageTimeFontSize={channelLastMessageTimeFontSize}
-                    channelAvatarSize={channelAvatarSize}
-                    channelAvatarTextSize={channelAvatarTextSize}
-                    channelsPaddings={channelsPaddings}
-                    channelsMargin={channelsMargin}
-                    notificationsIsMutedIcon={notificationsIsMutedIcon}
-                    notificationsIsMutedIconColor={notificationsIsMutedIconColor}
-                    pinedIcon={pinedIcon}
-                    showAvatar={showAvatar}
-                    avatarBorderRadius={avatarBorderRadius}
-                    channel={channel}
-                    key={channel.id}
-                    contactsMap={contactsMap}
-                    setSelectedChannel={setSelectedChannel}
-                    getCustomLatestMessage={getCustomLatestMessage as any}
-                    doNotShowMessageDeliveryTypes={doNotShowMessageDeliveryTypes}
-                    showPhoneNumber={showPhoneNumber}
-                  />
-                )
-              )}
-            </ChannelsList>
-          )}
+          {!searchValue &&
+            (channelsLoading === LOADING_STATE.LOADED || channels.length > 0 ? (
+              <ChannelsList
+                ref={channelsScrollRef}
+                onScroll={handleAllChannelsListScroll}
+                onMouseEnter={() => setIsScrolling(true)}
+                onMouseLeave={() => setIsScrolling(false)}
+                className={isScrolling ? 'show-scrollbar' : ''}
+                thumbColor={surface2}
+              >
+                {channels.map((channel: IChannel) =>
+                  ListItem ? (
+                    <ListItem channel={channel} setSelectedChannel={setSelectedChannel} key={channel.id} />
+                  ) : (
+                    <Channel
+                      selectedChannelLeftBorder={selectedChannelLeftBorder}
+                      selectedChannelBackground={selectedChannelBackground}
+                      selectedChannelBorderRadius={selectedChannelBorderRadius}
+                      selectedChannelPaddings={selectedChannelPaddings}
+                      channelHoverBackground={channelHoverBackground}
+                      channelSubjectFontSize={channelSubjectFontSize}
+                      channelSubjectLineHeight={channelSubjectLineHeight}
+                      channelSubjectColor={channelSubjectColor}
+                      channelLastMessageFontSize={channelLastMessageFontSize}
+                      channelLastMessageHeight={channelLastMessageHeight}
+                      channelLastMessageTimeFontSize={channelLastMessageTimeFontSize}
+                      channelAvatarSize={channelAvatarSize}
+                      channelAvatarTextSize={channelAvatarTextSize}
+                      channelsPaddings={channelsPaddings}
+                      channelsMargin={channelsMargin}
+                      notificationsIsMutedIcon={notificationsIsMutedIcon}
+                      notificationsIsMutedIconColor={notificationsIsMutedIconColor}
+                      pinedIcon={pinedIcon}
+                      showAvatar={showAvatar}
+                      avatarBorderRadius={avatarBorderRadius}
+                      channel={channel}
+                      key={channel.id}
+                      contactsMap={contactsMap}
+                      setSelectedChannel={setSelectedChannel}
+                      getCustomLatestMessage={getCustomLatestMessage as any}
+                      doNotShowMessageDeliveryTypes={doNotShowMessageDeliveryTypes}
+                      showPhoneNumber={showPhoneNumber}
+                    />
+                  )
+                )}
+                {channelsLoading === LOADING_STATE.LOADING && channelsHasNext && (
+                  <ChannelSkeletonList color={surface1} count={1} />
+                )}
+              </ChannelsList>
+            ) : (
+              <ChannelSkeletonList color={surface1} />
+            ))}
           {!!searchValue &&
             (channelsLoading === LOADING_STATE.LOADED ? (
               !searchedChannels.chats_groups?.length &&
@@ -884,9 +907,7 @@ const ChannelList: React.FC<IChannelListProps> = ({
                 </SearchedChannels>
               )
             ) : (
-              <LoadingWrapper>
-                <UploadingIcon color={textFootnote} />
-              </LoadingWrapper>
+              <ChannelSkeletonList color={surface1} />
             ))}
         </React.Fragment>
       )}
@@ -970,11 +991,58 @@ const NoData = styled.div<{ color: string; fontSize?: string }>`
   font-size: ${(props) => props.fontSize};
   color: ${(props) => props.color};
 `
-const LoadingWrapper = styled.div`
-  position: absolute;
-  left: calc(50% - 20px);
-  top: calc(50% - 20px);
+const shimmer = keyframes`
+  0% { background-position: -400px 0; }
+  100% { background-position: 400px 0; }
 `
+
+const SkeletonBlock = styled.div<{ color: string }>`
+  background-color: ${(p) => p.color};
+  background-image: linear-gradient(
+    90deg,
+    ${(p) => p.color} 0px,
+    rgba(255, 255, 255, 0.35) 80px,
+    ${(p) => p.color} 160px
+  );
+  background-size: 400px 100%;
+  background-repeat: no-repeat;
+  animation: ${shimmer} 1.4s ease infinite;
+`
+
+const SkeletonAvatar = styled(SkeletonBlock)<{ size: number }>`
+  width: ${(p) => p.size}px;
+  height: ${(p) => p.size}px;
+  border-radius: 50%;
+  flex-shrink: 0;
+`
+
+const SkeletonLine = styled(SkeletonBlock)<{ width: string; height?: string }>`
+  width: ${(p) => p.width};
+  height: ${(p) => p.height || '14px'};
+  border-radius: 7px;
+`
+
+const SkeletonRight = styled.div`
+  flex: 1;
+  margin-left: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+`
+
+const SkeletonTopRow = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+`
+
+const SkeletonItem = styled.div`
+  display: flex;
+  align-items: center;
+  padding: 8px;
+  margin: 0 8px;
+`
+
 const ChannelListHeader = styled.div<{
   maxWidth?: string
   withoutProfile?: any
