@@ -1067,20 +1067,16 @@ const MessageList: React.FC<MessagesProps> = ({
                   )
                 })}
               </MessagesBox>
+            ) : loadingPrevMessages === LOADING_STATE.LOADED && loadingNextMessages === LOADING_STATE.LOADED ? (
+              <NoMessagesContainer color={textPrimary}>
+                <NoMessagesIcon />
+                <NoMessagesTitle color={textPrimary}>No Messages yet</NoMessagesTitle>
+                <NoMessagesText color={textSecondary}>No messages yet, start the chat</NoMessagesText>
+              </NoMessagesContainer>
             ) : (
-              loadingPrevMessages === LOADING_STATE.LOADED &&
-              loadingNextMessages === LOADING_STATE.LOADED && (
-                <NoMessagesContainer color={textPrimary}>
-                  <NoMessagesIcon />
-                  <NoMessagesTitle color={textPrimary}>No Messages yet</NoMessagesTitle>
-                  <NoMessagesText color={textSecondary}>No messages yet, start the chat</NoMessagesText>
-                  {/* {channel.type === CHANNEL_TYPE.DIRECT
-                  ? ' chat'
-                  : channel.type === CHANNEL_TYPE.GROUP || channel.type === CHANNEL_TYPE.PRIVATE
-                  ? ' group chat'
-                  : ' channel'} */}
-                </NoMessagesContainer>
-              )
+              <NoMessagesContainer color={textPrimary}>
+                <JumpSpinner $color={iconInactive} $size={32} />
+              </NoMessagesContainer>
             )}
             {attachmentsPreview?.show && mediaFile && (
               <SliderPopup
@@ -1173,9 +1169,9 @@ const JumpOverlay = styled.div`
   z-index: 10;
 `
 
-const JumpSpinner = styled.div<{ $color?: string }>`
-  width: 26px;
-  height: 26px;
+const JumpSpinner = styled.div<{ $color?: string; $size?: number }>`
+  width: ${(props) => props.$size || 26}px;
+  height: ${(props) => props.$size || 26}px;
   border: 2.5px solid transparent;
   border-top-color: ${(props) => props.$color || '#9EA6B0'};
   border-radius: 50%;
