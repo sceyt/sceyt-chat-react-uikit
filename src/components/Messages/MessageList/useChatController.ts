@@ -1061,7 +1061,7 @@ export function useChatController({
               }
               // Cancel the saga so its finally block runs and sets LOADED,
               // clearing the Redux loading state that drives the visible spinner.
-            }, 4000)
+            }, 7000)
             await beginWindowPagedRequest(
               () => {
                 dispatch(loadAroundMessageAC(channelRef.current, itemId))
