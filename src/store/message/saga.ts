@@ -1725,6 +1725,52 @@ const getCachedMessagesForResult = (channelId: string, messages: IMessage[]) => 
   return cachedMessages.length > 0 ? cachedMessages : messages
 }
 
+const getCachedAroundMessageWindow = (
+  channel: IChannel,
+  messageId: string
+): {
+  messages: IMessage[]
+  hasPrevMessages: boolean
+  hasNextMessages: boolean
+} | null => {
+  const targetMessage = getMessageFromMap(channel.id, messageId)
+  if (!targetMessage?.id) {
+    return null
+  }
+
+  const targetInterval = getCachedWindowInterval(channel.id, targetMessage.id, targetMessage.id)
+  if (!targetInterval.isFullyCached) {
+    return null
+  }
+
+  const halfWindowSize = MESSAGES_MAX_PAGE_COUNT / 2
+  const previousMessages = getContiguousPrevMessages(channel.id, targetMessage, halfWindowSize)
+  const nextMessages = getContiguousNextMessages(channel.id, targetMessage, halfWindowSize)
+  const messages = [...previousMessages, targetMessage, ...nextMessages]
+  const firstConfirmedMessageId = getFirstConfirmedMessageId(messages)
+  const lastConfirmedMessageId = getLastConfirmedMessageId(messages)
+
+  if (!firstConfirmedMessageId || !lastConfirmedMessageId) {
+    return null
+  }
+
+  const cachedWindowInterval = getCachedWindowInterval(channel.id, firstConfirmedMessageId, lastConfirmedMessageId)
+  if (!cachedWindowInterval.isFullyCached) {
+    return null
+  }
+
+  const hasNewerChannelMessage =
+    !!channel.lastMessage?.id &&
+    !!lastConfirmedMessageId &&
+    compareMessageIds(channel.lastMessage.id, lastConfirmedMessageId) > 0
+
+  return {
+    messages,
+    hasPrevMessages: cachedWindowInterval.hasPrevMessages,
+    hasNextMessages: cachedWindowInterval.hasNextMessages || hasNewerChannelMessage
+  }
+}
+
 function* patchActiveMessagesFromCacheRange(channelId: string, startId: string, endId: string): any {
   if (getActiveChannelId() !== channelId) {
     return
@@ -2186,6 +2232,37 @@ function* loadAroundMessageWorker(action: IAction): any {
         return
       }
 
+      const cachedAroundWindow = messageId && !networkChanged ? getCachedAroundMessageWindow(channel, messageId) : null
+      if (cachedAroundWindow) {
+        const firstConfirmedMessageId = getFirstConfirmedMessageId(cachedAroundWindow.messages)
+        const lastConfirmedMessageId = getLastConfirmedMessageId(cachedAroundWindow.messages)
+        if (firstConfirmedMessageId && lastConfirmedMessageId) {
+          setActiveSegment(channel.id, firstConfirmedMessageId, lastConfirmedMessageId)
+        }
+
+        yield put(setMessagesHasPrevAC(cachedAroundWindow.hasPrevMessages))
+        yield put(setMessagesHasNextAC(cachedAroundWindow.hasNextMessages))
+        yield call(loadOGMetadataForLinkMessages, cachedAroundWindow.messages, true, false, false)
+        yield put(setMessagesAC(JSON.parse(JSON.stringify(cachedAroundWindow.messages)), channel.id))
+
+        const filteredPendingMessages = getFilteredPendingMessages(channel, cachedAroundWindow.messages, {
+          hasNext: cachedAroundWindow.hasNextMessages
+        })
+        yield put(addMessagesAC(filteredPendingMessages, MESSAGE_LOAD_DIRECTION.NEXT))
+        yield call(loadOGMetadataForLinkMessages, filteredPendingMessages, true, false, false)
+
+        const waitToSendPendingMessages = store.getState().UserReducer.waitToSendPendingMessages
+        if (connectionState === CONNECTION_STATUS.CONNECTED && waitToSendPendingMessages) {
+          yield put(setWaitToSendPendingMessagesAC(false))
+          yield spawn(sendPendingMessages, connectionState)
+        }
+        return
+      }
+
+      if (connectionState !== CONNECTION_STATUS.CONNECTED) {
+        return
+      }
+
       // Standard around-message path
       yield call(setMessageListLoading, 'both', LOADING_STATE.LOADING)
 
@@ -2193,8 +2270,7 @@ function* loadAroundMessageWorker(action: IAction): any {
       const messageQueryBuilder = new (SceytChatClient.MessageListQueryBuilder as any)(channel.id)
       messageQueryBuilder.limit(MESSAGES_MAX_LENGTH)
       messageQueryBuilder.reverse(true)
-      const messageQuery =
-        connectionState === CONNECTION_STATUS.CONNECTED ? yield call(messageQueryBuilder.build) : null
+      const messageQuery = yield call(messageQueryBuilder.build)
       query.messageQuery = messageQuery
 
       let loadNextMessageId = ''
@@ -2263,11 +2339,70 @@ function* loadAroundMessageWorker(action: IAction): any {
   }
 }
 
+// Fetches the around-message window from the server and caches it without
+// touching Redux loading state or the visible message list. Used so that a
+// cancelled jumpToItem request still populates the cache, making the next
+// jump resolve instantly from cache.
+function* backgroundCacheAroundMessage(action: IAction): any {
+  try {
+    const { channel, messageId } = action.payload
+    if (!channel?.id || !messageId) return
+
+    // Wait until we are actually connected before hitting the server.
+    // Poll at 2 s intervals for up to 60 s, then give up silently.
+    let waited = 0
+    while (store.getState().UserReducer.connectionStatus !== CONNECTION_STATUS.CONNECTED) {
+      if (waited >= 60000) return
+      yield call(delay, 2000)
+      waited += 2000
+    }
+
+    const SceytChatClient = getClient()
+    const messageQueryBuilder = new (SceytChatClient.MessageListQueryBuilder as any)(channel.id)
+    messageQueryBuilder.limit(MESSAGES_MAX_LENGTH)
+    messageQueryBuilder.reverse(true)
+    const messageQuery = yield call(messageQueryBuilder.build)
+
+    messageQuery.limit = MESSAGES_MAX_PAGE_COUNT / 2
+    const firstResult: { messages: IMessage[]; hasNext: boolean } = yield call(
+      messageQuery.loadPreviousMessageId,
+      messageId
+    )
+
+    let loadNextMessageId =
+      firstResult.messages.length > 0 ? getLastConfirmedMessageId(firstResult.messages) : '0'
+
+    messageQuery.reverse = false
+    messageQuery.limit = MESSAGES_MAX_PAGE_COUNT / 2
+    const secondResult: { messages: IMessage[]; hasNext: boolean } = yield call(
+      messageQuery.loadNextMessageId,
+      loadNextMessageId
+    )
+
+    const resultMessages = [...firstResult.messages, ...secondResult.messages]
+    const firstConfirmedMessageId = getFirstConfirmedMessageId(resultMessages)
+    const lastConfirmedMessageId = getLastConfirmedMessageId(resultMessages)
+    if (firstConfirmedMessageId && lastConfirmedMessageId) {
+      setMessagesToMap(channel.id, resultMessages, firstConfirmedMessageId, lastConfirmedMessageId)
+      setActiveSegment(channel.id, firstConfirmedMessageId, lastConfirmedMessageId)
+    }
+  } catch (e) {
+    // Silent — this is a best-effort background cache warm-up.
+    log.error('error in backgroundCacheAroundMessage', e)
+  }
+}
+
 function* loadAroundMessage(action: IAction): any {
-  yield race({
+  const result: { cancel?: unknown } = yield race({
     load: call(loadAroundMessageWorker, action),
     cancel: take(CANCEL_WINDOW_LOAD)
   })
+
+  if (result.cancel) {
+    // The UI timed out, but kick off a background fetch so the cache is warm
+    // for the next jump attempt.
+    yield spawn(backgroundCacheAroundMessage, action)
+  }
 }
 
 function* loadNearUnread(action: IAction): any {

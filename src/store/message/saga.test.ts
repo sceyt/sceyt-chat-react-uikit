@@ -3355,6 +3355,200 @@ describe('message saga message-list flows', () => {
   })
 })
 
+describe('loadAroundMessage generic cache-first', () => {
+  beforeEach(() => {
+    logErrorSpy = jest.spyOn(log, 'error').mockImplementation(() => undefined)
+    resetMessageListFixtureIds()
+    resetMockServerDelay()
+    clearMessagesMap()
+    destroyChannelsMap()
+    setActiveChannelId('')
+    __resetMessageSagaTestState()
+    mockStore.dispatch.mockClear()
+    mockStore.getState.mockImplementation(() => mockStoreState)
+    ;(navigateToLatest as jest.Mock).mockClear()
+    mockStoreState.UserReducer = {
+      connectionStatus: CONNECTION_STATUS.DISCONNECTED,
+      waitToSendPendingMessages: false
+    }
+    mockStoreState.ChannelReducer = {
+      channelsLoadingState: LOADING_STATE.LOADED,
+      activeChannel: {}
+    }
+    mockStoreState.MessageReducer = {
+      activeChannelMessages: [],
+      activePaginationIntent: null,
+      stableUnreadAnchor: { channelId: '', messageId: '' },
+      pendingPollActions: {},
+      pendingMessageMutations: {},
+      oGMetadata: {}
+    }
+    setClient(createClient(createMessageQuery()))
+  })
+
+  afterEach(() => {
+    logErrorSpy?.mockRestore()
+    clearMessagesMap()
+    destroyChannelsMap()
+    setActiveChannelId('')
+    __resetMessageSagaTestState()
+  })
+
+  it('renders a cached around-message window without a server round-trip', async () => {
+    const channel = makeChannel({
+      id: 'channel-around-cache-hit',
+      lastMessage: makeMessage({ id: '110', channelId: 'channel-around-cache-hit', body: 'server-latest' })
+    })
+    const cachedMessages = ['100', '101', '102', '103', '104'].map((id) =>
+      makeMessage({ id, channelId: channel.id, body: `cached-${id}` })
+    )
+    const pendingMessage = makePendingMessage({
+      channelId: channel.id,
+      body: 'pending-should-not-append',
+      createdAt: new Date('2026-04-01T12:06:00.000Z')
+    })
+    const query = createMessageQuery()
+
+    mockStoreState.UserReducer.connectionStatus = CONNECTION_STATUS.CONNECTED
+    setActiveChannelId(channel.id)
+    setChannelInMap(channel)
+    cachedMessages.forEach((message) => addMessageToMap(channel.id, message))
+    addMessageToMap(channel.id, pendingMessage)
+    setActiveSegment(channel.id, '100', '104')
+    setClient(createClient(query, channel))
+
+    const dispatched = await runMessageSaga(
+      __messageSagaTestables.loadAroundMessageWorker,
+      loadAroundMessageAC(channel, '102')
+    )
+
+    expect(dispatched).not.toEqual(expect.arrayContaining(bothDirectionLoadingActions(LOADING_STATE.LOADING)))
+    expect(query.loadPreviousMessageId).not.toHaveBeenCalled()
+    expect(query.loadNextMessageId).not.toHaveBeenCalled()
+
+    expect(dispatched).toEqual(expect.arrayContaining([setMessagesHasPrevAC(false), setMessagesHasNextAC(true)]))
+
+    const setMessagesAction = getActionByType(dispatched, setMessagesAC([], channel.id).type)
+    expect(setMessagesAction.payload.messages.map((message: IMessage) => message.id)).toEqual([
+      '100',
+      '101',
+      '102',
+      '103',
+      '104'
+    ])
+
+    const appendPendingAction = getActionByType(dispatched, addMessagesAC([], MESSAGE_LOAD_DIRECTION.NEXT).type)
+    expect(appendPendingAction.payload.messages).toEqual([])
+  })
+
+  it('renders a cached around-message window while offline without calling the server', async () => {
+    const channel = makeChannel({
+      id: 'channel-around-cache-offline',
+      lastMessage: makeMessage({ id: '204', channelId: 'channel-around-cache-offline' })
+    })
+    const cachedMessages = ['201', '202', '203', '204'].map((id) =>
+      makeMessage({ id, channelId: channel.id, body: `cached-${id}` })
+    )
+    const query = createMessageQuery()
+
+    mockStoreState.UserReducer.connectionStatus = CONNECTION_STATUS.DISCONNECTED
+    setActiveChannelId(channel.id)
+    setChannelInMap(channel)
+    cachedMessages.forEach((message) => addMessageToMap(channel.id, message))
+    setActiveSegment(channel.id, '201', '204')
+    setClient(createClient(query, channel))
+
+    const dispatched = await runMessageSaga(
+      __messageSagaTestables.loadAroundMessageWorker,
+      loadAroundMessageAC(channel, '203')
+    )
+
+    expect(dispatched).not.toEqual(expect.arrayContaining(bothDirectionLoadingActions(LOADING_STATE.LOADING)))
+    expect(query.loadPreviousMessageId).not.toHaveBeenCalled()
+    expect(query.loadNextMessageId).not.toHaveBeenCalled()
+
+    const setMessagesAction = getActionByType(dispatched, setMessagesAC([], channel.id).type)
+    expect(setMessagesAction.payload.messages.map((message: IMessage) => message.id)).toEqual([
+      '201',
+      '202',
+      '203',
+      '204'
+    ])
+  })
+
+  it('falls back to the server when the around-message target is not cached', async () => {
+    const channel = makeChannel({
+      id: 'channel-around-cache-miss',
+      lastMessage: makeMessage({ id: '305', channelId: 'channel-around-cache-miss' })
+    })
+    const serverMessages = [
+      makeMessage({ id: '302', channelId: channel.id, body: 'server-302' }),
+      makeMessage({ id: '303', channelId: channel.id, body: 'server-303' })
+    ]
+    const query = createMessageQuery({
+      loadPreviousMessageId: jest.fn(() => resolveWithMockServerDelay({ messages: serverMessages, hasNext: false }))
+    })
+
+    mockStoreState.UserReducer.connectionStatus = CONNECTION_STATUS.CONNECTED
+    setActiveChannelId(channel.id)
+    setChannelInMap(channel)
+    setClient(createClient(query, channel))
+
+    const dispatched = await runMessageSaga(
+      __messageSagaTestables.loadAroundMessageWorker,
+      loadAroundMessageAC(channel, '303')
+    )
+
+    expect(dispatched).toEqual(expect.arrayContaining(bothDirectionLoadingActions(LOADING_STATE.LOADING)))
+    expect(query.loadPreviousMessageId).toHaveBeenCalledWith('303')
+
+    const setMessagesAction = getActionByType(dispatched, setMessagesAC([], channel.id).type)
+    expect(setMessagesAction.payload.messages.map((message: IMessage) => message.id)).toEqual(['302', '303'])
+  })
+
+  it('bypasses the around-message cache when networkChanged requests a server refresh', async () => {
+    const channel = makeChannel({
+      id: 'channel-around-network-refresh',
+      lastMessage: makeMessage({ id: '405', channelId: 'channel-around-network-refresh' })
+    })
+    const cachedMessages = [
+      makeMessage({ id: '401', channelId: channel.id, body: 'cached-401' }),
+      makeMessage({ id: '402', channelId: channel.id, body: 'cached-402' })
+    ]
+    const refreshedMessages = [
+      makeMessage({ id: '401', channelId: channel.id, body: 'server-401' }),
+      makeMessage({ id: '402', channelId: channel.id, body: 'server-402' })
+    ]
+    const query = createMessageQuery({
+      loadPreviousMessageId: jest.fn(() =>
+        resolveWithMockServerDelay({ messages: refreshedMessages, hasNext: false })
+      )
+    })
+
+    mockStoreState.UserReducer.connectionStatus = CONNECTION_STATUS.CONNECTED
+    mockStoreState.MessageReducer.activeChannelMessages = cachedMessages
+    setActiveChannelId(channel.id)
+    setChannelInMap(channel)
+    cachedMessages.forEach((message) => addMessageToMap(channel.id, message))
+    setActiveSegment(channel.id, '401', '402')
+    setClient(createClient(query, channel))
+
+    const dispatched = await runMessageSaga(
+      __messageSagaTestables.loadAroundMessageWorker,
+      loadAroundMessageAC(channel, '402', true)
+    )
+
+    expect(dispatched).toEqual(expect.arrayContaining(bothDirectionLoadingActions(LOADING_STATE.LOADING)))
+    expect(query.loadPreviousMessageId).toHaveBeenCalledWith('402')
+
+    const setMessagesAction = getActionByType(dispatched, setMessagesAC([], channel.id).type)
+    expect(setMessagesAction.payload.messages.map((message: IMessage) => message.body)).toEqual([
+      'server-401',
+      'server-402'
+    ])
+  })
+})
+
 describe('loadAroundMessage cache-first restore (restoreWindow)', () => {
   beforeEach(() => {
     logErrorSpy = jest.spyOn(log, 'error').mockImplementation(() => undefined)

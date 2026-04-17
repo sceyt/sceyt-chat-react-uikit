@@ -55,7 +55,7 @@ const DEFAULT_UNREAD_VISIBILITY_THRESHOLD = 0.5
 const JUMP_SCROLL_LOCK_MS = 1800
 const PRESERVE_ANCHOR_SCROLL_EPSILON_PX = 1
 const SCROLL_IDLE_MS = 800
-
+const delay = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms))
 type ChannelRestoreWindow = {
   startId: string
   endId: string
@@ -386,7 +386,6 @@ export function useChatController({
 
   loadingPrevMessagesRef.current = loadingPrevMessages
   loadingNextMessagesRef.current = loadingNextMessages
-
   const isPreviousLoading = loadingPrevMessages === LOADING_STATE.LOADING
   const isNextLoading = loadingNextMessages === LOADING_STATE.LOADING
 
@@ -1051,12 +1050,29 @@ export function useChatController({
           setIsJumpingToItem(true)
 
           try {
-            await beginWindowPagedRequest(() => {
-              dispatch(loadAroundMessageAC(channelRef.current, itemId))
-            })
-
+            await delay(20)
+            const timeout = setTimeout(() => {
+              if (pendingWindowLoadRef.current) {
+                dispatch(cancelWindowLoadAC())
+                pendingWindowLoadRef.current.resolve({ items: [] })
+                pendingWindowLoadRef.current = null
+                windowLoadScopeRef.current = null
+                setIsJumpingToItem(false)
+              }
+              // Cancel the saga so its finally block runs and sets LOADED,
+              // clearing the Redux loading state that drives the visible spinner.
+            }, 4000)
+            await beginWindowPagedRequest(
+              () => {
+                dispatch(loadAroundMessageAC(channelRef.current, itemId))
+              },
+              { allowNoLoading: true }
+            )
+            clearTimeout(timeout)
             // A newer jump has already taken over — don't continue
             if (jumpId !== currentJumpIdRef.current) {
+              setIsJumpingToItem(false)
+              windowLoadScopeRef.current = null
               clearJumpBlur()
               return
             }

@@ -15,6 +15,23 @@ import { handleVoteDetails } from '../../helpers/message'
 import store from 'store'
 import { getPollVotesAC } from './actions'
 
+export type PendingMessageMutation =
+  | {
+      type: 'EDIT_MESSAGE'
+      channelId: string
+      messageId: string
+      message: IMessage
+      originalMessage: IMessage
+      queuedAt: number
+    }
+  | {
+      type: 'DELETE_MESSAGE'
+      channelId: string
+      messageId: string
+      deleteOption: 'forMe' | 'forEveryone'
+      originalMessage: IMessage
+      queuedAt: number
+    }
 export interface IMessageStore {
   loadingPrevMessagesState: number | null
   loadingNextMessagesState: number | null
@@ -79,24 +96,6 @@ export interface IMessageStore {
     messageId: string
   }
 }
-
-export type PendingMessageMutation =
-  | {
-      type: 'EDIT_MESSAGE'
-      channelId: string
-      messageId: string
-      message: IMessage
-      originalMessage: IMessage
-      queuedAt: number
-    }
-  | {
-      type: 'DELETE_MESSAGE'
-      channelId: string
-      messageId: string
-      deleteOption: 'forMe' | 'forEveryone'
-      originalMessage: IMessage
-      queuedAt: number
-    }
 
 const initialState: IMessageStore = {
   loadingPrevMessagesState: null,
