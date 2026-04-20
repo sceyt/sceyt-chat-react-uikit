@@ -55,7 +55,6 @@ const DEFAULT_UNREAD_VISIBILITY_THRESHOLD = 0.5
 const JUMP_SCROLL_LOCK_MS = 1800
 const PRESERVE_ANCHOR_SCROLL_EPSILON_PX = 1
 const SCROLL_IDLE_MS = 800
-const delay = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms))
 type ChannelRestoreWindow = {
   startId: string
   endId: string
@@ -374,6 +373,8 @@ export function useChatController({
   const loadPrevFrameRef = useRef<number | null>(null)
   const loadNextFrameRef = useRef<number | null>(null)
   const pendingLatestJumpRef = useRef<PendingLatestJump | null>(null)
+  const historyArmTimerRef = useRef<NodeJS.Timeout | null>(null)
+  const latestArmTimerRef = useRef<NodeJS.Timeout | null>(null)
 
   const [isLoadingPrevious, setIsLoadingPrevious] = useState(false)
   const [isLoadingNext, setIsLoadingNext] = useState(false)
@@ -581,6 +582,14 @@ export function useChatController({
     historyLoadArmedRef.current = true
     latestLoadArmedRef.current = true
 
+    if (historyArmTimerRef.current !== null) {
+      clearTimeout(historyArmTimerRef.current)
+      historyArmTimerRef.current = null
+    }
+    if (latestArmTimerRef.current !== null) {
+      clearTimeout(latestArmTimerRef.current)
+      latestArmTimerRef.current = null
+    }
     if (jumpUnlockTimeoutRef.current !== null) {
       clearTimeout(jumpUnlockTimeoutRef.current)
       jumpUnlockTimeoutRef.current = null
@@ -1050,7 +1059,6 @@ export function useChatController({
           setIsJumpingToItem(true)
 
           try {
-            await delay(20)
             const timeout = setTimeout(() => {
               if (pendingWindowLoadRef.current) {
                 dispatch(cancelWindowLoadAC())
@@ -1519,11 +1527,21 @@ export function useChatController({
     const latestTriggered = container.scrollTop <= PRELOAD_TRIGGER_PX + LATEST_EDGE_GAP_PX && hasNext
 
     if (distanceFromHistory > PRELOAD_RESET_PX) {
-      historyLoadArmedRef.current = true
+      if (historyArmTimerRef.current === null) {
+        historyArmTimerRef.current = setTimeout(() => {
+          historyArmTimerRef.current = null
+          historyLoadArmedRef.current = true
+        }, 7000)
+      }
       invalidateEdgeDirection('previous')
     }
     if (container.scrollTop > PRELOAD_RESET_PX) {
-      latestLoadArmedRef.current = true
+      if (latestArmTimerRef.current === null) {
+        latestArmTimerRef.current = setTimeout(() => {
+          latestArmTimerRef.current = null
+          latestLoadArmedRef.current = true
+        }, 7000)
+      }
       invalidateEdgeDirection('next')
     }
 
@@ -1659,6 +1677,14 @@ export function useChatController({
     if (highlightTimeoutRef.current !== null) {
       clearTimeout(highlightTimeoutRef.current)
       highlightTimeoutRef.current = null
+    }
+    if (historyArmTimerRef.current !== null) {
+      clearTimeout(historyArmTimerRef.current)
+      historyArmTimerRef.current = null
+    }
+    if (latestArmTimerRef.current !== null) {
+      clearTimeout(latestArmTimerRef.current)
+      latestArmTimerRef.current = null
     }
     if (jumpUnlockTimeoutRef.current !== null) {
       clearTimeout(jumpUnlockTimeoutRef.current)
@@ -2208,6 +2234,12 @@ export function useChatController({
       }
       if (highlightTimeoutRef.current !== null) {
         clearTimeout(highlightTimeoutRef.current)
+      }
+      if (historyArmTimerRef.current !== null) {
+        clearTimeout(historyArmTimerRef.current)
+      }
+      if (latestArmTimerRef.current !== null) {
+        clearTimeout(latestArmTimerRef.current)
       }
       if (jumpUnlockTimeoutRef.current !== null) {
         clearTimeout(jumpUnlockTimeoutRef.current)
