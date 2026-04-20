@@ -848,27 +848,46 @@ export function removeReactionToMessageOnMap(
 }
 
 export function updateMessageStatusOnMap(channelId: string, newMarkers: { name: string; markersMap: any }) {
-  if (messagesMap[channelId] && newMarkers && newMarkers.markersMap) {
-    const messageIds: string[] = []
-    Object.keys(newMarkers.markersMap).forEach((messageId) => {
-      if (newMarkers.markersMap[messageId]) {
-        messageIds.push(messageId)
+  if (!messagesMap[channelId] || !newMarkers?.markersMap) return
+
+  const isForwardMarker =
+    newMarkers.name === MESSAGE_DELIVERY_STATUS.DELIVERED || newMarkers.name === MESSAGE_DELIVERY_STATUS.READ
+
+  let maxMarkerId: bigint | null = null
+  const explicitIds: string[] = []
+  for (const mid of Object.keys(newMarkers.markersMap)) {
+    if (newMarkers.markersMap[mid]) {
+      explicitIds.push(mid)
+      if (isForwardMarker) {
+        try {
+          const v = BigInt(mid)
+          if (maxMarkerId === null || v > maxMarkerId) maxMarkerId = v
+        } catch {}
       }
-    })
-    messageIds.forEach((messageId: string) => {
-      const messageShouldBeUpdated = messagesMap[channelId][messageId]
-      if (messageShouldBeUpdated) {
-        const statusUpdatedMessage = updateMessageDeliveryStatusAndMarkers(messageShouldBeUpdated, newMarkers.name)
-        if (messageShouldBeUpdated.tid && messagesMap[channelId][messageShouldBeUpdated.tid]) {
-          delete messagesMap[channelId][messageShouldBeUpdated.tid]
-        }
-        messagesMap[channelId][messageId] = {
-          ...messageShouldBeUpdated,
-          ...statusUpdatedMessage
-        }
-      }
-    })
+    }
   }
+
+  const targetIds =
+    isForwardMarker && maxMarkerId !== null
+      ? Object.keys(messagesMap[channelId]).filter((id) => {
+          try {
+            return BigInt(id) <= maxMarkerId!
+          } catch {
+            return false
+          }
+        })
+      : explicitIds
+
+  targetIds.forEach((messageId: string) => {
+    const messageShouldBeUpdated = messagesMap[channelId][messageId]
+    if (messageShouldBeUpdated) {
+      const statusUpdatedMessage = updateMessageDeliveryStatusAndMarkers(messageShouldBeUpdated, newMarkers.name)
+      if (messageShouldBeUpdated.tid && messagesMap[channelId][messageShouldBeUpdated.tid]) {
+        delete messagesMap[channelId][messageShouldBeUpdated.tid]
+      }
+      messagesMap[channelId][messageId] = { ...messageShouldBeUpdated, ...statusUpdatedMessage }
+    }
+  })
 }
 
 export function getMessagesFromMap(channelId: string) {

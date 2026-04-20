@@ -9,7 +9,7 @@ import {
   PendingPollAction,
   updateMessageDeliveryStatusAndMarkers
 } from '../../helpers/messagesHalper'
-import { MESSAGE_STATUS } from '../../helpers/constants'
+import { MESSAGE_DELIVERY_STATUS, MESSAGE_STATUS } from '../../helpers/constants'
 import log from 'loglevel'
 import { handleVoteDetails } from '../../helpers/message'
 import store from 'store'
@@ -290,17 +290,26 @@ const messageSlice = createSlice({
     ) => {
       const { name, markersMap, isOwnMarker } = action.payload
       const markerName = name
-      for (let index = 0; index < state.activeChannelMessages.length; index++) {
-        if (!markersMap[state.activeChannelMessages[index].id]) {
-          continue
+      const isForwardMarker =
+        markerName === MESSAGE_DELIVERY_STATUS.DELIVERED || markerName === MESSAGE_DELIVERY_STATUS.READ
+      let maxMarkerId: bigint | null = null
+      if (isForwardMarker) {
+        for (const mid of Object.keys(markersMap)) {
+          try {
+            const v = BigInt(mid)
+            if (maxMarkerId === null || v > maxMarkerId) maxMarkerId = v
+          } catch {}
         }
-        if (state.activeChannelMessages[index].state !== 'Deleted') {
-          const message = state.activeChannelMessages[index]
+      }
+      for (let index = 0; index < state.activeChannelMessages.length; index++) {
+        const message = state.activeChannelMessages[index]
+        const inMap = !!markersMap[message.id]
+        const beforeMax =
+          isForwardMarker && maxMarkerId !== null && !!message.id ? BigInt(message.id) <= maxMarkerId : false
+        if (!inMap && !beforeMax) continue
+        if (message.state !== 'Deleted') {
           const statusUpdatedMessage = updateMessageDeliveryStatusAndMarkers(message, markerName, isOwnMarker)
-          state.activeChannelMessages[index] = {
-            ...message,
-            ...statusUpdatedMessage
-          }
+          state.activeChannelMessages[index] = { ...message, ...statusUpdatedMessage }
         }
       }
       state.activeChannelMessages = normalizeActiveChannelMessages(state.activeChannelMessages)
