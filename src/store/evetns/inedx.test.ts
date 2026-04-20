@@ -44,8 +44,12 @@ describe('event message last-message handling', () => {
     MessageReducer: {
       pendingPollActions: {},
       messagesHasNext: false
+    },
+    UserReducer: {
+      browserTabIsActive: true
     }
   }
+  const getSagaState = () => ({ ...defaultStoreState, ...mockStore.getState() })
 
   const keepsNewestPendingTitle =
     'restores confirmed channel last message when an older resend confirmation arrives as a channel message event'
@@ -101,6 +105,7 @@ describe('event message last-message handling', () => {
 
     await runSaga(
       {
+        getState: getSagaState,
         dispatch: (action) => {
           dispatched.push(action)
         }
@@ -175,6 +180,7 @@ describe('event message last-message handling', () => {
 
     await runSaga(
       {
+        getState: getSagaState,
         dispatch: (action) => {
           dispatched.push(action)
         }
@@ -244,6 +250,7 @@ describe('event message last-message handling', () => {
 
     await runSaga(
       {
+        getState: getSagaState,
         dispatch: (action) => {
           dispatched.push(action)
         }
@@ -309,6 +316,7 @@ describe('event message last-message handling', () => {
 
     await runSaga(
       {
+        getState: getSagaState,
         dispatch: (action) => {
           dispatched.push(action)
         }
@@ -368,6 +376,7 @@ describe('event message last-message handling', () => {
 
     await runSaga(
       {
+        getState: getSagaState,
         dispatch: (action) => {
           dispatched.push(action)
         }
@@ -376,6 +385,8 @@ describe('event message last-message handling', () => {
       { channel: { ...storedChannel, lastMessage: incomingMessage }, message: incomingMessage },
       { user: { id: incomingMessage.user.id } }
     ).toPromise()
+
+    await new Promise((resolve) => setTimeout(resolve, 60))
 
     expect(dispatched).toEqual(expect.arrayContaining([addMessagesAC([incomingMessage], 'next')]))
     expect(navigateToLatest).toHaveBeenCalledWith(true)
@@ -426,6 +437,7 @@ describe('event message last-message handling', () => {
 
     await runSaga(
       {
+        getState: getSagaState,
         dispatch: (action) => {
           dispatched.push(action)
         }
@@ -480,6 +492,7 @@ describe('event message last-message handling', () => {
 
     await runSaga(
       {
+        getState: getSagaState,
         dispatch: (action) => {
           dispatched.push(action)
         }
@@ -531,6 +544,7 @@ describe('event message last-message handling', () => {
 
     await runSaga(
       {
+        getState: getSagaState,
         dispatch: () => undefined
       },
       __eventsTestables.handleChannelMessageEvent,
@@ -578,6 +592,7 @@ describe('event message last-message handling', () => {
 
     await runSaga(
       {
+        getState: getSagaState,
         dispatch: () => undefined
       },
       __eventsTestables.handleChannelMessageEvent,

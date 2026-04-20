@@ -935,6 +935,9 @@ export function updateMessageStatusOnMap(
   targetIds.forEach((messageId: string) => {
     const messageShouldBeUpdated = messagesMap[channelId][messageId]
     if (messageShouldBeUpdated) {
+      // For cascade messages (not explicitly in the marker map), skip if already at this status or higher
+      const isExplicit = explicitIds.includes(messageId)
+      if (!isExplicit && shouldSkipDeliveryStatusUpdate(newMarkers.name, messageShouldBeUpdated.deliveryStatus)) return
       const statusUpdatedMessage = updateMessageDeliveryStatusAndMarkers(
         messageShouldBeUpdated,
         {

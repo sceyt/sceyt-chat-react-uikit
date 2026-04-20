@@ -153,6 +153,7 @@ export interface UseChatControllerParams {
   selectedMessagesMap: Map<string, any>
   allowEditDeleteIncomingMessage: boolean
   dispatch: (...args: any[]) => void
+  tabIsActive?: boolean
 }
 
 const formatMessageDateLabel = (message: IMessage) => {
@@ -319,6 +320,7 @@ export function useChatController({
   unreadMessageId,
   selectedMessagesMap,
   allowEditDeleteIncomingMessage,
+  tabIsActive = true,
   dispatch
 }: UseChatControllerParams) {
   const scrollRef = useRef<HTMLDivElement | null>(null)
@@ -618,7 +620,7 @@ export function useChatController({
   )
 
   const queueVisibleUnreadCheck = useCallback(() => {
-    if (pendingVisibleUnreadFrameRef.current !== null || unreadScrollTo) {
+    if (pendingVisibleUnreadFrameRef.current !== null || unreadScrollTo || !tabIsActive) {
       return
     }
 
@@ -678,7 +680,8 @@ export function useChatController({
     hasNext,
     messages,
     registerLocallyReadUnreadMessages,
-    unreadScrollTo
+    unreadScrollTo,
+    tabIsActive
   ])
 
   const timelineItems = useMemo<TimelineItem[]>(() => {

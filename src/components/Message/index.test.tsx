@@ -298,6 +298,50 @@ describe('Message', () => {
     expect(queueReadMarker).not.toHaveBeenCalled()
   })
 
+  it('does not queue read markers when browser tab is inactive', () => {
+    const channelId = 'channel-message-read-tab-inactive'
+    const queueReadMarker = jest.fn()
+    const incomingMessage = makeMessage({
+      id: '1603',
+      channelId,
+      body: 'incoming-visible-tab-inactive',
+      incoming: true
+    })
+    const channel = makeChannel({
+      id: channelId,
+      lastMessage: incomingMessage,
+      newMessageCount: 3
+    })
+    const store = createMessageListStore({
+      ChannelReducer: {
+        activeChannel: channel
+      },
+      MessageReducer: {
+        unreadScrollTo: false
+      }
+    })
+
+    renderWithSceytProvider(
+      <Message
+        message={incomingMessage}
+        channel={channel}
+        stopScrolling={() => undefined}
+        handleScrollToRepliedMessage={() => undefined}
+        prevMessage={undefined as any}
+        nextMessage={undefined as any}
+        isUnreadMessage
+        unreadMessageId={incomingMessage.id}
+        queueReadMarker={queueReadMarker}
+        connectionStatus={CONNECTION_STATUS.CONNECTED}
+        isThreadMessage={false}
+        tabIsActive={false}
+      />,
+      { store }
+    )
+
+    expect(queueReadMarker).not.toHaveBeenCalled()
+  })
+
   it('queues delivered markers for visible incoming messages that already have a read marker', () => {
     const channelId = 'channel-message-delivered-queue'
     const queueDeliveredMarker = jest.fn()

@@ -498,7 +498,8 @@ const MessageList: React.FC<MessagesProps> = ({
     unreadMessageId,
     selectedMessagesMap,
     allowEditDeleteIncomingMessage,
-    dispatch
+    dispatch,
+    tabIsActive: browserTabIsActive
   })
 
   const queueReadMarker = useCallback((channelId: string, messageId?: string) => {

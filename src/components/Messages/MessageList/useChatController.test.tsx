@@ -63,6 +63,7 @@ type HarnessProps = {
   jumpToItemSmooth?: boolean
   scrollToMessageHighlight?: boolean
   scrollToMessageBehavior?: ScrollBehavior
+  tabIsActive?: boolean
   dispatch?: jest.Mock
   layoutSpec?: {
     containerRect?: { top?: number; left?: number; width?: number; height?: number }
@@ -193,6 +194,7 @@ const ControllerHarness = ({
   jumpToItemSmooth = false,
   scrollToMessageHighlight = true,
   scrollToMessageBehavior = 'smooth',
+  tabIsActive = true,
   dispatch = jest.fn(),
   layoutSpec
 }: HarnessProps) => {
@@ -275,6 +277,7 @@ const ControllerHarness = ({
     unreadMessageId: controllerState.unreadMessageId,
     selectedMessagesMap: new Map(),
     allowEditDeleteIncomingMessage: true,
+    tabIsActive,
     dispatch: controlledDispatch
   })
 

@@ -196,7 +196,7 @@ const Message = ({
   selectedMessagesMap,
   contactsMap,
   openedMessageMenuId,
-  tabIsActive,
+  tabIsActive = true,
   connectionStatus,
   messageTextFontSize,
   messageTextLineHeight,
@@ -516,6 +516,7 @@ const Message = ({
         message.userMarkers.find((marker) => marker.name === MESSAGE_DELIVERY_STATUS.READ)
       ) &&
       !disableAutoReadTracking &&
+      tabIsActive &&
       channel.newMessageCount &&
       channel.newMessageCount > 0 &&
       connectionStatus === CONNECTION_STATUS.CONNECTED
@@ -537,7 +538,8 @@ const Message = ({
     connectionStatus,
     queueReadMarker,
     queueDeliveredMarker,
-    disableAutoReadTracking
+    disableAutoReadTracking,
+    tabIsActive
   ])
 
   const handleForwardMessage = useCallback(
@@ -625,7 +627,8 @@ const Message = ({
     channel.lastMessage,
     scrollToNewMessage.scrollToBottom,
     dispatch,
-    message
+    message,
+    tabIsActive
   ])
 
   useEffect(() => {
@@ -635,16 +638,10 @@ const Message = ({
   }, [isVisible, infoPopupOpen])
 
   useDidUpdate(() => {
-    if (tabIsActive) {
-      handleSendReadMarker()
-    }
-  }, [tabIsActive])
-
-  useDidUpdate(() => {
     if (connectionStatus === CONNECTION_STATUS.CONNECTED) {
       handleSendReadMarker()
     }
-  }, [connectionStatus])
+  }, [connectionStatus, handleSendReadMarker])
 
   useEffect(() => {
     if (emojisPopupOpen) {

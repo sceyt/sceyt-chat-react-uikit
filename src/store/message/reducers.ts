@@ -7,7 +7,8 @@ import {
   MESSAGE_LOAD_DIRECTION,
   MESSAGES_MAX_PAGE_COUNT,
   PendingPollAction,
-  updateMessageDeliveryStatusAndMarkers
+  updateMessageDeliveryStatusAndMarkers,
+  shouldSkipDeliveryStatusUpdate
 } from '../../helpers/messagesHalper'
 import { MESSAGE_DELIVERY_STATUS, MESSAGE_STATUS } from '../../helpers/constants'
 import log from 'loglevel'
@@ -309,6 +310,8 @@ const messageSlice = createSlice({
           isForwardMarker && maxMarkerId !== null && !!message.id ? BigInt(message.id) <= maxMarkerId : false
         if (!inMap && !beforeMax) continue
         if (message.state !== 'Deleted') {
+          // For cascade messages (not explicitly in the marker map), skip if already at this status or higher
+          if (!inMap && shouldSkipDeliveryStatusUpdate(markerName, message.deliveryStatus)) continue
           const statusUpdatedMessage = updateMessageDeliveryStatusAndMarkers(
             message,
             { deliveryStatus: markerName, marker },
