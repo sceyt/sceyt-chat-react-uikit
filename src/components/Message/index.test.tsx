@@ -254,6 +254,50 @@ describe('Message', () => {
     expect(queueReadMarker).toHaveBeenCalledWith(channelId, incomingMessage.id)
   })
 
+  it('does not queue read markers when row auto-read tracking is disabled', () => {
+    const channelId = 'channel-message-read-disabled'
+    const queueReadMarker = jest.fn()
+    const incomingMessage = makeMessage({
+      id: '1602',
+      channelId,
+      body: 'incoming-visible-disabled',
+      incoming: true
+    })
+    const channel = makeChannel({
+      id: channelId,
+      lastMessage: incomingMessage,
+      newMessageCount: 3
+    })
+    const store = createMessageListStore({
+      ChannelReducer: {
+        activeChannel: channel
+      },
+      MessageReducer: {
+        unreadScrollTo: false
+      }
+    })
+
+    renderWithSceytProvider(
+      <Message
+        message={incomingMessage}
+        channel={channel}
+        stopScrolling={() => undefined}
+        handleScrollToRepliedMessage={() => undefined}
+        prevMessage={undefined as any}
+        nextMessage={undefined as any}
+        isUnreadMessage
+        unreadMessageId={incomingMessage.id}
+        queueReadMarker={queueReadMarker}
+        connectionStatus={CONNECTION_STATUS.CONNECTED}
+        isThreadMessage={false}
+        disableAutoReadTracking
+      />,
+      { store }
+    )
+
+    expect(queueReadMarker).not.toHaveBeenCalled()
+  })
+
   it('queues delivered markers for visible incoming messages that already have a read marker', () => {
     const channelId = 'channel-message-delivered-queue'
     const queueDeliveredMarker = jest.fn()

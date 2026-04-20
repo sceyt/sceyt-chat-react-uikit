@@ -1,12 +1,16 @@
-import MessageReducer, { addMessage, addMessages, setMessages, updateMessage } from './reducers'
+import MessageReducer, { addMessage, addMessages, setMessages, updateMessage, updateMessagesStatus } from './reducers'
 import {
   addMessageToMap,
   clearMessagesMap,
+  getMessagesFromMap,
   getAllPendingFromMap,
   getPendingMessagesFromMap,
-  MESSAGE_LOAD_DIRECTION
+  MESSAGE_LOAD_DIRECTION,
+  updateMessageDeliveryStatusAndMarkers,
+  updateMessageStatusOnMap
 } from '../../helpers/messagesHalper'
 import { makeMessage, makePendingMessage, resetMessageListFixtureIds } from '../../testUtils/messageFixtures'
+import { MESSAGE_DELIVERY_STATUS } from '../../helpers/constants'
 
 describe('message pending ordering', () => {
   beforeEach(() => {
@@ -315,5 +319,195 @@ describe('message pending ordering', () => {
     )
 
     expect(deepHistoryState.activeChannelMessages.some((message) => message.body === 'pending-tail')).toBe(false)
+  })
+})
+
+describe('message marker status updates', () => {
+  beforeEach(() => {
+    resetMessageListFixtureIds()
+    clearMessagesMap()
+  })
+
+  afterEach(() => {
+    clearMessagesMap()
+  })
+
+  it('adds own markers to userMarkers without updating markerTotals', () => {
+    const markerUser = { id: 'current-user' } as any
+    const message = makeMessage({
+      id: '100',
+      deliveryStatus: MESSAGE_DELIVERY_STATUS.SENT,
+      userMarkers: [],
+      markerTotals: []
+    })
+
+    const updatedMessage = updateMessageDeliveryStatusAndMarkers(
+      message,
+      {
+        deliveryStatus: MESSAGE_DELIVERY_STATUS.DELIVERED,
+        marker: {
+          messageIds: [message.id],
+          user: markerUser,
+          name: MESSAGE_DELIVERY_STATUS.DELIVERED,
+          createdAt: new Date('2026-04-01T12:30:00.000Z')
+        }
+      },
+      true
+    )
+
+    expect(updatedMessage.deliveryStatus).toBe(MESSAGE_DELIVERY_STATUS.DELIVERED)
+    expect(updatedMessage.userMarkers).toEqual([
+      expect.objectContaining({
+        name: MESSAGE_DELIVERY_STATUS.DELIVERED,
+        messageId: message.id,
+        user: markerUser
+      })
+    ])
+    expect(updatedMessage.markerTotals).toBeUndefined()
+  })
+
+  it('adds other-user markers to markerTotals without updating userMarkers', () => {
+    const message = makeMessage({
+      id: '101',
+      deliveryStatus: MESSAGE_DELIVERY_STATUS.SENT,
+      userMarkers: [],
+      markerTotals: []
+    })
+
+    const updatedMessage = updateMessageDeliveryStatusAndMarkers(
+      message,
+      {
+        deliveryStatus: MESSAGE_DELIVERY_STATUS.READ,
+        marker: {
+          messageIds: [message.id],
+          user: { id: 'remote-user' },
+          name: MESSAGE_DELIVERY_STATUS.READ,
+          createdAt: new Date('2026-04-01T12:31:00.000Z')
+        }
+      },
+      false
+    )
+
+    expect(updatedMessage.deliveryStatus).toBe(MESSAGE_DELIVERY_STATUS.READ)
+    expect(updatedMessage.markerTotals).toEqual([{ name: MESSAGE_DELIVERY_STATUS.READ, count: 1 }])
+    expect(updatedMessage.userMarkers).toBeUndefined()
+  })
+
+  it('does not downgrade deliveryStatus while still merging marker collections', () => {
+    const message = makeMessage({
+      id: '102',
+      deliveryStatus: MESSAGE_DELIVERY_STATUS.READ,
+      userMarkers: [],
+      markerTotals: []
+    })
+
+    const updatedMessage = updateMessageDeliveryStatusAndMarkers(
+      message,
+      {
+        deliveryStatus: MESSAGE_DELIVERY_STATUS.DELIVERED,
+        marker: {
+          messageIds: [message.id],
+          user: { id: 'remote-user' },
+          name: MESSAGE_DELIVERY_STATUS.DELIVERED,
+          createdAt: new Date('2026-04-01T12:32:00.000Z')
+        }
+      },
+      false
+    )
+
+    expect(updatedMessage.deliveryStatus).toBe(MESSAGE_DELIVERY_STATUS.READ)
+    expect(updatedMessage.markerTotals).toEqual([{ name: MESSAGE_DELIVERY_STATUS.DELIVERED, count: 1 }])
+  })
+
+  it('does not duplicate same-status own markers', () => {
+    const existingMarker = {
+      name: MESSAGE_DELIVERY_STATUS.READ,
+      messageId: '103',
+      user: { id: 'current-user' },
+      createdAt: new Date('2026-04-01T12:33:00.000Z')
+    } as any
+    const message = makeMessage({
+      id: '103',
+      deliveryStatus: MESSAGE_DELIVERY_STATUS.READ,
+      userMarkers: [existingMarker],
+      markerTotals: []
+    })
+
+    const updatedMessage = updateMessageDeliveryStatusAndMarkers(
+      message,
+      {
+        deliveryStatus: MESSAGE_DELIVERY_STATUS.READ,
+        marker: {
+          messageIds: [message.id],
+          user: { id: 'current-user' },
+          name: MESSAGE_DELIVERY_STATUS.READ,
+          createdAt: new Date('2026-04-01T12:34:00.000Z')
+        }
+      },
+      true
+    )
+
+    expect(updatedMessage.userMarkers).toEqual([existingMarker])
+  })
+
+  it('updates active messages and cached messages with the same own-vs-other marker logic', () => {
+    const channelId = 'marker-cache-channel'
+    const activeOwnMessage = makeMessage({
+      id: '110',
+      channelId,
+      deliveryStatus: MESSAGE_DELIVERY_STATUS.SENT,
+      userMarkers: [],
+      markerTotals: []
+    })
+    const cachedRemoteMessage = makeMessage({
+      id: '111',
+      channelId,
+      deliveryStatus: MESSAGE_DELIVERY_STATUS.SENT,
+      userMarkers: [],
+      markerTotals: []
+    })
+    const ownMarker = {
+      messageIds: [activeOwnMessage.id],
+      user: { id: 'current-user' },
+      name: MESSAGE_DELIVERY_STATUS.DELIVERED,
+      createdAt: new Date('2026-04-01T12:35:00.000Z')
+    } as any
+    const remoteMarker = {
+      messageIds: [cachedRemoteMessage.id],
+      user: { id: 'remote-user' },
+      name: MESSAGE_DELIVERY_STATUS.READ,
+      createdAt: new Date('2026-04-01T12:36:00.000Z')
+    } as any
+
+    const initialState = MessageReducer(undefined, setMessages({ messages: [activeOwnMessage] }))
+    const nextState = MessageReducer(
+      initialState,
+      updateMessagesStatus({
+        name: MESSAGE_DELIVERY_STATUS.DELIVERED,
+        markersMap: { [activeOwnMessage.id]: true as any },
+        isOwnMarker: true,
+        marker: ownMarker
+      })
+    )
+
+    addMessageToMap(channelId, cachedRemoteMessage)
+    updateMessageStatusOnMap(
+      channelId,
+      {
+        name: MESSAGE_DELIVERY_STATUS.READ,
+        markersMap: { [cachedRemoteMessage.id]: true },
+        marker: remoteMarker
+      },
+      false
+    )
+
+    expect(nextState.activeChannelMessages[0].userMarkers).toEqual([
+      expect.objectContaining({ name: MESSAGE_DELIVERY_STATUS.DELIVERED, messageId: activeOwnMessage.id })
+    ])
+    expect(nextState.activeChannelMessages[0].markerTotals).toEqual([])
+    expect(getMessagesFromMap(channelId)[cachedRemoteMessage.id].markerTotals).toEqual([
+      { name: MESSAGE_DELIVERY_STATUS.READ, count: 1 }
+    ])
+    expect(getMessagesFromMap(channelId)[cachedRemoteMessage.id].userMarkers).toEqual([])
   })
 })

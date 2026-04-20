@@ -413,6 +413,7 @@ const channelSlice = createSlice({
               ...channel.lastMessage,
               deliveryStatus: message.deliveryStatus,
               userMarkers: message.userMarkers,
+              markerTotals: message.markerTotals,
               state: message.state
             }
           }

@@ -26,7 +26,8 @@ import {
   setMutualChannelsHasNextAC,
   setMutualChannelsAC,
   setMutualChannelsLoadingStateAC,
-  updateMessageAsOpenedAC
+  updateMessageAsOpenedAC,
+  markMessagesAsDeliveredAC
 } from './actions'
 import {
   BLOCK_CHANNEL,
@@ -98,6 +99,7 @@ import {
   updateChannelMemberInAllChannels
 } from '../../helpers/channelHalper'
 import { DEFAULT_CHANNEL_TYPE, LOADING_STATE, MESSAGE_DELIVERY_STATUS } from '../../helpers/constants'
+import { MESSAGE_TYPE } from '../../types/enum'
 import { IAction, IChannel, IContact, IMember, IMessage } from '../../types'
 import { getClient } from '../../common/client'
 import {
@@ -392,6 +394,17 @@ function* getChannels(action: IAction): any {
       `${new Date().toISOString()} [getChannels] setting channels in state, count: ${mappedChannels?.length || 0}`
     )
     yield put(setChannelsAC(mappedChannels))
+    for (const ch of mappedChannels) {
+      const lastMsg = ch.lastMessage
+      if (
+        ch.newMessageCount > 0 &&
+        lastMsg?.id &&
+        lastMsg.type !== MESSAGE_TYPE.SYSTEM &&
+        !lastMsg.userMarkers?.find((marker: any) => marker.name === MESSAGE_DELIVERY_STATUS.DELIVERED)
+      ) {
+        yield put(markMessagesAsDeliveredAC(ch.id, [lastMsg.id]))
+      }
+    }
     if (!channelId) {
       ;[activeChannel] = channelList
       log.info(
@@ -1143,6 +1156,7 @@ function* markMessagesDelivered(action: IAction): any {
     }
 
     if (channel) {
+      console.log('Mark Messages As Delivered', messageIds)
       const messageListMarker = yield call(channel.markMessagesAsReceived, messageIds)
       for (const messageId of messageListMarker.messageIds) {
         const updateParams = {

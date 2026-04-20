@@ -63,50 +63,100 @@ export const shouldSkipDeliveryStatusUpdate = (markerName: string, currentDelive
   return false
 }
 
+const getMessageMarker = (markerName: string, messageId: string, params: any) => {
+  const marker = params?.marker || {}
+  return {
+    ...marker,
+    ...(marker.messageIds ? {} : { messageId }),
+    name: markerName,
+    createdAt: marker.createdAt || params?.createdAt || new Date(),
+    user: marker.user || params?.user || null
+  }
+}
+
+const mergeUserMarkers = (message: IMessage, markerName: string, params: any) => {
+  const userMarkers = [...(message.userMarkers || [])]
+  const markers = params?.userMarkers?.length
+    ? params.userMarkers
+    : [getMessageMarker(markerName, message.id || params?.messageId, params)]
+
+  for (const marker of markers) {
+    const normalizedMarker = {
+      ...marker,
+      name: marker.name || markerName,
+      messageId: marker.messageId || message.id || params?.messageId
+    }
+    const exists = userMarkers.some((mark: any) => mark.name === normalizedMarker.name)
+    if (!exists) {
+      userMarkers.push(normalizedMarker)
+    }
+  }
+
+  return userMarkers
+}
+
+const mergeMarkerTotals = (message: IMessage, markerName: string, params: any) => {
+  const markerTotals = [...(message.markerTotals || [])]
+  const hasProvidedMarkerTotals = !!params?.markerTotals?.length
+  const markerTotalsParams = hasProvidedMarkerTotals ? params.markerTotals : [{ name: markerName, count: 1 }]
+
+  for (const marker of markerTotalsParams) {
+    const count = marker.count || 1
+    const markerIndex = markerTotals.findIndex((mark: any) => mark.name === marker.name)
+    if (markerIndex === -1) {
+      markerTotals.push({ ...marker, count })
+    } else if (hasProvidedMarkerTotals) {
+      markerTotals[markerIndex] = {
+        ...markerTotals[markerIndex],
+        ...marker,
+        count
+      }
+    } else {
+      markerTotals[markerIndex] = {
+        ...markerTotals[markerIndex],
+        count: (markerTotals[markerIndex].count || 0) + count
+      }
+    }
+  }
+
+  return markerTotals
+}
+
 /**
- * Updates a message's delivery status and markerTotals array.
- * If the marker doesn't exist in markerTotals, it adds it with count 1.
- * If it exists, it increments the count.
- * @param message - The message object to update
- * @param markerName - The new delivery status marker name (SENT, DELIVERED, READ, PLAYED)
- * @returns A new message object with updated deliveryStatus and markerTotals
+ * Updates a message's delivery status and marker collections.
+ * Own markers are merged into userMarkers, while markers from other users update markerTotals.
  */
 export const updateMessageDeliveryStatusAndMarkers = (
   message: IMessage,
-  markerName: string,
+  params: any,
   isOwnMarker?: boolean
 ): {
   userMarkers?: IMarker[]
   markerTotals?: IMarker[]
   deliveryStatus: string
 } => {
-  if (shouldSkipDeliveryStatusUpdate(markerName, message.deliveryStatus)) {
+  const markerName = params?.deliveryStatus
+  if (!markerName) {
     return {
-      markerTotals: message.markerTotals,
-      userMarkers: message.userMarkers,
       deliveryStatus: message.deliveryStatus
     }
   }
-  const markersTotal = isOwnMarker ? message.userMarkers : message.markerTotals
-  const markerInMarkersTotal = (markersTotal || [])?.find((marker: IMarker) => marker.name === markerName)
-  if (!markerInMarkersTotal) {
+
+  const shouldUpdateOwnMarkers = isOwnMarker || !!params?.userMarkers?.length
+  const deliveryStatus = shouldSkipDeliveryStatusUpdate(markerName, message.deliveryStatus)
+    ? message.deliveryStatus
+    : markerName
+
+  if (shouldUpdateOwnMarkers) {
     return {
-      [isOwnMarker ? 'userMarkers' : 'markerTotals']: [
-        ...(markersTotal || []),
-        {
-          name: markerName,
-          count: 1
-        }
-      ],
-      deliveryStatus: markerName
+      userMarkers: mergeUserMarkers(message, markerName, params),
+      deliveryStatus
     }
-  } else {
-    return {
-      [isOwnMarker ? 'userMarkers' : 'markerTotals']: markersTotal.map((marker: { name: string; count: number }) =>
-        marker.name === markerName ? { ...marker, count: marker.count + 1 } : marker
-      ),
-      deliveryStatus: markerName
-    }
+  }
+
+  return {
+    markerTotals: mergeMarkerTotals(message, markerName, params),
+    deliveryStatus
   }
 }
 
@@ -764,7 +814,7 @@ export function updateMessageOnMap(
           continue
         } else {
           const statusUpdatedMessage = updatedMessage.params?.deliveryStatus
-            ? updateMessageDeliveryStatusAndMarkers(mes, updatedMessage.params.deliveryStatus)
+            ? updateMessageDeliveryStatusAndMarkers(mes, updatedMessage.params)
             : {}
           updatedMessageData = {
             ...mes,
@@ -847,7 +897,11 @@ export function removeReactionToMessageOnMap(
   }
 }
 
-export function updateMessageStatusOnMap(channelId: string, newMarkers: { name: string; markersMap: any }) {
+export function updateMessageStatusOnMap(
+  channelId: string,
+  newMarkers: { name: string; markersMap: any; marker?: IMarker },
+  isOwnMarker?: boolean
+) {
   if (!messagesMap[channelId] || !newMarkers?.markersMap) return
 
   const isForwardMarker =
@@ -881,7 +935,14 @@ export function updateMessageStatusOnMap(channelId: string, newMarkers: { name: 
   targetIds.forEach((messageId: string) => {
     const messageShouldBeUpdated = messagesMap[channelId][messageId]
     if (messageShouldBeUpdated) {
-      const statusUpdatedMessage = updateMessageDeliveryStatusAndMarkers(messageShouldBeUpdated, newMarkers.name)
+      const statusUpdatedMessage = updateMessageDeliveryStatusAndMarkers(
+        messageShouldBeUpdated,
+        {
+          deliveryStatus: newMarkers.name,
+          marker: newMarkers.marker
+        },
+        isOwnMarker
+      )
       if (messageShouldBeUpdated.tid && messagesMap[channelId][messageShouldBeUpdated.tid]) {
         delete messagesMap[channelId][messageShouldBeUpdated.tid]
       }

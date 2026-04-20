@@ -56,17 +56,18 @@ jest.mock('../../Message', () => {
     queueReadMarker,
     setLastVisibleMessageId,
     isUnreadMessage,
-    startsUnreadSection
+    startsUnreadSection,
+    disableAutoReadTracking
   }: any) {
     React.useEffect(() => {
-      if (message.__queueReadOnMount && queueReadMarker && message.id) {
+      if (message.__queueReadOnMount && queueReadMarker && message.id && !disableAutoReadTracking) {
         queueReadMarker(channel.id, message.id)
       }
 
       if (message.__setVisibleOnMount && setLastVisibleMessageId) {
         setLastVisibleMessageId(message)
       }
-    }, [channel?.id, message, queueReadMarker, setLastVisibleMessageId])
+    }, [channel?.id, disableAutoReadTracking, message, queueReadMarker, setLastVisibleMessageId])
 
     return React.createElement(
       'div',
@@ -78,7 +79,8 @@ jest.mock('../../Message', () => {
         'data-message-edited': String(Boolean(message.updatedAt)),
         'data-message-incoming': String(Boolean(message.incoming)),
         'data-message-is-unread': String(Boolean(isUnreadMessage)),
-        'data-message-starts-unread': String(Boolean(startsUnreadSection))
+        'data-message-starts-unread': String(Boolean(startsUnreadSection)),
+        'data-disable-auto-read': String(Boolean(disableAutoReadTracking))
       },
       message.body
     )
@@ -1634,7 +1636,7 @@ describe('MessageList', () => {
     expect(screen.getByTestId('scroll-to-bottom')).toHaveTextContent('100')
   })
 
-  it('debounces visible message read markers into one grouped dispatch', () => {
+  it('disables row-level read tracking so controller read tracking does not duplicate markers', () => {
     jest.useFakeTimers()
 
     try {
@@ -1685,9 +1687,10 @@ describe('MessageList', () => {
 
       const readActions = dispatchSpy.mock.calls.map(([action]) => action).filter((action) => action.type === readType)
 
-      expect(readActions).toHaveLength(1)
-      expect(readActions[0].payload.channelId).toBe(channelId)
-      expect(readActions[0].payload.messageIds).toEqual(visibleMessages.map((message) => message.id))
+      expect(readActions).toHaveLength(0)
+      screen.getAllByTestId('message-row').forEach((row) => {
+        expect(row).toHaveAttribute('data-disable-auto-read', 'true')
+      })
     } finally {
       jest.runOnlyPendingTimers()
       jest.useRealTimers()

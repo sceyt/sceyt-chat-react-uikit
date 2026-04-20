@@ -99,10 +99,10 @@ import {
   setPendingMessageMutation,
   removePendingMessageMutation,
   setUnreadMessageId,
-  setStableUnreadAnchor
+  setStableUnreadAnchor,
+  PendingMessageMutation
 } from './reducers'
 import { PendingPollAction } from 'helpers/messagesHalper'
-import { PendingMessageMutation } from './reducers'
 import { ATTACHMENT_VERSION } from 'helpers/attachmentsCache'
 
 export function sendMessageAC(
@@ -459,8 +459,13 @@ export function updateMessageAC(
   return updateMessage({ messageId, params, addIfNotExists, voteDetails })
 }
 
-export function updateMessagesStatusAC(name: string, markersMap: { [key: string]: IMarker }, isOwnMarker?: boolean) {
-  return updateMessagesStatus({ name, markersMap, isOwnMarker })
+export function updateMessagesStatusAC(
+  name: string,
+  markersMap: { [key: string]: IMarker },
+  isOwnMarker?: boolean,
+  marker?: IMarker
+) {
+  return updateMessagesStatus({ name, markersMap, isOwnMarker, marker })
 }
 
 export function clearMessagesAC() {

@@ -3,7 +3,6 @@ import { setClient } from '../../common/client'
 import {
   addChannelToAllChannels,
   destroyChannelsMap,
-  getChannelFromAllChannels,
   getChannelFromMap,
   setActiveChannelId,
   setChannelInMap
@@ -14,6 +13,7 @@ import {
   clearVisibleMessagesMap,
   getActiveSegment,
   getContiguousNextMessages,
+  getMessagesFromMap,
   setMessageToVisibleMessagesMap,
   setActiveSegment
 } from '../../helpers/messagesHalper'
@@ -25,8 +25,9 @@ import {
   makeUser,
   resetMessageListFixtureIds
 } from '../../testUtils/messageFixtures'
-import { updateChannelDataAC, updateChannelLastMessageAC } from '../channel/actions'
-import { addMessagesAC } from '../message/actions'
+import { MESSAGE_DELIVERY_STATUS } from '../../helpers/constants'
+import { updateChannelDataAC, updateChannelLastMessageAC, updateChannelLastMessageStatusAC } from '../channel/actions'
+import { addMessagesAC, updateMessagesMarkersAC, updateMessagesStatusAC } from '../message/actions'
 import { navigateToLatest } from '../../helpers/messageListNavigator'
 import { __eventsTestables } from './inedx'
 
@@ -71,6 +72,141 @@ describe('event message last-message handling', () => {
     clearVisibleMessagesMap()
     destroyChannelsMap()
     setActiveChannelId('')
+  })
+
+  it('handles current-user message markers as userMarkers across active action, cache, and last message', async () => {
+    const currentUser = makeUser({ id: 'current-user' })
+    const channelId = 'channel-own-marker-event'
+    const message = makeMessage({
+      id: '1200',
+      channelId,
+      incoming: true,
+      deliveryStatus: MESSAGE_DELIVERY_STATUS.SENT,
+      userMarkers: [],
+      markerTotals: []
+    })
+    const channel = makeChannel({ id: channelId, lastMessage: message })
+    const markerList = {
+      messageIds: [message.id],
+      user: currentUser,
+      name: MESSAGE_DELIVERY_STATUS.DELIVERED,
+      createdAt: new Date('2026-04-02T12:00:00.000Z')
+    } as any
+    const dispatched: any[] = []
+
+    setActiveChannelId(channelId)
+    setChannelInMap(channel)
+    addChannelToAllChannels(channel)
+    addMessageToMap(channelId, message)
+
+    await runSaga(
+      {
+        dispatch: (action) => {
+          dispatched.push(action)
+        }
+      },
+      __eventsTestables.handleMessageMarkersReceivedEvent,
+      { channelId, markerList },
+      { user: currentUser }
+    ).toPromise()
+
+    const activeStatusAction = dispatched.find(
+      (action) => action.type === updateMessagesStatusAC(markerList.name, {}, true, markerList).type
+    )
+
+    expect(activeStatusAction).toEqual(
+      expect.objectContaining({
+        payload: expect.objectContaining({
+          isOwnMarker: true,
+          marker: markerList
+        })
+      })
+    )
+    expect(
+      dispatched.some((action) => action.type === updateMessagesMarkersAC(channelId, markerList.name, markerList).type)
+    ).toBe(false)
+    expect(getMessagesFromMap(channelId)[message.id].userMarkers).toEqual([
+      expect.objectContaining({
+        name: MESSAGE_DELIVERY_STATUS.DELIVERED,
+        messageId: message.id,
+        user: currentUser
+      })
+    ])
+    expect(getMessagesFromMap(channelId)[message.id].markerTotals).toEqual([])
+    expect(getChannelFromMap(channelId)?.lastMessage.userMarkers).toEqual([
+      expect.objectContaining({
+        name: MESSAGE_DELIVERY_STATUS.DELIVERED,
+        messageId: message.id,
+        user: currentUser
+      })
+    ])
+    expect(getChannelFromMap(channelId)?.lastMessage.markerTotals).toEqual([])
+    expect(dispatched.some((action) => action.type === updateChannelLastMessageStatusAC(message, channel).type)).toBe(
+      true
+    )
+  })
+
+  it('handles remote-user message markers as markerTotals across active action, cache, and last message', async () => {
+    const currentUser = makeUser({ id: 'current-user' })
+    const remoteUser = makeUser({ id: 'remote-user' })
+    const channelId = 'channel-remote-marker-event'
+    const message = makeMessage({
+      id: '1210',
+      channelId,
+      user: currentUser,
+      incoming: false,
+      deliveryStatus: MESSAGE_DELIVERY_STATUS.SENT,
+      userMarkers: [],
+      markerTotals: []
+    })
+    const channel = makeChannel({ id: channelId, lastMessage: message })
+    const markerList = {
+      messageIds: [message.id],
+      user: remoteUser,
+      name: MESSAGE_DELIVERY_STATUS.READ,
+      createdAt: new Date('2026-04-02T12:05:00.000Z')
+    } as any
+    const dispatched: any[] = []
+
+    setActiveChannelId(channelId)
+    setChannelInMap(channel)
+    addChannelToAllChannels(channel)
+    addMessageToMap(channelId, message)
+
+    await runSaga(
+      {
+        dispatch: (action) => {
+          dispatched.push(action)
+        }
+      },
+      __eventsTestables.handleMessageMarkersReceivedEvent,
+      { channelId, markerList },
+      { user: currentUser }
+    ).toPromise()
+
+    const activeStatusAction = dispatched.find(
+      (action) => action.type === updateMessagesStatusAC(markerList.name, {}, false, markerList).type
+    )
+
+    expect(activeStatusAction).toEqual(
+      expect.objectContaining({
+        payload: expect.objectContaining({
+          isOwnMarker: false,
+          marker: markerList
+        })
+      })
+    )
+    expect(
+      dispatched.some((action) => action.type === updateMessagesMarkersAC(channelId, markerList.name, markerList).type)
+    ).toBe(true)
+    expect(getMessagesFromMap(channelId)[message.id].markerTotals).toEqual([
+      { name: MESSAGE_DELIVERY_STATUS.READ, count: 1 }
+    ])
+    expect(getMessagesFromMap(channelId)[message.id].userMarkers).toEqual([])
+    expect(getChannelFromMap(channelId)?.lastMessage.markerTotals).toEqual([
+      { name: MESSAGE_DELIVERY_STATUS.READ, count: 1 }
+    ])
+    expect(getChannelFromMap(channelId)?.lastMessage.userMarkers).toEqual([])
   })
 
   it(keepsNewestPendingTitle, async () => {
@@ -243,7 +379,9 @@ describe('event message last-message handling', () => {
 
     expect(dispatched).toEqual(expect.arrayContaining([addMessagesAC([incomingMessage], 'next')]))
     expect(navigateToLatest).toHaveBeenCalledWith(true)
-    expect(getContiguousNextMessages(channelId, { id: '902' } as IMessage, 10).map((message) => message.id)).toEqual(['903'])
+    expect(getContiguousNextMessages(channelId, { id: '902' } as IMessage, 10).map((message) => message.id)).toEqual([
+      '903'
+    ])
     expect(getActiveSegment()).toEqual({ startId: '900', endId: '903' })
   })
 
@@ -351,7 +489,9 @@ describe('event message last-message handling', () => {
       { user: { id: incomingMessage.user.id } }
     ).toPromise()
 
-    expect(getContiguousNextMessages(channelId, { id: '902' } as IMessage, 10).map((message) => message.id)).toEqual(['903'])
+    expect(getContiguousNextMessages(channelId, { id: '902' } as IMessage, 10).map((message) => message.id)).toEqual([
+      '903'
+    ])
     expect(getActiveSegment()).toEqual({ startId: '900', endId: '903' })
   })
 
@@ -398,7 +538,9 @@ describe('event message last-message handling', () => {
       { user: { id: incomingMessage.user.id } }
     ).toPromise()
 
-    expect(getContiguousNextMessages(channelId, { id: '952' } as IMessage, 10).map((message) => message.id)).toEqual(['953'])
+    expect(getContiguousNextMessages(channelId, { id: '952' } as IMessage, 10).map((message) => message.id)).toEqual([
+      '953'
+    ])
   })
 
   it('does not extend an inactive channel cached segment when the cached range is not the channel latest edge', async () => {

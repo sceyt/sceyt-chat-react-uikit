@@ -94,13 +94,13 @@ export interface IMessageProps {
   setLastVisibleMessageId?: (message: IMessage) => void
   queueReadMarker?: (channelId: string, messageId?: string) => void
   queueDeliveredMarker?: (channelId: string, messageId?: string) => void
+  disableAutoReadTracking?: boolean
   handleScrollToRepliedMessage: (msgId: string) => void
   handleMediaItemClick?: (attachment: IAttachment) => void
   unreadMessageId: string
   isUnreadMessage: boolean
   nextMessageStartsUnreadSection?: boolean
   isThreadMessage: boolean
-  disableAutoReadTracking?: boolean
   fontFamily?: string
   ownMessageOnRightSide?: boolean
   messageWidthPercent?: string | number

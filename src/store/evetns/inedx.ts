@@ -318,9 +318,59 @@ export function* handleUnreadMessagesInfoEvent(args: { channel: IChannel }): any
   updateChannelOnAllChannels(channel.id, channelUpdateParams)
 }
 
+export function* handleMessageMarkersReceivedEvent(
+  args: { channelId: string; markerList: IMarker },
+  SceytChatClient: any
+): any {
+  const { channelId, markerList } = args
+  const channel = getStoredChannel(channelId)
+  log.info('channel MESSAGE_MARKERS_RECEIVED ... channel: ', channel, 'markers list: ', markerList)
+
+  if (!channel) {
+    return
+  }
+
+  const isOwnMarker = markerList.user?.id === SceytChatClient.user.id
+  const activeChannelId = yield call(getActiveChannelId)
+  let updateLastMessage = false
+  const markersMap: any = {}
+  const markerUpdateParams = {
+    deliveryStatus: markerList.name,
+    marker: markerList
+  }
+
+  for (const messageId of markerList.messageIds) {
+    markersMap[messageId] = true
+    if (channel.lastMessage && messageId === channel.lastMessage.id) {
+      updateLastMessage = true
+    }
+  }
+
+  if (updateLastMessage) {
+    const lastMessage = {
+      ...channel.lastMessage,
+      ...updateMessageDeliveryStatusAndMarkers(channel.lastMessage, markerUpdateParams, isOwnMarker)
+    }
+
+    updateChannelLastMessageOnAllChannels(channel.id, lastMessage)
+    yield put(updateChannelLastMessageStatusAC(lastMessage, channel))
+  }
+
+  if (activeChannelId === channelId) {
+    yield put(updateMessagesStatusAC(markerList.name, markersMap, isOwnMarker, markerList))
+  }
+
+  updateMessageStatusOnMap(channel.id, { name: markerList.name, markersMap, marker: markerList }, isOwnMarker)
+
+  if (!isOwnMarker) {
+    yield put(updateMessagesMarkersAC(channelId, markerList.name, markerList))
+  }
+}
+
 export const __eventsTestables = {
   handleChannelMessageEvent,
-  handleUnreadMessagesInfoEvent
+  handleUnreadMessagesInfoEvent,
+  handleMessageMarkersReceivedEvent
 }
 
 export default function* watchForEvents(): any {
@@ -1038,50 +1088,7 @@ export default function* watchForEvents(): any {
           break
         }
         case CHANNEL_EVENT_TYPES.MESSAGE_MARKERS_RECEIVED: {
-          const { channelId, markerList } = args
-          const channel = getStoredChannel(channelId)
-          log.info('channel MESSAGE_MARKERS_RECEIVED ... channel: ', channel, 'markers list: ', markerList)
-
-          if (channel) {
-            const isOwnMarker = markerList.user?.id === SceytChatClient.user.id
-            const activeChannelId = yield call(getActiveChannelId)
-            let updateLastMessage = false
-            const markersMap: any = {}
-            for (const messageId of markerList.messageIds) {
-              markersMap[messageId] = true
-              if (channel) {
-                if (channel.lastMessage && messageId === channel.lastMessage.id) {
-                  updateLastMessage = true
-                }
-              }
-              updateChannelOnAllChannels(
-                channelId,
-                {},
-                {
-                  id: messageId,
-                  deliveryStatus: markerList.name
-                }
-              )
-            }
-            if (updateLastMessage) {
-              const lastMessage = {
-                ...channel.lastMessage,
-                ...updateMessageDeliveryStatusAndMarkers(channel.lastMessage, markerList.name, isOwnMarker)
-              }
-
-              updateChannelLastMessageOnAllChannels(channel.id, lastMessage)
-              yield put(updateChannelLastMessageStatusAC(lastMessage, channel))
-            }
-            if (activeChannelId === channelId) {
-              yield put(updateMessagesStatusAC(markerList.name, markersMap, isOwnMarker))
-            }
-
-            updateMessageStatusOnMap(channel.id, { name: markerList.name, markersMap })
-            if (!isOwnMarker) {
-              yield put(updateMessagesMarkersAC(channelId, markerList.name, markerList))
-            }
-          }
-
+          yield call(handleMessageMarkersReceivedEvent, args, SceytChatClient)
           break
         }
         case CHANNEL_EVENT_TYPES.DELETE: {

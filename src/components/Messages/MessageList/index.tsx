@@ -769,9 +769,7 @@ const MessageList: React.FC<MessagesProps> = ({
           channel={channel}
           message={message}
           nextMessage={nextMessage as IMessage}
-          connectionStatus={connectionStatus}
           differentUserMessageSpacing={differentUserMessageSpacing}
-          tabIsActive={browserTabIsActive}
           contactsMap={contactsMap}
           fontSize={dateDividerFontSize}
           textColor={dateDividerTextColor}
@@ -779,8 +777,6 @@ const MessageList: React.FC<MessagesProps> = ({
           backgroundColor={dateDividerBackgroundColor}
           borderRadius={dateDividerBorderRadius}
           setLastVisibleMessageId={setLastVisibleMessageId}
-          queueReadMarker={queueReadMarker}
-          disableAutoReadTracking
         />
       )
     }
@@ -809,8 +805,8 @@ const MessageList: React.FC<MessagesProps> = ({
           setLastVisibleMessageId={setLastVisibleMessageId}
           queueReadMarker={queueReadMarker}
           queueDeliveredMarker={queueDeliveredMarker}
-          isThreadMessage={false}
           disableAutoReadTracking
+          isThreadMessage={false}
           fontFamily={fontFamily}
           ownMessageOnRightSide={ownMessageOnRightSide}
           messageWidthPercent={messageWidthPercent}

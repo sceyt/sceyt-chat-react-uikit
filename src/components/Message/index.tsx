@@ -81,11 +81,11 @@ const Message = ({
   setLastVisibleMessageId,
   queueReadMarker,
   queueDeliveredMarker,
+  disableAutoReadTracking = false,
   isUnreadMessage,
   nextMessageStartsUnreadSection = false,
   unreadMessageId,
   isThreadMessage,
-  disableAutoReadTracking = false,
   fontFamily,
   ownMessageOnRightSide,
   messageWidthPercent,
@@ -500,16 +500,10 @@ const Message = ({
 
   const handleSendReadMarker = useCallback(() => {
     if (message.incoming && !message.userMarkers.find((marker) => marker.name === MESSAGE_DELIVERY_STATUS.DELIVERED)) {
-      if (
-        message.userMarkers &&
-        message.userMarkers.length &&
-        message.userMarkers.find((marker) => marker.name === MESSAGE_DELIVERY_STATUS.READ)
-      ) {
-        if (queueDeliveredMarker) {
-          queueDeliveredMarker(channel.id, message.id)
-        } else {
-          dispatch(markMessagesAsDeliveredAC(channel.id, [message.id]))
-        }
+      if (queueDeliveredMarker) {
+        queueDeliveredMarker(channel.id, message.id)
+      } else {
+        dispatch(markMessagesAsDeliveredAC(channel.id, [message.id]))
       }
     }
 
@@ -521,6 +515,7 @@ const Message = ({
         message.userMarkers.length &&
         message.userMarkers.find((marker) => marker.name === MESSAGE_DELIVERY_STATUS.READ)
       ) &&
+      !disableAutoReadTracking &&
       channel.newMessageCount &&
       channel.newMessageCount > 0 &&
       connectionStatus === CONNECTION_STATUS.CONNECTED
@@ -541,7 +536,8 @@ const Message = ({
     channel.newMessageCount,
     connectionStatus,
     queueReadMarker,
-    queueDeliveredMarker
+    queueDeliveredMarker,
+    disableAutoReadTracking
   ])
 
   const handleForwardMessage = useCallback(
@@ -603,9 +599,7 @@ const Message = ({
       if (setLastVisibleMessageId) {
         setLastVisibleMessageId(message)
       }
-      if (!disableAutoReadTracking) {
-        handleSendReadMarker()
-      }
+      handleSendReadMarker()
       if (!channel.isLinkedChannel) {
         setMessageToVisibleMessagesMap(message)
       }
@@ -627,7 +621,6 @@ const Message = ({
     setLastVisibleMessageId,
     message.id,
     handleSendReadMarker,
-    disableAutoReadTracking,
     channel.isLinkedChannel,
     channel.lastMessage,
     scrollToNewMessage.scrollToBottom,
@@ -642,16 +635,16 @@ const Message = ({
   }, [isVisible, infoPopupOpen])
 
   useDidUpdate(() => {
-    if (tabIsActive && !disableAutoReadTracking) {
+    if (tabIsActive) {
       handleSendReadMarker()
     }
-  }, [tabIsActive, disableAutoReadTracking])
+  }, [tabIsActive])
 
   useDidUpdate(() => {
-    if (connectionStatus === CONNECTION_STATUS.CONNECTED && !disableAutoReadTracking) {
+    if (connectionStatus === CONNECTION_STATUS.CONNECTED) {
       handleSendReadMarker()
     }
-  }, [connectionStatus, disableAutoReadTracking])
+  }, [connectionStatus])
 
   useEffect(() => {
     if (emojisPopupOpen) {

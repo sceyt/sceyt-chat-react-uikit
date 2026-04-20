@@ -2,16 +2,13 @@ import styled from 'styled-components'
 import React, { useEffect, useMemo, useRef } from 'react'
 import { useDispatch, useSelector } from 'store/hooks'
 // Store
-import { markMessagesAsReadAC } from '../../../store/channel/actions'
-import { CONNECTION_STATUS } from '../../../store/user/constants'
 // Hooks
-import { useColor, useDidUpdate, useOnScreen } from '../../../hooks'
+import { useColor, useOnScreen } from '../../../hooks'
 // Helpers
 import { isJSON, makeUsername } from '../../../helpers/message'
 import { systemMessageUserName, formatDisappearingMessageTime } from '../../../helpers'
 import { IChannel, IMessage } from '../../../types'
 import { getShowOnlyContactUsers } from '../../../helpers/contacts'
-import { MESSAGE_DELIVERY_STATUS } from '../../../helpers/constants'
 import { THEME_COLORS } from '../../../UIHelper/constants'
 import { getClient } from '../../../common/client'
 import {
@@ -27,7 +24,6 @@ interface ISystemMessageProps {
   channel: IChannel
   message: IMessage
   nextMessage: IMessage
-  connectionStatus: string
   contactsMap: { [key: string]: any }
   differentUserMessageSpacing?: string
   fontSize?: string
@@ -35,18 +31,13 @@ interface ISystemMessageProps {
   border?: string
   backgroundColor?: string
   borderRadius?: string
-  tabIsActive?: boolean
   setLastVisibleMessageId?: (message: IMessage) => void
-  queueReadMarker?: (channelId: string, messageId?: string) => void
-  disableAutoReadTracking?: boolean
 }
 
 const Message = ({
   message,
   nextMessage,
-  connectionStatus,
   channel,
-  tabIsActive,
   differentUserMessageSpacing,
   fontSize,
   textColor,
@@ -54,9 +45,7 @@ const Message = ({
   backgroundColor,
   borderRadius,
   contactsMap,
-  setLastVisibleMessageId,
-  queueReadMarker,
-  disableAutoReadTracking = false
+  setLastVisibleMessageId
 }: ISystemMessageProps) => {
   const { [THEME_COLORS.TEXT_ON_PRIMARY]: textOnPrimary, [THEME_COLORS.OVERLAY_BACKGROUND]: overlayBackground } =
     useColor()
@@ -73,35 +62,10 @@ const Message = ({
     return isJSON(message.metadata) ? JSON.parse(message.metadata) : message.metadata
   }, [message.metadata])
 
-  const handleSendReadMarker = () => {
-    if (
-      isVisible &&
-      message.incoming &&
-      !(
-        message.userMarkers &&
-        message.userMarkers.length &&
-        message.userMarkers.find((marker) => marker.name === MESSAGE_DELIVERY_STATUS.READ)
-      ) &&
-      channel.newMessageCount &&
-      channel.newMessageCount > 0 &&
-      connectionStatus === CONNECTION_STATUS.CONNECTED &&
-      !unreadScrollTo
-    ) {
-      if (queueReadMarker) {
-        queueReadMarker(channel.id, message.id)
-      } else {
-        dispatch(markMessagesAsReadAC(channel.id, [message.id]))
-      }
-    }
-  }
-
   useEffect(() => {
     if (isVisible && !unreadScrollTo) {
       if (setLastVisibleMessageId) {
         setLastVisibleMessageId(message)
-      }
-      if (!disableAutoReadTracking) {
-        handleSendReadMarker()
       }
       if (!channel.isLinkedChannel) {
         setMessageToVisibleMessagesMap(message)
@@ -122,27 +86,13 @@ const Message = ({
   }, [
     channel.isLinkedChannel,
     channel.lastMessage,
-    disableAutoReadTracking,
     dispatch,
     isVisible,
     message,
     scrollToNewMessage.scrollToBottom,
     unreadScrollTo,
-    setLastVisibleMessageId,
-    queueReadMarker
+    setLastVisibleMessageId
   ])
-
-  useDidUpdate(() => {
-    if (tabIsActive && !disableAutoReadTracking) {
-      handleSendReadMarker()
-    }
-  }, [tabIsActive, disableAutoReadTracking])
-
-  useDidUpdate(() => {
-    if (connectionStatus === CONNECTION_STATUS.CONNECTED && !disableAutoReadTracking) {
-      handleSendReadMarker()
-    }
-  }, [connectionStatus, disableAutoReadTracking])
 
   return (
     <Container
@@ -218,9 +168,7 @@ export default React.memo(Message, (prevProps, nextProps) => {
     prevProps.message.deliveryStatus === nextProps.message.deliveryStatus &&
     prevProps.message.state === nextProps.message.state &&
     prevProps.message.userMarkers === nextProps.message.userMarkers &&
-    prevProps.nextMessage === nextProps.nextMessage &&
-    prevProps.connectionStatus === nextProps.connectionStatus &&
-    prevProps.tabIsActive === nextProps.tabIsActive
+    prevProps.nextMessage === nextProps.nextMessage
   )
 })
 

@@ -286,9 +286,10 @@ const messageSlice = createSlice({
         name: string
         markersMap: { [key: string]: IMarker }
         isOwnMarker?: boolean
+        marker?: IMarker
       }>
     ) => {
-      const { name, markersMap, isOwnMarker } = action.payload
+      const { name, markersMap, isOwnMarker, marker } = action.payload
       const markerName = name
       const isForwardMarker =
         markerName === MESSAGE_DELIVERY_STATUS.DELIVERED || markerName === MESSAGE_DELIVERY_STATUS.READ
@@ -308,7 +309,11 @@ const messageSlice = createSlice({
           isForwardMarker && maxMarkerId !== null && !!message.id ? BigInt(message.id) <= maxMarkerId : false
         if (!inMap && !beforeMax) continue
         if (message.state !== 'Deleted') {
-          const statusUpdatedMessage = updateMessageDeliveryStatusAndMarkers(message, markerName, isOwnMarker)
+          const statusUpdatedMessage = updateMessageDeliveryStatusAndMarkers(
+            message,
+            { deliveryStatus: markerName, marker },
+            isOwnMarker
+          )
           state.activeChannelMessages[index] = { ...message, ...statusUpdatedMessage }
         }
       }
@@ -337,7 +342,7 @@ const messageSlice = createSlice({
           } else {
             let statusUpdatedMessage = null
             if (params?.deliveryStatus) {
-              statusUpdatedMessage = updateMessageDeliveryStatusAndMarkers(message, params.deliveryStatus)
+              statusUpdatedMessage = updateMessageDeliveryStatusAndMarkers(message, params)
             }
             const messageOldData: IMessage = {
               ...message,
