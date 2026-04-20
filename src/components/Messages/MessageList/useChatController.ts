@@ -375,6 +375,7 @@ export function useChatController({
   const pendingLatestJumpRef = useRef<PendingLatestJump | null>(null)
   const historyArmTimerRef = useRef<NodeJS.Timeout | null>(null)
   const latestArmTimerRef = useRef<NodeJS.Timeout | null>(null)
+  const pendingEdgeCheckAfterLoadRef = useRef(false)
 
   const [isLoadingPrevious, setIsLoadingPrevious] = useState(false)
   const [isLoadingNext, setIsLoadingNext] = useState(false)
@@ -1017,8 +1018,9 @@ export function useChatController({
         clearJumpBlur()
       }
       const length = messagesRef.current?.length
+      const loadIndex = connectionStatus === CONNECTION_STATUS.CONNECTED ? 10 : 0
       const isLoaded = messagesRef.current.some(
-        (message, index) => index < length - 10 && index > 10 && getMessageLocalRef(message) === itemId
+        (message, index) => index < length - loadIndex && index >= loadIndex && getMessageLocalRef(message) === itemId
       )
       setTimeout(
         async () => {
@@ -1109,7 +1111,8 @@ export function useChatController({
       dispatch,
       invalidateEdgeDirection,
       lockJumpScrolling,
-      setHighlight
+      setHighlight,
+      connectionStatus
     ]
   )
 
@@ -1711,6 +1714,7 @@ export function useChatController({
     previousMessagesRef.current = []
     suppressedMessageChangesRef.current = 0
     pendingLatestJumpRef.current = null
+    pendingEdgeCheckAfterLoadRef.current = false
     pendingWindowLoadRef.current?.resolve({ items: [] })
     pendingWindowLoadRef.current = null
     pendingEdgeLoadRefs.current.previous?.resolve({ items: [] })
@@ -1945,6 +1949,13 @@ export function useChatController({
   useEffect(() => {
     const previousMessages = previousMessagesRef.current
 
+    if (pendingEdgeCheckAfterLoadRef.current) {
+      pendingEdgeCheckAfterLoadRef.current = false
+      requestAnimationFrame(() => {
+        handleScrollRef.current()
+      })
+    }
+
     if (suppressedMessageChangesRef.current > 0) {
       suppressedMessageChangesRef.current -= 1
       previousMessagesRef.current = messages
@@ -2136,6 +2147,7 @@ export function useChatController({
     historyLoadArmedRef.current = true
     latestLoadArmedRef.current = true
     invalidateEdgeDirection('previous')
+    invalidateEdgeDirection('next')
     suppressNextMessageChange()
 
     const isHistoryTopVisible = messagesRef.current[0]
@@ -2143,6 +2155,19 @@ export function useChatController({
           (visibleMessage) => visibleMessage.id === messagesRef.current[0]?.id
         )
       : false
+
+    // If the view is pinned to a scroll edge, flag that we need to re-check
+    // pagination once the reconnect reload settles — no scroll event fires on
+    // its own after a server-side message refresh.
+    const reconnectContainer = scrollRef.current
+    if (reconnectContainer) {
+      const maxTop = getMaxScrollTop(reconnectContainer)
+      const atHistoryEdge = maxTop - reconnectContainer.scrollTop <= PRELOAD_TRIGGER_PX
+      const atLatestEdge = reconnectContainer.scrollTop <= PRELOAD_TRIGGER_PX + LATEST_EDGE_GAP_PX
+      if (atHistoryEdge || atLatestEdge) {
+        pendingEdgeCheckAfterLoadRef.current = true
+      }
+    }
 
     dispatch(
       reloadActiveChannelAfterReconnectAC(

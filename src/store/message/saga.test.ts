@@ -9,6 +9,7 @@ import {
   getContiguousPrevMessages,
   getMessageFromMap,
   getPendingMessagesFromMap,
+  MESSAGES_MAX_PAGE_COUNT,
   MESSAGE_LOAD_DIRECTION,
   setActiveSegment
 } from '../../helpers/messagesHalper'
@@ -3426,7 +3427,7 @@ describe('loadAroundMessage generic cache-first', () => {
     expect(query.loadPreviousMessageId).not.toHaveBeenCalled()
     expect(query.loadNextMessageId).not.toHaveBeenCalled()
 
-    expect(dispatched).toEqual(expect.arrayContaining([setMessagesHasPrevAC(false), setMessagesHasNextAC(true)]))
+    expect(dispatched).toEqual(expect.arrayContaining([setMessagesHasPrevAC(true), setMessagesHasNextAC(true)]))
 
     const setMessagesAction = getActionByType(dispatched, setMessagesAC([], channel.id).type)
     expect(setMessagesAction.payload.messages.map((message: IMessage) => message.id)).toEqual([
@@ -3439,6 +3440,101 @@ describe('loadAroundMessage generic cache-first', () => {
 
     const appendPendingAction = getActionByType(dispatched, addMessagesAC([], MESSAGE_LOAD_DIRECTION.NEXT).type)
     expect(appendPendingAction.payload.messages).toEqual([])
+  })
+
+  it('fills the cached around-message window from next messages when previous cache has less than half a page', async () => {
+    const channel = makeChannel({
+      id: 'channel-around-cache-fill-next',
+      lastMessage: makeMessage({ id: '160', channelId: 'channel-around-cache-fill-next' })
+    })
+    const cachedMessages = Array.from({ length: MESSAGES_MAX_PAGE_COUNT + 1 }, (_, index) => {
+      const id = String(100 + index)
+      return makeMessage({ id, channelId: channel.id, body: `cached-${id}` })
+    })
+    const query = createMessageQuery()
+
+    mockStoreState.UserReducer.connectionStatus = CONNECTION_STATUS.CONNECTED
+    setActiveChannelId(channel.id)
+    setChannelInMap(channel)
+    cachedMessages.forEach((message) => addMessageToMap(channel.id, message))
+    setActiveSegment(channel.id, '100', '160')
+    setClient(createClient(query, channel))
+
+    const dispatched = await runMessageSaga(
+      __messageSagaTestables.loadAroundMessageWorker,
+      loadAroundMessageAC(channel, '105')
+    )
+
+    expect(query.loadPreviousMessageId).not.toHaveBeenCalled()
+    expect(query.loadNextMessageId).not.toHaveBeenCalled()
+    expect(dispatched).toEqual(expect.arrayContaining([setMessagesHasPrevAC(true)]))
+
+    const setMessagesAction = getActionByType(dispatched, setMessagesAC([], channel.id).type)
+    expect(setMessagesAction.payload.messages).toHaveLength(MESSAGES_MAX_PAGE_COUNT)
+    expect(setMessagesAction.payload.messages.map((message: IMessage) => message.id)).toEqual(
+      cachedMessages.slice(0, MESSAGES_MAX_PAGE_COUNT).map((message) => message.id)
+    )
+  })
+
+  it('fills the cached around-message window from previous messages when next cache has less than half a page', async () => {
+    const channel = makeChannel({
+      id: 'channel-around-cache-fill-prev',
+      lastMessage: makeMessage({ id: '160', channelId: 'channel-around-cache-fill-prev' })
+    })
+    const cachedMessages = Array.from({ length: MESSAGES_MAX_PAGE_COUNT + 1 }, (_, index) => {
+      const id = String(100 + index)
+      return makeMessage({ id, channelId: channel.id, body: `cached-${id}` })
+    })
+    const query = createMessageQuery()
+
+    mockStoreState.UserReducer.connectionStatus = CONNECTION_STATUS.CONNECTED
+    setActiveChannelId(channel.id)
+    setChannelInMap(channel)
+    cachedMessages.forEach((message) => addMessageToMap(channel.id, message))
+    setActiveSegment(channel.id, '100', '160')
+    setClient(createClient(query, channel))
+
+    const dispatched = await runMessageSaga(
+      __messageSagaTestables.loadAroundMessageWorker,
+      loadAroundMessageAC(channel, '155')
+    )
+
+    expect(query.loadPreviousMessageId).not.toHaveBeenCalled()
+    expect(query.loadNextMessageId).not.toHaveBeenCalled()
+
+    const setMessagesAction = getActionByType(dispatched, setMessagesAC([], channel.id).type)
+    expect(setMessagesAction.payload.messages).toHaveLength(MESSAGES_MAX_PAGE_COUNT)
+    expect(setMessagesAction.payload.messages.map((message: IMessage) => message.id)).toEqual(
+      cachedMessages.slice(1).map((message) => message.id)
+    )
+  })
+
+  it('keeps previous pagination available for an offline cached search hit rendered at the top', async () => {
+    const channel = makeChannel({
+      id: 'channel-around-cache-offline-top-hit',
+      lastMessage: makeMessage({ id: '902', channelId: 'channel-around-cache-offline-top-hit' })
+    })
+    const searchedMessage = makeMessage({ id: '900', channelId: channel.id, body: 'cached-search-hit' })
+    const query = createMessageQuery()
+
+    mockStoreState.UserReducer.connectionStatus = CONNECTION_STATUS.DISCONNECTED
+    setActiveChannelId(channel.id)
+    setChannelInMap(channel)
+    addMessageToMap(channel.id, searchedMessage)
+    setActiveSegment(channel.id, searchedMessage.id!, searchedMessage.id!)
+    setClient(createClient(query, channel))
+
+    const dispatched = await runMessageSaga(
+      __messageSagaTestables.loadAroundMessageWorker,
+      loadAroundMessageAC(channel, searchedMessage.id!)
+    )
+
+    expect(query.loadPreviousMessageId).not.toHaveBeenCalled()
+    expect(query.loadNextMessageId).not.toHaveBeenCalled()
+    expect(dispatched).toEqual(expect.arrayContaining([setMessagesHasPrevAC(true), setMessagesHasNextAC(true)]))
+
+    const setMessagesAction = getActionByType(dispatched, setMessagesAC([], channel.id).type)
+    expect(setMessagesAction.payload.messages.map((message: IMessage) => message.id)).toEqual([searchedMessage.id])
   })
 
   it('renders a cached around-message window while offline without calling the server', async () => {

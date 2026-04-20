@@ -1744,8 +1744,22 @@ const getCachedAroundMessageWindow = (
   }
 
   const halfWindowSize = MESSAGES_MAX_PAGE_COUNT / 2
-  const previousMessages = getContiguousPrevMessages(channel.id, targetMessage, halfWindowSize)
-  const nextMessages = getContiguousNextMessages(channel.id, targetMessage, halfWindowSize)
+  let previousMessages = getContiguousPrevMessages(channel.id, targetMessage, halfWindowSize)
+  const hasPotentialOlderUncachedMessages = previousMessages.length < halfWindowSize
+  const nextLimit =
+    previousMessages.length < halfWindowSize
+      ? MESSAGES_MAX_PAGE_COUNT - previousMessages.length - 1
+      : halfWindowSize - 1
+  const nextMessages = getContiguousNextMessages(channel.id, targetMessage, nextLimit)
+
+  if (nextMessages.length < halfWindowSize) {
+    previousMessages = getContiguousPrevMessages(
+      channel.id,
+      targetMessage,
+      MESSAGES_MAX_PAGE_COUNT - nextMessages.length - 1
+    )
+  }
+
   const messages = [...previousMessages, targetMessage, ...nextMessages]
   const firstConfirmedMessageId = getFirstConfirmedMessageId(messages)
   const lastConfirmedMessageId = getLastConfirmedMessageId(messages)
@@ -1766,7 +1780,7 @@ const getCachedAroundMessageWindow = (
 
   return {
     messages,
-    hasPrevMessages: cachedWindowInterval.hasPrevMessages,
+    hasPrevMessages: cachedWindowInterval.hasPrevMessages || hasPotentialOlderUncachedMessages,
     hasNextMessages: cachedWindowInterval.hasNextMessages || hasNewerChannelMessage
   }
 }
