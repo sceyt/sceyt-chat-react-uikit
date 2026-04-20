@@ -5,6 +5,7 @@ import { useSelector, useDispatch } from 'store/hooks'
 import { activeChannelSelector } from '../../store/channel/selector'
 import { switchMessageSearchAC } from '../../store/channel/actions'
 import { navigateToMessage } from '../../helpers/messageListNavigator'
+import { getMessagesFromMap } from '../../helpers/messagesHalper'
 import { getClient } from '../../common/client'
 import { makeUsername } from '../../helpers/message'
 import { contactsMapSelector, connectionStatusSelector } from '../../store/user/selector'
@@ -130,33 +131,25 @@ export default function MessagesSearch({ size = 'large' }: IProps) {
     [activeChannel?.id]
   )
 
-  const refreshSearch = useCallback(
-    async (text: string, currentCount: number) => {
-      if (!text.trim() || !activeChannel?.id) return
-      try {
-        const SceytChatClient = getClient()
-        const pagesToLoad = Math.max(1, Math.ceil(currentCount / 20))
-        const builder = new (SceytChatClient.MessageListSearchQueryBuilder as any)()
-        builder.setChannelId(activeChannel?.id)
-        builder.addField({ key: 0, value: { word: text, op: 1 } })
-        builder.setCount(20)
-        const query = await builder.build()
-        const refreshed: IMessage[] = []
-        let hasNextRefresh = false
-        for (let i = 0; i < pagesToLoad; i++) {
-          const result = await query.loadNext()
-          if (result) {
-            refreshed.push(...(result.messages || []))
-            hasNextRefresh = result.hasNext || false
-            if (!result.hasNext) break
-          }
-        }
-        queryRef.current = query
-        setResults(refreshed)
-        setHasNext(hasNextRefresh)
-      } catch (e) {
-        console.error('[MessagesSearch] refresh error', e)
+  const performLocalSearch = useCallback(
+    (text: string) => {
+      if (!text.trim() || !activeChannel?.id) {
+        setResults([])
+        setHasNext(false)
+        queryRef.current = null
+        setCurrentIndex(-1)
+        return
       }
+      const channelMessages = getMessagesFromMap(activeChannel.id)
+      const allMessages = Object.values(channelMessages || {})
+      const lowerText = text.toLowerCase()
+      const matched = allMessages
+        .filter((msg) => msg.state !== 'deleted' && msg.body?.toLowerCase().includes(lowerText))
+        .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+      setResults(matched)
+      setHasNext(false)
+      queryRef.current = null
+      setCurrentIndex(-1)
     },
     [activeChannel?.id]
   )
@@ -165,7 +158,13 @@ export default function MessagesSearch({ size = 'large' }: IProps) {
     const val = e.target.value
     setSearchText(val)
     if (debounceRef.current) clearTimeout(debounceRef.current)
-    debounceRef.current = setTimeout(() => buildAndSearch(val), SEARCH_DEBOUNCE_MS)
+    debounceRef.current = setTimeout(() => {
+      if (connectionStatus !== CONNECTION_STATUS.CONNECTED) {
+        performLocalSearch(val)
+      } else {
+        buildAndSearch(val)
+      }
+    }, SEARCH_DEBOUNCE_MS)
   }
 
   const handleLoadMore = useCallback(async () => {
@@ -244,18 +243,18 @@ export default function MessagesSearch({ size = 'large' }: IProps) {
     setCurrentIndex(-1)
     queryRef.current = null
     if (searchText.trim()) {
-      buildAndSearch(searchText)
-    }
-  }, [activeChannel?.id])
-
-  // Re-run search on reconnect
-  useEffect(() => {
-    if (connectionStatus === CONNECTION_STATUS.CONNECTED && searchText.trim()) {
-      if (results.length > 0) {
-        refreshSearch(searchText, results.length)
+      if (connectionStatus !== CONNECTION_STATUS.CONNECTED) {
+        performLocalSearch(searchText)
       } else {
         buildAndSearch(searchText)
       }
+    }
+  }, [activeChannel?.id])
+
+  // Re-run search on reconnect — always do a fresh server search to replace any local results
+  useEffect(() => {
+    if (connectionStatus === CONNECTION_STATUS.CONNECTED && searchText.trim()) {
+      buildAndSearch(searchText)
     }
   }, [connectionStatus])
 
