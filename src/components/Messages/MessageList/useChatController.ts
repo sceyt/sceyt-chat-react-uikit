@@ -58,6 +58,8 @@ const JUMP_SCROLL_LOCK_MS = 1800
 const PRESERVE_ANCHOR_SCROLL_EPSILON_PX = 1
 const SCROLL_IDLE_MS = 800
 const PREFETCH_CACHE_MESSAGE_THRESHOLD = LOAD_MAX_MESSAGE_COUNT_PREFETCH * 2
+type EdgeDirection = 'previous' | 'next'
+
 type ChannelRestoreWindow = {
   startId: string
   endId: string
@@ -74,7 +76,7 @@ type RestoreState =
   | { mode: 'to-bottom' }
   | { mode: 'to-bottom-smooth' }
   | { mode: 'reveal-unread-separator' }
-  | { mode: 'reveal-message'; messageId: string; smooth?: boolean }
+  | { mode: 'reveal-message'; messageId: string; smooth?: boolean; direction?: EdgeDirection | null }
   | { mode: 'restore-scroll-top'; scrollTop: number }
   | {
       mode: 'preserve-anchor-window'
@@ -99,8 +101,6 @@ type PendingLoadRequest = {
   hasSeenLoading: boolean
   allowNoLoading: boolean
 }
-
-type EdgeDirection = 'previous' | 'next'
 
 type EdgePaginationRequest = {
   requestId: string
@@ -193,10 +193,24 @@ const scrollToLatestEdge = (container: HTMLElement, behavior: ScrollBehavior = '
 
 const getMaxScrollTop = (container: HTMLElement) => Math.max(0, container.scrollHeight - container.clientHeight)
 
-const scrollItemIntoView = (container: HTMLElement, target: HTMLElement, smooth: boolean, isInView = false) => {
+const scrollToHistoryEdge = (container: HTMLElement, behavior: ScrollBehavior = 'auto') => {
+  setScrollTop(container, Math.max(LATEST_EDGE_GAP_PX, getMaxScrollTop(container) - LATEST_EDGE_GAP_PX), behavior)
+}
+
+const scrollItemIntoView = (
+  container: HTMLElement,
+  target: HTMLElement,
+  smooth: boolean,
+  isInView = false,
+  direction?: EdgeDirection | null
+) => {
   if (smooth) {
     if (!isInView) {
-      scrollToLatestEdge(container, 'auto')
+      if (direction === 'next') {
+        scrollToHistoryEdge(container, 'auto')
+      } else if (direction === 'previous') {
+        scrollToLatestEdge(container, 'auto')
+      }
     }
     requestAnimationFrame(() => {
       requestAnimationFrame(() => {
@@ -243,6 +257,24 @@ const getTopViewportAnchor = (container: HTMLElement, itemElements: Map<string, 
     itemId: anchor.itemId,
     offsetFromTop: anchor.rect.top - containerRect.top
   }
+}
+
+const getCenterViewportAnchorId = (container: HTMLElement, itemElements: Map<string, HTMLElement>) => {
+  const containerRect = container.getBoundingClientRect()
+  const viewportCenterY = containerRect.top + containerRect.height / 2
+  const candidates = Array.from(itemElements.entries())
+    .map(([itemId, element]) => {
+      const rect = element.getBoundingClientRect()
+      return {
+        itemId,
+        rect,
+        distanceFromCenter: Math.abs(rect.top + rect.height / 2 - viewportCenterY)
+      }
+    })
+    .filter(({ rect }) => rect.bottom > containerRect.top && rect.top < containerRect.bottom)
+    .sort((left, right) => left.distanceFromCenter - right.distanceFromCenter)
+
+  return candidates[0]?.itemId || ''
 }
 
 const isPinnedToLatest = (container: HTMLElement | null) => {
@@ -946,6 +978,29 @@ export function useChatController({
     [channel.id, dispatch]
   )
 
+  const getJumpDirection = useCallback((itemId: string): EdgeDirection | null => {
+    const currentMessages = messagesRef.current || []
+    const targetIndex = currentMessages.findIndex((message) => getMessageLocalRef(message) === itemId)
+    const container = scrollRef.current
+    const viewportCenterAnchorId = container ? getCenterViewportAnchorId(container, itemElementsRef.current) : ''
+    const anchorId =
+      viewportCenterAnchorId ||
+      getClosestConfirmedMessageId(currentMessages, Math.floor(currentMessages.length / 2), 'nearest')
+    const anchorIndex = anchorId
+      ? currentMessages.findIndex((message) => getMessageLocalRef(message) === anchorId || message.id === anchorId)
+      : -1
+
+    if (targetIndex >= 0 && anchorIndex >= 0 && targetIndex !== anchorIndex) {
+      return targetIndex < anchorIndex ? 'previous' : 'next'
+    }
+
+    if (!anchorId || itemId === anchorId) {
+      return null
+    }
+
+    return compareMessageIds(itemId, anchorId) < 0 ? 'previous' : 'next'
+  }, [])
+
   const jumpToLatest = useCallback(
     async (smooth = true) => {
       clearScrollIdleTimer()
@@ -1056,11 +1111,19 @@ export function useChatController({
         pendingWindowLoadRef.current = null
         clearJumpBlur()
       }
+      const jumpDirection = getJumpDirection(itemId)
       const length = messagesRef.current?.length
       const loadIndex = connectionStatus === CONNECTION_STATUS.CONNECTED ? 10 : 0
-      const isLoaded = messagesRef.current.some(
-        (message, index) => index < length - loadIndex && index >= loadIndex && getMessageLocalRef(message) === itemId
-      )
+
+      const isLoaded =
+        !jumpDirection || (jumpDirection === 'next' && !hasNext) || (jumpDirection === 'previous' && !hasPrevious)
+          ? true
+          : messagesRef.current.some(
+              (message, index) =>
+                index < length - (jumpDirection === 'next' ? loadIndex : 0) &&
+                index >= (jumpDirection === 'next' ? 0 : loadIndex) &&
+                getMessageLocalRef(message) === itemId
+            )
       setTimeout(
         async () => {
           clearPendingLatestJump()
@@ -1071,9 +1134,9 @@ export function useChatController({
           restoreRef.current = {
             mode: 'reveal-message',
             messageId: itemId,
-            smooth
+            smooth,
+            direction: jumpDirection
           }
-
           if (isLoaded) {
             const container = scrollRef.current
             const target = container ? getItemElement(container, itemId) : null
@@ -1148,10 +1211,13 @@ export function useChatController({
       clearJumpBlur,
       clearPendingLatestJump,
       dispatch,
+      getJumpDirection,
       invalidateEdgeDirection,
       lockJumpScrolling,
       setHighlight,
-      connectionStatus
+      connectionStatus,
+      hasPrevious,
+      hasNext
     ]
   )
 
@@ -1850,7 +1916,7 @@ export function useChatController({
       restoreRef.current = null
       viewIsAtLatestRef.current = false
       setIsViewingLatest(false)
-      scrollItemIntoView(container, target, !!restoreState.smooth)
+      scrollItemIntoView(container, target, !!restoreState.smooth, false, restoreState.direction)
 
       if (jumpTargetIdRef.current === restoreState.messageId) {
         if (jumpObserverRef.current) {
@@ -1935,18 +2001,6 @@ export function useChatController({
         pendingEdgeLoad &&
         !messages.some((message) => !pendingEdgeLoad.previousIds.has(getMessageLocalRef(message)))
       ) {
-        return
-      }
-
-      if (
-        restoreState.loadDirection === 'next' &&
-        restoreState.sourceScrollTop <= PRELOAD_TRIGGER_PX + LATEST_EDGE_GAP_PX &&
-        !hasNextMessages
-      ) {
-        restoreRef.current = null
-        viewIsAtLatestRef.current = true
-        setIsViewingLatest(true)
-        scrollToLatestEdge(container, 'auto')
         return
       }
 

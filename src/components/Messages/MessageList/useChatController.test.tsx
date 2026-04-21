@@ -1780,6 +1780,55 @@ describe('useChatController', () => {
     expect(rendered.scrollable.scrollTop).toBe(scrollTopBefore)
   })
 
+  it('starts unloaded jumpToItem smooth reveal from the edge opposite the target direction', async () => {
+    const channel = makeChannel({ id: 'channel-jump-item-directional-reveal' })
+    const currentMessages = [
+      makeMessage({ id: '100', channelId: channel.id, body: 'msg-100' }),
+      makeMessage({ id: '200', channelId: channel.id, body: 'msg-200' }),
+      makeMessage({ id: '300', channelId: channel.id, body: 'msg-300' })
+    ]
+    const newerTarget = makeMessage({ id: '250', channelId: channel.id, body: 'newer-than-center-target' })
+    const dispatch = jest.fn()
+    const rendered = renderAsyncController({
+      channel,
+      messages: currentMessages,
+      hasPrevMessages: true,
+      hasNextMessages: true,
+      jumpToItemId: newerTarget.id!,
+      jumpToItemSmooth: true,
+      connectionStatus: CONNECTION_STATUS.CONNECTED,
+      dispatch,
+      layoutSpec: (state) => ({
+        containerRect: { top: 0, left: 0, width: 320, height: 240 },
+        scrollMetrics: { scrollTop: 300, scrollHeight: 800, clientHeight: 240, offsetTop: 0, offsetHeight: 240 },
+        itemRects: Object.fromEntries(
+          state.messages.map((message: IMessage, index: number) => [
+            getMessageLocalRef(message),
+            { top: 100 * index, left: 0, width: 320, height: 32 }
+          ])
+        )
+      }),
+      server: {
+        onLoadAround: () => ({
+          messages: [newerTarget],
+          hasPrevMessages: true,
+          hasNextMessages: false
+        })
+      }
+    })
+
+    fireEvent.click(screen.getByTestId('set-visible-2'))
+    fireEvent.click(screen.getByTestId('jump-to-item'))
+    await flushMockServerDelay()
+    await flushEffects()
+    act(() => {
+      flushAnimationFrames()
+      flushAnimationFrames()
+    })
+
+    expect(rendered.scrollable.scrollTop).toBe(800 - 240 - LATEST_EDGE_GAP_PX)
+  })
+
   it('retries previous-page pagination when connection returns while the user is still pinned at the history edge', async () => {
     const channel = makeChannel({ id: 'channel-reconnect-history-edge-retry' })
     const messages = [
