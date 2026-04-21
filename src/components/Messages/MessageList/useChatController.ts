@@ -11,6 +11,7 @@ import {
   loadNearUnreadAC,
   reloadActiveChannelAfterReconnectAC,
   refreshCacheAroundMessageAC,
+  prefetchMessagesAC,
   scrollToNewMessageAC,
   setActivePaginationIntentAC,
   setUnreadScrollToAC,
@@ -38,6 +39,7 @@ import {
   hasNextContiguousInMap,
   hasPrevContiguousInMap,
   LOAD_MAX_MESSAGE_COUNT,
+  LOAD_MAX_MESSAGE_COUNT_PREFETCH,
   MESSAGE_LOAD_DIRECTION
 } from '../../../helpers/messagesHalper'
 import { setAllowEditDeleteIncomingMessage } from '../../../helpers/message'
@@ -55,6 +57,7 @@ const DEFAULT_UNREAD_VISIBILITY_THRESHOLD = 0.5
 const JUMP_SCROLL_LOCK_MS = 1800
 const PRESERVE_ANCHOR_SCROLL_EPSILON_PX = 1
 const SCROLL_IDLE_MS = 800
+const PREFETCH_CACHE_MESSAGE_THRESHOLD = LOAD_MAX_MESSAGE_COUNT_PREFETCH * 2
 type ChannelRestoreWindow = {
   startId: string
   endId: string
@@ -910,6 +913,33 @@ export function useChatController({
     [channel.id]
   )
 
+  const requestDirectionalPrefetchIfNeeded = useCallback(
+    (direction: EdgeDirection, fromMessage: IMessage | null | undefined) => {
+      if (!channel.id || !fromMessage?.id || connectionStatusRef.current !== CONNECTION_STATUS.CONNECTED) {
+        return
+      }
+
+      const cachedMessages =
+        direction === 'previous'
+          ? getContiguousPrevMessages(channel.id, fromMessage, PREFETCH_CACHE_MESSAGE_THRESHOLD)
+          : getContiguousNextMessages(channel.id, fromMessage, PREFETCH_CACHE_MESSAGE_THRESHOLD)
+      const cachedConfirmedCount = cachedMessages.filter((message) => !!message.id).length
+      if (cachedConfirmedCount >= PREFETCH_CACHE_MESSAGE_THRESHOLD) {
+        return
+      }
+
+      dispatch(
+        prefetchMessagesAC(
+          channel.id,
+          cachedMessages && cachedMessages?.length ? cachedMessages[0].id : fromMessage.id,
+          direction === 'previous' ? MESSAGE_LOAD_DIRECTION.PREV : MESSAGE_LOAD_DIRECTION.NEXT,
+          2
+        )
+      )
+    },
+    [channel.id, dispatch]
+  )
+
   const jumpToLatest = useCallback(
     async (smooth = true) => {
       clearScrollIdleTimer()
@@ -1272,6 +1302,7 @@ export function useChatController({
 
       suppressNextMessageChange()
       dispatch(addMessagesAC(cachedPreviousMessages, MESSAGE_LOAD_DIRECTION.PREV))
+      requestDirectionalPrefetchIfNeeded('previous', cachedPreviousMessages[0])
       historyLoadArmedRef.current = true
       if (loadPrevFrameRef.current !== null) {
         cancelAnimationFrame(loadPrevFrameRef.current)
@@ -1348,7 +1379,8 @@ export function useChatController({
     isActiveEdgeRequestCurrent,
     isLoadingPrevious,
     loadPrevious,
-    messages
+    messages,
+    requestDirectionalPrefetchIfNeeded
   ])
 
   const loadNextItems = useCallback(async () => {
@@ -1389,6 +1421,10 @@ export function useChatController({
 
       suppressNextMessageChange()
       dispatch(addMessagesAC(cachedNextMessages, MESSAGE_LOAD_DIRECTION.NEXT))
+      requestDirectionalPrefetchIfNeeded(
+        'next',
+        [...cachedNextMessages].reverse().find((message) => !!message.id)
+      )
       latestLoadArmedRef.current = true
       if (loadNextFrameRef.current !== null) {
         cancelAnimationFrame(loadNextFrameRef.current)
@@ -1464,7 +1500,8 @@ export function useChatController({
     isActiveEdgeRequestCurrent,
     isLoadingNext,
     loadNext,
-    messages
+    messages,
+    requestDirectionalPrefetchIfNeeded
   ])
 
   const handleTimelineScroll = useCallback(() => {
@@ -1892,6 +1929,18 @@ export function useChatController({
         pendingEdgeLoad &&
         !messages.some((message) => !pendingEdgeLoad.previousIds.has(getMessageLocalRef(message)))
       ) {
+        return
+      }
+
+      if (
+        restoreState.loadDirection === 'next' &&
+        restoreState.sourceScrollTop <= PRELOAD_TRIGGER_PX + LATEST_EDGE_GAP_PX &&
+        !hasNextMessages
+      ) {
+        restoreRef.current = null
+        viewIsAtLatestRef.current = true
+        setIsViewingLatest(true)
+        scrollToLatestEdge(container, 'auto')
         return
       }
 

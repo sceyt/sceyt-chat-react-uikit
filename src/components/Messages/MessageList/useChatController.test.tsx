@@ -19,6 +19,7 @@ import {
   loadDefaultMessagesAC,
   loadLatestMessagesAC,
   loadMoreMessagesAC,
+  prefetchMessagesAC,
   reloadActiveChannelAfterReconnectAC,
   refreshCacheAroundMessageAC,
   setActivePaginationIntentAC,
@@ -2916,6 +2917,7 @@ describe('useChatController', () => {
     expect(addMessagesActions).toHaveLength(1)
     expect(addMessagesActions[0].payload.direction).toBe(MESSAGE_LOAD_DIRECTION.PREV)
     expect(addMessagesActions[0].payload.messages.map((message: IMessage) => message.id)).toEqual(['498', '499'])
+    expect(dispatch).toHaveBeenCalledWith(prefetchMessagesAC(channel.id, '498', MESSAGE_LOAD_DIRECTION.PREV, 2))
     expect(
       dispatch.mock.calls.some(
         ([action]) =>
@@ -2923,6 +2925,54 @@ describe('useChatController', () => {
             loadMoreMessagesAC(channel.id, LOAD_MAX_MESSAGE_COUNT, MESSAGE_LOAD_DIRECTION.PREV, '500', false).type &&
           action.payload.direction === MESSAGE_LOAD_DIRECTION.PREV &&
           action.payload.anchorMessageId === '500'
+      )
+    ).toBe(false)
+  })
+
+  it('prefetches more next messages when a cached next page leaves less than 100 messages ahead', () => {
+    const channel = makeChannel({ id: 'channel-cached-next-prefetch-threshold' })
+    const initialMessages = [
+      makeMessage({ id: '500', channelId: channel.id, body: 'msg-500' }),
+      makeMessage({ id: '501', channelId: channel.id, body: 'msg-501' })
+    ]
+    const cachedNextMessages = [
+      makeMessage({ id: '502', channelId: channel.id, body: 'msg-502' }),
+      makeMessage({ id: '503', channelId: channel.id, body: 'msg-503' })
+    ]
+
+    initialMessages.forEach((message) => addMessageToMap(channel.id, message))
+    cachedNextMessages.forEach((message) => addMessageToMap(channel.id, message))
+    setActiveSegment(channel.id, '500', '503')
+
+    const dispatch = jest.fn()
+    const rendered = renderController({
+      channel,
+      messages: initialMessages,
+      hasPrevMessages: false,
+      hasNextMessages: false,
+      dispatch
+    })
+
+    dispatch.mockClear()
+
+    act(() => {
+      setScrollMetrics(rendered.scrollable, { scrollTop: 8, scrollHeight: 800, clientHeight: 240 })
+      fireEvent.scroll(rendered.scrollable)
+    })
+
+    const addMessagesActions = dispatch.mock.calls
+      .map(([action]) => action)
+      .filter((action) => action.type === addMessagesAC([], MESSAGE_LOAD_DIRECTION.NEXT).type)
+
+    expect(addMessagesActions).toHaveLength(1)
+    expect(addMessagesActions[0].payload.direction).toBe(MESSAGE_LOAD_DIRECTION.NEXT)
+    expect(addMessagesActions[0].payload.messages.map((message: IMessage) => message.id)).toEqual(['502', '503'])
+    expect(dispatch).toHaveBeenCalledWith(prefetchMessagesAC(channel.id, '503', MESSAGE_LOAD_DIRECTION.NEXT, 2))
+    expect(
+      dispatch.mock.calls.some(
+        ([action]) =>
+          action.type ===
+          loadMoreMessagesAC(channel.id, LOAD_MAX_MESSAGE_COUNT, MESSAGE_LOAD_DIRECTION.NEXT, '501', false).type
       )
     ).toBe(false)
   })

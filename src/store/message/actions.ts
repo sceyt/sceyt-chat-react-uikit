@@ -14,6 +14,7 @@ import {
   GET_MESSAGES_ATTACHMENTS,
   GET_REACTIONS,
   LOAD_MORE_MESSAGES,
+  PREFETCH_MESSAGES,
   LOAD_MORE_MESSAGES_ATTACHMENTS,
   LOAD_MORE_REACTIONS,
   PAUSE_ATTACHMENT_UPLOADING,
@@ -410,6 +411,18 @@ export function loadMoreMessagesAC(
   }
 
   return action
+}
+
+export function prefetchMessagesAC(channelId: string, fromMessageId: string, direction: string, pages: number) {
+  return {
+    type: PREFETCH_MESSAGES,
+    payload: {
+      channelId,
+      fromMessageId,
+      direction,
+      pages
+    }
+  }
 }
 
 export function setActivePaginationIntentAC(

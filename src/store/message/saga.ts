@@ -16,6 +16,7 @@ import {
   GET_MESSAGES_ATTACHMENTS,
   GET_REACTIONS,
   LOAD_MORE_MESSAGES,
+  PREFETCH_MESSAGES,
   LOAD_MORE_MESSAGES_ATTACHMENTS,
   LOAD_MORE_REACTIONS,
   PAUSE_ATTACHMENT_UPLOADING,
@@ -2900,6 +2901,15 @@ function* prefetchMessages(channelId: string, fromMessageId: string, direction: 
   }
 }
 
+function* prefetchMessagesFromAction(action: IAction): any {
+  const { channelId, fromMessageId, direction, pages } = action.payload
+  if (!channelId || !fromMessageId || !direction || !pages) {
+    return
+  }
+
+  yield call(prefetchMessages, channelId, fromMessageId, direction, pages)
+}
+
 function* loadMoreMessages(action: IAction): any {
   let acquiredLock = false
   let loadingScope: MessageListLoadScope = 'both'
@@ -3947,6 +3957,7 @@ export const __messageSagaTestables = {
   loadAroundMessageWorker,
   getMessagesQuery,
   prefetchMessages,
+  prefetchMessagesFromAction,
   refreshCacheAroundMessage
 }
 
@@ -4062,6 +4073,7 @@ export default function* MessageSaga() {
   yield takeLatest(ADD_REACTION, addReaction)
   yield takeLatest(DELETE_REACTION, deleteReaction)
   yield takeEvery(LOAD_MORE_MESSAGES, loadMoreMessages)
+  yield takeEvery(PREFETCH_MESSAGES, prefetchMessagesFromAction)
   yield takeEvery(GET_REACTIONS, getReactions)
   yield takeEvery(LOAD_MORE_REACTIONS, loadMoreReactions)
   yield takeEvery(PAUSE_ATTACHMENT_UPLOADING, pauseAttachmentUploading)
