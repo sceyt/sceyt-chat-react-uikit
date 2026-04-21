@@ -942,7 +942,7 @@ const MessageList: React.FC<MessagesProps> = ({
           id='draggingContainer'
           draggable
           onDragLeave={handleDragOut}
-          topOffset={scrollRef.current?.offsetTop}
+          topOffset={(scrollRef.current?.offsetParent as any)?.offsetTop || 0}
           height={scrollRef.current?.offsetHeight}
           backgroundColor={backgroundColor || background}
         >
