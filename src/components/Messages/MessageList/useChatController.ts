@@ -927,11 +927,17 @@ export function useChatController({
       if (cachedConfirmedCount >= PREFETCH_CACHE_MESSAGE_THRESHOLD) {
         return
       }
+      const messageId =
+        cachedMessages && cachedMessages?.length
+          ? direction === 'previous'
+            ? cachedMessages[0].id
+            : cachedMessages[cachedMessages?.length - 1].id
+          : fromMessage.id
 
       dispatch(
         prefetchMessagesAC(
           channel.id,
-          cachedMessages && cachedMessages?.length ? cachedMessages[0].id : fromMessage.id,
+          messageId,
           direction === 'previous' ? MESSAGE_LOAD_DIRECTION.PREV : MESSAGE_LOAD_DIRECTION.NEXT,
           2
         )
