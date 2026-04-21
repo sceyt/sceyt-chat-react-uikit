@@ -494,7 +494,9 @@ const addPendingMessage = (message: any, messageCopy: IMessage, channelId: strin
     store.dispatch(updateChannelLastMessageAC(nextLastMessage, { id: channelId } as IChannel))
     updateChannelLastMessageOnAllChannels(channelId, nextLastMessage)
   }
-  store.dispatch(addMessagesAC([messageToAdd], 'next'))
+  if (getActiveChannelId() === channelId) {
+    store.dispatch(addMessagesAC([messageToAdd], 'next'))
+  }
 }
 
 const addConfirmedMessageToCache = (channelId: string, message: IMessage) => {

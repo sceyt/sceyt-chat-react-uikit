@@ -2391,6 +2391,90 @@ describe('message saga message-list flows', () => {
     )
   })
 
+  it('does not append a forwarded message to the visible list when forwarding to another channel', async () => {
+    const currentUser = makeUser({ id: 'current-user' })
+    const sourceUser = makeUser({ id: 'source-user' })
+    const activeChannelId = 'active-channel-forward-source'
+    const destinationChannel = makeChannel({
+      id: 'destination-channel-forward-target',
+      lastMessage: makeMessage({
+        id: '731',
+        channelId: 'destination-channel-forward-target',
+        body: 'destination-last'
+      })
+    })
+    const createdForward = makePendingMessage({
+      channelId: destinationChannel.id,
+      tid: 'cross-channel-forward-tid',
+      body: 'cross channel forward body',
+      metadata: '{}',
+      user: currentUser,
+      forwardingDetails: {
+        messageId: 'origin-cross-channel'
+      } as any
+    })
+    const confirmedForward = makeMessage({
+      id: '732',
+      tid: createdForward.tid,
+      channelId: destinationChannel.id,
+      body: 'cross channel forward body',
+      metadata: {} as any,
+      user: currentUser,
+      forwardingDetails: {
+        messageId: 'origin-cross-channel'
+      } as any
+    })
+    const builder = {
+      setBody: jest.fn().mockReturnThis(),
+      setBodyAttributes: jest.fn().mockReturnThis(),
+      setAttachments: jest.fn().mockReturnThis(),
+      setMentionUserIds: jest.fn().mockReturnThis(),
+      setType: jest.fn().mockReturnThis(),
+      setDisableMentionsCount: jest.fn().mockReturnThis(),
+      setMetadata: jest.fn().mockReturnThis(),
+      setForwardingMessageId: jest.fn().mockReturnThis(),
+      setPollDetails: jest.fn().mockReturnThis(),
+      create: jest.fn(() => createdForward)
+    }
+
+    destinationChannel.createMessageBuilder = jest.fn(() => builder as any)
+    destinationChannel.sendMessage = jest.fn(() => resolveWithMockServerDelay(confirmedForward))
+
+    mockStoreState.UserReducer.connectionStatus = CONNECTION_STATUS.CONNECTED
+    setActiveChannelId(activeChannelId)
+    setChannelInMap(destinationChannel)
+    setClient({
+      user: { id: 'current-user' },
+      Channel: { create: jest.fn() }
+    })
+
+    const sourceMessage = makeMessage({
+      id: 'origin-cross-channel',
+      channelId: activeChannelId,
+      body: 'cross channel forward body',
+      metadata: {} as any,
+      user: sourceUser,
+      attachments: []
+    })
+
+    const dispatched = await runMessageSaga(
+      __messageSagaTestables.forwardMessage,
+      forwardMessageAC(sourceMessage, destinationChannel.id, CONNECTION_STATUS.CONNECTED, true)
+    )
+
+    expect(mockStore.dispatch.mock.calls.some(([action]) => action.type === addMessagesAC([], 'next').type)).toBe(
+      false
+    )
+    expect(dispatched.some((action) => action.type === updateMessageAC(createdForward.tid, {}, true).type)).toBe(false)
+    expect(getPendingMessagesFromMap(destinationChannel.id)).toEqual([])
+    expect(getMessageFromMap(destinationChannel.id, confirmedForward.id)).toEqual(
+      expect.objectContaining({ id: confirmedForward.id, tid: createdForward.tid })
+    )
+    expect(getChannelFromMap(destinationChannel.id)?.lastMessage).toEqual(
+      expect.objectContaining({ id: confirmedForward.id, body: 'cross channel forward body' })
+    )
+  })
+
   it('edits the latest message and updates both the visible list state and channel last message', async () => {
     const currentUser = makeUser({ id: 'current-user' })
     const channel = makeChannel({
