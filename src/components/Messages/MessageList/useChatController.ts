@@ -2211,9 +2211,9 @@ export function useChatController({
 
   useEffect(() => {
     const latestLocalRef = getMessageLocalRef(channel.lastMessage)
-    const shouldShow =
-      (!!latestLocalRef && lastVisibleMessageId !== latestLocalRef) ||
-      (!isViewingLatest && (pendingNewestCount > 0 || !!scrollToMentionedMessage))
+    const latestVisibleMessages = Object.values(getVisibleMessagesMap())
+    const isLatestInView = latestVisibleMessages.find((m) => m.sortKey === latestLocalRef)
+    const shouldShow = !isLatestInView || (!isViewingLatest && (pendingNewestCount > 0 || !!scrollToMentionedMessage))
     if (showScrollToNewMessageButton !== shouldShow) {
       dispatch(showScrollToNewMessageButtonAC(shouldShow))
     }

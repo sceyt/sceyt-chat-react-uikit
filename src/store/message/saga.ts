@@ -157,7 +157,8 @@ import {
   getCachedWindowInterval,
   LOAD_MAX_MESSAGE_COUNT_PREFETCH,
   removeMessageFromMap,
-  checkIsItSentAlready
+  checkIsItSentAlready,
+  getMessageLocalRef
 } from '../../helpers/messagesHalper'
 import { navigateToLatest } from '../../helpers/messageListNavigator'
 import { CONNECTION_STATUS } from '../user/constants'
@@ -2383,8 +2384,7 @@ function* backgroundCacheAroundMessage(action: IAction): any {
       messageId
     )
 
-    let loadNextMessageId =
-      firstResult.messages.length > 0 ? getLastConfirmedMessageId(firstResult.messages) : '0'
+    const loadNextMessageId = firstResult.messages.length > 0 ? getLastConfirmedMessageId(firstResult.messages) : '0'
 
     messageQuery.reverse = false
     messageQuery.limit = MESSAGES_MAX_PAGE_COUNT / 2
@@ -3113,6 +3113,11 @@ function* addReaction(action: IAction): any {
     yield put(addReactionToListAC(reaction))
     yield put(addReactionToMessageAC(message, reaction, true))
     addReactionToMessageOnMap(channelId, message, reaction, true)
+    if (getMessageLocalRef(message) === getMessageLocalRef(channel.lastMessage)) {
+      setTimeout(() => {
+        navigateToLatest(true)
+      }, 200)
+    }
   } catch (e) {
     log.error('ERROR in add reaction', e.message)
     // yield put(setErrorNotification(e.message))
