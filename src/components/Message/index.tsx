@@ -632,6 +632,14 @@ const Message = ({
   ])
 
   useEffect(() => {
+    return () => {
+      if (!channel.isLinkedChannel) {
+        removeMessageFromVisibleMessagesMap(message)
+      }
+    }
+  }, [channel.isLinkedChannel, message])
+
+  useEffect(() => {
     if (!isVisible && infoPopupOpen) {
       setInfoPopupOpen(false)
     }

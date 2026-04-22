@@ -94,6 +94,14 @@ const Message = ({
     setLastVisibleMessageId
   ])
 
+  useEffect(() => {
+    return () => {
+      if (!channel.isLinkedChannel) {
+        removeMessageFromVisibleMessagesMap(message)
+      }
+    }
+  }, [channel.isLinkedChannel, message])
+
   return (
     <Container
       id={message.id || message.tid}
