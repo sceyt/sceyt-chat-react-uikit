@@ -1336,6 +1336,12 @@ export function useChatController({
     ]
   )
 
+  const isPreviousPaginationBlocked = useCallback(
+    (allowWhilePreviousLoading = false) =>
+      !!windowLoadScopeRef.current || (!allowWhilePreviousLoading && isPreviousLoading),
+    [isPreviousLoading]
+  )
+
   const loadPreviousItems = useCallback(async () => {
     if (isJumping.current) {
       return
@@ -1383,6 +1389,12 @@ export function useChatController({
         loadPrevFrameRef.current = null
         handleScrollRef.current()
       })
+      return
+    }
+
+    if (isPreviousPaginationBlocked()) {
+      pendingEdgeCheckAfterLoadRef.current = true
+      historyLoadArmedRef.current = true
       return
     }
 
@@ -1448,6 +1460,7 @@ export function useChatController({
     suppressNextMessageChange,
     hasNext,
     hasPrevious,
+    isPreviousPaginationBlocked,
     isActiveEdgeRequestCurrent,
     isLoadingPrevious,
     loadPrevious,
@@ -1670,6 +1683,14 @@ export function useChatController({
       }
       activeEdgeIntentRef.current = 'previous'
       if (historyLoadArmedRef.current) {
+        const oldestVisibleMessage = messages[0]
+        const hasCachedPreviousMessages = oldestVisibleMessage
+          ? getCachedPreviousMessages(oldestVisibleMessage).length > 0
+          : false
+        if (isPreviousPaginationBlocked(hasCachedPreviousMessages)) {
+          pendingEdgeCheckAfterLoadRef.current = true
+          return
+        }
         historyLoadArmedRef.current = false
         loadPreviousItems()
         return
@@ -1721,8 +1742,10 @@ export function useChatController({
     hasNext,
     hasPrevious,
     invalidateEdgeDirection,
+    getCachedPreviousMessages,
     isLatestJumpLocked,
     isActiveEdgeRequestCurrent,
+    isPreviousPaginationBlocked,
     loadNextItems,
     loadPreviousItems,
     queueVisibleUnreadCheck,
@@ -2112,6 +2135,25 @@ export function useChatController({
     syncLatestState()
     queueVisibleUnreadCheck()
   }, [messages, notifyIncomingItems, notifyOutgoingItem, queueVisibleUnreadCheck, syncLatestState])
+
+  useEffect(() => {
+    if (
+      !pendingEdgeCheckAfterLoadRef.current ||
+      loadingPrevMessages === LOADING_STATE.LOADING ||
+      loadingNextMessages === LOADING_STATE.LOADING
+    ) {
+      return
+    }
+
+    pendingEdgeCheckAfterLoadRef.current = false
+    const frameId = requestAnimationFrame(() => {
+      handleScrollRef.current()
+    })
+
+    return () => {
+      cancelAnimationFrame(frameId)
+    }
+  }, [loadingNextMessages, loadingPrevMessages])
 
   useEffect(() => {
     serverUnreadCountRef.current = channel.newMessageCount || 0

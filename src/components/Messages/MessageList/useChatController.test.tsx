@@ -5011,6 +5011,58 @@ describe('useChatController', () => {
     )
   })
 
+  it('keeps history pagination armed when initial loading blocks a top-edge scroll', async () => {
+    const channel = makeChannel({
+      id: 'channel-history-edge-loading-blocked'
+    })
+    const messages = [
+      makeMessage({ id: '930', channelId: channel.id, body: 'confirmed-930' }),
+      makeMessage({ id: '931', channelId: channel.id, body: 'confirmed-931' }),
+      makeMessage({ id: '932', channelId: channel.id, body: 'confirmed-932' })
+    ]
+    const rendered = renderController({
+      channel,
+      messages,
+      hasPrevMessages: true,
+      loadingPrevMessages: LOADING_STATE.LOADING
+    })
+    const { scrollable, dispatch } = rendered
+
+    dispatch.mockClear()
+
+    act(() => {
+      setScrollMetrics(scrollable, {
+        scrollTop: 558,
+        scrollHeight: 800,
+        clientHeight: 240
+      })
+      fireEvent.scroll(scrollable)
+    })
+
+    expect(dispatch).not.toHaveBeenCalledWith(
+      loadMoreMessagesAC(channel.id, LOAD_MAX_MESSAGE_COUNT, MESSAGE_LOAD_DIRECTION.PREV, '930', true)
+    )
+
+    rendered.rerender(
+      <ControllerHarness
+        channel={channel}
+        messages={messages}
+        hasPrevMessages={true}
+        loadingPrevMessages={LOADING_STATE.LOADED}
+        dispatch={dispatch}
+      />
+    )
+
+    await flushEffects()
+    act(() => {
+      flushAnimationFrames()
+    })
+
+    expect(dispatch).toHaveBeenCalledWith(
+      loadMoreMessagesAC(channel.id, LOAD_MAX_MESSAGE_COUNT, MESSAGE_LOAD_DIRECTION.PREV, '930', true)
+    )
+  })
+
   it('loads the previous page when a fast wheel scroll overshoots the history edge and clamps to the real max scrollTop', () => {
     const channel = makeChannel({
       id: 'channel-wheel-prev-fast'
