@@ -1013,11 +1013,11 @@ function* markMessagesRead(action: IAction): any {
       // yield put(setChannelUnreadCount(0, channel.id));
       yield put(
         updateChannelDataAC(channel.id, {
-          lastReadMessageId: channel.lastDisplayedMessageId
+          lastDisplayedMessageId: channel.lastDisplayedMessageId
         })
       )
       updateChannelOnAllChannels(channel.id, {
-        lastReadMessageId: channel.lastDisplayedMessageId
+        lastDisplayedMessageId: channel.lastDisplayedMessageId
       })
       for (const messageId of messageListMarker.messageIds) {
         const updateParams = {
@@ -1280,11 +1280,12 @@ function* markChannelAsRead(action: IAction): any {
       channel = getChannelFromAllChannels(channelId)
     }
     // const updatedChannel = yield call(channel.markAsRead)
-    yield call(channel.markAsRead)
+    const updatedChannel = yield call(channel.markAsRead)
     const updateData = {
       unread: false,
       newMessageCount: 0,
-      newMentionCount: 0
+      newMentionCount: 0,
+      lastDisplayedMessageId: updatedChannel?.lastDisplayedMessageId
     }
     updateChannelOnAllChannels(channel.id, updateData)
     yield put(updateChannelDataAC(channel.id, updateData))
@@ -1994,4 +1995,9 @@ export default function* ChannelsSaga() {
   yield takeLatest(GET_CHANNEL_BY_INVITE_KEY, getChannelByInviteKey)
   yield takeLatest(JOIN_TO_CHANNEL_WITH_INVITE_KEY, joinChannelWithInviteKey)
   yield takeLatest(SET_MESSAGE_RETENTION_PERIOD, setMessageRetentionPeriod)
+}
+
+export const __channelSagaTestables = {
+  markMessagesRead,
+  markChannelAsRead
 }
