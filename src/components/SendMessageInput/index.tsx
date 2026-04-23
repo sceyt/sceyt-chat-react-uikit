@@ -199,7 +199,7 @@ function onError(error: any) {
 let prevActiveChannelId: any
 let attachmentsUpdate: any = []
 
-interface SendMessageProps {
+export interface SendMessageProps {
   draggedAttachments?: boolean
   // eslint-disable-next-line no-unused-vars
   handleAttachmentSelected?: (state: boolean) => void
@@ -262,6 +262,11 @@ interface SendMessageProps {
   replyEditMessageContainerBottomPosition?: string
   replyEditMessageContainerLeftPosition?: string
   replyEditMessageContainerPadding?: string
+  customReplyMessageTypes?: string[]
+  CustomReplyMessageContainer?: FC<{
+    messageForReply: IMessage
+    onClose: () => void
+  }>
   editMessageIcon?: JSX.Element
   editMessageBackgroundColor?: string
   editMessageTextColor?: string
@@ -340,6 +345,8 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
   replyEditMessageContainerBottomPosition,
   replyEditMessageContainerPadding,
   replyEditMessageContainerLeftPosition,
+  customReplyMessageTypes,
+  CustomReplyMessageContainer,
   sendAttachmentSeparately,
   allowMentionUser = true,
   allowTextEdit = true,
@@ -1913,100 +1920,106 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
                     <CloseEditMode color={textSecondary} onClick={handleCloseReply}>
                       <CloseIcon />
                     </CloseEditMode>
-                    <ReplyMessageCont>
-                      {!!(messageForReply.attachments && messageForReply.attachments.length) &&
-                        !messageForReply.viewOnce &&
-                        (messageForReply.attachments[0].type === attachmentTypes.image ||
-                        messageForReply.attachments[0].type === attachmentTypes.video ? (
-                          <Attachment
-                            attachment={messageForReply.attachments[0]}
-                            backgroundColor={selectedFileAttachmentsBoxBackground || ''}
-                            isRepliedMessage
-                          />
-                        ) : (
-                          messageForReply.attachments[0].type === attachmentTypes.file && (
-                            <ReplyIconWrapper backgroundColor={accentColor} iconColor={textOnPrimary}>
-                              <ChooseFileIcon />
-                            </ReplyIconWrapper>
-                          )
-                        ))}
-                      <ReplyMessageBody linkColor={accentColor}>
-                        <EditReplyMessageHeader color={accentColor}>
-                          {replyMessageIcon || <ReplyIcon />} Reply to
-                          <UserName>
-                            {user.id === messageForReply.user.id
-                              ? user.firstName
-                                ? `${user.firstName} ${user.lastName}`
-                                : user.id
-                              : makeUsername(
-                                  contactsMap[messageForReply.user.id],
-                                  messageForReply.user,
-                                  getFromContacts
-                                )}
-                          </UserName>
-                        </EditReplyMessageHeader>
-                        {messageForReply.attachments && messageForReply.attachments.length ? (
-                          messageForReply.attachments[0].type === attachmentTypes.voice ? (
-                            <TextInOneLine>
-                              {messageForReply?.viewOnce && <ViewOnceIconOpen style={{ margin: '0 4px -3px 0' }} />}
-                              {messageForReply.body && !messageForReply.viewOnce ? messageForReply.body : 'Voice'}
-                            </TextInOneLine>
-                          ) : !messageForReply.viewOnce &&
-                            messageForReply.body &&
-                            messageForReply.bodyAttributes &&
-                            messageForReply.bodyAttributes.length > 0 ? (
+                    {CustomReplyMessageContainer && customReplyMessageTypes?.includes(messageForReply.type) ? (
+                      <CustomReplyMessageContainer messageForReply={messageForReply} onClose={handleCloseReply} />
+                    ) : (
+                      <ReplyMessageCont>
+                        {!!(messageForReply.attachments && messageForReply.attachments.length) &&
+                          !messageForReply.viewOnce &&
+                          (messageForReply.attachments[0].type === attachmentTypes.image ||
+                          messageForReply.attachments[0].type === attachmentTypes.video ? (
+                            <Attachment
+                              attachment={messageForReply.attachments[0]}
+                              backgroundColor={selectedFileAttachmentsBoxBackground || ''}
+                              isRepliedMessage
+                            />
+                          ) : (
+                            messageForReply.attachments[0].type === attachmentTypes.file && (
+                              <ReplyIconWrapper backgroundColor={accentColor} iconColor={textOnPrimary}>
+                                <ChooseFileIcon />
+                              </ReplyIconWrapper>
+                            )
+                          ))}
+                        <ReplyMessageBody linkColor={accentColor}>
+                          <EditReplyMessageHeader color={accentColor}>
+                            {replyMessageIcon || <ReplyIcon />} Reply to
+                            <UserName>
+                              {user.id === messageForReply.user.id
+                                ? user.firstName
+                                  ? `${user.firstName} ${user.lastName}`
+                                  : user.id
+                                : makeUsername(
+                                    contactsMap[messageForReply.user.id],
+                                    messageForReply.user,
+                                    getFromContacts
+                                  )}
+                            </UserName>
+                          </EditReplyMessageHeader>
+                          {messageForReply.attachments && messageForReply.attachments.length ? (
+                            messageForReply.attachments[0].type === attachmentTypes.voice ? (
+                              <TextInOneLine>
+                                {messageForReply?.viewOnce && <ViewOnceIconOpen style={{ margin: '0 4px -3px 0' }} />}
+                                {messageForReply.body && !messageForReply.viewOnce ? messageForReply.body : 'Voice'}
+                              </TextInOneLine>
+                            ) : !messageForReply.viewOnce &&
+                              messageForReply.body &&
+                              messageForReply.bodyAttributes &&
+                              messageForReply.bodyAttributes.length > 0 ? (
+                              MessageTextFormat({
+                                text: messageForReply.body,
+                                message: {
+                                  ...messageForReply,
+                                  mentionedUsers:
+                                    messageForReply.mentionedUsers && messageForReply.mentionedUsers.length > 0
+                                      ? messageForReply.mentionedUsers
+                                      : activeChannelMembers &&
+                                          messageForReply.bodyAttributes &&
+                                          messageForReply.bodyAttributes.length > 0
+                                        ? messageForReply.bodyAttributes
+                                            .filter((attr: any) => attr.type.includes('mention'))
+                                            .map((attr: any) => {
+                                              const member = activeChannelMembers.find(
+                                                (m: any) => m.id === attr.metadata
+                                              )
+                                              return member || null
+                                            })
+                                            .filter((m: IMember | null): m is IMember => m !== null)
+                                        : messageForReply.mentionedUsers || [],
+                                  channel: activeChannelMembers ? { members: activeChannelMembers } : undefined
+                                },
+                                contactsMap,
+                                getFromContacts,
+                                accentColor,
+                                textSecondary
+                              })
+                            ) : messageForReply.attachments[0].type === attachmentTypes.image ? (
+                              <TextInOneLine>
+                                {messageForReply?.viewOnce && <ViewOnceIconOpen style={{ margin: '0 4px -2px 0' }} />}
+                                {messageForReply.body && !messageForReply.viewOnce ? messageForReply.body : 'Photo'}
+                              </TextInOneLine>
+                            ) : messageForReply.attachments[0].type === attachmentTypes.video ? (
+                              <TextInOneLine>
+                                {messageForReply?.viewOnce && <ViewOnceIconOpen style={{ margin: '0 4px -2px 0' }} />}
+                                {messageForReply.body && !messageForReply.viewOnce ? messageForReply.body : 'Video'}
+                              </TextInOneLine>
+                            ) : (
+                              <TextInOneLine>
+                                {messageForReply.body && !messageForReply.viewOnce ? messageForReply.body : 'File'}
+                              </TextInOneLine>
+                            )
+                          ) : (
                             MessageTextFormat({
                               text: messageForReply.body,
-                              message: {
-                                ...messageForReply,
-                                mentionedUsers:
-                                  messageForReply.mentionedUsers && messageForReply.mentionedUsers.length > 0
-                                    ? messageForReply.mentionedUsers
-                                    : activeChannelMembers &&
-                                        messageForReply.bodyAttributes &&
-                                        messageForReply.bodyAttributes.length > 0
-                                      ? messageForReply.bodyAttributes
-                                          .filter((attr: any) => attr.type.includes('mention'))
-                                          .map((attr: any) => {
-                                            const member = activeChannelMembers.find((m: any) => m.id === attr.metadata)
-                                            return member || null
-                                          })
-                                          .filter((m: IMember | null): m is IMember => m !== null)
-                                      : messageForReply.mentionedUsers || [],
-                                channel: activeChannelMembers ? { members: activeChannelMembers } : undefined
-                              },
+                              message: messageForReply,
                               contactsMap,
                               getFromContacts,
                               accentColor,
                               textSecondary
                             })
-                          ) : messageForReply.attachments[0].type === attachmentTypes.image ? (
-                            <TextInOneLine>
-                              {messageForReply?.viewOnce && <ViewOnceIconOpen style={{ margin: '0 4px -2px 0' }} />}
-                              {messageForReply.body && !messageForReply.viewOnce ? messageForReply.body : 'Photo'}
-                            </TextInOneLine>
-                          ) : messageForReply.attachments[0].type === attachmentTypes.video ? (
-                            <TextInOneLine>
-                              {messageForReply?.viewOnce && <ViewOnceIconOpen style={{ margin: '0 4px -2px 0' }} />}
-                              {messageForReply.body && !messageForReply.viewOnce ? messageForReply.body : 'Video'}
-                            </TextInOneLine>
-                          ) : (
-                            <TextInOneLine>
-                              {messageForReply.body && !messageForReply.viewOnce ? messageForReply.body : 'File'}
-                            </TextInOneLine>
-                          )
-                        ) : (
-                          MessageTextFormat({
-                            text: messageForReply.body,
-                            message: messageForReply,
-                            contactsMap,
-                            getFromContacts,
-                            accentColor,
-                            textSecondary
-                          })
-                        )}
-                      </ReplyMessageBody>
-                    </ReplyMessageCont>
+                          )}
+                        </ReplyMessageBody>
+                      </ReplyMessageCont>
+                    )}
                   </EditReplyMessageCont>
                 )}
                 {showLinkPreview && linkPreview && (
