@@ -69,13 +69,21 @@ function setFloatingElemPosition(
 
   const floatingElemRect = floatingElem.getBoundingClientRect()
   const anchorElementRect = anchorElem.getBoundingClientRect()
-  const top = floatingElemRect.height - targetRect.height + verticalGap
   const menuWidthHalf = floatingElemRect.width / 2
   const selectionWidthHalf = targetRect.width / 2
   const left = targetRect.left - anchorElementRect.left + horizontalOffset - menuWidthHalf + selectionWidthHalf
 
+  // Clamp to the anchor's visible top so scrolled-out-of-view content doesn't push the popup far above
+  const effectiveTop = Math.max(targetRect.top, anchorElementRect.top)
+  let top = effectiveTop - anchorElementRect.top - floatingElemRect.height - verticalGap
+
+  // If the popup would overflow above the viewport, flip it below the selection instead
+  if (effectiveTop - floatingElemRect.height - verticalGap < 0) {
+    top = Math.min(targetRect.bottom, anchorElementRect.bottom) - anchorElementRect.top + verticalGap
+  }
+
   floatingElem.style.opacity = '1'
-  floatingElem.style.transform = `translate(${left}px, ${-top}px)`
+  floatingElem.style.transform = `translate(${left}px, ${top}px)`
 }
 
 export function getSelectedNode(selection: RangeSelection): TextNode | ElementNode {
