@@ -98,7 +98,7 @@ import {
   removePendingDeleteChannel,
   updateChannelMemberInAllChannels
 } from '../../helpers/channelHalper'
-import { DEFAULT_CHANNEL_TYPE, LOADING_STATE, MESSAGE_DELIVERY_STATUS } from '../../helpers/constants'
+import { DEFAULT_CHANNEL_TYPE, LOADING_STATE, MESSAGE_DELIVERY_STATUS, USER_STATE } from '../../helpers/constants'
 import { MESSAGE_TYPE } from '../../types/enum'
 import { IAction, IChannel, IContact, IMember, IMessage } from '../../types'
 import { getClient } from '../../common/client'
@@ -118,7 +118,7 @@ import { setActionIsRestrictedAC, updateMembersPresenceAC } from '../member/acti
 import { updateUserStatusOnMapAC } from '../user/actions'
 import { isJSON, makeUsername } from '../../helpers/message'
 import { getShowOnlyContactUsers } from '../../helpers/contacts'
-import { updateUserOnMap, usersMap } from '../../helpers/userHelper'
+import { updateUserOnMap, usersMap, hideUserPresence } from '../../helpers/userHelper'
 import log from 'loglevel'
 import { queryDirection } from 'store/message/constants'
 import store from 'store'
@@ -673,7 +673,15 @@ function* getChannelsForForward(): any {
       return channel.type === DEFAULT_CHANNEL_TYPE.BROADCAST || channel.type === DEFAULT_CHANNEL_TYPE.PUBLIC
         ? channel.userRole === 'admin' || channel.userRole === 'owner'
         : channel.type === DEFAULT_CHANNEL_TYPE.DIRECT
-          ? isSelfChannel || channel.members.find((member) => member.id && member.id !== SceytChatClient.user.id)
+          ? isSelfChannel ||
+            channel.members.find(
+              (member) =>
+                member.id &&
+                member.id !== SceytChatClient.user.id &&
+                !member.blocked &&
+                member.state !== USER_STATE.DELETED &&
+                !(hideUserPresence && hideUserPresence(member))
+            )
           : true
     })
     const { channels: mappedChannels } = yield call(setChannelsInMap, channelsToAdd)
@@ -735,10 +743,17 @@ function* searchChannelsForForward(action: IAction): any {
               directChannelUser,
               getFromContacts
             ).toLowerCase()
+            const isBlockedOrDeleted =
+              !isSelfChannel &&
+              directChannelUser &&
+              (directChannelUser.blocked ||
+                directChannelUser.state === USER_STATE.DELETED ||
+                !!(hideUserPresence && hideUserPresence(directChannelUser)))
             if (
-              userName.includes(lowerCaseSearchBy) ||
-              (isSelfChannel && 'me'.includes(lowerCaseSearchBy)) ||
-              (isSelfChannel && 'you'.includes(lowerCaseSearchBy))
+              !isBlockedOrDeleted &&
+              (userName.includes(lowerCaseSearchBy) ||
+                (isSelfChannel && 'me'.includes(lowerCaseSearchBy)) ||
+                (isSelfChannel && 'you'.includes(lowerCaseSearchBy)))
             ) {
               // directChannels.push(JSON.parse(JSON.stringify(channel)))
               chatsGroups.push(channel)
@@ -746,7 +761,9 @@ function* searchChannelsForForward(action: IAction): any {
           } else {
             if (channel.subject && channel.subject.toLowerCase().includes(lowerCaseSearchBy)) {
               if (channel.type === DEFAULT_CHANNEL_TYPE.PUBLIC || channel.type === DEFAULT_CHANNEL_TYPE.BROADCAST) {
-                publicChannels.push(channel)
+                if (channel.userRole === 'admin' || channel.userRole === 'owner') {
+                  publicChannels.push(channel)
+                }
               } else {
                 chatsGroups.push(channel)
               }
@@ -793,7 +810,8 @@ function* searchChannelsForForward(action: IAction): any {
       handleChannels(Object.values(channelsMap))
       const channelsToAdd = channelsData.channels.filter(
         (channel: IChannel) =>
-          channel.type === DEFAULT_CHANNEL_TYPE.PUBLIC || channel.type === DEFAULT_CHANNEL_TYPE.BROADCAST
+          (channel.type === DEFAULT_CHANNEL_TYPE.PUBLIC || channel.type === DEFAULT_CHANNEL_TYPE.BROADCAST) &&
+          (channel.userRole === 'admin' || channel.userRole === 'owner')
       )
       yield put(
         setSearchedChannelsForForwardAC({
@@ -972,13 +990,23 @@ function* channelsForForwardLoadMore(action: IAction): any {
     yield put(setChannelsLoadingStateAC(LOADING_STATE.LOADING, true))
     const channelsData = yield call(channelQueryForward.loadNextPage)
     yield put(channelHasNextAC(channelsData.hasNext, true))
-    const channelsToAdd = channelsData.channels.filter((channel: IChannel) =>
-      channel.type === DEFAULT_CHANNEL_TYPE.BROADCAST || channel.type === DEFAULT_CHANNEL_TYPE.PUBLIC
+    const channelsToAdd = channelsData.channels.filter((channel: IChannel) => {
+      const isSelfChannel =
+        channel.memberCount === 1 && channel.members.length > 0 && channel.members[0].id === SceytChatClient.user.id
+      return channel.type === DEFAULT_CHANNEL_TYPE.BROADCAST || channel.type === DEFAULT_CHANNEL_TYPE.PUBLIC
         ? channel.userRole === 'admin' || channel.userRole === 'owner'
         : channel.type === DEFAULT_CHANNEL_TYPE.DIRECT
-          ? channel.members.find((member) => member.id && member.id !== SceytChatClient.user.id)
+          ? isSelfChannel ||
+            channel.members.find(
+              (member) =>
+                member.id &&
+                member.id !== SceytChatClient.user.id &&
+                !member.blocked &&
+                member.state !== USER_STATE.DELETED &&
+                !(hideUserPresence && hideUserPresence(member))
+            )
           : true
-    )
+    })
     const { channels: mappedChannels } = yield call(setChannelsInMap, channelsToAdd)
     yield put(addChannelsForForwardAC(mappedChannels))
     yield put(setChannelsLoadingStateAC(LOADING_STATE.LOADED, true))
