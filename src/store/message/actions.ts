@@ -15,6 +15,7 @@ import {
   GET_REACTIONS,
   LOAD_MORE_MESSAGES,
   PREFETCH_MESSAGES,
+  CANCEL_CHANNEL_MESSAGE_PROCESSES,
   LOAD_MORE_MESSAGES_ATTACHMENTS,
   LOAD_MORE_REACTIONS,
   PAUSE_ATTACHMENT_UPLOADING,
@@ -421,6 +422,15 @@ export function prefetchMessagesAC(channelId: string, fromMessageId: string, dir
       fromMessageId,
       direction,
       pages
+    }
+  }
+}
+
+export function cancelChannelMessageProcessesAC(channelId: string) {
+  return {
+    type: CANCEL_CHANNEL_MESSAGE_PROCESSES,
+    payload: {
+      channelId
     }
   }
 }

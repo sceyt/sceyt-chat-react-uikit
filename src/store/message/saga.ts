@@ -17,6 +17,7 @@ import {
   GET_REACTIONS,
   LOAD_MORE_MESSAGES,
   PREFETCH_MESSAGES,
+  CANCEL_CHANNEL_MESSAGE_PROCESSES,
   LOAD_MORE_MESSAGES_ATTACHMENTS,
   LOAD_MORE_REACTIONS,
   PAUSE_ATTACHMENT_UPLOADING,
@@ -188,6 +189,7 @@ const loadMoreMessagesInFlight = new Set<string>()
 const prefetchInFlight = new Set<string>()
 const queuedPrefetchRequests = new Map<string, { fromMessageId: string; pages: number }>()
 const prefetchCompletionWaiters = new Map<string, Array<() => void>>()
+const prefetchCancelVersions = new Map<string, number>()
 const ACTIVE_CHANNEL_RECONNECT_REFRESH_TIMEOUT_MS = 1500
 
 type ActivePaginationIntent = {
@@ -271,6 +273,39 @@ const notifyPrefetchCompletion = (key: string) => {
 
   prefetchCompletionWaiters.delete(key)
   waiters.forEach((resolve) => resolve())
+}
+
+const getPrefetchCancelVersion = (channelId: string) => prefetchCancelVersions.get(channelId) || 0
+
+const isPrefetchCancelled = (channelId: string, cancelVersion: number) =>
+  getPrefetchCancelVersion(channelId) !== cancelVersion
+
+function* cancelChannelMessageProcesses(action: IAction): any {
+  const channelId = action.payload?.channelId
+  if (!channelId) {
+    return
+  }
+
+  prefetchCancelVersions.set(channelId, getPrefetchCancelVersion(channelId) + 1)
+
+  Array.from(queuedPrefetchRequests.keys()).forEach((key) => {
+    if (key.startsWith(`${channelId}:`)) {
+      queuedPrefetchRequests.delete(key)
+    }
+  })
+
+  Array.from(prefetchInFlight.keys()).forEach((key) => {
+    if (key.startsWith(`${channelId}:`)) {
+      prefetchInFlight.delete(key)
+      notifyPrefetchCompletion(key)
+    }
+  })
+
+  Array.from(loadMoreMessagesInFlight.keys()).forEach((key) => {
+    if (key.startsWith(`${channelId}:`)) {
+      loadMoreMessagesInFlight.delete(key)
+    }
+  })
 }
 
 const isChannelStillActive = (channelId: string) => {
@@ -1691,6 +1726,22 @@ const sameConfirmedWindow = (leftMessages: IMessage[], rightMessages: IMessage[]
   return leftIds.every((id, index) => id === rightIds[index])
 }
 
+const containsConfirmedWindow = (outerMessages: IMessage[], innerMessages: IMessage[]) => {
+  const outerIds = confirmedWindowIds(outerMessages)
+  const innerIds = confirmedWindowIds(innerMessages)
+
+  if (!innerIds.length || innerIds.length > outerIds.length) {
+    return false
+  }
+
+  const startIndex = outerIds.indexOf(innerIds[0])
+  if (startIndex < 0 || startIndex + innerIds.length > outerIds.length) {
+    return false
+  }
+
+  return innerIds.every((id, index) => outerIds[startIndex + index] === id)
+}
+
 const getChangedActiveMessages = (currentMessages: IMessage[], nextMessages: IMessage[]) => {
   const currentById = new Map(currentMessages.filter((message) => !!message.id).map((message) => [message.id, message]))
 
@@ -2609,9 +2660,15 @@ function* loadDefaultMessages(action: IAction): any {
         yield call(loadOGMetadataForLinkMessages, appliedMessages, true, false, false)
         yield put(setMessagesHasPrevAC(true))
         yield put(setMessagesHasNextAC(false))
-        if (cachedMessages?.length && sameConfirmedWindow(cachedMessages, appliedMessages)) {
+        const shouldPatchShownCache =
+          cachedMessages?.length &&
+          (sameConfirmedWindow(cachedMessages, appliedMessages) ||
+            containsConfirmedWindow(cachedMessages, appliedMessages) ||
+            containsConfirmedWindow(cachedMessages, updatedMessages))
+
+        if (shouldPatchShownCache) {
           // Cache was already shown — only dispatch updates for messages that changed
-          const changedMessages = getChangedActiveMessages(cachedMessages, appliedMessages)
+          const changedMessages = getChangedActiveMessages(cachedMessages, updatedMessages)
           for (const message of changedMessages) {
             yield put(updateMessageAC(message.id, message))
           }
@@ -2800,14 +2857,23 @@ function* prefetchMessages(channelId: string, fromMessageId: string, direction: 
     queuePrefetchRequest(key, direction, fromMessageId, pages)
     return
   }
+  const cancelVersion = getPrefetchCancelVersion(channelId)
   prefetchInFlight.add(key)
   try {
     const SceytChatClient = getClient()
     let request: { fromMessageId: string; pages: number } | null = { fromMessageId, pages }
 
     while (request) {
+      if (isPrefetchCancelled(channelId, cancelVersion)) {
+        break
+      }
+
       let currentFromId = request.fromMessageId
       for (let i = 0; i < request.pages; i++) {
+        if (isPrefetchCancelled(channelId, cancelVersion)) {
+          break
+        }
+
         if (direction === MESSAGE_LOAD_DIRECTION.PREV) {
           if (hasPrevContiguousInMap(channelId, { id: currentFromId } as IMessage)) {
             const cached = getContiguousPrevMessages(
@@ -2825,6 +2891,9 @@ function* prefetchMessages(channelId: string, fromMessageId: string, direction: 
           mqb.reverse(true)
           const mq = yield call(mqb.build)
           const result = yield call(mq.loadPreviousMessageId, currentFromId)
+          if (isPrefetchCancelled(channelId, cancelVersion)) {
+            break
+          }
           if (!result.messages.length) break
           setMessagesToMap(
             channelId,
@@ -2863,6 +2932,9 @@ function* prefetchMessages(channelId: string, fromMessageId: string, direction: 
           mqb.reverse(false)
           const mq = yield call(mqb.build)
           const result = yield call(mq.loadNextMessageId, currentFromId)
+          if (isPrefetchCancelled(channelId, cancelVersion)) {
+            break
+          }
           if (!result.messages.length) break
           setMessagesToMap(
             channelId,
@@ -2945,6 +3017,9 @@ function* loadMoreMessages(action: IAction): any {
       let mapCached = getContiguousPrevMessages(channelId, { id: messageId } as IMessage, limit || 30)
       if (!mapCached.length && hasNext && prefetchInFlight.has(prefetchKey)) {
         yield call(waitForPrefetchCompletion, prefetchKey)
+        if (!isChannelStillActive(channelId)) {
+          return
+        }
         mapCached = getContiguousPrevMessages(channelId, { id: messageId } as IMessage, limit || 30)
       }
       if (mapCached.length > 0) {
@@ -2963,6 +3038,9 @@ function* loadMoreMessages(action: IAction): any {
           return
         }
         result = yield call(messageQuery.loadPreviousMessageId, messageId)
+        if (!isChannelStillActive(channelId)) {
+          return
+        }
         if (result.messages.length) {
           setMessagesToMap(
             channelId,
@@ -2992,6 +3070,9 @@ function* loadMoreMessages(action: IAction): any {
       let mapCached = getContiguousNextMessages(channelId, { id: messageId } as IMessage, limit || 30)
       if (!mapCached.length && hasNext && prefetchInFlight.has(prefetchKey)) {
         yield call(waitForPrefetchCompletion, prefetchKey)
+        if (!isChannelStillActive(channelId)) {
+          return
+        }
         mapCached = getContiguousNextMessages(channelId, { id: messageId } as IMessage, limit || 30)
       }
       if (mapCached.length > 0) {
@@ -3022,6 +3103,9 @@ function* loadMoreMessages(action: IAction): any {
           return
         }
         result = yield call(messageQuery.loadNextMessageId, messageId)
+        if (!isChannelStillActive(channelId)) {
+          return
+        }
         if (result.messages.length) {
           setMessagesToMap(
             channelId,
@@ -3089,10 +3173,12 @@ function* loadMoreMessages(action: IAction): any {
     if (acquiredLock) {
       loadMoreMessagesInFlight.delete(getLoadMoreInFlightKey(action.payload.channelId, action.payload.direction))
       // Always release loading state — even on error — so pagination guards never get stuck
-      if (loadingScope === 'previous') {
-        store.dispatch(setLoadingPrevMessagesStateAC(LOADING_STATE.LOADED))
-      } else if (loadingScope === 'next') {
-        store.dispatch(setLoadingNextMessagesStateAC(LOADING_STATE.LOADED))
+      if (isChannelStillActive(action.payload.channelId)) {
+        if (loadingScope === 'previous') {
+          store.dispatch(setLoadingPrevMessagesStateAC(LOADING_STATE.LOADED))
+        } else if (loadingScope === 'next') {
+          store.dispatch(setLoadingNextMessagesStateAC(LOADING_STATE.LOADED))
+        }
       }
     }
   }
@@ -3958,6 +4044,7 @@ export const __messageSagaTestables = {
   getMessagesQuery,
   prefetchMessages,
   prefetchMessagesFromAction,
+  cancelChannelMessageProcesses,
   refreshCacheAroundMessage
 }
 
@@ -3966,6 +4053,7 @@ export const __resetMessageSagaTestState = () => {
   prefetchInFlight.clear()
   queuedPrefetchRequests.clear()
   prefetchCompletionWaiters.clear()
+  prefetchCancelVersions.clear()
 }
 
 const REFRESH_WINDOW_HALF = 30
@@ -4074,6 +4162,7 @@ export default function* MessageSaga() {
   yield takeLatest(DELETE_REACTION, deleteReaction)
   yield takeEvery(LOAD_MORE_MESSAGES, loadMoreMessages)
   yield takeEvery(PREFETCH_MESSAGES, prefetchMessagesFromAction)
+  yield takeEvery(CANCEL_CHANNEL_MESSAGE_PROCESSES, cancelChannelMessageProcesses)
   yield takeEvery(GET_REACTIONS, getReactions)
   yield takeEvery(LOAD_MORE_REACTIONS, loadMoreReactions)
   yield takeEvery(PAUSE_ATTACHMENT_UPLOADING, pauseAttachmentUploading)

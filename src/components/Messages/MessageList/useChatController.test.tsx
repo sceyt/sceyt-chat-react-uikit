@@ -14,6 +14,7 @@ import { CONNECTION_STATUS } from '../../../store/user/constants'
 import { markMessagesAsReadAC } from '../../../store/channel/actions'
 import {
   addMessagesAC,
+  cancelChannelMessageProcessesAC,
   clearActivePaginationIntentAC,
   loadAroundMessageAC,
   loadDefaultMessagesAC,
@@ -4166,9 +4167,9 @@ describe('useChatController', () => {
       fireEvent.scroll(rendered.scrollable)
     })
 
-    expect(
-      dispatch.mock.calls.some(([action]) => action?.type === refreshCacheAroundMessageAC('', '').type)
-    ).toBe(false)
+    expect(dispatch.mock.calls.some(([action]) => action?.type === refreshCacheAroundMessageAC('', '').type)).toBe(
+      false
+    )
 
     fireEvent.click(screen.getByTestId('jump-to-latest'))
     act(() => {
@@ -4181,9 +4182,9 @@ describe('useChatController', () => {
       await new Promise((resolve) => window.setTimeout(resolve, 825))
     })
 
-    expect(
-      dispatch.mock.calls.some(([action]) => action?.type === refreshCacheAroundMessageAC('', '').type)
-    ).toBe(false)
+    expect(dispatch.mock.calls.some(([action]) => action?.type === refreshCacheAroundMessageAC('', '').type)).toBe(
+      false
+    )
     expect(rendered.scrollable.scrollTop).toBe(LATEST_EDGE_GAP_PX)
   })
 
@@ -4224,9 +4225,9 @@ describe('useChatController', () => {
       await new Promise((resolve) => window.setTimeout(resolve, 825))
     })
 
-    expect(
-      dispatch.mock.calls.some(([action]) => action?.type === refreshCacheAroundMessageAC('', '').type)
-    ).toBe(false)
+    expect(dispatch.mock.calls.some(([action]) => action?.type === refreshCacheAroundMessageAC('', '').type)).toBe(
+      false
+    )
   })
 
   it('restores latest-view state after jumpToLatest', async () => {
@@ -5060,6 +5061,111 @@ describe('useChatController', () => {
 
     expect(dispatch).toHaveBeenCalledWith(
       loadMoreMessagesAC(channel.id, LOAD_MAX_MESSAGE_COUNT, MESSAGE_LOAD_DIRECTION.PREV, '930', true)
+    )
+  })
+
+  it('keeps history pagination armed when the user reaches the history edge before cached messages mount', async () => {
+    const channel = makeChannel({
+      id: 'channel-cached-open-scroll-before-mount'
+    })
+    const messages = [
+      makeMessage({ id: '930', channelId: channel.id, body: 'confirmed-930' }),
+      makeMessage({ id: '931', channelId: channel.id, body: 'confirmed-931' }),
+      makeMessage({ id: '932', channelId: channel.id, body: 'confirmed-932' })
+    ]
+    const rendered = renderController({
+      channel,
+      messages: [],
+      hasPrevMessages: true
+    })
+    const { scrollable, dispatch } = rendered
+
+    dispatch.mockClear()
+
+    act(() => {
+      setScrollMetrics(scrollable, {
+        scrollTop: 558,
+        scrollHeight: 800,
+        clientHeight: 240
+      })
+      fireEvent.scroll(scrollable)
+    })
+
+    expect(dispatch).not.toHaveBeenCalledWith(
+      loadMoreMessagesAC(channel.id, LOAD_MAX_MESSAGE_COUNT, MESSAGE_LOAD_DIRECTION.PREV, '930', true)
+    )
+
+    rendered.rerender(
+      <ControllerHarness channel={channel} messages={messages} hasPrevMessages={true} dispatch={dispatch} />
+    )
+
+    await flushEffects()
+    act(() => {
+      flushAnimationFrames()
+    })
+
+    expect(scrollable.scrollTop).toBe(555)
+    expect(dispatch).toHaveBeenCalledWith(
+      loadMoreMessagesAC(channel.id, LOAD_MAX_MESSAGE_COUNT, MESSAGE_LOAD_DIRECTION.PREV, '930', true)
+    )
+  })
+
+  it('re-arms history pagination immediately after switching chats from the history edge', () => {
+    const firstChannel = makeChannel({
+      id: 'channel-history-edge-before-switch'
+    })
+    const firstMessages = [
+      makeMessage({ id: '910', channelId: firstChannel.id, body: 'first-older' }),
+      makeMessage({ id: '911', channelId: firstChannel.id, body: 'first-newer' })
+    ]
+    const rendered = renderController({
+      channel: firstChannel,
+      messages: firstMessages,
+      hasPrevMessages: true
+    })
+    const { dispatch } = rendered
+
+    act(() => {
+      setScrollMetrics(rendered.scrollable, {
+        scrollTop: 558,
+        scrollHeight: 800,
+        clientHeight: 240
+      })
+      fireEvent.scroll(rendered.scrollable)
+    })
+
+    expect(dispatch).toHaveBeenCalledWith(
+      loadMoreMessagesAC(firstChannel.id, LOAD_MAX_MESSAGE_COUNT, MESSAGE_LOAD_DIRECTION.PREV, '910', true)
+    )
+    dispatch.mockClear()
+
+    const secondChannel = makeChannel({
+      id: 'channel-history-edge-after-switch'
+    })
+    const secondMessages = [
+      makeMessage({ id: '920', channelId: secondChannel.id, body: 'second-older' }),
+      makeMessage({ id: '921', channelId: secondChannel.id, body: 'second-newer' })
+    ]
+
+    rendered.rerender(
+      <ControllerHarness channel={secondChannel} messages={secondMessages} hasPrevMessages={true} dispatch={dispatch} />
+    )
+
+    expect(dispatch).toHaveBeenCalledWith(cancelChannelMessageProcessesAC(firstChannel.id))
+    dispatch.mockClear()
+
+    const nextScrollable = rendered.container.querySelector('#scrollableDiv') as HTMLDivElement
+    act(() => {
+      setScrollMetrics(nextScrollable, {
+        scrollTop: 558,
+        scrollHeight: 800,
+        clientHeight: 240
+      })
+      fireEvent.scroll(nextScrollable)
+    })
+
+    expect(dispatch).toHaveBeenCalledWith(
+      loadMoreMessagesAC(secondChannel.id, LOAD_MAX_MESSAGE_COUNT, MESSAGE_LOAD_DIRECTION.PREV, '920', true)
     )
   })
 

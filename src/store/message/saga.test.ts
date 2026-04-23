@@ -38,6 +38,7 @@ import {
 import {
   addMessageAC,
   addMessagesAC,
+  cancelChannelMessageProcessesAC,
   deleteMessageAC,
   editMessageAC,
   forwardMessageAC,
@@ -438,6 +439,58 @@ describe('message saga message-list flows', () => {
 
     const appendPendingAction = getActionByType(dispatched, addMessagesAC([], MESSAGE_LOAD_DIRECTION.NEXT).type)
     expect(appendPendingAction.payload.messages).toEqual([])
+  })
+
+  it('keeps a larger cached default window and patches changed server messages inside it', async () => {
+    const channel = makeChannel({
+      id: 'channel-default-large-cache',
+      lastMessage: makeMessage({
+        id: '1060',
+        channelId: 'channel-default-large-cache',
+        body: 'cached-1060'
+      })
+    })
+    const cachedMessages = Array.from({ length: 60 }, (_, index) => {
+      const id = String(1001 + index)
+      return makeMessage({ id, channelId: channel.id, body: `cached-${id}`, incoming: true })
+    })
+    const refreshedMessages = cachedMessages.slice(20).map((message) =>
+      message.id === '1040'
+        ? {
+            ...message,
+            body: 'refreshed-1040'
+          }
+        : { ...message }
+    )
+    const query = createMessageQuery({
+      loadPrevious: jest.fn(() => resolveWithMockServerDelay({ messages: refreshedMessages, hasNext: true }))
+    })
+
+    mockStoreState.UserReducer.connectionStatus = CONNECTION_STATUS.CONNECTED
+    setActiveChannelId(channel.id)
+    setChannelInMap(channel)
+    cachedMessages.forEach((message) => addMessageToMap(channel.id, message))
+    setActiveSegment(channel.id, '1001', '1060')
+    setClient(createClient(query, { ...channel, lastMessage: cachedMessages[cachedMessages.length - 1] }))
+
+    const dispatched = await runMessageSaga(__messageSagaTestables.loadDefaultMessages, loadDefaultMessagesAC(channel))
+
+    const setMessagesActions = dispatched.filter((action) => action.type === setMessagesAC([], channel.id).type)
+    expect(setMessagesActions).toHaveLength(1)
+    expect(setMessagesActions[0].payload.messages).toHaveLength(60)
+    expect(setMessagesActions[0].payload.messages[0].id).toBe('1001')
+    expect(setMessagesActions[0].payload.messages.at(-1).id).toBe('1060')
+
+    expect(query.loadPrevious).toHaveBeenCalled()
+    expect(dispatched).toContainEqual(
+      updateMessageAC(
+        '1040',
+        expect.objectContaining({
+          id: '1040',
+          body: 'refreshed-1040'
+        })
+      )
+    )
   })
 
   it('reloads around the visible anchor on reconnect when refreshed channel data is available', () => {
@@ -1435,6 +1488,73 @@ describe('message saga message-list flows', () => {
         })
       ])
     )
+  })
+
+  it('cancels an in-flight prefetch for a channel switch and ignores the returned page', async () => {
+    const channelId = 'channel-prefetch-cancel'
+    const firstDeferred = (() => {
+      let resolveDeferred!: (value: QueryResult) => void
+      const promise = new Promise<QueryResult>((resolve) => {
+        resolveDeferred = resolve
+      })
+      return { promise, resolve: resolveDeferred }
+    })()
+    const query = createMessageQuery({
+      loadPreviousMessageId: jest
+        .fn()
+        .mockImplementationOnce(() => firstDeferred.promise)
+        .mockImplementationOnce(() =>
+          resolveWithMockServerDelay({
+            messages: [
+              makeMessage({ id: '896', channelId, body: 'next-prefetch-prev-1' }),
+              makeMessage({ id: '897', channelId, body: 'next-prefetch-prev-2' })
+            ],
+            hasNext: false
+          })
+        )
+    })
+
+    addMessageToMap(channelId, makeMessage({ id: '900', channelId, body: 'anchor-start' }))
+    setActiveSegment(channelId, '900', '900')
+    setClient(createClient(query))
+
+    const prefetchTask = runSaga(
+      {
+        dispatch: () => undefined,
+        getState: () => mockStoreState
+      },
+      __messageSagaTestables.prefetchMessages,
+      channelId,
+      '900',
+      MESSAGE_LOAD_DIRECTION.PREV,
+      1
+    )
+
+    await flushAsyncWork()
+    await runMessageSaga(
+      __messageSagaTestables.cancelChannelMessageProcesses,
+      cancelChannelMessageProcessesAC(channelId)
+    )
+
+    firstDeferred.resolve({
+      messages: [
+        makeMessage({ id: '898', channelId, body: 'cancelled-prefetch-prev-1' }),
+        makeMessage({ id: '899', channelId, body: 'cancelled-prefetch-prev-2' })
+      ],
+      hasNext: true
+    })
+
+    await prefetchTask.toPromise()
+
+    expect(getContiguousPrevMessages(channelId, { id: '900' } as IMessage, 10)).toEqual([])
+    expect(getActiveSegment()).toEqual({ startId: '900', endId: '900' })
+
+    await runMessageSaga(__messageSagaTestables.prefetchMessages, channelId, '900', MESSAGE_LOAD_DIRECTION.PREV, 1)
+
+    expect(getContiguousPrevMessages(channelId, { id: '900' } as IMessage, 10).map((message) => message.id)).toEqual([
+      '896',
+      '897'
+    ])
   })
 
   it('queues overlapping prefetch requests for the same direction instead of dropping the later request', async () => {

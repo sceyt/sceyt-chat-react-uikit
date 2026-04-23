@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import {
   addMessagesAC,
+  cancelChannelMessageProcessesAC,
   cancelWindowLoadAC,
   clearActivePaginationIntentAC,
   clearSelectedMessagesAC,
@@ -487,7 +488,7 @@ export function useChatController({
     suppressedMessageChangesRef.current = Math.max(0, suppressedMessageChangesRef.current - count)
   }, [])
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     messagesRef.current = messages
     channelRef.current = channel
     connectionStatusRef.current = connectionStatus
@@ -1351,6 +1352,10 @@ export function useChatController({
     const oldestVisibleLocalRef = getMessageLocalRef(oldestVisibleMessage)
     const oldestVisibleId = getFirstConfirmedMessageId(messages)
     if (!oldestVisibleMessage || !hasPrevious || windowLoadScopeRef.current) {
+      if (!oldestVisibleMessage) {
+        pendingEdgeCheckAfterLoadRef.current = true
+        historyLoadArmedRef.current = true
+      }
       return
     }
 
@@ -1684,6 +1689,11 @@ export function useChatController({
       activeEdgeIntentRef.current = 'previous'
       if (historyLoadArmedRef.current) {
         const oldestVisibleMessage = messages[0]
+        if (!oldestVisibleMessage) {
+          pendingEdgeCheckAfterLoadRef.current = true
+          historyLoadArmedRef.current = true
+          return
+        }
         const hasCachedPreviousMessages = oldestVisibleMessage
           ? getCachedPreviousMessages(oldestVisibleMessage).length > 0
           : false
@@ -1795,6 +1805,8 @@ export function useChatController({
       return
     }
 
+    const previousChannelId = activeChannelIdRef.current
+
     // Stop all active processes before switching to the new channel
     if (pendingVisibleUnreadFrameRef.current !== null) {
       cancelAnimationFrame(pendingVisibleUnreadFrameRef.current)
@@ -1870,6 +1882,7 @@ export function useChatController({
     setIsViewingLatest(true)
     setHighlightedItemId(null)
     highlightedItemIdRef.current = null
+    dispatch(cancelChannelMessageProcessesAC(previousChannelId))
     dispatch(clearActivePaginationIntentAC())
     if (channel?.hidden) {
       dispatch(setMessagesAC([]))
@@ -1922,7 +1935,11 @@ export function useChatController({
     if (!lastBootKeyRef.current) {
       lastBootKeyRef.current = `${channel.id}:${getMessageLocalRef(messages[0])}`
       restoreRef.current =
-        unreadScrollTo && unreadMessageId ? { mode: 'reveal-unread-separator' } : { mode: 'to-bottom' }
+        unreadScrollTo && unreadMessageId
+          ? { mode: 'reveal-unread-separator' }
+          : isScrollInteractionActive()
+            ? null
+            : { mode: 'to-bottom' }
     }
 
     const restoreState = restoreRef.current
@@ -2049,10 +2066,12 @@ export function useChatController({
     channel.id,
     unreadMessageId,
     isActiveEdgeRequestCurrent,
+    dispatch,
     messages,
     unreadScrollTo,
     clearJumpBlur,
-    hasNextMessages
+    hasNextMessages,
+    isScrollInteractionActive
   ])
 
   useEffect(() => {
