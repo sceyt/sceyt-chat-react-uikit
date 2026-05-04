@@ -197,6 +197,7 @@ const Message = ({
   contactsMap,
   openedMessageMenuId,
   tabIsActive = true,
+  tabIsActiveRef,
   connectionStatus,
   messageTextFontSize,
   messageTextLineHeight,
@@ -208,6 +209,7 @@ const Message = ({
   createChatOnAvatarTap = true,
   ifLatestAndHasNotPreview
 }: IMessageProps) => {
+  const isTabActive = tabIsActiveRef?.current ?? tabIsActive
   const getComparableUserId = (messageUser?: IUser | null) => (messageUser?.id ? String(messageUser.id) : 'deleted')
   const {
     [THEME_COLORS.ACCENT]: accentColor,
@@ -516,7 +518,7 @@ const Message = ({
         message.userMarkers.find((marker) => marker.name === MESSAGE_DELIVERY_STATUS.READ)
       ) &&
       !disableAutoReadTracking &&
-      tabIsActive &&
+      isTabActive &&
       channel.newMessageCount &&
       channel.newMessageCount > 0 &&
       connectionStatus === CONNECTION_STATUS.CONNECTED
@@ -539,7 +541,7 @@ const Message = ({
     queueReadMarker,
     queueDeliveredMarker,
     disableAutoReadTracking,
-    tabIsActive
+    isTabActive
   ])
 
   const handleForwardMessage = useCallback(
@@ -628,7 +630,7 @@ const Message = ({
     scrollToNewMessage.scrollToBottom,
     dispatch,
     message,
-    tabIsActive
+    isTabActive
   ])
 
   useEffect(() => {
@@ -1080,7 +1082,8 @@ export default React.memo(Message, (prev, next) => {
   if (prev.selectedMessagesMap !== next.selectedMessagesMap) return false
   if (prev.contactsMap !== next.contactsMap) return false
   if (prev.connectionStatus !== next.connectionStatus) return false
-  if (prev.tabIsActive !== next.tabIsActive) return false
+  if ((prev.tabIsActiveRef?.current ?? prev.tabIsActive) !== (next.tabIsActiveRef?.current ?? next.tabIsActive))
+    return false
   if (prev.ifLatestAndHasNotPreview !== next.ifLatestAndHasNotPreview) return false
 
   // Only re-render when THIS message's menu open-state changes, not when any other message opens its menu

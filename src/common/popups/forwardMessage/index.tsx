@@ -515,6 +515,13 @@ const ForwardChannelsCont = styled.div<{ selectedChannelsHeight: number; thumbCo
   overflow-y: auto;
   margin-top: 16px;
   max-height: ${(props) => `calc(100% - ${props.selectedChannelsHeight + 82}px)`};
+  scrollbar-width: none;
+  scrollbar-color: transparent transparent;
+  overscroll-behavior: none;
+
+  @supports (overflow: overlay) {
+    overflow-y: overlay;
+  }
 
   &::-webkit-scrollbar {
     width: 8px;
@@ -530,6 +537,11 @@ const ForwardChannelsCont = styled.div<{ selectedChannelsHeight: number; thumbCo
   }
   &.show-scrollbar::-webkit-scrollbar-track {
     background: transparent;
+  }
+
+  &.show-scrollbar {
+    scrollbar-width: thin;
+    scrollbar-color: ${(props) => props.thumbColor} transparent;
   }
 `
 

@@ -571,6 +571,13 @@ const MembersContainer = styled(List)<{
   max-height: ${(props) => `calc(100% - (${(props.isAdd ? 67 : 70) + props.selectedMembersHeight}px))`};
   overflow-y: auto;
   padding-right: 16px;
+  scrollbar-width: none;
+  scrollbar-color: transparent transparent;
+  overscroll-behavior: none;
+
+  @supports (overflow: overlay) {
+    overflow-y: overlay;
+  }
 
   &::-webkit-scrollbar {
     width: 8px;
@@ -586,6 +593,11 @@ const MembersContainer = styled(List)<{
   }
   &.show-scrollbar::-webkit-scrollbar-track {
     background: transparent;
+  }
+
+  &.show-scrollbar {
+    scrollbar-width: thin;
+    scrollbar-color: ${(props) => props.thumbColor} transparent;
   }
 `
 
@@ -681,6 +693,9 @@ const SelectedMembersContainer = styled.div<{ thumbColor: string }>`
   padding: 2px 12px 0;
   box-sizing: border-box;
   overflow-y: auto;
+  scrollbar-width: none;
+  scrollbar-color: transparent transparent;
+  overscroll-behavior: none;
 
   &::-webkit-scrollbar {
     width: 8px;

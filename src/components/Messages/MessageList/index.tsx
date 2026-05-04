@@ -502,6 +502,20 @@ const MessageList: React.FC<MessagesProps> = ({
     tabIsActive: browserTabIsActive
   })
 
+  const handleScrollToRepliedMessageRef = React.useRef(handleScrollToRepliedMessage)
+  useEffect(() => {
+    handleScrollToRepliedMessageRef.current = handleScrollToRepliedMessage
+  }, [handleScrollToRepliedMessage])
+
+  const stableHandleScrollToRepliedMessage = useCallback((messageId: string) => {
+    handleScrollToRepliedMessageRef.current(messageId)
+  }, [])
+
+  const tabIsActiveRef = React.useRef(browserTabIsActive)
+  useEffect(() => {
+    tabIsActiveRef.current = browserTabIsActive
+  }, [browserTabIsActive])
+
   const queueReadMarker = useCallback((channelId: string, messageId?: string) => {
     markerBatcherRef.current?.enqueueRead(channelId, messageId)
   }, [])
@@ -594,7 +608,7 @@ const MessageList: React.FC<MessagesProps> = ({
       }
 
       const remainingMentionIds = mentionIds.filter((mentionId) => mentionId !== nextUnreadMentionId)
-      handleScrollToRepliedMessage(nextUnreadMentionId)
+      stableHandleScrollToRepliedMessage(nextUnreadMentionId)
       dispatch(markMessagesAsReadAC(channel.id, [nextUnreadMentionId]))
       dispatch(updateChannelDataAC(channel.id, { mentionsIds: remainingMentionIds }))
 
@@ -602,7 +616,7 @@ const MessageList: React.FC<MessagesProps> = ({
         dispatch(getChannelMentionsAC(channel.id))
       }
     },
-    [channel?.id, channel.newMentionCount, dispatch, handleScrollToRepliedMessage, isMessageRead]
+    [channel?.id, channel.newMentionCount, dispatch, isMessageRead, stableHandleScrollToRepliedMessage]
   )
 
   useEffect(() => {
@@ -797,7 +811,7 @@ const MessageList: React.FC<MessagesProps> = ({
           channel={channel}
           stopScrolling={setStopScrolling}
           handleMediaItemClick={handleMediaItemClickStable}
-          handleScrollToRepliedMessage={handleScrollToRepliedMessage}
+          handleScrollToRepliedMessage={stableHandleScrollToRepliedMessage}
           prevMessage={prevMessage as IMessage}
           nextMessage={nextMessage as IMessage}
           isUnreadMessage={isUnreadMessage}
@@ -914,7 +928,7 @@ const MessageList: React.FC<MessagesProps> = ({
           contactsMap={contactsMap}
           connectionStatus={connectionStatus}
           openedMessageMenuId={openedMessageMenuId}
-          tabIsActive={browserTabIsActive}
+          tabIsActiveRef={tabIsActiveRef}
           messageTextFontSize={messageTextFontSize}
           messageTextLineHeight={messageTextLineHeight}
           messageStatusSize={messageStatusSize}
@@ -1130,11 +1144,18 @@ export const Container = styled.div<{ stopScrolling?: boolean; backgroundColor?:
   flex: 1;
   min-height: 0;
   transform: scaleY(-1);
+  will-change: transform;
   background-color: ${(props) => props.backgroundColor};
-  overflow-y: overlay;
+  overflow-y: auto;
   overflow-x: hidden;
-  overscroll-behavior-y: contain;
   margin-top: auto;
+  scrollbar-width: none;
+  scrollbar-color: transparent transparent;
+  overscroll-behavior: contain;
+
+  @supports (overflow: overlay) {
+    overflow-y: overlay;
+  }
 
   &::-webkit-scrollbar {
     width: 8px;
@@ -1150,6 +1171,11 @@ export const Container = styled.div<{ stopScrolling?: boolean; backgroundColor?:
   }
   &.show-scrollbar::-webkit-scrollbar-track {
     background: transparent;
+  }
+
+  &.show-scrollbar {
+    scrollbar-width: thin;
+    scrollbar-color: ${(props) => props.thumbColor} transparent;
   }
 `
 
@@ -1188,6 +1214,7 @@ const MessagesBox = styled.div<{ $isJumping?: boolean }>`
   width: 100%;
   transform: scaleY(-1);
   backface-visibility: hidden;
+  will-change: transform;
   filter: ${(props) => (props.$isJumping ? 'blur(4px)' : 'none')};
   transition: filter 0.2s ease;
 `

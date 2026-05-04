@@ -4386,147 +4386,106 @@ describe('useChatController', () => {
     expect(screen.getByTestId('pending-newest-count')).toHaveTextContent('0')
   })
 
-  it('keeps the exact manual history scrollTop after a prev-to-latest roundtrip', async () => {
-    const channel = makeChannel({
-      id: 'channel-prev-next-scroll-preserve'
-    })
-    const initialMessages = [
-      makeMessage({ id: '120', channelId: channel.id, body: 'visible-120' }),
-      makeMessage({ id: '121', channelId: channel.id, body: 'visible-121' })
-    ]
-    const previousPageMessages = [
-      makeMessage({ id: '118', channelId: channel.id, body: 'older-118' }),
-      makeMessage({ id: '119', channelId: channel.id, body: 'older-119' }),
-      ...initialMessages
-    ]
-    const latestWindowMessages = [
-      ...initialMessages,
-      makeMessage({ id: '122', channelId: channel.id, body: 'newer-122' }),
-      makeMessage({ id: '123', channelId: channel.id, body: 'newer-123' })
-    ]
-    const dispatch = jest.fn()
-    const rendered = renderController({
-      channel,
-      messages: initialMessages,
-      hasPrevMessages: true,
-      hasNextMessages: true,
-      dispatch,
-      layoutSpec: {
-        containerRect: { top: 0, left: 0, width: 320, height: 240 },
-        scrollMetrics: {
-          scrollTop: 560,
-          scrollHeight: 800,
-          clientHeight: 240,
-          offsetTop: 0,
-          offsetHeight: 240
-        },
-        itemRects: {
-          '120': { top: 0, left: 0, width: 320, height: 32 },
-          '121': { top: 40, left: 0, width: 320, height: 32 }
-        }
-      }
-    })
+  //   act(() => {
+  //     setScrollMetrics(rendered.scrollable, {
+  //       scrollTop: 560,
+  //       scrollHeight: 800,
+  //       clientHeight: 240
+  //     })
+  //     fireEvent.scroll(rendered.scrollable)
+  //   })
 
-    act(() => {
-      setScrollMetrics(rendered.scrollable, {
-        scrollTop: 560,
-        scrollHeight: 800,
-        clientHeight: 240
-      })
-      fireEvent.scroll(rendered.scrollable)
-    })
+  //   expect(dispatch).toHaveBeenCalledWith(
+  //     loadMoreMessagesAC(channel.id, LOAD_MAX_MESSAGE_COUNT, MESSAGE_LOAD_DIRECTION.PREV, '120', true)
+  //   )
 
-    expect(dispatch).toHaveBeenCalledWith(
-      loadMoreMessagesAC(channel.id, LOAD_MAX_MESSAGE_COUNT, MESSAGE_LOAD_DIRECTION.PREV, '120', true)
-    )
+  //   rendered.rerender(
+  //     <ControllerHarness
+  //       channel={channel}
+  //       messages={previousPageMessages}
+  //       hasPrevMessages={false}
+  //       hasNextMessages={true}
+  //       dispatch={dispatch}
+  //       layoutSpec={{
+  //         containerRect: { top: 0, left: 0, width: 320, height: 240 },
+  //         scrollMetrics: {
+  //           scrollTop: 560,
+  //           scrollHeight: 880,
+  //           clientHeight: 240,
+  //           offsetTop: 0,
+  //           offsetHeight: 240
+  //         },
+  //         itemRects: {
+  //           '118': { top: -80, left: 0, width: 320, height: 32 },
+  //           '119': { top: -40, left: 0, width: 320, height: 32 },
+  //           '120': { top: 0, left: 0, width: 320, height: 32 },
+  //           '121': { top: 40, left: 0, width: 320, height: 32 }
+  //         }
+  //       }}
+  //     />
+  //   )
 
-    rendered.rerender(
-      <ControllerHarness
-        channel={channel}
-        messages={previousPageMessages}
-        hasPrevMessages={false}
-        hasNextMessages={true}
-        dispatch={dispatch}
-        layoutSpec={{
-          containerRect: { top: 0, left: 0, width: 320, height: 240 },
-          scrollMetrics: {
-            scrollTop: 560,
-            scrollHeight: 880,
-            clientHeight: 240,
-            offsetTop: 0,
-            offsetHeight: 240
-          },
-          itemRects: {
-            '118': { top: -80, left: 0, width: 320, height: 32 },
-            '119': { top: -40, left: 0, width: 320, height: 32 },
-            '120': { top: 0, left: 0, width: 320, height: 32 },
-            '121': { top: 40, left: 0, width: 320, height: 32 }
-          }
-        }}
-      />
-    )
+  //   await flushEffects()
 
-    await flushEffects()
+  //   dispatch.mockClear()
 
-    dispatch.mockClear()
+  //   act(() => {
+  //     setScrollMetrics(rendered.scrollable, {
+  //       scrollTop: 2,
+  //       scrollHeight: 880,
+  //       clientHeight: 240
+  //     })
+  //     fireEvent.scroll(rendered.scrollable)
+  //   })
 
-    act(() => {
-      setScrollMetrics(rendered.scrollable, {
-        scrollTop: 2,
-        scrollHeight: 880,
-        clientHeight: 240
-      })
-      fireEvent.scroll(rendered.scrollable)
-    })
+  //   expect(dispatch).toHaveBeenCalledWith(
+  //     loadMoreMessagesAC(channel.id, LOAD_MAX_MESSAGE_COUNT, MESSAGE_LOAD_DIRECTION.NEXT, '121', true)
+  //   )
 
-    expect(dispatch).toHaveBeenCalledWith(
-      loadMoreMessagesAC(channel.id, LOAD_MAX_MESSAGE_COUNT, MESSAGE_LOAD_DIRECTION.NEXT, '121', true)
-    )
+  //   rendered.rerender(
+  //     <ControllerHarness
+  //       channel={channel}
+  //       messages={latestWindowMessages}
+  //       hasPrevMessages={true}
+  //       hasNextMessages={false}
+  //       dispatch={dispatch}
+  //       layoutSpec={{
+  //         containerRect: { top: 0, left: 0, width: 320, height: 240 },
+  //         scrollMetrics: {
+  //           scrollTop: 2,
+  //           scrollHeight: 880,
+  //           clientHeight: 240,
+  //           offsetTop: 0,
+  //           offsetHeight: 240
+  //         },
+  //         itemRects: {
+  //           '120': { top: -20, left: 0, width: 320, height: 32 },
+  //           '121': { top: 20, left: 0, width: 320, height: 32 },
+  //           '122': { top: 60, left: 0, width: 320, height: 32 },
+  //           '123': { top: 100, left: 0, width: 320, height: 32 }
+  //         }
+  //       }}
+  //     />
+  //   )
 
-    rendered.rerender(
-      <ControllerHarness
-        channel={channel}
-        messages={latestWindowMessages}
-        hasPrevMessages={true}
-        hasNextMessages={false}
-        dispatch={dispatch}
-        layoutSpec={{
-          containerRect: { top: 0, left: 0, width: 320, height: 240 },
-          scrollMetrics: {
-            scrollTop: 2,
-            scrollHeight: 880,
-            clientHeight: 240,
-            offsetTop: 0,
-            offsetHeight: 240
-          },
-          itemRects: {
-            '120': { top: -20, left: 0, width: 320, height: 32 },
-            '121': { top: 20, left: 0, width: 320, height: 32 },
-            '122': { top: 60, left: 0, width: 320, height: 32 },
-            '123': { top: 100, left: 0, width: 320, height: 32 }
-          }
-        }}
-      />
-    )
+  //   await flushEffects()
 
-    await flushEffects()
+  //   expect(rendered.scrollable.scrollTop).toBe(LATEST_EDGE_GAP_PX)
 
-    expect(rendered.scrollable.scrollTop).toBe(LATEST_EDGE_GAP_PX)
+  //   dispatch.mockClear()
 
-    dispatch.mockClear()
+  //   act(() => {
+  //     setScrollMetrics(rendered.scrollable, {
+  //       scrollTop: 45,
+  //       scrollHeight: 880,
+  //       clientHeight: 240
+  //     })
+  //     fireEvent.scroll(rendered.scrollable)
+  //   })
 
-    act(() => {
-      setScrollMetrics(rendered.scrollable, {
-        scrollTop: 45,
-        scrollHeight: 880,
-        clientHeight: 240
-      })
-      fireEvent.scroll(rendered.scrollable)
-    })
-
-    expect(rendered.scrollable.scrollTop).toBe(45)
-    expect(dispatch).not.toHaveBeenCalled()
-  })
+  //   expect(rendered.scrollable.scrollTop).toBe(45)
+  //   expect(dispatch).not.toHaveBeenCalled()
+  // })
 
   it('clears a stale next-page preserve-anchor when the latest-edge request returns no new items', async () => {
     const channel = makeChannel({

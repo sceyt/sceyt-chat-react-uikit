@@ -10,7 +10,7 @@ import {
   MessageInfoTab,
   OGMetadataProps
 } from '../../types'
-import { FC } from 'react'
+import { FC, MutableRefObject } from 'react'
 
 export interface IMessageActions {
   message: IMessage
@@ -214,6 +214,7 @@ export interface IMessageProps {
   contactsMap: { [key: string]: any }
   openedMessageMenuId?: string
   tabIsActive?: boolean
+  tabIsActiveRef?: MutableRefObject<boolean>
   connectionStatus: string
   messageTextFontSize?: string
   messageTextLineHeight?: string

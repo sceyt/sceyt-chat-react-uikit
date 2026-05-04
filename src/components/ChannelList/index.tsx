@@ -944,6 +944,13 @@ const ChannelsList = styled.div<{ thumbColor: string }>`
   overflow-y: auto;
   width: 400px;
   height: 100%;
+  scrollbar-width: none;
+  scrollbar-color: transparent transparent;
+  overscroll-behavior: none;
+
+  @supports (overflow: overlay) {
+    overflow-y: overlay;
+  }
 
   &::-webkit-scrollbar {
     width: 8px;
@@ -959,6 +966,11 @@ const ChannelsList = styled.div<{ thumbColor: string }>`
   }
   &.show-scrollbar::-webkit-scrollbar-track {
     background: transparent;
+  }
+
+  &.show-scrollbar {
+    scrollbar-width: thin;
+    scrollbar-color: ${(props) => props.thumbColor} transparent;
   }
 `
 const SearchedChannels = styled.div`

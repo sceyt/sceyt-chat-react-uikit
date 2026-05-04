@@ -2643,6 +2643,13 @@ const LexicalWrapper = styled.div<{
     order: ${(props) => (props.order === 0 || props.order ? props.order : 1)};
     overflow-y: auto;
     overflow-x: hidden;
+    scrollbar-width: none;
+    scrollbar-color: transparent transparent;
+    overscroll-behavior: none;
+
+    @supports (overflow: overlay) {
+      overflow-y: overlay;
+    }
 
     &::-webkit-scrollbar {
       width: 8px;
@@ -2658,6 +2665,11 @@ const LexicalWrapper = styled.div<{
     }
     &.show-scrollbar::-webkit-scrollbar-track {
       background: transparent;
+    }
+
+    &.show-scrollbar {
+      scrollbar-width: thin;
+      scrollbar-color: ${(props) => props.thumbColor} transparent;
     }
 
     & p {

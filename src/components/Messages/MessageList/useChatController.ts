@@ -179,7 +179,29 @@ const formatMessageDateLabel = (message: IMessage) => {
   }).format(current)
 }
 
+const SMOOTH_SCROLL_DURATION_MS = 300
+const easeOutCubic = (t: number) => 1 - Math.pow(1 - t, 3)
+
+// Native smooth scroll doesn't animate in Firefox when the container has transform: scaleY(-1).
+// Drive the animation manually so it works identically across all browsers.
+const smoothScrollTo = (container: HTMLElement, targetScrollTop: number) => {
+  const startScrollTop = container.scrollTop
+  const distance = targetScrollTop - startScrollTop
+  if (Math.abs(distance) < 1) return
+  const startTime = performance.now()
+  const step = (now: number) => {
+    const progress = Math.min((now - startTime) / SMOOTH_SCROLL_DURATION_MS, 1)
+    container.scrollTop = startScrollTop + distance * easeOutCubic(progress)
+    if (progress < 1) requestAnimationFrame(step)
+  }
+  requestAnimationFrame(step)
+}
+
 const setScrollTop = (container: HTMLElement, top: number, behavior: ScrollBehavior = 'auto') => {
+  if (behavior === 'smooth') {
+    smoothScrollTo(container, top)
+    return
+  }
   if (typeof container.scrollTo === 'function') {
     container.scrollTo({ top, behavior })
     return
@@ -215,11 +237,14 @@ const scrollItemIntoView = (
     }
     requestAnimationFrame(() => {
       requestAnimationFrame(() => {
-        target.scrollIntoView({
-          behavior: 'smooth',
-          block: 'center',
-          inline: 'nearest'
-        })
+        const containerRect = container.getBoundingClientRect()
+        const targetRect = target.getBoundingClientRect()
+        const containerCenter = containerRect.top + containerRect.height / 2
+        const targetCenter = targetRect.top + targetRect.height / 2
+        // Container uses scaleY(-1): increasing scrollTop moves elements DOWN visually,
+        // so the centering delta is subtracted rather than added.
+        const newScrollTop = container.scrollTop + (containerCenter - targetCenter)
+        smoothScrollTo(container, Math.max(LATEST_EDGE_GAP_PX, newScrollTop))
       })
     })
     return
@@ -414,6 +439,7 @@ export function useChatController({
   const historyArmTimerRef = useRef<NodeJS.Timeout | null>(null)
   const latestArmTimerRef = useRef<NodeJS.Timeout | null>(null)
   const pendingEdgeCheckAfterLoadRef = useRef(false)
+  const lastUnreadCheckAtRef = useRef(0)
 
   const [isLoadingPrevious, setIsLoadingPrevious] = useState(false)
   const [isLoadingNext, setIsLoadingNext] = useState(false)
@@ -549,11 +575,15 @@ export function useChatController({
   )
 
   const captureWindowPreserveAnchor = useCallback(() => {
-    if (isLatestJumpLocked()) {
+    if (isJumping.current || (jumpLockModeRef.current !== null && Date.now() < jumpLockUntilRef.current)) {
       return
     }
 
-    if (restoreRef.current?.mode === 'to-bottom' || restoreRef.current?.mode === 'to-bottom-smooth') {
+    if (
+      restoreRef.current?.mode === 'to-bottom' ||
+      restoreRef.current?.mode === 'to-bottom-smooth' ||
+      restoreRef.current?.mode === 'reveal-message'
+    ) {
       return
     }
 
@@ -573,7 +603,7 @@ export function useChatController({
       offsetFromTop: anchor.offsetFromTop,
       sourceScrollTop: container.scrollTop
     }
-  }, [isLatestJumpLocked])
+  }, [])
 
   const syncLatestState = useCallback(() => {
     const nextIsViewingLatest = !hasNext && isPinnedToLatest(scrollRef.current)
@@ -1087,7 +1117,11 @@ export function useChatController({
         if (!renderedContainer) {
           return
         }
-        scrollToLatestEdge(renderedContainer, smooth ? 'smooth' : 'auto')
+        // Only scroll if restoreRef wasn't already consumed by useLayoutEffect (messages unchanged edge case)
+        if (restoreRef.current?.mode === 'to-bottom' || restoreRef.current?.mode === 'to-bottom-smooth') {
+          restoreRef.current = null
+          scrollToLatestEdge(renderedContainer, smooth ? 'smooth' : 'auto')
+        }
       })
     },
     [
@@ -1127,6 +1161,7 @@ export function useChatController({
             )
       setTimeout(
         async () => {
+          clearScrollIdleTimer()
           clearPendingLatestJump()
           const jumpId = ++currentJumpIdRef.current
           isJumping.current = true
@@ -1649,7 +1684,11 @@ export function useChatController({
     }
 
     syncLatestState()
-    queueVisibleUnreadCheck()
+    const now = Date.now()
+    if (now - lastUnreadCheckAtRef.current >= 100) {
+      lastUnreadCheckAtRef.current = now
+      queueVisibleUnreadCheck()
+    }
 
     const maxScrollTop = getMaxScrollTop(container)
     if (container.scrollTop > maxScrollTop - LATEST_EDGE_GAP_PX) {
@@ -1767,14 +1806,14 @@ export function useChatController({
 
   useEffect(() => {
     const el = scrollRef.current
-    if (!el) {
+    if (!el || !messages || !messages.length) {
       return
     }
 
     const onScroll = () => handleScrollRef.current()
     el.addEventListener('scroll', onScroll, { passive: true })
     return () => el.removeEventListener('scroll', onScroll)
-  }, [channel?.id])
+  }, [channel?.id, messages])
 
   useEffect(() => {
     const el = scrollRef.current
@@ -2011,6 +2050,14 @@ export function useChatController({
     }
 
     if (restoreState.mode === 'preserve-anchor-window') {
+      if (!hasNextMessages && container.scrollTop <= PRELOAD_TRIGGER_PX + LATEST_EDGE_GAP_PX) {
+        restoreRef.current = null
+        viewIsAtLatestRef.current = true
+        setIsViewingLatest(true)
+        scrollToLatestEdge(container, 'auto')
+        return
+      }
+
       const anchorElement = getItemElement(container, restoreState.itemId)
       if (!anchorElement) {
         return
