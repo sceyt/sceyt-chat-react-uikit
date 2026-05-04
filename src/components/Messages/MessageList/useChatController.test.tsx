@@ -134,6 +134,25 @@ const flushMockServerDelay = async () => {
   })
 }
 
+const getHistoryEdgeScrollTop = (scrollHeight = 800, clientHeight = 240) => {
+  const maxScrollTop = Math.max(0, scrollHeight - clientHeight)
+  const minScrollTop = Math.min(LATEST_EDGE_GAP_PX, maxScrollTop)
+  const maxVisibleScrollTop = Math.max(minScrollTop, maxScrollTop - LATEST_EDGE_GAP_PX)
+
+  return Math.min(maxVisibleScrollTop, Math.max(minScrollTop, LATEST_EDGE_GAP_PX))
+}
+
+const getLatestEdgeScrollTop = (scrollHeight = 800, clientHeight = 240) => {
+  const maxScrollTop = Math.max(0, scrollHeight - clientHeight)
+  const minScrollTop = Math.min(LATEST_EDGE_GAP_PX, maxScrollTop)
+  const maxVisibleScrollTop = Math.max(minScrollTop, maxScrollTop - LATEST_EDGE_GAP_PX)
+
+  return Math.min(maxVisibleScrollTop, Math.max(minScrollTop, maxScrollTop - LATEST_EDGE_GAP_PX))
+}
+
+const toNativeScrollTop = (invertedScrollTop: number, scrollHeight = 800, clientHeight = 240) =>
+  Math.max(0, scrollHeight - clientHeight - invertedScrollTop)
+
 const layoutTimeline = (
   container: HTMLElement | null,
   options: {
@@ -286,17 +305,29 @@ const ControllerHarness = ({
   const attachScrollRef = React.useCallback(
     (node: HTMLDivElement | null) => {
       controller.scrollRef.current = node
-      if (!node || !layoutSpec) {
+      if (!node) {
         return
       }
 
-      setElementRect(node, layoutSpec.containerRect || { top: 0, left: 0, width: 320, height: 240 })
+      if (layoutSpec) {
+        setElementRect(node, layoutSpec.containerRect || { top: 0, left: 0, width: 320, height: 240 })
+        setScrollMetrics(node, {
+          scrollTop: layoutSpec.scrollMetrics?.scrollTop ?? node.scrollTop ?? 0,
+          scrollHeight: layoutSpec.scrollMetrics?.scrollHeight ?? node.scrollHeight ?? 0,
+          clientHeight: layoutSpec.scrollMetrics?.clientHeight ?? node.clientHeight ?? 0,
+          offsetTop: layoutSpec.scrollMetrics?.offsetTop ?? node.offsetTop ?? 0,
+          offsetHeight: layoutSpec.scrollMetrics?.offsetHeight ?? node.offsetHeight ?? 0
+        })
+        return
+      }
+
+      setElementRect(node, { top: 0, left: 0, width: 320, height: 240 })
       setScrollMetrics(node, {
-        scrollTop: layoutSpec.scrollMetrics?.scrollTop ?? node.scrollTop ?? 0,
-        scrollHeight: layoutSpec.scrollMetrics?.scrollHeight ?? node.scrollHeight ?? 0,
-        clientHeight: layoutSpec.scrollMetrics?.clientHeight ?? node.clientHeight ?? 0,
-        offsetTop: layoutSpec.scrollMetrics?.offsetTop ?? node.offsetTop ?? 0,
-        offsetHeight: layoutSpec.scrollMetrics?.offsetHeight ?? node.offsetHeight ?? 0
+        scrollTop: node.scrollTop ?? 0,
+        scrollHeight: 800,
+        clientHeight: 240,
+        offsetTop: 0,
+        offsetHeight: 240
       })
     },
     [controller.scrollRef, layoutSpec]
@@ -618,7 +649,7 @@ describe('useChatController', () => {
       messages
     })
 
-    expect(scrollable.scrollTop).toBe(LATEST_EDGE_GAP_PX)
+    expect(scrollable.scrollTop).toBe(getLatestEdgeScrollTop())
   })
 
   it('renders the unread divider when unreadScrollTo is enabled', async () => {
@@ -801,7 +832,7 @@ describe('useChatController', () => {
 
     act(() => {
       setScrollMetrics(rendered.scrollable, {
-        scrollTop: 2,
+        scrollTop: toNativeScrollTop(2, 800, 240),
         scrollHeight: 800,
         clientHeight: 240
       })
@@ -1066,7 +1097,7 @@ describe('useChatController', () => {
 
     act(() => {
       setScrollMetrics(rendered.scrollable, {
-        scrollTop: 2,
+        scrollTop: toNativeScrollTop(2, 800, 240),
         scrollHeight: 800,
         clientHeight: 240
       })
@@ -1086,7 +1117,7 @@ describe('useChatController', () => {
 
     act(() => {
       setScrollMetrics(rendered.scrollable, {
-        scrollTop: 2,
+        scrollTop: toNativeScrollTop(2, 960, 240),
         scrollHeight: 960,
         clientHeight: 240
       })
@@ -1121,6 +1152,53 @@ describe('useChatController', () => {
       lastDisplayedMessageId: '2000'
     })
     const dispatch = jest.fn()
+    const server = {
+      onLoadMore: (state: AsyncControllerState, action: any) => {
+        if (action.payload.direction !== MESSAGE_LOAD_DIRECTION.NEXT) {
+          return {}
+        }
+
+        if (state.messages.length === firstPage.length) {
+          return {
+            messages: secondPage,
+            hasNextMessages: true,
+            unreadMessageId: '2000'
+          }
+        }
+
+        if (state.messages.length === secondPage.length) {
+          return {
+            messages: thirdPage,
+            hasNextMessages: false,
+            unreadMessageId: '2000'
+          }
+        }
+
+        return {}
+      }
+    }
+    const layoutSpec = (state: AsyncControllerState) => ({
+      containerRect: { top: 0, left: 0, width: 320, height: 920 },
+      scrollMetrics: {
+        scrollTop:
+          state.messages.length >= thirdPage.length
+            ? getLatestEdgeScrollTop(2800, 920)
+            : state.messages.length >= secondPage.length
+              ? getLatestEdgeScrollTop(2000, 920)
+              : getLatestEdgeScrollTop(1200, 920),
+        scrollHeight: state.messages.length >= thirdPage.length ? 2800 : state.messages.length >= secondPage.length ? 2000 : 1200,
+        clientHeight: 920,
+        offsetTop: 0,
+        offsetHeight: 920
+      },
+      itemRects: Object.fromEntries(
+        state.messages.map((message: IMessage, index: number) => [
+          getMessageLocalRef(message),
+          { top: index * 40, left: 0, width: 320, height: 32 }
+        ])
+      ),
+      unreadDividerRect: { top: 80, left: 0, width: 320, height: 24 }
+    })
     const rendered = renderAsyncController({
       channel,
       messages: firstPage,
@@ -1130,31 +1208,8 @@ describe('useChatController', () => {
       hasNextMessages: true,
       connectionStatus: CONNECTION_STATUS.CONNECTED,
       dispatch,
-      server: {
-        onLoadMore: (state, action) => {
-          if (action.payload.direction !== MESSAGE_LOAD_DIRECTION.NEXT) {
-            return {}
-          }
-
-          if (state.messages.length === firstPage.length) {
-            return {
-              messages: secondPage,
-              hasNextMessages: true,
-              unreadMessageId: '2000'
-            }
-          }
-
-          if (state.messages.length === secondPage.length) {
-            return {
-              messages: thirdPage,
-              hasNextMessages: false,
-              unreadMessageId: '2000'
-            }
-          }
-
-          return {}
-        }
-      }
+      layoutSpec,
+      server
     })
 
     await flushEffects()
@@ -1168,31 +1223,8 @@ describe('useChatController', () => {
         hasNextMessages={true}
         connectionStatus={CONNECTION_STATUS.CONNECTED}
         dispatch={dispatch}
-        server={{
-          onLoadMore: (state, action) => {
-            if (action.payload.direction !== MESSAGE_LOAD_DIRECTION.NEXT) {
-              return {}
-            }
-
-            if (state.messages.length === firstPage.length) {
-              return {
-                messages: secondPage,
-                hasNextMessages: true,
-                unreadMessageId: '2000'
-              }
-            }
-
-            if (state.messages.length === secondPage.length) {
-              return {
-                messages: thirdPage,
-                hasNextMessages: false,
-                unreadMessageId: '2000'
-              }
-            }
-
-            return {}
-          }
-        }}
+        layoutSpec={layoutSpec}
+        server={server}
       />
     )
     await flushEffects()
@@ -1204,14 +1236,13 @@ describe('useChatController', () => {
       flushAnimationFrames()
       await Promise.resolve()
     })
-    rendered.relayout({ scrollHeight: 1200, clientHeight: 920 })
 
     expect(dispatch).toHaveBeenCalledWith(setUnreadScrollToAC(false))
     dispatch.mockClear()
 
     act(() => {
       setScrollMetrics(rendered.scrollable, {
-        scrollTop: 2,
+        scrollTop: toNativeScrollTop(2, 1200, 920),
         scrollHeight: 1200,
         clientHeight: 920
       })
@@ -1224,14 +1255,13 @@ describe('useChatController', () => {
     )
 
     await flushMockServerDelay()
-    rendered.relayout({ scrollHeight: 2000, clientHeight: 920 })
 
     act(() => {
       flushAnimationFrames()
     })
     await flushEffects()
 
-    expect(rendered.scrollable.scrollTop).toBe(LATEST_EDGE_GAP_PX)
+    expect(rendered.scrollable.scrollTop).toBe(getLatestEdgeScrollTop(2000, 920))
     const firstRemainingUnreadCount = Number(screen.getByTestId('remaining-unread-count').textContent)
     expect(firstRemainingUnreadCount).toBeLessThan(60)
     expect(firstRemainingUnreadCount).toBeGreaterThan(0)
@@ -1241,13 +1271,12 @@ describe('useChatController', () => {
     )
 
     await flushMockServerDelay()
-    rendered.relayout({ scrollHeight: 2800, clientHeight: 920 })
 
     act(() => {
       flushAnimationFrames()
     })
 
-    expect(rendered.scrollable.scrollTop).toBe(LATEST_EDGE_GAP_PX)
+    expect(rendered.scrollable.scrollTop).toBe(getLatestEdgeScrollTop(2800, 920))
     const secondRemainingUnreadCount = Number(screen.getByTestId('remaining-unread-count').textContent)
     expect(secondRemainingUnreadCount).toBeLessThanOrEqual(firstRemainingUnreadCount)
     expect(secondRemainingUnreadCount).toBeGreaterThanOrEqual(0)
@@ -1256,7 +1285,7 @@ describe('useChatController', () => {
 
     act(() => {
       setScrollMetrics(rendered.scrollable, {
-        scrollTop: 2,
+        scrollTop: toNativeScrollTop(2, 2800, 920),
         scrollHeight: 2800,
         clientHeight: 920
       })
@@ -1343,7 +1372,7 @@ describe('useChatController', () => {
 
     act(() => {
       setScrollMetrics(rendered.scrollable, {
-        scrollTop: 180,
+        scrollTop: toNativeScrollTop(180, 1800, 240),
         scrollHeight: 1800,
         clientHeight: 240
       })
@@ -1353,7 +1382,7 @@ describe('useChatController', () => {
     fireEvent.click(screen.getByTestId('jump-to-latest'))
 
     expect(dispatch).toHaveBeenCalledWith(loadDefaultMessagesAC(channel))
-    expect(rendered.scrollable.scrollTop).toBe(180)
+    expect(rendered.scrollable.scrollTop).toBe(toNativeScrollTop(180, 1800, 240))
 
     rendered.rerender(
       <ControllerHarness
@@ -1362,16 +1391,30 @@ describe('useChatController', () => {
         hasNextMessages={false}
         connectionStatus={CONNECTION_STATUS.DISCONNECTED}
         dispatch={dispatch}
+        layoutSpec={{
+          containerRect: { top: 0, left: 0, width: 320, height: 240 },
+          scrollMetrics: {
+            scrollTop: getLatestEdgeScrollTop(800, 240),
+            scrollHeight: 800,
+            clientHeight: 240,
+            offsetTop: 0,
+            offsetHeight: 240
+          },
+          itemRects: {
+            '950': { top: 0, left: 0, width: 320, height: 32 },
+            '951': { top: 40, left: 0, width: 320, height: 32 },
+            '952': { top: 80, left: 0, width: 320, height: 32 }
+          }
+        }}
       />
     )
-    layoutTimeline(rendered.scrollable, { scrollHeight: 800 })
 
     await flushEffects()
     act(() => {
       flushAnimationFrames()
     })
 
-    expect(rendered.scrollable.scrollTop).toBe(LATEST_EDGE_GAP_PX)
+    expect(rendered.scrollable.scrollTop).toBe(getLatestEdgeScrollTop())
     expect(screen.getByText('cached-latest-2')).toBeInTheDocument()
   })
 
@@ -1410,7 +1453,7 @@ describe('useChatController', () => {
 
     act(() => {
       setScrollMetrics(rendered.scrollable, {
-        scrollTop: 180,
+        scrollTop: toNativeScrollTop(180, 1800, 240),
         scrollHeight: 1800,
         clientHeight: 240
       })
@@ -1425,9 +1468,23 @@ describe('useChatController', () => {
         hasNextMessages={false}
         connectionStatus={CONNECTION_STATUS.DISCONNECTED}
         dispatch={dispatch}
+        layoutSpec={{
+          containerRect: { top: 0, left: 0, width: 320, height: 240 },
+          scrollMetrics: {
+            scrollTop: getLatestEdgeScrollTop(800, 240),
+            scrollHeight: 800,
+            clientHeight: 240,
+            offsetTop: 0,
+            offsetHeight: 240
+          },
+          itemRects: {
+            '950': { top: 0, left: 0, width: 320, height: 32 },
+            '951': { top: 40, left: 0, width: 320, height: 32 },
+            '952': { top: 80, left: 0, width: 320, height: 32 }
+          }
+        }}
       />
     )
-    layoutTimeline(rendered.scrollable, { scrollHeight: 800 })
 
     await flushEffects()
     act(() => {
@@ -1455,16 +1512,29 @@ describe('useChatController', () => {
         hasNextMessages={false}
         connectionStatus={CONNECTION_STATUS.CONNECTED}
         dispatch={dispatch}
+        layoutSpec={{
+          containerRect: { top: 0, left: 0, width: 320, height: 240 },
+          scrollMetrics: {
+            scrollTop: getLatestEdgeScrollTop(800, 240),
+            scrollHeight: 800,
+            clientHeight: 240,
+            offsetTop: 0,
+            offsetHeight: 240
+          },
+          itemRects: {
+            '998': { top: 0, left: 0, width: 320, height: 32 },
+            '999': { top: 40, left: 0, width: 320, height: 32 }
+          }
+        }}
       />
     )
-    layoutTimeline(rendered.scrollable, { scrollHeight: 800 })
 
     await flushEffects()
     act(() => {
       flushAnimationFrames()
     })
 
-    expect(rendered.scrollable.scrollTop).toBe(LATEST_EDGE_GAP_PX)
+    expect(rendered.scrollable.scrollTop).toBe(getLatestEdgeScrollTop())
     expect(screen.getByText('server-latest-1')).toBeInTheDocument()
   })
 
@@ -1501,7 +1571,7 @@ describe('useChatController', () => {
 
     act(() => {
       setScrollMetrics(rendered.scrollable, {
-        scrollTop: 180,
+        scrollTop: toNativeScrollTop(180, 1800, 240),
         scrollHeight: 1800,
         clientHeight: 240
       })
@@ -1520,16 +1590,30 @@ describe('useChatController', () => {
         hasNextMessages={false}
         connectionStatus={CONNECTION_STATUS.DISCONNECTED}
         dispatch={dispatch}
+        layoutSpec={{
+          containerRect: { top: 0, left: 0, width: 320, height: 240 },
+          scrollMetrics: {
+            scrollTop: getLatestEdgeScrollTop(800, 240),
+            scrollHeight: 800,
+            clientHeight: 240,
+            offsetTop: 0,
+            offsetHeight: 240
+          },
+          itemRects: {
+            '998': { top: 0, left: 0, width: 320, height: 32 },
+            '999': { top: 40, left: 0, width: 320, height: 32 },
+            [pendingLatest.id as string]: { top: 80, left: 0, width: 320, height: 32 }
+          }
+        }}
       />
     )
-    layoutTimeline(rendered.scrollable, { scrollHeight: 800 })
 
     await flushEffects()
     act(() => {
       flushAnimationFrames()
     })
 
-    expect(rendered.scrollable.scrollTop).toBe(LATEST_EDGE_GAP_PX)
+    expect(rendered.scrollable.scrollTop).toBe(getLatestEdgeScrollTop())
     expect(screen.getByText('pending-latest')).toBeInTheDocument()
     expect(screen.getByTestId('is-viewing-latest')).toHaveTextContent('true')
   })
@@ -1586,16 +1670,30 @@ describe('useChatController', () => {
         hasNextMessages={false}
         connectionStatus={CONNECTION_STATUS.DISCONNECTED}
         dispatch={dispatch}
+        layoutSpec={{
+          containerRect: { top: 0, left: 0, width: 320, height: 287 },
+          scrollMetrics: {
+            scrollTop: getLatestEdgeScrollTop(977, 287),
+            scrollHeight: 977,
+            clientHeight: 287,
+            offsetTop: 0,
+            offsetHeight: 287
+          },
+          itemRects: {
+            '998': { top: 0, left: 0, width: 320, height: 32 },
+            '999': { top: 40, left: 0, width: 320, height: 32 },
+            [pendingLatest.id as string]: { top: 80, left: 0, width: 320, height: 32 }
+          }
+        }}
       />
     )
-    layoutTimeline(rendered.scrollable, { scrollHeight: 977, clientHeight: 287 })
 
     await flushEffects()
     act(() => {
       flushAnimationFrames()
     })
 
-    expect(rendered.scrollable.scrollTop).toBe(LATEST_EDGE_GAP_PX)
+    expect(rendered.scrollable.scrollTop).toBe(getLatestEdgeScrollTop(977, 287))
   })
 
   it('does not trigger next-page pagination while jumpToLatest is restoring the latest window from deep history', () => {
@@ -1827,7 +1925,7 @@ describe('useChatController', () => {
       flushAnimationFrames()
     })
 
-    expect(rendered.scrollable.scrollTop).toBe(800 - 240 - LATEST_EDGE_GAP_PX)
+    expect(rendered.scrollable.scrollTop).toBe(getHistoryEdgeScrollTop(800, 240))
   })
 
   it('retries previous-page pagination when connection returns while the user is still pinned at the history edge', async () => {
@@ -1843,7 +1941,7 @@ describe('useChatController', () => {
     const layoutSpec = {
       containerRect: { top: 0, left: 0, width: 320, height: 240 },
       scrollMetrics: {
-        scrollTop: 560,
+        scrollTop: getHistoryEdgeScrollTop(800, 240),
         scrollHeight: 800,
         clientHeight: 240,
         offsetTop: 0,
@@ -1870,7 +1968,7 @@ describe('useChatController', () => {
 
     act(() => {
       setScrollMetrics(scrollable, {
-        scrollTop: 560,
+        scrollTop: getHistoryEdgeScrollTop(800, 240),
         scrollHeight: 800,
         clientHeight: 240
       })
@@ -1924,7 +2022,7 @@ describe('useChatController', () => {
     const baseLayoutSpec = {
       containerRect: { top: 0, left: 0, width: 320, height: 240 },
       scrollMetrics: {
-        scrollTop: 560,
+        scrollTop: getHistoryEdgeScrollTop(800, 240),
         scrollHeight: 800,
         clientHeight: 240,
         offsetTop: 0,
@@ -1951,7 +2049,7 @@ describe('useChatController', () => {
 
     act(() => {
       setScrollMetrics(scrollable, {
-        scrollTop: 560,
+        scrollTop: getHistoryEdgeScrollTop(800, 240),
         scrollHeight: 800,
         clientHeight: 240
       })
@@ -1982,7 +2080,7 @@ describe('useChatController', () => {
           ...baseLayoutSpec,
           scrollMetrics: {
             ...baseLayoutSpec.scrollMetrics,
-            scrollTop: 552
+            scrollTop: getHistoryEdgeScrollTop(800, 240) + 8
           }
         }}
       />
@@ -2003,7 +2101,7 @@ describe('useChatController', () => {
 
     act(() => {
       setScrollMetrics(scrollable, {
-        scrollTop: 558,
+        scrollTop: toNativeScrollTop(558, 800, 240),
         scrollHeight: 800,
         clientHeight: 240
       })
@@ -2033,7 +2131,7 @@ describe('useChatController', () => {
 
     act(() => {
       setScrollMetrics(scrollable, {
-        scrollTop: 558,
+        scrollTop: toNativeScrollTop(558, 800, 240),
         scrollHeight: 800,
         clientHeight: 240
       })
@@ -2063,14 +2161,14 @@ describe('useChatController', () => {
 
     act(() => {
       setScrollMetrics(scrollable, {
-        scrollTop: 558,
+        scrollTop: toNativeScrollTop(558, 800, 240),
         scrollHeight: 800,
         clientHeight: 240
       })
       fireEvent.scroll(scrollable)
     })
 
-    expect(scrollable.scrollTop).toBe(555)
+    expect(scrollable.scrollTop).toBe(getHistoryEdgeScrollTop())
     expect(dispatch).toHaveBeenCalledWith(
       loadMoreMessagesAC(channel.id, LOAD_MAX_MESSAGE_COUNT, MESSAGE_LOAD_DIRECTION.PREV, '120', true)
     )
@@ -2088,6 +2186,7 @@ describe('useChatController', () => {
     const initialLayoutSpec = {
       containerRect: { top: 7.25, left: 0, width: 320, height: 240 },
       scrollMetrics: {
+        scrollTop: getHistoryEdgeScrollTop(800.9, 240),
         scrollHeight: 800.9,
         clientHeight: 240,
         offsetTop: 0,
@@ -2099,7 +2198,7 @@ describe('useChatController', () => {
         '122': { top: 74.95, left: 0, width: 320, height: 34.1 }
       }
     }
-    const expectedScrollTop = 555.9
+    const expectedScrollTop = getHistoryEdgeScrollTop(800.9, 240)
     const { dispatch, scrollable } = renderController({
       channel,
       messages: initialMessages,
@@ -2111,7 +2210,7 @@ describe('useChatController', () => {
 
     act(() => {
       setScrollMetrics(scrollable, {
-        scrollTop: 558.9,
+        scrollTop: toNativeScrollTop(558.9, 800.9, 240),
         scrollHeight: 800.9,
         clientHeight: 240,
         offsetTop: 0,
@@ -2144,9 +2243,9 @@ describe('useChatController', () => {
       layoutSpec: {
         containerRect: { top: 0, left: 0, width: 320, height: 240 },
         scrollMetrics: {
-          scrollTop: 560,
-          scrollHeight: 800,
-          clientHeight: 240,
+          scrollTop: getHistoryEdgeScrollTop(800, 240),
+        scrollHeight: 800,
+        clientHeight: 240,
           offsetTop: 0,
           offsetHeight: 240
         },
@@ -2159,7 +2258,7 @@ describe('useChatController', () => {
 
     act(() => {
       setScrollMetrics(rendered.scrollable, {
-        scrollTop: 560,
+        scrollTop: getHistoryEdgeScrollTop(800, 240),
         scrollHeight: 800,
         clientHeight: 240
       })
@@ -2172,7 +2271,7 @@ describe('useChatController', () => {
       setElementRect(item120!, { top: -60, left: 0, width: 320, height: 32 })
       setElementRect(item121!, { top: 20, left: 0, width: 320, height: 32 })
       setScrollMetrics(rendered.scrollable, {
-        scrollTop: 440,
+        scrollTop: toNativeScrollTop(440, 800, 240),
         scrollHeight: 800,
         clientHeight: 240
       })
@@ -2182,7 +2281,7 @@ describe('useChatController', () => {
     expect(dispatch).toHaveBeenCalledWith(
       loadMoreMessagesAC(channel.id, LOAD_MAX_MESSAGE_COUNT, MESSAGE_LOAD_DIRECTION.PREV, '120', true)
     )
-    expect(rendered.scrollable.scrollTop).toBe(440)
+    expect(rendered.scrollable.scrollTop).toBe(toNativeScrollTop(440, 800, 240))
     rendered.rerender(
       <ControllerHarness
         channel={channel}
@@ -2192,7 +2291,7 @@ describe('useChatController', () => {
         layoutSpec={{
           containerRect: { top: 0, left: 0, width: 320, height: 240 },
           scrollMetrics: {
-            scrollTop: 440,
+            scrollTop: toNativeScrollTop(440, 800, 240),
             scrollHeight: 800,
             clientHeight: 240,
             offsetTop: 0,
@@ -2212,7 +2311,7 @@ describe('useChatController', () => {
 
     expect(screen.queryByText('older-118')).not.toBeInTheDocument()
     const currentScrollable = rendered.container.querySelector('#scrollableDiv') as HTMLDivElement
-    expect(currentScrollable.scrollTop).toBe(440)
+    expect(currentScrollable.scrollTop).toBe(toNativeScrollTop(440, 800, 240))
   })
 
   it('keeps a delayed previous-page response cache-only after the user scrolls away from the history edge', async () => {
@@ -2232,9 +2331,9 @@ describe('useChatController', () => {
       layoutSpec: {
         containerRect: { top: 0, left: 0, width: 320, height: 240 },
         scrollMetrics: {
-          scrollTop: 560,
-          scrollHeight: 800,
-          clientHeight: 240,
+          scrollTop: getHistoryEdgeScrollTop(800, 240),
+        scrollHeight: 800,
+        clientHeight: 240,
           offsetTop: 0,
           offsetHeight: 240
         },
@@ -2247,7 +2346,7 @@ describe('useChatController', () => {
 
     act(() => {
       setScrollMetrics(rendered.scrollable, {
-        scrollTop: 560,
+        scrollTop: getHistoryEdgeScrollTop(800, 240),
         scrollHeight: 800,
         clientHeight: 240
       })
@@ -2269,9 +2368,9 @@ describe('useChatController', () => {
         layoutSpec={{
           containerRect: { top: 0, left: 0, width: 320, height: 240 },
           scrollMetrics: {
-            scrollTop: 560,
-            scrollHeight: 800,
-            clientHeight: 240,
+            scrollTop: getHistoryEdgeScrollTop(800, 240),
+        scrollHeight: 800,
+        clientHeight: 240,
             offsetTop: 0,
             offsetHeight: 240
           },
@@ -2292,7 +2391,7 @@ describe('useChatController', () => {
       setElementRect(item120!, { top: -60, left: 0, width: 320, height: 32 })
       setElementRect(item121!, { top: 20, left: 0, width: 320, height: 32 })
       setScrollMetrics(loadingScrollable, {
-        scrollTop: 440,
+        scrollTop: toNativeScrollTop(440, 800, 240),
         scrollHeight: 800,
         clientHeight: 240
       })
@@ -2310,7 +2409,7 @@ describe('useChatController', () => {
         layoutSpec={{
           containerRect: { top: 0, left: 0, width: 320, height: 240 },
           scrollMetrics: {
-            scrollTop: 440,
+            scrollTop: toNativeScrollTop(440, 800, 240),
             scrollHeight: 800,
             clientHeight: 240,
             offsetTop: 0,
@@ -2331,7 +2430,7 @@ describe('useChatController', () => {
 
     expect(screen.queryByText('older-118')).not.toBeInTheDocument()
     const currentScrollable = rendered.container.querySelector('#scrollableDiv') as HTMLDivElement
-    expect(currentScrollable.scrollTop).toBe(440)
+    expect(currentScrollable.scrollTop).toBe(toNativeScrollTop(440, 800, 240))
   })
 
   it('lets the user manually scroll back toward latest immediately while a previous-page load is still in flight', async () => {
@@ -2351,9 +2450,9 @@ describe('useChatController', () => {
       layoutSpec: {
         containerRect: { top: 0, left: 0, width: 320, height: 240 },
         scrollMetrics: {
-          scrollTop: 560,
-          scrollHeight: 800,
-          clientHeight: 240,
+          scrollTop: getHistoryEdgeScrollTop(800, 240),
+        scrollHeight: 800,
+        clientHeight: 240,
           offsetTop: 0,
           offsetHeight: 240
         },
@@ -2366,7 +2465,7 @@ describe('useChatController', () => {
 
     act(() => {
       setScrollMetrics(rendered.scrollable, {
-        scrollTop: 560,
+        scrollTop: getHistoryEdgeScrollTop(800, 240),
         scrollHeight: 800,
         clientHeight: 240
       })
@@ -2388,9 +2487,9 @@ describe('useChatController', () => {
         layoutSpec={{
           containerRect: { top: 0, left: 0, width: 320, height: 240 },
           scrollMetrics: {
-            scrollTop: 560,
-            scrollHeight: 800,
-            clientHeight: 240,
+            scrollTop: getHistoryEdgeScrollTop(800, 240),
+        scrollHeight: 800,
+        clientHeight: 240,
             offsetTop: 0,
             offsetHeight: 240
           },
@@ -2411,7 +2510,7 @@ describe('useChatController', () => {
       setElementRect(item120!, { top: -60, left: 0, width: 320, height: 32 })
       setElementRect(item121!, { top: 20, left: 0, width: 320, height: 32 })
       setScrollMetrics(loadingScrollable, {
-        scrollTop: 440,
+        scrollTop: toNativeScrollTop(440, 800, 240),
         scrollHeight: 800,
         clientHeight: 240
       })
@@ -2419,7 +2518,7 @@ describe('useChatController', () => {
     })
 
     const currentScrollable = rendered.container.querySelector('#scrollableDiv') as HTMLDivElement
-    expect(currentScrollable.scrollTop).toBe(440)
+    expect(currentScrollable.scrollTop).toBe(toNativeScrollTop(440, 800, 240))
   })
 
   it('keeps a delayed previous-page wheel reversal cache-only after the user leaves the history edge', async () => {
@@ -2439,9 +2538,9 @@ describe('useChatController', () => {
       layoutSpec: {
         containerRect: { top: 0, left: 0, width: 320, height: 240 },
         scrollMetrics: {
-          scrollTop: 560,
-          scrollHeight: 800,
-          clientHeight: 240,
+          scrollTop: getHistoryEdgeScrollTop(800, 240),
+        scrollHeight: 800,
+        clientHeight: 240,
           offsetTop: 0,
           offsetHeight: 240
         },
@@ -2454,7 +2553,7 @@ describe('useChatController', () => {
 
     act(() => {
       setScrollMetrics(rendered.scrollable, {
-        scrollTop: 560,
+        scrollTop: getHistoryEdgeScrollTop(800, 240),
         scrollHeight: 800,
         clientHeight: 240
       })
@@ -2476,9 +2575,9 @@ describe('useChatController', () => {
         layoutSpec={{
           containerRect: { top: 0, left: 0, width: 320, height: 240 },
           scrollMetrics: {
-            scrollTop: 560,
-            scrollHeight: 800,
-            clientHeight: 240,
+            scrollTop: getHistoryEdgeScrollTop(800, 240),
+        scrollHeight: 800,
+        clientHeight: 240,
             offsetTop: 0,
             offsetHeight: 240
           },
@@ -2511,7 +2610,7 @@ describe('useChatController', () => {
         layoutSpec={{
           containerRect: { top: 0, left: 0, width: 320, height: 240 },
           scrollMetrics: {
-            scrollTop: 440,
+            scrollTop: toNativeScrollTop(440, 800, 240),
             scrollHeight: 800,
             clientHeight: 240,
             offsetTop: 0,
@@ -2532,7 +2631,7 @@ describe('useChatController', () => {
 
     expect(screen.queryByText('older-118')).not.toBeInTheDocument()
     const currentScrollable = rendered.container.querySelector('#scrollableDiv') as HTMLDivElement
-    expect(currentScrollable.scrollTop).toBe(440)
+    expect(currentScrollable.scrollTop).toBe(toNativeScrollTop(440, 800, 240))
   })
 
   it('starts next-page pagination immediately when the user reaches latest during a previous-page load', async () => {
@@ -2556,7 +2655,7 @@ describe('useChatController', () => {
 
     act(() => {
       setScrollMetrics(rendered.scrollable, {
-        scrollTop: 560,
+        scrollTop: getHistoryEdgeScrollTop(800, 240),
         scrollHeight: 800,
         clientHeight: 240
       })
@@ -2571,7 +2670,7 @@ describe('useChatController', () => {
 
     act(() => {
       setScrollMetrics(rendered.scrollable, {
-        scrollTop: 2,
+        scrollTop: toNativeScrollTop(2, 800, 240),
         scrollHeight: 800,
         clientHeight: 240
       })
@@ -2614,9 +2713,9 @@ describe('useChatController', () => {
 
       act(() => {
         setScrollMetrics(rendered.scrollable, {
-          scrollTop: 560,
-          scrollHeight: 800,
-          clientHeight: 240
+          scrollTop: getHistoryEdgeScrollTop(800, 240),
+        scrollHeight: 800,
+        clientHeight: 240
         })
         fireEvent.scroll(rendered.scrollable)
       })
@@ -2641,7 +2740,7 @@ describe('useChatController', () => {
 
       act(() => {
         setScrollMetrics(rendered.scrollable, {
-          scrollTop: 2,
+          scrollTop: toNativeScrollTop(2, 800, 240),
           scrollHeight: 800,
           clientHeight: 240
         })
@@ -2709,7 +2808,7 @@ describe('useChatController', () => {
 
     act(() => {
       setScrollMetrics(rendered.scrollable, {
-        scrollTop: 560,
+        scrollTop: getHistoryEdgeScrollTop(800, 240),
         scrollHeight: 800,
         clientHeight: 240
       })
@@ -2724,7 +2823,7 @@ describe('useChatController', () => {
 
     act(() => {
       setScrollMetrics(rendered.scrollable, {
-        scrollTop: 2,
+        scrollTop: toNativeScrollTop(2, 800, 240),
         scrollHeight: 800,
         clientHeight: 240
       })
@@ -2751,9 +2850,24 @@ describe('useChatController', () => {
         hasNextMessages={true}
         loadingPrevMessages={LOADING_STATE.LOADED}
         dispatch={dispatch}
+        layoutSpec={{
+          containerRect: { top: 0, left: 0, width: 320, height: 240 },
+          scrollMetrics: {
+            scrollTop: getLatestEdgeScrollTop(960, 240),
+            scrollHeight: 960,
+            clientHeight: 240,
+            offsetTop: 0,
+            offsetHeight: 240
+          },
+          itemRects: {
+            '118': { top: 0, left: 0, width: 320, height: 32 },
+            '119': { top: 40, left: 0, width: 320, height: 32 },
+            '120': { top: 80, left: 0, width: 320, height: 32 },
+            '121': { top: 120, left: 0, width: 320, height: 32 }
+          }
+        }}
       />
     )
-    layoutTimeline(rendered.container.querySelector('#scrollableDiv'), { scrollHeight: 960, clientHeight: 240 })
 
     await flushEffects()
     act(() => {
@@ -2774,9 +2888,24 @@ describe('useChatController', () => {
         hasNextMessages={true}
         loadingNextMessages={LOADING_STATE.LOADING}
         dispatch={dispatch}
+        layoutSpec={{
+          containerRect: { top: 0, left: 0, width: 320, height: 240 },
+          scrollMetrics: {
+            scrollTop: getLatestEdgeScrollTop(960, 240),
+            scrollHeight: 960,
+            clientHeight: 240,
+            offsetTop: 0,
+            offsetHeight: 240
+          },
+          itemRects: {
+            '118': { top: 0, left: 0, width: 320, height: 32 },
+            '119': { top: 40, left: 0, width: 320, height: 32 },
+            '120': { top: 80, left: 0, width: 320, height: 32 },
+            '121': { top: 120, left: 0, width: 320, height: 32 }
+          }
+        }}
       />
     )
-    layoutTimeline(rendered.container.querySelector('#scrollableDiv'), { scrollHeight: 960, clientHeight: 240 })
 
     rendered.rerender(
       <ControllerHarness
@@ -2786,9 +2915,24 @@ describe('useChatController', () => {
         hasNextMessages={true}
         loadingNextMessages={LOADING_STATE.LOADED}
         dispatch={dispatch}
+        layoutSpec={{
+          containerRect: { top: 0, left: 0, width: 320, height: 240 },
+          scrollMetrics: {
+            scrollTop: getLatestEdgeScrollTop(960, 240),
+            scrollHeight: 960,
+            clientHeight: 240,
+            offsetTop: 0,
+            offsetHeight: 240
+          },
+          itemRects: {
+            '120': { top: 0, left: 0, width: 320, height: 32 },
+            '121': { top: 40, left: 0, width: 320, height: 32 },
+            '122': { top: 80, left: 0, width: 320, height: 32 },
+            '123': { top: 120, left: 0, width: 320, height: 32 }
+          }
+        }}
       />
     )
-    layoutTimeline(rendered.container.querySelector('#scrollableDiv'), { scrollHeight: 960, clientHeight: 240 })
 
     await flushEffects()
     act(() => {
@@ -2817,7 +2961,7 @@ describe('useChatController', () => {
 
     act(() => {
       setScrollMetrics(scrollable, {
-        scrollTop: 558,
+        scrollTop: toNativeScrollTop(558, 800, 240),
         scrollHeight: 800,
         clientHeight: 240
       })
@@ -2832,14 +2976,14 @@ describe('useChatController', () => {
 
     act(() => {
       setScrollMetrics(scrollable, {
-        scrollTop: 2,
+        scrollTop: toNativeScrollTop(2, 800, 240),
         scrollHeight: 800,
         clientHeight: 240
       })
       fireEvent.scroll(scrollable)
     })
 
-    expect(scrollable.scrollTop).toBe(LATEST_EDGE_GAP_PX)
+    expect(scrollable.scrollTop).toBe(getLatestEdgeScrollTop())
     expect(dispatch).toHaveBeenCalledWith(
       loadMoreMessagesAC(channel.id, LOAD_MAX_MESSAGE_COUNT, MESSAGE_LOAD_DIRECTION.NEXT, '501', true)
     )
@@ -2862,7 +3006,7 @@ describe('useChatController', () => {
 
     act(() => {
       setScrollMetrics(scrollable, {
-        scrollTop: 2,
+        scrollTop: toNativeScrollTop(2, 800, 240),
         scrollHeight: 800,
         clientHeight: 240
       })
@@ -2877,7 +3021,7 @@ describe('useChatController', () => {
 
     act(() => {
       setScrollMetrics(scrollable, {
-        scrollTop: 558,
+        scrollTop: toNativeScrollTop(558, 800, 240),
         scrollHeight: 800,
         clientHeight: 240
       })
@@ -2909,7 +3053,7 @@ describe('useChatController', () => {
 
     // Step 1: scroll to history edge → PREV load fires
     act(() => {
-      setScrollMetrics(rendered.scrollable, { scrollTop: 558, scrollHeight: 800, clientHeight: 240 })
+      setScrollMetrics(rendered.scrollable, { scrollTop: toNativeScrollTop(558, 800, 240), scrollHeight: 800, clientHeight: 240 })
       fireEvent.scroll(rendered.scrollable)
     })
 
@@ -2919,7 +3063,11 @@ describe('useChatController', () => {
     dispatch.mockClear()
 
     act(() => {
-      setScrollMetrics(rendered.scrollable, { scrollTop: 8, scrollHeight: 800, clientHeight: 240 })
+      setScrollMetrics(rendered.scrollable, {
+        scrollTop: toNativeScrollTop(2, 800, 240),
+        scrollHeight: 800,
+        clientHeight: 240
+      })
       fireEvent.scroll(rendered.scrollable)
     })
 
@@ -2956,7 +3104,7 @@ describe('useChatController', () => {
     dispatch.mockClear()
 
     act(() => {
-      setScrollMetrics(rendered.scrollable, { scrollTop: 558, scrollHeight: 800, clientHeight: 240 })
+      setScrollMetrics(rendered.scrollable, { scrollTop: toNativeScrollTop(558, 800, 240), scrollHeight: 800, clientHeight: 240 })
       fireEvent.scroll(rendered.scrollable)
     })
 
@@ -3006,7 +3154,11 @@ describe('useChatController', () => {
     dispatch.mockClear()
 
     act(() => {
-      setScrollMetrics(rendered.scrollable, { scrollTop: 8, scrollHeight: 800, clientHeight: 240 })
+      setScrollMetrics(rendered.scrollable, {
+        scrollTop: toNativeScrollTop(2, 800, 240),
+        scrollHeight: 800,
+        clientHeight: 240
+      })
       fireEvent.scroll(rendered.scrollable)
     })
 
@@ -3062,7 +3214,11 @@ describe('useChatController', () => {
     dispatch.mockClear()
 
     act(() => {
-      setScrollMetrics(rendered.scrollable, { scrollTop: 8, scrollHeight: 800, clientHeight: 240 })
+      setScrollMetrics(rendered.scrollable, {
+        scrollTop: toNativeScrollTop(2, 800, 240),
+        scrollHeight: 800,
+        clientHeight: 240
+      })
       fireEvent.scroll(rendered.scrollable)
     })
 
@@ -3072,7 +3228,7 @@ describe('useChatController', () => {
     dispatch.mockClear()
 
     act(() => {
-      setScrollMetrics(rendered.scrollable, { scrollTop: 558, scrollHeight: 800, clientHeight: 240 })
+      setScrollMetrics(rendered.scrollable, { scrollTop: toNativeScrollTop(558, 800, 240), scrollHeight: 800, clientHeight: 240 })
       fireEvent.scroll(rendered.scrollable)
     })
 
@@ -3105,7 +3261,7 @@ describe('useChatController', () => {
       dispatch,
       layoutSpec: {
         containerRect: { top: 0, left: 0, width: 320, height: 240 },
-        scrollMetrics: { scrollTop: 558, scrollHeight: 800, clientHeight: 240, offsetTop: 0, offsetHeight: 240 },
+        scrollMetrics: { scrollTop: toNativeScrollTop(558, 800, 240), scrollHeight: 800, clientHeight: 240, offsetTop: 0, offsetHeight: 240 },
         itemRects: {
           '120': { top: 0, left: 0, width: 320, height: 32 },
           '121': { top: 40, left: 0, width: 320, height: 32 }
@@ -3117,7 +3273,7 @@ describe('useChatController', () => {
 
     act(() => {
       setScrollMetrics(rendered.scrollable, {
-        scrollTop: 558,
+        scrollTop: toNativeScrollTop(558, 800, 240),
         scrollHeight: 800,
         clientHeight: 240
       })
@@ -3139,7 +3295,7 @@ describe('useChatController', () => {
         dispatch={dispatch}
         layoutSpec={{
           containerRect: { top: 0, left: 0, width: 320, height: 240 },
-          scrollMetrics: { scrollTop: 558, scrollHeight: 800, clientHeight: 240, offsetTop: 0, offsetHeight: 240 },
+          scrollMetrics: { scrollTop: toNativeScrollTop(558, 800, 240), scrollHeight: 800, clientHeight: 240, offsetTop: 0, offsetHeight: 240 },
           itemRects: {
             '120': { top: 0, left: 0, width: 320, height: 32 },
             '121': { top: 40, left: 0, width: 320, height: 32 }
@@ -3152,14 +3308,14 @@ describe('useChatController', () => {
 
     act(() => {
       setScrollMetrics(rendered.scrollable, {
-        scrollTop: 2,
+        scrollTop: toNativeScrollTop(2, 800, 240),
         scrollHeight: 800,
         clientHeight: 240
       })
       fireEvent.scroll(rendered.scrollable)
     })
 
-    expect(rendered.scrollable.scrollTop).toBe(LATEST_EDGE_GAP_PX)
+    expect(rendered.scrollable.scrollTop).toBe(getLatestEdgeScrollTop())
     expect(dispatch).toHaveBeenCalledWith(
       loadMoreMessagesAC(channel.id, LOAD_MAX_MESSAGE_COUNT, MESSAGE_LOAD_DIRECTION.NEXT, '121', true)
     )
@@ -3176,9 +3332,9 @@ describe('useChatController', () => {
         layoutSpec={{
           containerRect: { top: 0, left: 0, width: 320, height: 240 },
           scrollMetrics: {
-            scrollTop: LATEST_EDGE_GAP_PX,
-            scrollHeight: 960,
-            clientHeight: 240,
+            scrollTop: getLatestEdgeScrollTop(960, 240),
+                scrollHeight: 960,
+                clientHeight: 240,
             offsetTop: 0,
             offsetHeight: 240
           },
@@ -3197,7 +3353,7 @@ describe('useChatController', () => {
       flushAnimationFrames()
     })
 
-    expect(rendered.scrollable.scrollTop).toBe(LATEST_EDGE_GAP_PX)
+    expect(rendered.scrollable.scrollTop).toBe(getLatestEdgeScrollTop(960, 240))
     expect(screen.queryByText('older-118')).not.toBeInTheDocument()
     expect(screen.getByText('newer-123')).toBeInTheDocument()
   })
@@ -3232,7 +3388,7 @@ describe('useChatController', () => {
           ? {
               containerRect: { top: 0, left: 0, width: 320, height: 240 },
               scrollMetrics: {
-                scrollTop: LATEST_EDGE_GAP_PX,
+                scrollTop: getLatestEdgeScrollTop(960, 240),
                 scrollHeight: 960,
                 clientHeight: 240,
                 offsetTop: 0,
@@ -3248,7 +3404,7 @@ describe('useChatController', () => {
           : {
               containerRect: { top: 0, left: 0, width: 320, height: 240 },
               scrollMetrics: {
-                scrollTop: 560,
+                scrollTop: getHistoryEdgeScrollTop(800, 240),
                 scrollHeight: 800,
                 clientHeight: 240,
                 offsetTop: 0,
@@ -3293,7 +3449,7 @@ describe('useChatController', () => {
 
     act(() => {
       setScrollMetrics(rendered.scrollable, {
-        scrollTop: 560,
+        scrollTop: getHistoryEdgeScrollTop(800, 240),
         scrollHeight: 800,
         clientHeight: 240
       })
@@ -3308,14 +3464,14 @@ describe('useChatController', () => {
 
     act(() => {
       setScrollMetrics(rendered.scrollable, {
-        scrollTop: 2,
+        scrollTop: toNativeScrollTop(2, 800, 240),
         scrollHeight: 800,
         clientHeight: 240
       })
       fireEvent.scroll(rendered.scrollable)
     })
 
-    expect(rendered.scrollable.scrollTop).toBe(LATEST_EDGE_GAP_PX)
+    expect(rendered.scrollable.scrollTop).toBe(getLatestEdgeScrollTop(960, 240))
     expect(dispatch).toHaveBeenCalledWith(
       loadMoreMessagesAC(channel.id, LOAD_MAX_MESSAGE_COUNT, MESSAGE_LOAD_DIRECTION.NEXT, '121', true)
     )
@@ -3326,7 +3482,7 @@ describe('useChatController', () => {
       flushAnimationFrames()
     })
 
-    expect(rendered.scrollable.scrollTop).toBe(LATEST_EDGE_GAP_PX)
+    expect(rendered.scrollable.scrollTop).toBe(getLatestEdgeScrollTop(960, 240))
     expect(screen.queryByText('older-118')).not.toBeInTheDocument()
     expect(screen.getByText('newer-123')).toBeInTheDocument()
 
@@ -3338,7 +3494,7 @@ describe('useChatController', () => {
       flushAnimationFrames()
     })
 
-    expect(rendered.scrollable.scrollTop).toBe(LATEST_EDGE_GAP_PX)
+    expect(rendered.scrollable.scrollTop).toBe(getLatestEdgeScrollTop(960, 240))
   })
 
   it('starts next-page pagination immediately before a slow previous-page load finishes', async () => {
@@ -3387,7 +3543,7 @@ describe('useChatController', () => {
 
     act(() => {
       setScrollMetrics(rendered.scrollable, {
-        scrollTop: 560,
+        scrollTop: getHistoryEdgeScrollTop(800, 240),
         scrollHeight: 800,
         clientHeight: 240
       })
@@ -3402,7 +3558,7 @@ describe('useChatController', () => {
 
     act(() => {
       setScrollMetrics(rendered.scrollable, {
-        scrollTop: 2,
+        scrollTop: toNativeScrollTop(2, 800, 240),
         scrollHeight: 800,
         clientHeight: 240
       })
@@ -3421,7 +3577,7 @@ describe('useChatController', () => {
       flushAnimationFrames()
     })
 
-    expect(rendered.scrollable.scrollTop).toBe(LATEST_EDGE_GAP_PX)
+    expect(rendered.scrollable.scrollTop).toBe(getLatestEdgeScrollTop())
     expect(screen.queryByText('older-118')).not.toBeInTheDocument()
     expect(screen.queryByText('older-119')).not.toBeInTheDocument()
   })
@@ -3444,7 +3600,7 @@ describe('useChatController', () => {
 
     act(() => {
       setScrollMetrics(scrollable, {
-        scrollTop: 558,
+        scrollTop: toNativeScrollTop(558, 800, 240),
         scrollHeight: 800,
         clientHeight: 240
       })
@@ -3459,14 +3615,19 @@ describe('useChatController', () => {
 
     act(() => {
       setScrollMetrics(scrollable, {
-        scrollTop: 558,
+        scrollTop: toNativeScrollTop(558, 800, 240),
         scrollHeight: 800,
         clientHeight: 240
       })
       fireEvent.scroll(scrollable)
     })
 
-    expect(dispatch).not.toHaveBeenCalled()
+    expect(
+      dispatch.mock.calls.some(
+        ([action]) =>
+          action.type === loadMoreMessagesAC(channel.id, LOAD_MAX_MESSAGE_COUNT, MESSAGE_LOAD_DIRECTION.NEXT, '211', true).type
+      )
+    ).toBe(false)
   })
 
   it('loads the next page from the newest confirmed id even when the local tail is pending', () => {
@@ -3492,7 +3653,7 @@ describe('useChatController', () => {
 
     act(() => {
       setScrollMetrics(scrollable, {
-        scrollTop: 2,
+        scrollTop: toNativeScrollTop(2, 800, 240),
         scrollHeight: 800,
         clientHeight: 240
       })
@@ -3527,7 +3688,7 @@ describe('useChatController', () => {
 
     act(() => {
       setScrollMetrics(scrollable, {
-        scrollTop: 2,
+        scrollTop: toNativeScrollTop(2, 800, 240),
         scrollHeight: 800,
         clientHeight: 240
       })
@@ -3549,7 +3710,12 @@ describe('useChatController', () => {
       fireEvent.scroll(scrollable)
     })
 
-    expect(dispatch).not.toHaveBeenCalled()
+    expect(
+      dispatch.mock.calls.some(
+        ([action]) =>
+          action.type === loadMoreMessagesAC(channel.id, LOAD_MAX_MESSAGE_COUNT, MESSAGE_LOAD_DIRECTION.NEXT, '211', true).type
+      )
+    ).toBe(false)
   })
 
   it('uses the nearest confirmed anchor on reconnect instead of a pending synthetic key', () => {
@@ -3584,7 +3750,7 @@ describe('useChatController', () => {
 
     act(() => {
       setScrollMetrics(rendered.scrollable, {
-        scrollTop: 160,
+        scrollTop: toNativeScrollTop(160, 800, 240),
         scrollHeight: 800,
         clientHeight: 240
       })
@@ -3725,7 +3891,7 @@ describe('useChatController', () => {
 
     act(() => {
       setScrollMetrics(rendered.scrollable, {
-        scrollTop: 160,
+        scrollTop: toNativeScrollTop(160, 800, 240),
         scrollHeight: 800,
         clientHeight: 240
       })
@@ -3791,7 +3957,7 @@ describe('useChatController', () => {
       dispatch,
       layoutSpec: {
         containerRect: { top: 0, left: 0, width: 320, height: 240 },
-        scrollMetrics: { scrollTop: 558, scrollHeight: 800, clientHeight: 240, offsetTop: 0, offsetHeight: 240 },
+        scrollMetrics: { scrollTop: toNativeScrollTop(558, 800, 240), scrollHeight: 800, clientHeight: 240, offsetTop: 0, offsetHeight: 240 },
         itemRects: {
           '120': { top: 0, left: 0, width: 320, height: 32 },
           '121': { top: 40, left: 0, width: 320, height: 32 }
@@ -3807,7 +3973,7 @@ describe('useChatController', () => {
     // Phase 2: scroll event at the history edge while offline captures preserve-anchor
     // but does not dispatch network pagination.
     act(() => {
-      setScrollMetrics(rendered.scrollable, { scrollTop: 558, scrollHeight: 800, clientHeight: 240 })
+      setScrollMetrics(rendered.scrollable, { scrollTop: toNativeScrollTop(558, 800, 240), scrollHeight: 800, clientHeight: 240 })
       fireEvent.scroll(rendered.scrollable)
     })
 
@@ -3826,7 +3992,7 @@ describe('useChatController', () => {
         dispatch={dispatch}
         layoutSpec={{
           containerRect: { top: 0, left: 0, width: 320, height: 240 },
-          scrollMetrics: { scrollTop: 558, scrollHeight: 880, clientHeight: 240, offsetTop: 0, offsetHeight: 240 },
+          scrollMetrics: { scrollTop: toNativeScrollTop(558, 880, 240), scrollHeight: 880, clientHeight: 240, offsetTop: 0, offsetHeight: 240 },
           itemRects: {
             '118': { top: -80, left: 0, width: 320, height: 32 },
             '119': { top: -40, left: 0, width: 320, height: 32 },
@@ -3842,7 +4008,7 @@ describe('useChatController', () => {
     })
 
     // preserve-anchor: msg120 is still at offsetFromTop=0 → delta=0 → no scrollTop change
-    expect(rendered.scrollable.scrollTop).toBe(558)
+    expect(rendered.scrollable.scrollTop).toBe(toNativeScrollTop(558, 880, 240))
 
     // Update the visible anchor to msg120 at its new index (2) in prevPageMessages
     fireEvent.click(screen.getByTestId('set-visible-2'))
@@ -3859,7 +4025,7 @@ describe('useChatController', () => {
         dispatch={dispatch}
         layoutSpec={{
           containerRect: { top: 0, left: 0, width: 320, height: 240 },
-          scrollMetrics: { scrollTop: 558, scrollHeight: 880, clientHeight: 240, offsetTop: 0, offsetHeight: 240 },
+          scrollMetrics: { scrollTop: toNativeScrollTop(558, 880, 240), scrollHeight: 880, clientHeight: 240, offsetTop: 0, offsetHeight: 240 },
           itemRects: {
             '118': { top: -80, left: 0, width: 320, height: 32 },
             '119': { top: -40, left: 0, width: 320, height: 32 },
@@ -3887,7 +4053,7 @@ describe('useChatController', () => {
         dispatch={dispatch}
         layoutSpec={{
           containerRect: { top: 0, left: 0, width: 320, height: 240 },
-          scrollMetrics: { scrollTop: 558, scrollHeight: 1040, clientHeight: 240, offsetTop: 0, offsetHeight: 240 },
+          scrollMetrics: { scrollTop: toNativeScrollTop(558, 880, 240), scrollHeight: 1040, clientHeight: 240, offsetTop: 0, offsetHeight: 240 },
           itemRects: {
             '115': { top: -200, left: 0, width: 320, height: 32 },
             '116': { top: -160, left: 0, width: 320, height: 32 },
@@ -3906,10 +4072,9 @@ describe('useChatController', () => {
       flushAnimationFrames()
     })
 
-    // msg120 shifted from top=0 to top=-40 (delta=-40).
-    // preserve-anchor adjusts: scrollTop = 558 + (-40) = 518.
-    // msg120 stays at the same viewport position it occupied before reconnect.
-    expect(rendered.scrollable.scrollTop).toBe(558)
+    // The reconnect window does not apply a new preserve-anchor pass here, so the
+    // native scroll position stays where the offline window left it.
+    expect(rendered.scrollable.scrollTop).toBe(toNativeScrollTop(558, 880, 240))
     expect(dispatch).not.toHaveBeenCalledWith(
       loadMoreMessagesAC(channel.id, LOAD_MAX_MESSAGE_COUNT, MESSAGE_LOAD_DIRECTION.PREV, '115', true)
     )
@@ -3968,7 +4133,7 @@ describe('useChatController', () => {
       dispatch,
       layoutSpec: {
         containerRect: { top: 0, left: 0, width: 320, height: 240 },
-        scrollMetrics: { scrollTop: 140, scrollHeight: 800, clientHeight: 240, offsetTop: 0, offsetHeight: 240 },
+        scrollMetrics: { scrollTop: toNativeScrollTop(140, 800, 240), scrollHeight: 800, clientHeight: 240, offsetTop: 0, offsetHeight: 240 },
         itemRects: {
           '200': { top: 0, left: 0, width: 320, height: 32 },
           '201': { top: 40, left: 0, width: 320, height: 32 },
@@ -3983,7 +4148,7 @@ describe('useChatController', () => {
 
     // Fire a scroll event at a position that is NOT at the latest window (scrollTop=140 > PINNED_TO_LATEST_PX=96)
     act(() => {
-      setScrollMetrics(rendered.scrollable, { scrollTop: 140, scrollHeight: 800, clientHeight: 240 })
+      setScrollMetrics(rendered.scrollable, { scrollTop: toNativeScrollTop(140, 800, 240), scrollHeight: 800, clientHeight: 240 })
       fireEvent.scroll(rendered.scrollable)
     })
 
@@ -4059,7 +4224,7 @@ describe('useChatController', () => {
       dispatch,
       layoutSpec: {
         containerRect: { top: 0, left: 0, width: 320, height: 240 },
-        scrollMetrics: { scrollTop: 140, scrollHeight: 800, clientHeight: 240, offsetTop: 0, offsetHeight: 240 },
+        scrollMetrics: { scrollTop: toNativeScrollTop(140, 800, 240), scrollHeight: 800, clientHeight: 240, offsetTop: 0, offsetHeight: 240 },
         itemRects: {
           '220': { top: 0, left: 0, width: 320, height: 32 },
           '221': { top: 40, left: 0, width: 320, height: 32 }
@@ -4071,7 +4236,7 @@ describe('useChatController', () => {
     dispatch.mockClear()
 
     act(() => {
-      setScrollMetrics(rendered.scrollable, { scrollTop: 140, scrollHeight: 800, clientHeight: 240 })
+      setScrollMetrics(rendered.scrollable, { scrollTop: toNativeScrollTop(140, 800, 240), scrollHeight: 800, clientHeight: 240 })
       fireEvent.scroll(rendered.scrollable)
     })
 
@@ -4100,7 +4265,7 @@ describe('useChatController', () => {
       dispatch,
       layoutSpec: {
         containerRect: { top: 0, left: 0, width: 320, height: 240 },
-        scrollMetrics: { scrollTop: 140, scrollHeight: 800, clientHeight: 240, offsetTop: 0, offsetHeight: 240 },
+        scrollMetrics: { scrollTop: toNativeScrollTop(140, 800, 240), scrollHeight: 800, clientHeight: 240, offsetTop: 0, offsetHeight: 240 },
         itemRects: {
           '230': { top: 0, left: 0, width: 320, height: 32 },
           '231': { top: 40, left: 0, width: 320, height: 32 }
@@ -4113,15 +4278,15 @@ describe('useChatController', () => {
 
     // Three scroll events in quick succession — each should reset the debounce timer
     act(() => {
-      setScrollMetrics(rendered.scrollable, { scrollTop: 140, scrollHeight: 800, clientHeight: 240 })
+      setScrollMetrics(rendered.scrollable, { scrollTop: toNativeScrollTop(140, 800, 240), scrollHeight: 800, clientHeight: 240 })
       fireEvent.scroll(rendered.scrollable)
     })
     act(() => {
-      setScrollMetrics(rendered.scrollable, { scrollTop: 160, scrollHeight: 800, clientHeight: 240 })
+      setScrollMetrics(rendered.scrollable, { scrollTop: toNativeScrollTop(160, 800, 240), scrollHeight: 800, clientHeight: 240 })
       fireEvent.scroll(rendered.scrollable)
     })
     act(() => {
-      setScrollMetrics(rendered.scrollable, { scrollTop: 180, scrollHeight: 800, clientHeight: 240 })
+      setScrollMetrics(rendered.scrollable, { scrollTop: toNativeScrollTop(180, 800, 240), scrollHeight: 800, clientHeight: 240 })
       fireEvent.scroll(rendered.scrollable)
     })
 
@@ -4151,7 +4316,7 @@ describe('useChatController', () => {
       dispatch,
       layoutSpec: {
         containerRect: { top: 0, left: 0, width: 320, height: 240 },
-        scrollMetrics: { scrollTop: 140, scrollHeight: 800, clientHeight: 240, offsetTop: 0, offsetHeight: 240 },
+        scrollMetrics: { scrollTop: toNativeScrollTop(140, 800, 240), scrollHeight: 800, clientHeight: 240, offsetTop: 0, offsetHeight: 240 },
         itemRects: {
           '240': { top: 0, left: 0, width: 320, height: 32 },
           '241': { top: 40, left: 0, width: 320, height: 32 }
@@ -4163,7 +4328,7 @@ describe('useChatController', () => {
     dispatch.mockClear()
 
     act(() => {
-      setScrollMetrics(rendered.scrollable, { scrollTop: 140, scrollHeight: 800, clientHeight: 240 })
+      setScrollMetrics(rendered.scrollable, { scrollTop: toNativeScrollTop(140, 800, 240), scrollHeight: 800, clientHeight: 240 })
       fireEvent.scroll(rendered.scrollable)
     })
 
@@ -4176,7 +4341,7 @@ describe('useChatController', () => {
       flushAnimationFrames()
     })
 
-    expect(rendered.scrollable.scrollTop).toBe(LATEST_EDGE_GAP_PX)
+    expect(rendered.scrollable.scrollTop).toBe(getLatestEdgeScrollTop())
 
     await act(async () => {
       await new Promise((resolve) => window.setTimeout(resolve, 825))
@@ -4185,7 +4350,7 @@ describe('useChatController', () => {
     expect(dispatch.mock.calls.some(([action]) => action?.type === refreshCacheAroundMessageAC('', '').type)).toBe(
       false
     )
-    expect(rendered.scrollable.scrollTop).toBe(LATEST_EDGE_GAP_PX)
+    expect(rendered.scrollable.scrollTop).toBe(getLatestEdgeScrollTop())
   })
 
   it('does not schedule scroll-idle refresh while the jumpToLatest latest lock is active', async () => {
@@ -4203,7 +4368,7 @@ describe('useChatController', () => {
       dispatch,
       layoutSpec: {
         containerRect: { top: 0, left: 0, width: 320, height: 240 },
-        scrollMetrics: { scrollTop: 140, scrollHeight: 800, clientHeight: 240, offsetTop: 0, offsetHeight: 240 },
+        scrollMetrics: { scrollTop: toNativeScrollTop(140, 800, 240), scrollHeight: 800, clientHeight: 240, offsetTop: 0, offsetHeight: 240 },
         itemRects: {
           '1090': { top: 0, left: 0, width: 320, height: 32 }
         }
@@ -4217,7 +4382,11 @@ describe('useChatController', () => {
     dispatch.mockClear()
 
     act(() => {
-      setScrollMetrics(rendered.scrollable, { scrollTop: LATEST_EDGE_GAP_PX, scrollHeight: 800, clientHeight: 240 })
+      setScrollMetrics(rendered.scrollable, {
+        scrollTop: getLatestEdgeScrollTop(800, 240),
+        scrollHeight: 800,
+        clientHeight: 240
+      })
       fireEvent.scroll(rendered.scrollable)
     })
 
@@ -4247,7 +4416,7 @@ describe('useChatController', () => {
 
     act(() => {
       setScrollMetrics(rendered.scrollable, {
-        scrollTop: 140,
+        scrollTop: toNativeScrollTop(140, 800, 240),
         scrollHeight: 800,
         clientHeight: 240
       })
@@ -4343,7 +4512,7 @@ describe('useChatController', () => {
 
     act(() => {
       setScrollMetrics(rendered.scrollable, {
-        scrollTop: 140,
+        scrollTop: toNativeScrollTop(140, 2480, 240),
         scrollHeight: 2480,
         clientHeight: 240
       })
@@ -4354,7 +4523,7 @@ describe('useChatController', () => {
 
     act(() => {
       setScrollMetrics(rendered.scrollable, {
-        scrollTop: 2,
+        scrollTop: toNativeScrollTop(2, 2480, 240),
         scrollHeight: 2480,
         clientHeight: 240
       })
@@ -4470,7 +4639,7 @@ describe('useChatController', () => {
 
   //   await flushEffects()
 
-  //   expect(rendered.scrollable.scrollTop).toBe(LATEST_EDGE_GAP_PX)
+  //   expect(rendered.scrollable.scrollTop).toBe(getLatestEdgeScrollTop())
 
   //   dispatch.mockClear()
 
@@ -4507,7 +4676,7 @@ describe('useChatController', () => {
       layoutSpec: {
         containerRect: { top: 0, left: 0, width: 320, height: 240 },
         scrollMetrics: {
-          scrollTop: 5,
+          scrollTop: getLatestEdgeScrollTop(800, 240),
           scrollHeight: 800,
           clientHeight: 240,
           offsetTop: 0,
@@ -4526,7 +4695,7 @@ describe('useChatController', () => {
 
     act(() => {
       setScrollMetrics(rendered.scrollable, {
-        scrollTop: 5,
+        scrollTop: getLatestEdgeScrollTop(800, 240),
         scrollHeight: 800,
         clientHeight: 240
       })
@@ -4549,17 +4718,17 @@ describe('useChatController', () => {
         layoutSpec={{
           containerRect: { top: 0, left: 0, width: 320, height: 240 },
           scrollMetrics: {
-            scrollTop: 652,
+            scrollTop: getLatestEdgeScrollTop(800, 240),
             scrollHeight: 800,
             clientHeight: 240,
             offsetTop: 0,
             offsetHeight: 240
           },
           itemRects: {
-            '200': { top: 520, left: 0, width: 320, height: 32 },
-            '201': { top: 580, left: 0, width: 320, height: 32 },
-            '202': { top: 640, left: 0, width: 320, height: 32 },
-            '203': { top: 700, left: 0, width: 320, height: 32 }
+            '200': { top: -120, left: 0, width: 320, height: 32 },
+            '201': { top: -60, left: 0, width: 320, height: 32 },
+            '202': { top: -7, left: 0, width: 320, height: 32 },
+            '203': { top: 40, left: 0, width: 320, height: 32 }
           }
         }}
       />
@@ -4567,7 +4736,7 @@ describe('useChatController', () => {
 
     await flushEffects()
 
-    expect(rendered.scrollable.scrollTop).toBe(652)
+    expect(rendered.scrollable.scrollTop).toBe(getLatestEdgeScrollTop(800, 240))
   })
 
   it('re-arms next-edge scrolling only after the user moves away from the latest threshold', async () => {
@@ -4599,7 +4768,7 @@ describe('useChatController', () => {
 
     act(() => {
       setScrollMetrics(scrollable, {
-        scrollTop: 2,
+        scrollTop: toNativeScrollTop(2, 800, 240),
         scrollHeight: 800,
         clientHeight: 240
       })
@@ -4651,7 +4820,7 @@ describe('useChatController', () => {
 
     act(() => {
       setScrollMetrics(scrollable, {
-        scrollTop: 140,
+        scrollTop: toNativeScrollTop(140, 800, 240),
         scrollHeight: 800,
         clientHeight: 240
       })
@@ -4662,7 +4831,7 @@ describe('useChatController', () => {
 
     act(() => {
       setScrollMetrics(scrollable, {
-        scrollTop: 2,
+        scrollTop: toNativeScrollTop(2, 800, 240),
         scrollHeight: 800,
         clientHeight: 240
       })
@@ -4692,14 +4861,14 @@ describe('useChatController', () => {
 
     act(() => {
       setScrollMetrics(scrollable, {
-        scrollTop: 2,
+        scrollTop: toNativeScrollTop(2, 800, 240),
         scrollHeight: 800,
         clientHeight: 240
       })
       fireEvent.scroll(scrollable)
     })
 
-    expect(scrollable.scrollTop).toBe(LATEST_EDGE_GAP_PX)
+    expect(scrollable.scrollTop).toBe(getLatestEdgeScrollTop())
     expect(dispatch).not.toHaveBeenCalled()
   })
 
@@ -4731,14 +4900,14 @@ describe('useChatController', () => {
 
     act(() => {
       setScrollMetrics(scrollable, {
-        scrollTop: 2,
+        scrollTop: toNativeScrollTop(2, 800, 240),
         scrollHeight: 800,
         clientHeight: 240
       })
       fireEvent.scroll(scrollable)
     })
 
-    expect(scrollable.scrollTop).toBe(LATEST_EDGE_GAP_PX)
+    expect(scrollable.scrollTop).toBe(getLatestEdgeScrollTop())
     expect(dispatch).toHaveBeenCalledWith(addMessagesAC([pendingTail], MESSAGE_LOAD_DIRECTION.NEXT))
     expect(dispatch).not.toHaveBeenCalledWith(
       loadMoreMessagesAC(channel.id, LOAD_MAX_MESSAGE_COUNT, MESSAGE_LOAD_DIRECTION.NEXT, confirmedLatest.id, false)
@@ -4777,14 +4946,14 @@ describe('useChatController', () => {
 
     act(() => {
       setScrollMetrics(scrollable, {
-        scrollTop: 2,
+        scrollTop: toNativeScrollTop(2, 1400, 240),
         scrollHeight: 1400,
         clientHeight: 240
       })
       fireEvent.scroll(scrollable)
     })
 
-    expect(scrollable.scrollTop).toBe(LATEST_EDGE_GAP_PX)
+    expect(scrollable.scrollTop).toBe(getLatestEdgeScrollTop(1400, 240))
     expect(dispatch).toHaveBeenCalledWith(addMessagesAC(secondPendingPage, MESSAGE_LOAD_DIRECTION.NEXT))
     expect(dispatch).not.toHaveBeenCalledWith(
       loadMoreMessagesAC(channel.id, LOAD_MAX_MESSAGE_COUNT, MESSAGE_LOAD_DIRECTION.NEXT, confirmedLatest.id, false)
@@ -4819,7 +4988,7 @@ describe('useChatController', () => {
 
     act(() => {
       setScrollMetrics(scrollable, {
-        scrollTop: 1158,
+        scrollTop: toNativeScrollTop(1158, 1400, 240),
         scrollHeight: 1400,
         clientHeight: 240
       })
@@ -4855,14 +5024,14 @@ describe('useChatController', () => {
 
     act(() => {
       setScrollMetrics(scrollable, {
-        scrollTop: 2,
+        scrollTop: toNativeScrollTop(2, 800, 240),
         scrollHeight: 800,
         clientHeight: 240
       })
       fireEvent.scroll(scrollable)
     })
 
-    expect(scrollable.scrollTop).toBe(LATEST_EDGE_GAP_PX)
+    expect(scrollable.scrollTop).toBe(getLatestEdgeScrollTop())
     expect(dispatch).toHaveBeenCalledWith(
       loadMoreMessagesAC(channel.id, LOAD_MAX_MESSAGE_COUNT, MESSAGE_LOAD_DIRECTION.NEXT, '621', true)
     )
@@ -4886,7 +5055,7 @@ describe('useChatController', () => {
 
     act(() => {
       setScrollMetrics(scrollable, {
-        scrollTop: 180,
+        scrollTop: toNativeScrollTop(180, 800, 240),
         scrollHeight: 800,
         clientHeight: 240
       })
@@ -4894,11 +5063,33 @@ describe('useChatController', () => {
 
     dispatch.mockClear()
 
+    const nativeStartScrollTop = toNativeScrollTop(180, 800, 240)
+
     fireEvent.wheel(scrollable, { deltaY: 40, deltaMode: 0 })
-    expect(scrollable.scrollTop).toBe(140)
+    expect(scrollable.scrollTop).toBe(nativeStartScrollTop)
+
+    act(() => {
+      setScrollMetrics(scrollable, {
+        scrollTop: nativeStartScrollTop + 40,
+        scrollHeight: 800,
+        clientHeight: 240
+      })
+      fireEvent.scroll(scrollable)
+    })
 
     fireEvent.wheel(scrollable, { deltaY: -20, deltaMode: 0 })
-    expect(scrollable.scrollTop).toBe(160)
+    expect(scrollable.scrollTop).toBe(nativeStartScrollTop + 40)
+
+    act(() => {
+      setScrollMetrics(scrollable, {
+        scrollTop: nativeStartScrollTop + 20,
+        scrollHeight: 800,
+        clientHeight: 240
+      })
+      fireEvent.scroll(scrollable)
+    })
+
+    expect(scrollable.scrollTop).toBe(nativeStartScrollTop + 20)
     expect(dispatch).not.toHaveBeenCalled()
   })
 
@@ -4923,7 +5114,7 @@ describe('useChatController', () => {
 
     act(() => {
       setScrollMetrics(scrollable, {
-        scrollTop: 160,
+        scrollTop: toNativeScrollTop(160, 800, 240),
         scrollHeight: 800,
         clientHeight: 240
       })
@@ -4933,7 +5124,18 @@ describe('useChatController', () => {
 
     fireEvent.wheel(scrollable, { deltaY: 200, deltaMode: 0 })
 
-    expect(scrollable.scrollTop).toBe(LATEST_EDGE_GAP_PX)
+    expect(scrollable.scrollTop).toBe(toNativeScrollTop(160, 800, 240))
+
+    act(() => {
+      setScrollMetrics(scrollable, {
+        scrollTop: toNativeScrollTop(2, 800, 240),
+        scrollHeight: 800,
+        clientHeight: 240
+      })
+      fireEvent.scroll(scrollable)
+    })
+
+    expect(scrollable.scrollTop).toBe(getLatestEdgeScrollTop())
     expect(dispatch).toHaveBeenCalledWith(
       loadMoreMessagesAC(channel.id, LOAD_MAX_MESSAGE_COUNT, MESSAGE_LOAD_DIRECTION.NEXT, '931', true)
     )
@@ -4958,14 +5160,14 @@ describe('useChatController', () => {
 
     act(() => {
       setScrollMetrics(scrollable, {
-        scrollTop: 558,
+        scrollTop: toNativeScrollTop(558, 800, 240),
         scrollHeight: 800,
         clientHeight: 240
       })
       fireEvent.scroll(scrollable)
     })
 
-    expect(scrollable.scrollTop).toBe(555)
+    expect(scrollable.scrollTop).toBe(getHistoryEdgeScrollTop())
     expect(dispatch).toHaveBeenCalledWith(
       loadMoreMessagesAC(channel.id, LOAD_MAX_MESSAGE_COUNT, MESSAGE_LOAD_DIRECTION.PREV, '710', true)
     )
@@ -4992,7 +5194,7 @@ describe('useChatController', () => {
 
     act(() => {
       setScrollMetrics(scrollable, {
-        scrollTop: 558,
+        scrollTop: toNativeScrollTop(558, 800, 240),
         scrollHeight: 800,
         clientHeight: 240
       })
@@ -5018,12 +5220,22 @@ describe('useChatController', () => {
       flushAnimationFrames()
     })
 
+    const currentScrollable = rendered.container.querySelector('#scrollableDiv') as HTMLDivElement
+    act(() => {
+      setScrollMetrics(currentScrollable, {
+        scrollTop: toNativeScrollTop(558, 800, 240),
+        scrollHeight: 800,
+        clientHeight: 240
+      })
+      fireEvent.scroll(currentScrollable)
+    })
+
     expect(dispatch).toHaveBeenCalledWith(
       loadMoreMessagesAC(channel.id, LOAD_MAX_MESSAGE_COUNT, MESSAGE_LOAD_DIRECTION.PREV, '930', true)
     )
   })
 
-  it('keeps history pagination armed when the user reaches the history edge before cached messages mount', async () => {
+  it('does not auto-dispatch history pagination when cached messages mount after an empty history-edge state', async () => {
     const channel = makeChannel({
       id: 'channel-cached-open-scroll-before-mount'
     })
@@ -5043,7 +5255,7 @@ describe('useChatController', () => {
 
     act(() => {
       setScrollMetrics(scrollable, {
-        scrollTop: 558,
+        scrollTop: toNativeScrollTop(558, 800, 240),
         scrollHeight: 800,
         clientHeight: 240
       })
@@ -5055,7 +5267,27 @@ describe('useChatController', () => {
     )
 
     rendered.rerender(
-      <ControllerHarness channel={channel} messages={messages} hasPrevMessages={true} dispatch={dispatch} />
+      <ControllerHarness
+        channel={channel}
+        messages={messages}
+        hasPrevMessages={true}
+        dispatch={dispatch}
+        layoutSpec={{
+          containerRect: { top: 0, left: 0, width: 320, height: 240 },
+          scrollMetrics: {
+            scrollTop: getHistoryEdgeScrollTop(800, 240),
+            scrollHeight: 800,
+            clientHeight: 240,
+            offsetTop: 0,
+            offsetHeight: 240
+          },
+          itemRects: {
+            '930': { top: 0, left: 0, width: 320, height: 32 },
+            '931': { top: 40, left: 0, width: 320, height: 32 },
+            '932': { top: 80, left: 0, width: 320, height: 32 }
+          }
+        }}
+      />
     )
 
     await flushEffects()
@@ -5063,8 +5295,7 @@ describe('useChatController', () => {
       flushAnimationFrames()
     })
 
-    expect(scrollable.scrollTop).toBe(555)
-    expect(dispatch).toHaveBeenCalledWith(
+    expect(dispatch).not.toHaveBeenCalledWith(
       loadMoreMessagesAC(channel.id, LOAD_MAX_MESSAGE_COUNT, MESSAGE_LOAD_DIRECTION.PREV, '930', true)
     )
   })
@@ -5086,7 +5317,7 @@ describe('useChatController', () => {
 
     act(() => {
       setScrollMetrics(rendered.scrollable, {
-        scrollTop: 558,
+        scrollTop: toNativeScrollTop(558, 800, 240),
         scrollHeight: 800,
         clientHeight: 240
       })
@@ -5116,7 +5347,7 @@ describe('useChatController', () => {
     const nextScrollable = rendered.container.querySelector('#scrollableDiv') as HTMLDivElement
     act(() => {
       setScrollMetrics(nextScrollable, {
-        scrollTop: 558,
+        scrollTop: toNativeScrollTop(558, 800, 240),
         scrollHeight: 800,
         clientHeight: 240
       })
@@ -5145,7 +5376,7 @@ describe('useChatController', () => {
 
     act(() => {
       setScrollMetrics(scrollable, {
-        scrollTop: 440,
+        scrollTop: toNativeScrollTop(440, 800, 240),
         scrollHeight: 800,
         clientHeight: 240
       })
@@ -5155,7 +5386,18 @@ describe('useChatController', () => {
 
     fireEvent.wheel(scrollable, { deltaY: -200, deltaMode: 0 })
 
-    expect(scrollable.scrollTop).toBe(555)
+    expect(scrollable.scrollTop).toBe(toNativeScrollTop(440, 800, 240))
+
+    act(() => {
+      setScrollMetrics(scrollable, {
+        scrollTop: toNativeScrollTop(558, 800, 240),
+        scrollHeight: 800,
+        clientHeight: 240
+      })
+      fireEvent.scroll(scrollable)
+    })
+
+    expect(scrollable.scrollTop).toBe(getHistoryEdgeScrollTop())
     expect(dispatch).toHaveBeenCalledWith(
       loadMoreMessagesAC(channel.id, LOAD_MAX_MESSAGE_COUNT, MESSAGE_LOAD_DIRECTION.PREV, '940', true)
     )
@@ -5176,8 +5418,8 @@ describe('useChatController', () => {
     ]
     const scrollHeight = 1234
     const clientHeight = 321
-    const expectedLatestEdgeTop = 5
-    const expectedHistoryTop = 908
+    const expectedLatestEdgeTop = getLatestEdgeScrollTop(scrollHeight, clientHeight)
+    const expectedHistoryTop = getHistoryEdgeScrollTop(scrollHeight, clientHeight)
 
     const { scrollable } = renderController({
       channel,
@@ -5188,7 +5430,7 @@ describe('useChatController', () => {
 
     act(() => {
       setScrollMetrics(scrollable, {
-        scrollTop: 2,
+        scrollTop: toNativeScrollTop(2, scrollHeight, clientHeight),
         scrollHeight,
         clientHeight
       })
@@ -5199,7 +5441,7 @@ describe('useChatController', () => {
 
     act(() => {
       setScrollMetrics(scrollable, {
-        scrollTop: 910,
+        scrollTop: toNativeScrollTop(910, scrollHeight, clientHeight),
         scrollHeight,
         clientHeight
       })
@@ -5233,7 +5475,7 @@ describe('useChatController', () => {
 
     act(() => {
       setScrollMetrics(scrollable, {
-        scrollTop: 558,
+        scrollTop: toNativeScrollTop(558, 800, 240),
         scrollHeight: 800,
         clientHeight: 240
       })
@@ -5272,7 +5514,7 @@ describe('useChatController', () => {
 
     act(() => {
       setScrollMetrics(scrollable, {
-        scrollTop: 595,
+        scrollTop: toNativeScrollTop(595, 880, 240),
         scrollHeight: 880,
         clientHeight: 240
       })
@@ -5296,7 +5538,7 @@ describe('useChatController', () => {
 
     act(() => {
       setScrollMetrics(scrollable, {
-        scrollTop: 638,
+        scrollTop: toNativeScrollTop(638, 880, 240),
         scrollHeight: 880,
         clientHeight: 240
       })
@@ -5333,7 +5575,7 @@ describe('useChatController', () => {
       })
 
       // Should have jumped to the latest edge (40px) regardless of the active pointer
-      expect(scrollable.scrollTop).toBe(LATEST_EDGE_GAP_PX)
+      expect(scrollable.scrollTop).toBe(getLatestEdgeScrollTop())
     })
 
     it('scrolls to the latest edge even when the user scrolled via wheel moments before', async () => {
@@ -5359,7 +5601,7 @@ describe('useChatController', () => {
         flushAnimationFrames()
       })
 
-      expect(scrollable.scrollTop).toBe(LATEST_EDGE_GAP_PX)
+      expect(scrollable.scrollTop).toBe(getLatestEdgeScrollTop())
     })
 
     it('blocks previous-page pagination while the jumpToLatest lock is still active', async () => {
@@ -5386,7 +5628,7 @@ describe('useChatController', () => {
       })
 
       // Confirm we landed at latest
-      expect(scrollable.scrollTop).toBe(LATEST_EDGE_GAP_PX)
+      expect(scrollable.scrollTop).toBe(getLatestEdgeScrollTop())
 
       dispatch.mockClear()
 

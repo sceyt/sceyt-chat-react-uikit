@@ -174,6 +174,25 @@ const flushMockServerDelay = async () => {
   })
 }
 
+const getHistoryEdgeScrollTop = (scrollHeight: number, clientHeight: number) => {
+  const maxScrollTop = Math.max(0, scrollHeight - clientHeight)
+  const minScrollTop = Math.min(LATEST_EDGE_GAP_PX, maxScrollTop)
+  const maxVisibleScrollTop = Math.max(minScrollTop, maxScrollTop - LATEST_EDGE_GAP_PX)
+
+  return Math.min(maxVisibleScrollTop, Math.max(minScrollTop, LATEST_EDGE_GAP_PX))
+}
+
+const getLatestEdgeScrollTop = (scrollHeight: number, clientHeight: number) => {
+  const maxScrollTop = Math.max(0, scrollHeight - clientHeight)
+  const minScrollTop = Math.min(LATEST_EDGE_GAP_PX, maxScrollTop)
+  const maxVisibleScrollTop = Math.max(minScrollTop, maxScrollTop - LATEST_EDGE_GAP_PX)
+
+  return Math.min(maxVisibleScrollTop, Math.max(minScrollTop, maxScrollTop - LATEST_EDGE_GAP_PX))
+}
+
+const toNativeScrollTop = (invertedScrollTop: number, scrollHeight: number, clientHeight: number) =>
+  Math.max(0, scrollHeight - clientHeight - invertedScrollTop)
+
 const layoutRenderedMessageList = (
   container: HTMLElement,
   options: {
@@ -1357,7 +1376,7 @@ describe('MessageList', () => {
 
     act(() => {
       setScrollMetrics(scrollable, {
-        scrollTop: 2,
+        scrollTop: toNativeScrollTop(2, 1600, 240),
         scrollHeight: 1600,
         clientHeight: 240
       })
@@ -1571,7 +1590,7 @@ describe('MessageList', () => {
       flushAnimationFrames()
     })
 
-    expect(scrollable.scrollTop).toBe(LATEST_EDGE_GAP_PX)
+    expect(scrollable.scrollTop).toBe(getLatestEdgeScrollTop(2600, 240))
     expect(screen.getByText('cached-latest-2')).toBeInTheDocument()
 
     delayedDispatch.mockClear()
@@ -1592,7 +1611,7 @@ describe('MessageList', () => {
       flushAnimationFrames()
     })
 
-    expect(scrollable.scrollTop).toBe(LATEST_EDGE_GAP_PX)
+    expect(scrollable.scrollTop).toBe(getLatestEdgeScrollTop(2600, 240))
     expect(screen.getByText('server-latest-1')).toBeInTheDocument()
   })
 
@@ -1792,7 +1811,7 @@ describe('MessageList', () => {
     })
 
     const latestEdgeTop = scrollable.scrollTop
-    expect(latestEdgeTop).toBe(LATEST_EDGE_GAP_PX)
+    expect(latestEdgeTop).toBe(getLatestEdgeScrollTop(2600, 240))
     expect(screen.queryByText('history-0')).not.toBeInTheDocument()
     expect(screen.getByText('confirmed-latest')).toBeInTheDocument()
     expect(screen.getByText('pending-latest')).toBeInTheDocument()
@@ -1897,7 +1916,7 @@ describe('MessageList', () => {
     expect(store.getState().MessageReducer.loadingPrevMessagesState).toBe(LOADING_STATE.LOADED)
     expect(store.getState().MessageReducer.loadingNextMessagesState).toBe(LOADING_STATE.LOADED)
     expect(store.getState().MessageReducer.messagesHasNext).toBe(false)
-    expect(scrollable.scrollTop).toBe(LATEST_EDGE_GAP_PX)
+    expect(scrollable.scrollTop).toBe(getLatestEdgeScrollTop(2600, 240))
     expect(screen.queryByText('history-delayed-0')).not.toBeInTheDocument()
     expect(screen.getByText('confirmed-before-latest-delayed')).toBeInTheDocument()
     expect(screen.getByText('confirmed-latest-delayed')).toBeInTheDocument()
@@ -1966,7 +1985,7 @@ describe('MessageList', () => {
 
     act(() => {
       layoutRenderedMessageList(scrollable, {
-        scrollTop: 558,
+        scrollTop: toNativeScrollTop(558, 800, 240),
         scrollHeight: 800,
         itemTops: {
           '500': 0,
@@ -1985,7 +2004,7 @@ describe('MessageList', () => {
 
     act(() => {
       layoutRenderedMessageList(scrollable, {
-        scrollTop: 2,
+        scrollTop: toNativeScrollTop(2, 800, 240),
         scrollHeight: 800,
         itemTops: {
           '500': -40,
@@ -2001,7 +2020,7 @@ describe('MessageList', () => {
 
     act(() => {
       layoutRenderedMessageList(scrollable, {
-        scrollTop: LATEST_EDGE_GAP_PX,
+        scrollTop: getLatestEdgeScrollTop(800, 240),
         scrollHeight: 800,
         itemTops: {
           '500': 80,
@@ -2016,7 +2035,7 @@ describe('MessageList', () => {
 
     act(() => {
       layoutRenderedMessageList(scrollable, {
-        scrollTop: LATEST_EDGE_GAP_PX,
+        scrollTop: getLatestEdgeScrollTop(960, 240),
         scrollHeight: 960,
         itemTops: {
           '500': 0,
@@ -2028,7 +2047,7 @@ describe('MessageList', () => {
       flushAnimationFrames()
     })
 
-    expect(scrollable.scrollTop).toBe(LATEST_EDGE_GAP_PX)
+    expect(scrollable.scrollTop).toBe(getLatestEdgeScrollTop(960, 240))
     expect(screen.queryByText('msg-498')).not.toBeInTheDocument()
     expect(screen.queryByText('msg-499')).not.toBeInTheDocument()
     expect(screen.getByText('msg-502')).toBeInTheDocument()
@@ -2149,7 +2168,7 @@ describe('MessageList', () => {
       flushAnimationFrames()
     })
 
-    expect(scrollable.scrollTop).toBe(LATEST_EDGE_GAP_PX)
+    expect(scrollable.scrollTop).toBe(getLatestEdgeScrollTop(2600, 240))
     expect(screen.getAllByTestId('message-row').map((node) => node.textContent)).toEqual([
       'confirmed-base',
       'confirmed-latest',

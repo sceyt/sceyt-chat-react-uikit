@@ -51,7 +51,7 @@ import { IChannel, IMessage } from '../../../types'
 
 export const PRELOAD_TRIGGER_PX = 5
 const PRELOAD_RESET_PX = 50
-export const LATEST_EDGE_GAP_PX = 5
+export const LATEST_EDGE_GAP_PX = 0
 const PINNED_TO_LATEST_PX = 96
 const HIGHLIGHT_DURATION_MS = 1600
 const DEFAULT_UNREAD_VISIBILITY_THRESHOLD = 0.5
@@ -179,29 +179,7 @@ const formatMessageDateLabel = (message: IMessage) => {
   }).format(current)
 }
 
-const SMOOTH_SCROLL_DURATION_MS = 300
-const easeOutCubic = (t: number) => 1 - Math.pow(1 - t, 3)
-
-// Native smooth scroll doesn't animate in Firefox when the container has transform: scaleY(-1).
-// Drive the animation manually so it works identically across all browsers.
-const smoothScrollTo = (container: HTMLElement, targetScrollTop: number) => {
-  const startScrollTop = container.scrollTop
-  const distance = targetScrollTop - startScrollTop
-  if (Math.abs(distance) < 1) return
-  const startTime = performance.now()
-  const step = (now: number) => {
-    const progress = Math.min((now - startTime) / SMOOTH_SCROLL_DURATION_MS, 1)
-    container.scrollTop = startScrollTop + distance * easeOutCubic(progress)
-    if (progress < 1) requestAnimationFrame(step)
-  }
-  requestAnimationFrame(step)
-}
-
 const setScrollTop = (container: HTMLElement, top: number, behavior: ScrollBehavior = 'auto') => {
-  if (behavior === 'smooth') {
-    smoothScrollTo(container, top)
-    return
-  }
   if (typeof container.scrollTo === 'function') {
     container.scrollTo({ top, behavior })
     return
@@ -210,14 +188,52 @@ const setScrollTop = (container: HTMLElement, top: number, behavior: ScrollBehav
   container.scrollTop = top
 }
 
-const scrollToLatestEdge = (container: HTMLElement, behavior: ScrollBehavior = 'auto') => {
-  setScrollTop(container, LATEST_EDGE_GAP_PX, behavior)
-}
-
 const getMaxScrollTop = (container: HTMLElement) => Math.max(0, container.scrollHeight - container.clientHeight)
 
+const clampScrollTopToViewport = (container: HTMLElement, nextScrollTop: number) => {
+  const maxScrollTop = getMaxScrollTop(container)
+  const minScrollTop = Math.min(LATEST_EDGE_GAP_PX, maxScrollTop)
+  const maxVisibleScrollTop = Math.max(minScrollTop, maxScrollTop - LATEST_EDGE_GAP_PX)
+
+  return Math.min(maxVisibleScrollTop, Math.max(minScrollTop, nextScrollTop))
+}
+
+const getHistoryEdgeScrollTop = (container: HTMLElement) => clampScrollTopToViewport(container, LATEST_EDGE_GAP_PX)
+
+const getLatestEdgeScrollTop = (container: HTMLElement) =>
+  clampScrollTopToViewport(container, getMaxScrollTop(container) - LATEST_EDGE_GAP_PX)
+
+const scrollToLatestEdge = (container: HTMLElement, behavior: ScrollBehavior = 'auto') => {
+  setScrollTop(container, getLatestEdgeScrollTop(container), behavior)
+}
+
 const scrollToHistoryEdge = (container: HTMLElement, behavior: ScrollBehavior = 'auto') => {
-  setScrollTop(container, Math.max(LATEST_EDGE_GAP_PX, getMaxScrollTop(container) - LATEST_EDGE_GAP_PX), behavior)
+  setScrollTop(container, getHistoryEdgeScrollTop(container), behavior)
+}
+
+const getElementScrollTopInContainer = (
+  container: HTMLElement,
+  target: HTMLElement,
+  alignment: 'center' | 'start' = 'center'
+) => {
+  const containerRect = container.getBoundingClientRect()
+  const targetRect = target.getBoundingClientRect()
+  const targetTop = container.scrollTop + (targetRect.top - containerRect.top)
+  const nextScrollTop = alignment === 'start' ? targetTop : targetTop - (container.clientHeight - targetRect.height) / 2
+
+  return clampScrollTopToViewport(container, nextScrollTop)
+}
+
+const scrollElementInContainer = (
+  container: HTMLElement,
+  target: HTMLElement,
+  options: {
+    behavior?: ScrollBehavior
+    alignment?: 'center' | 'start'
+  } = {}
+) => {
+  const { behavior = 'auto', alignment = 'center' } = options
+  setScrollTop(container, getElementScrollTopInContainer(container, target, alignment), behavior)
 }
 
 const scrollItemIntoView = (
@@ -237,23 +253,18 @@ const scrollItemIntoView = (
     }
     requestAnimationFrame(() => {
       requestAnimationFrame(() => {
-        const containerRect = container.getBoundingClientRect()
-        const targetRect = target.getBoundingClientRect()
-        const containerCenter = containerRect.top + containerRect.height / 2
-        const targetCenter = targetRect.top + targetRect.height / 2
-        // Container uses scaleY(-1): increasing scrollTop moves elements DOWN visually,
-        // so the centering delta is subtracted rather than added.
-        const newScrollTop = container.scrollTop + (containerCenter - targetCenter)
-        smoothScrollTo(container, Math.max(LATEST_EDGE_GAP_PX, newScrollTop))
+        scrollElementInContainer(container, target, {
+          behavior: 'smooth',
+          alignment: 'center'
+        })
       })
     })
     return
   }
 
-  target.scrollIntoView({
+  scrollElementInContainer(container, target, {
     behavior: 'auto',
-    block: 'center',
-    inline: 'nearest'
+    alignment: 'center'
   })
 }
 
@@ -308,7 +319,7 @@ const isPinnedToLatest = (container: HTMLElement | null) => {
     return true
   }
 
-  return container.scrollTop <= PINNED_TO_LATEST_PX
+  return getLatestEdgeScrollTop(container) - container.scrollTop <= PINNED_TO_LATEST_PX
 }
 
 const getVisibilityRatio = (containerRect: DOMRect, targetRect: DOMRect) => {
@@ -316,18 +327,6 @@ const getVisibilityRatio = (containerRect: DOMRect, targetRect: DOMRect) => {
   const visibleBottom = Math.min(containerRect.bottom, targetRect.bottom)
   const visibleHeight = Math.max(0, visibleBottom - visibleTop)
   return targetRect.height > 0 ? visibleHeight / targetRect.height : 0
-}
-
-const getWheelDelta = (event: WheelEvent, container: HTMLDivElement) => {
-  if (event.deltaMode === 1) {
-    return event.deltaY * 16
-  }
-
-  if (event.deltaMode === 2) {
-    return event.deltaY * container.clientHeight
-  }
-
-  return event.deltaY
 }
 
 const isUnreadIncomingMessage = (message: IMessage) =>
@@ -1035,7 +1034,6 @@ export function useChatController({
   const jumpToLatest = useCallback(
     async (smooth = true) => {
       clearScrollIdleTimer()
-      isJumping.current = true
       lockJumpScrolling(smooth, 'latest')
       invalidateEdgeDirection('previous')
       invalidateEdgeDirection('next')
@@ -1164,7 +1162,9 @@ export function useChatController({
           clearScrollIdleTimer()
           clearPendingLatestJump()
           const jumpId = ++currentJumpIdRef.current
-          isJumping.current = true
+          if (!isLoaded) {
+            isJumping.current = true
+          }
           invalidateEdgeDirection('previous')
           invalidateEdgeDirection('next')
           restoreRef.current = {
@@ -1634,6 +1634,9 @@ export function useChatController({
     if (!container) {
       return
     }
+    const historyEdgeScrollTop = getHistoryEdgeScrollTop(container)
+    const latestEdgeScrollTop = getLatestEdgeScrollTop(container)
+    let currentScrollTop = container.scrollTop
 
     lastScrollActivityAtRef.current = Date.now()
 
@@ -1641,16 +1644,22 @@ export function useChatController({
       return
     }
 
+    if (currentScrollTop <= historyEdgeScrollTop + PRELOAD_TRIGGER_PX) {
+      setScrollTop(container, historyEdgeScrollTop)
+      currentScrollTop = historyEdgeScrollTop
+    } else if (currentScrollTop >= latestEdgeScrollTop - PRELOAD_TRIGGER_PX) {
+      setScrollTop(container, latestEdgeScrollTop)
+      currentScrollTop = latestEdgeScrollTop
+    }
+
+    const distanceFromLatest = latestEdgeScrollTop - currentScrollTop
+
     if (Date.now() < jumpLockUntilRef.current) {
-      if (jumpLockModeRef.current === 'latest' && container.scrollTop > PRELOAD_RESET_PX) {
+      if (jumpLockModeRef.current === 'latest' && distanceFromLatest > PRELOAD_RESET_PX) {
         clearJumpScrollingLock()
       } else {
         return
       }
-    }
-
-    if (container.scrollTop < LATEST_EDGE_GAP_PX) {
-      setScrollTop(container, LATEST_EDGE_GAP_PX)
     }
 
     const pendingRestore =
@@ -1690,15 +1699,10 @@ export function useChatController({
       queueVisibleUnreadCheck()
     }
 
-    const maxScrollTop = getMaxScrollTop(container)
-    if (container.scrollTop > maxScrollTop - LATEST_EDGE_GAP_PX) {
-      setScrollTop(container, maxScrollTop - LATEST_EDGE_GAP_PX)
-    }
-    const distanceFromHistory = maxScrollTop - container.scrollTop
-    const historyTriggered = distanceFromHistory <= PRELOAD_TRIGGER_PX && hasPrevious
-    const latestTriggered = container.scrollTop <= PRELOAD_TRIGGER_PX + LATEST_EDGE_GAP_PX && hasNext
+    const historyTriggered = currentScrollTop <= historyEdgeScrollTop + PRELOAD_TRIGGER_PX && hasPrevious
+    const latestTriggered = distanceFromLatest <= PRELOAD_TRIGGER_PX && hasNext
 
-    if (distanceFromHistory > PRELOAD_RESET_PX) {
+    if (currentScrollTop > historyEdgeScrollTop + PRELOAD_RESET_PX) {
       if (historyArmTimerRef.current === null) {
         historyArmTimerRef.current = setTimeout(() => {
           historyArmTimerRef.current = null
@@ -1707,7 +1711,7 @@ export function useChatController({
       }
       invalidateEdgeDirection('previous')
     }
-    if (container.scrollTop > PRELOAD_RESET_PX) {
+    if (distanceFromLatest > PRELOAD_RESET_PX) {
       if (latestArmTimerRef.current === null) {
         latestArmTimerRef.current = setTimeout(() => {
           latestArmTimerRef.current = null
@@ -1801,7 +1805,7 @@ export function useChatController({
     syncLatestState
   ])
 
-  // Keep a stable latest-closure ref so the scroll/wheel listeners never need re-registering.
+  // Keep a stable latest-closure ref so the scroll listener never needs re-registering.
   handleScrollRef.current = handleTimelineScroll
 
   useEffect(() => {
@@ -1810,29 +1814,15 @@ export function useChatController({
       return
     }
 
-    const onScroll = () => handleScrollRef.current()
-    el.addEventListener('scroll', onScroll, { passive: true })
-    return () => el.removeEventListener('scroll', onScroll)
-  }, [channel?.id, messages])
-
-  useEffect(() => {
-    const el = scrollRef.current
-    if (!el) {
-      return
-    }
-
-    const onWheel = (event: WheelEvent) => {
-      event.preventDefault()
-      if (isJumping.current || (jumpLockModeRef.current === 'item' && Date.now() < jumpLockUntilRef.current)) {
-        return
-      }
-      el.scrollTop -= getWheelDelta(event, el)
+    const onScroll = () => {
       handleScrollRef.current()
     }
 
-    el.addEventListener('wheel', onWheel, { passive: false })
-    return () => el.removeEventListener('wheel', onWheel)
-  }, [channel?.id])
+    el.addEventListener('scroll', onScroll, { passive: true })
+    return () => {
+      el.removeEventListener('scroll', onScroll)
+    }
+  }, [channel?.id, messages])
 
   useEffect(() => {
     if (activeChannelIdRef.current === null) {
@@ -1973,12 +1963,16 @@ export function useChatController({
 
     if (!lastBootKeyRef.current) {
       lastBootKeyRef.current = `${channel.id}:${getMessageLocalRef(messages[0])}`
+      const preservePendingHistoryEdge =
+        pendingEdgeCheckAfterLoadRef.current && activeEdgeIntentRef.current === 'previous'
       restoreRef.current =
         unreadScrollTo && unreadMessageId
           ? { mode: 'reveal-unread-separator' }
-          : isScrollInteractionActive()
+          : preservePendingHistoryEdge
             ? null
-            : { mode: 'to-bottom' }
+            : isScrollInteractionActive()
+              ? null
+              : { mode: 'to-bottom' }
     }
 
     const restoreState = restoreRef.current
@@ -2022,10 +2016,9 @@ export function useChatController({
         unreadRestoreCompletedRef.current = true
         viewIsAtLatestRef.current = false
         setIsViewingLatest(false)
-        unreadDivider.scrollIntoView({
+        scrollElementInContainer(container, unreadDivider, {
           behavior: 'auto',
-          block: 'center',
-          inline: 'nearest'
+          alignment: 'center'
         })
       } else {
         return
@@ -2050,7 +2043,7 @@ export function useChatController({
     }
 
     if (restoreState.mode === 'preserve-anchor-window') {
-      if (!hasNextMessages && container.scrollTop <= PRELOAD_TRIGGER_PX + LATEST_EDGE_GAP_PX) {
+      if (!hasNextMessages && getLatestEdgeScrollTop(container) - container.scrollTop <= PRELOAD_TRIGGER_PX) {
         restoreRef.current = null
         viewIsAtLatestRef.current = true
         setIsViewingLatest(true)
@@ -2069,7 +2062,7 @@ export function useChatController({
 
       restoreRef.current = null
       if (offsetDelta !== 0) {
-        setScrollTop(container, Math.max(LATEST_EDGE_GAP_PX, container.scrollTop - offsetDelta), 'auto')
+        setScrollTop(container, clampScrollTopToViewport(container, container.scrollTop + offsetDelta), 'auto')
       }
       return
     }
@@ -2105,7 +2098,7 @@ export function useChatController({
         cachedEdgeRequestRef.current = null
       }
       if (offsetDelta !== 0) {
-        const nextScrollTop = Math.max(LATEST_EDGE_GAP_PX, container.scrollTop - offsetDelta)
+        const nextScrollTop = clampScrollTopToViewport(container, container.scrollTop + offsetDelta)
         setScrollTop(container, nextScrollTop, 'auto')
       }
     }
@@ -2140,10 +2133,9 @@ export function useChatController({
     restoreRef.current = null
     viewIsAtLatestRef.current = false
     setIsViewingLatest(false)
-    unreadDivider.scrollIntoView({
+    scrollElementInContainer(container, unreadDivider, {
       behavior: 'auto',
-      block: 'center',
-      inline: 'nearest'
+      alignment: 'center'
     })
   }, [messages, unreadMessageId, unreadScrollTo])
 
@@ -2381,9 +2373,10 @@ export function useChatController({
     // its own after a server-side message refresh.
     const reconnectContainer = scrollRef.current
     if (reconnectContainer) {
-      const maxTop = getMaxScrollTop(reconnectContainer)
-      const atHistoryEdge = maxTop - reconnectContainer.scrollTop <= PRELOAD_TRIGGER_PX
-      const atLatestEdge = reconnectContainer.scrollTop <= PRELOAD_TRIGGER_PX + LATEST_EDGE_GAP_PX
+      const atHistoryEdge =
+        reconnectContainer.scrollTop <= getHistoryEdgeScrollTop(reconnectContainer) + PRELOAD_TRIGGER_PX
+      const atLatestEdge =
+        getLatestEdgeScrollTop(reconnectContainer) - reconnectContainer.scrollTop <= PRELOAD_TRIGGER_PX
       if (atHistoryEdge || atLatestEdge) {
         pendingEdgeCheckAfterLoadRef.current = true
       }

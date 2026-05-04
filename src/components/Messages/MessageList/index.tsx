@@ -457,7 +457,6 @@ const MessageList: React.FC<MessagesProps> = ({
   const [mediaFile, setMediaFile] = useState<any>(null)
   const [isDragging, setIsDragging] = useState<any>(null)
   const [stopScrolling, setStopScrolling] = useState<any>(false)
-  const [isScrolling, setIsScrolling] = useState<boolean>(false)
   const [stickyDate, setStickyDate] = useState<string>('')
   const markerBatcherRef = React.useRef<ReturnType<typeof createMessageMarkerBatcher> | null>(null)
   if (!markerBatcherRef.current) {
@@ -1007,11 +1006,9 @@ const MessageList: React.FC<MessagesProps> = ({
           )}
           <Container
             id='scrollableDiv'
-            className={isScrolling ? 'show-scrollbar' : ''}
+            className={'show-scrollbar'}
             ref={scrollRef}
             stopScrolling={stopScrolling}
-            onMouseEnter={() => setIsScrolling(true)}
-            onMouseLeave={() => setIsScrolling(false)}
             onDragEnter={handleDragIn}
             backgroundColor={backgroundColor || themeBackgroundColor}
             thumbColor={surface2}
@@ -1143,19 +1140,12 @@ export const Container = styled.div<{ stopScrolling?: boolean; backgroundColor?:
   flex-direction: column;
   flex: 1;
   min-height: 0;
-  transform: scaleY(-1);
-  will-change: transform;
   background-color: ${(props) => props.backgroundColor};
   overflow-y: auto;
   overflow-x: hidden;
-  margin-top: auto;
   scrollbar-width: none;
   scrollbar-color: transparent transparent;
-  overscroll-behavior: contain;
-
-  @supports (overflow: overlay) {
-    overflow-y: overlay;
-  }
+  overscroll-behavior: none;
 
   &::-webkit-scrollbar {
     width: 8px;
@@ -1208,13 +1198,10 @@ const JumpSpinner = styled.div<{ $color?: string; $size?: number }>`
 
 const MessagesBox = styled.div<{ $isJumping?: boolean }>`
   display: flex;
-  padding-top: 5px;
   flex-direction: column;
-  padding-bottom: 6px;
   width: 100%;
-  transform: scaleY(-1);
-  backface-visibility: hidden;
-  will-change: transform;
+  margin-top: auto;
+  flex-shrink: 0;
   filter: ${(props) => (props.$isJumping ? 'blur(4px)' : 'none')};
   transition: filter 0.2s ease;
 `
@@ -1340,7 +1327,6 @@ export const NoMessagesContainer = styled.div<{ color: string }>`
   flex-direction: column;
   height: 100%;
   width: 100%;
-  transform: scaleY(-1);
   font-weight: 400;
   font-size: 15px;
   line-height: 18px;
