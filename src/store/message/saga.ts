@@ -105,7 +105,8 @@ import {
   setUpdateMessageAttachmentAC,
   setOGMetadataAC,
   fetchOGMetadataForLinkAC,
-  setUnreadMessageIdAC
+  setUnreadMessageIdAC,
+  deleteMessageFromListAC
 } from './actions'
 import {
   attachmentTypes,
@@ -160,7 +161,8 @@ import {
   LOAD_MAX_MESSAGE_COUNT_PREFETCH,
   removeMessageFromMap,
   checkIsItSentAlready,
-  getMessageLocalRef
+  getMessageLocalRef,
+  deletePendingMessage as deletePendingMessageLocally
 } from '../../helpers/messagesHalper'
 import { navigateToLatest } from '../../helpers/messageListNavigator'
 import { CONNECTION_STATUS } from '../user/constants'
@@ -703,6 +705,36 @@ function* applyOptimisticEditMessage(channelId: string, message: IMessage, origi
   }
 
   yield call(applyLocalMessageUpdate, channelId, message.id, optimisticEditedMessage)
+}
+
+function* syncChannelLastMessageAfterLocalRemoval(channelId: string, removedMessage: IMessage): any {
+  const storedChannel = getStoredChannel(channelId)
+  if (!storedChannel?.lastMessage) {
+    return
+  }
+
+  if (getMessageLocalRef(storedChannel.lastMessage) !== getMessageLocalRef(removedMessage)) {
+    return
+  }
+
+  const nextLastMessage = getLatestMessagesFromMap(channelId, 1)[0] || null
+  const channelUpdateParam = {
+    lastMessage: nextLastMessage
+  }
+
+  yield put(updateChannelDataAC(channelId, channelUpdateParam, true))
+  updateChannelOnAllChannels(channelId, channelUpdateParam)
+}
+
+function* deleteLocalPendingMessage(channelId: string, message: IMessage): any {
+  yield call(deletePendingMessageLocally, channelId, message)
+
+  if (getActiveChannelId() === channelId) {
+    yield put(deleteMessageFromListAC(message.id || message.tid!))
+  }
+
+  yield call(syncChannelLastMessageAfterLocalRemoval, channelId, message)
+  yield put(removePendingMessageMutationAC(message.id || message.tid!))
 }
 
 const getEditMessageRequestPayload = (channel: IChannel, message: IMessage) => {
@@ -1556,6 +1588,11 @@ function* deleteMessage(action: IAction): any {
     const currentMessage = getMessageFromMap(channelId, messageId)
     if (!currentMessage) {
       yield put(removePendingMessageMutationAC(messageId))
+      return
+    }
+
+    if (!currentMessage.id && currentMessage.tid) {
+      yield call(deleteLocalPendingMessage, channelId, currentMessage)
       return
     }
 

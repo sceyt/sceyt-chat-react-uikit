@@ -10,7 +10,6 @@ import {
   clearSelectedMessagesAC,
   closePollAC,
   deleteMessageAC,
-  deleteMessageFromListAC,
   deleteReactionAC,
   forwardMessageAC,
   removeSelectedMessageAC,
@@ -37,7 +36,6 @@ import { ReactComponent as ErrorIcon } from '../../assets/svg/errorIcon.svg'
 // Helpers
 import {
   compareMessagesForList,
-  deletePendingMessage,
   removeMessageFromVisibleMessagesMap,
   setMessageToVisibleMessagesMap
 } from 'helpers/messagesHalper'
@@ -330,8 +328,7 @@ const Message = ({
   }, [dispatch, channel.id, message])
 
   const handleDeletePendingMessage = useCallback(() => {
-    deletePendingMessage(channel.id, message)
-    dispatch(deleteMessageFromListAC(message.id || message.tid!))
+    dispatch(deleteMessageAC(channel.id, message.id || message.tid!, 'forEveryone'))
   }, [dispatch, channel.id, message])
 
   const handleToggleDeleteMessagePopup = useCallback(() => {
