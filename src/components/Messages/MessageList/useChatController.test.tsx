@@ -5366,6 +5366,67 @@ describe('useChatController', () => {
     )
   })
 
+  it('boots the next chat at the latest edge even if the previous chat was scrolled moments ago', async () => {
+    const firstChannel = makeChannel({
+      id: 'channel-recent-scroll-before-switch',
+      lastMessage: makeMessage({ id: '911', channelId: 'channel-recent-scroll-before-switch', body: 'first-latest' })
+    })
+    const firstMessages = [
+      makeMessage({ id: '910', channelId: firstChannel.id, body: 'first-older' }),
+      firstChannel.lastMessage as IMessage
+    ]
+    const rendered = renderController({
+      channel: firstChannel,
+      messages: firstMessages
+    })
+    const { dispatch } = rendered
+
+    act(() => {
+      setScrollMetrics(rendered.scrollable, {
+        scrollTop: 300,
+        scrollHeight: 800,
+        clientHeight: 240
+      })
+      fireEvent.scroll(rendered.scrollable)
+    })
+
+    const secondChannel = makeChannel({
+      id: 'channel-boot-after-fast-switch',
+      lastMessage: makeMessage({ id: '921', channelId: 'channel-boot-after-fast-switch', body: 'second-latest' })
+    })
+    const secondMessages = [
+      makeMessage({ id: '920', channelId: secondChannel.id, body: 'second-older' }),
+      secondChannel.lastMessage as IMessage
+    ]
+
+    rendered.rerender(
+      <ControllerHarness
+        channel={secondChannel}
+        messages={secondMessages}
+        dispatch={dispatch}
+        layoutSpec={{
+          containerRect: { top: 0, left: 0, width: 320, height: 240 },
+          scrollMetrics: {
+            scrollTop: 0,
+            scrollHeight: 800,
+            clientHeight: 240,
+            offsetTop: 0,
+            offsetHeight: 240
+          },
+          itemRects: {
+            '920': { top: 0, left: 0, width: 320, height: 32 },
+            '921': { top: 40, left: 0, width: 320, height: 32 }
+          }
+        }}
+      />
+    )
+
+    await flushEffects()
+
+    const nextScrollable = rendered.container.querySelector('#scrollableDiv') as HTMLDivElement
+    expect(nextScrollable.scrollTop).toBe(getLatestEdgeScrollTop(800, 240))
+  })
+
   it('loads the previous page when a fast wheel scroll overshoots the history edge and clamps to the real max scrollTop', () => {
     const channel = makeChannel({
       id: 'channel-wheel-prev-fast'

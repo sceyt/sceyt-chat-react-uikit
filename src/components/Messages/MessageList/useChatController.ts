@@ -1659,10 +1659,8 @@ export function useChatController({
     }
 
     if (currentScrollTop <= historyEdgeScrollTop + PRELOAD_TRIGGER_PX) {
-      setScrollTop(container, historyEdgeScrollTop)
       currentScrollTop = historyEdgeScrollTop
     } else if (currentScrollTop >= latestEdgeScrollTop - PRELOAD_TRIGGER_PX) {
-      setScrollTop(container, latestEdgeScrollTop)
       currentScrollTop = latestEdgeScrollTop
     }
 
@@ -1840,7 +1838,7 @@ export function useChatController({
 
   useEffect(() => {
     const el = scrollRef.current
-    if (!el || !shouldUseFirefoxWheelInterop()) {
+    if (!el || !shouldUseFirefoxWheelInterop() || !messages.length) {
       return
     }
 
@@ -1935,6 +1933,7 @@ export function useChatController({
     itemElementsRef.current.clear()
     previousMessagesRef.current = []
     suppressedMessageChangesRef.current = 0
+    lastScrollActivityAtRef.current = 0
     pendingLatestJumpRef.current = null
     pendingEdgeCheckAfterLoadRef.current = false
     pendingWindowLoadRef.current?.resolve({ items: [] })
@@ -1957,6 +1956,17 @@ export function useChatController({
     setIsViewingLatest(true)
     setHighlightedItemId(null)
     highlightedItemIdRef.current = null
+
+    // const nextChannel = channelRef.current
+    // const shouldBootstrapToLatest =
+    //   !nextChannel.hidden &&
+    //   !channelRestoreWindowMap.get(nextChannel.id) &&
+    //   !nextChannel.backToLinkedChannel &&
+    //   !(nextChannel.newMessageCount && nextChannel.lastDisplayedMessageId)
+    // if (shouldBootstrapToLatest && scrollRef.current && messagesRef.current.length) {
+    //   scrollToLatestEdge(scrollRef.current, 'auto')
+    // }
+
     dispatch(cancelChannelMessageProcessesAC(previousChannelId))
     dispatch(clearActivePaginationIntentAC())
     if (channel?.hidden) {
