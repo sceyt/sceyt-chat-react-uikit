@@ -153,6 +153,13 @@ const getLatestEdgeScrollTop = (scrollHeight = 800, clientHeight = 240) => {
 const toNativeScrollTop = (invertedScrollTop: number, scrollHeight = 800, clientHeight = 240) =>
   Math.max(0, scrollHeight - clientHeight - invertedScrollTop)
 
+const setUserAgent = (userAgent: string) => {
+  Object.defineProperty(window.navigator, 'userAgent', {
+    configurable: true,
+    value: userAgent
+  })
+}
+
 const layoutTimeline = (
   container: HTMLElement | null,
   options: {
@@ -5401,6 +5408,126 @@ describe('useChatController', () => {
     expect(dispatch).toHaveBeenCalledWith(
       loadMoreMessagesAC(channel.id, LOAD_MAX_MESSAGE_COUNT, MESSAGE_LOAD_DIRECTION.PREV, '940', true)
     )
+  })
+
+  it('keeps wheel scrolling active on Firefox after previous-page anchor preservation', async () => {
+    const originalUserAgent = window.navigator.userAgent
+    setUserAgent('Mozilla/5.0 (Macintosh; Intel Mac OS X 14.5; rv:126.0) Gecko/20100101 Firefox/126.0')
+
+    try {
+      const channel = makeChannel({
+        id: 'channel-firefox-wheel-prev-preserve'
+      })
+      const initialMessages = [
+        makeMessage({ id: '120', channelId: channel.id, body: 'visible-120' }),
+        makeMessage({ id: '121', channelId: channel.id, body: 'visible-121' })
+      ]
+      const prependedMessages = [
+        makeMessage({ id: '118', channelId: channel.id, body: 'older-118' }),
+        makeMessage({ id: '119', channelId: channel.id, body: 'older-119' }),
+        ...initialMessages
+      ]
+      const dispatch = jest.fn()
+      const rendered = renderController({
+        channel,
+        messages: initialMessages,
+        hasPrevMessages: true,
+        dispatch,
+        layoutSpec: {
+          containerRect: { top: 0, left: 0, width: 320, height: 240 },
+          scrollMetrics: {
+            scrollTop: getHistoryEdgeScrollTop(800, 240),
+            scrollHeight: 800,
+            clientHeight: 240,
+            offsetTop: 0,
+            offsetHeight: 240
+          },
+          itemRects: {
+            '120': { top: 0, left: 0, width: 320, height: 32 },
+            '121': { top: 40, left: 0, width: 320, height: 32 }
+          }
+        }
+      })
+
+      dispatch.mockClear()
+
+      act(() => {
+        setScrollMetrics(rendered.scrollable, {
+          scrollTop: getHistoryEdgeScrollTop(800, 240),
+          scrollHeight: 800,
+          clientHeight: 240
+        })
+        fireEvent.wheel(rendered.scrollable, { deltaY: -120, deltaMode: 0 })
+      })
+
+      expect(rendered.scrollable.scrollTop).toBe(getHistoryEdgeScrollTop(800, 240))
+      expect(dispatch).toHaveBeenCalledWith(
+        loadMoreMessagesAC(channel.id, LOAD_MAX_MESSAGE_COUNT, MESSAGE_LOAD_DIRECTION.PREV, '120', true)
+      )
+
+      rendered.rerender(
+        <ControllerHarness
+          channel={channel}
+          messages={initialMessages}
+          hasPrevMessages={true}
+          loadingPrevMessages={LOADING_STATE.LOADING}
+          dispatch={dispatch}
+          layoutSpec={{
+            containerRect: { top: 0, left: 0, width: 320, height: 240 },
+            scrollMetrics: {
+              scrollTop: getHistoryEdgeScrollTop(800, 240),
+              scrollHeight: 800,
+              clientHeight: 240,
+              offsetTop: 0,
+              offsetHeight: 240
+            },
+            itemRects: {
+              '120': { top: 0, left: 0, width: 320, height: 32 },
+              '121': { top: 40, left: 0, width: 320, height: 32 }
+            }
+          }}
+        />
+      )
+
+      rendered.rerender(
+        <ControllerHarness
+          channel={channel}
+          messages={prependedMessages}
+          hasPrevMessages={true}
+          loadingPrevMessages={LOADING_STATE.LOADED}
+          dispatch={dispatch}
+          layoutSpec={{
+            containerRect: { top: 0, left: 0, width: 320, height: 240 },
+            scrollMetrics: {
+              scrollTop: getHistoryEdgeScrollTop(880, 240),
+              scrollHeight: 880,
+              clientHeight: 240,
+              offsetTop: 0,
+              offsetHeight: 240
+            },
+            itemRects: {
+              '118': { top: 0, left: 0, width: 320, height: 32 },
+              '119': { top: 40, left: 0, width: 320, height: 32 },
+              '120': { top: 80, left: 0, width: 320, height: 32 },
+              '121': { top: 120, left: 0, width: 320, height: 32 }
+            }
+          }}
+        />
+      )
+
+      await flushEffects()
+
+      const currentScrollable = rendered.container.querySelector('#scrollableDiv') as HTMLDivElement
+      expect(currentScrollable.scrollTop).toBe(80)
+
+      act(() => {
+        fireEvent.wheel(currentScrollable, { deltaY: -40, deltaMode: 0 })
+      })
+
+      expect(currentScrollable.scrollTop).toBe(40)
+    } finally {
+      setUserAgent(originalUserAgent)
+    }
   })
 
   it('keeps exact scrollTop pixel targets for latest-edge correction and preserves in-range history positions', () => {

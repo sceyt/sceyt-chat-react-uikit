@@ -1004,97 +1004,104 @@ const MessageList: React.FC<MessagesProps> = ({
               <JumpSpinner $color={iconInactive} />
             </JumpOverlay>
           )}
-          <Container
-            id='scrollableDiv'
-            className={'show-scrollbar'}
-            ref={scrollRef}
-            stopScrolling={stopScrolling}
-            onDragEnter={handleDragIn}
-            backgroundColor={backgroundColor || themeBackgroundColor}
-            thumbColor={surface2}
-          >
-            {messages.length && messages.length > 0 ? (
-              <MessagesBox className='messageBox' id='messageBox' $isJumping={isJumpingToItem}>
-                {timelineItems.map((timelineItem, index) => {
-                  if (timelineItem.type === 'date-divider') {
+          {!messages.length &&
+          loadingPrevMessages === LOADING_STATE.LOADING &&
+          loadingNextMessages === LOADING_STATE.LOADING ? (
+            <NoMessagesContainer color={textPrimary}>
+              <JumpSpinner $color={iconInactive} $size={32} />
+            </NoMessagesContainer>
+          ) : (
+            <Container
+              id='scrollableDiv'
+              className={'show-scrollbar'}
+              ref={scrollRef}
+              stopScrolling={stopScrolling}
+              onDragEnter={handleDragIn}
+              backgroundColor={backgroundColor || themeBackgroundColor}
+              thumbColor={surface2}
+            >
+              {messages.length && messages.length > 0 ? (
+                <MessagesBox className='messageBox' id='messageBox' $isJumping={isJumpingToItem}>
+                  {timelineItems.map((timelineItem, index) => {
+                    if (timelineItem.type === 'date-divider') {
+                      return (
+                        <div key={timelineItem.key} data-date-label={timelineItem.label}>
+                          <MessageDivider
+                            index={index}
+                            dividerText={timelineItem.label}
+                            dateDividerFontSize={dateDividerFontSize}
+                            dateDividerTextColor={dateDividerTextColor}
+                            dateDividerBorder={dateDividerBorder}
+                            dateDividerBackgroundColor={dateDividerBackgroundColor}
+                            dateDividerBorderRadius={dateDividerBorderRadius}
+                            marginTop={differentUserMessageSpacing}
+                            chatBackgroundColor={backgroundColor || themeBackgroundColor}
+                          />
+                        </div>
+                      )
+                    }
+
+                    if (timelineItem.type === 'unread-divider') {
+                      return (
+                        <div data-message-list-unread-divider='true' key={timelineItem.key}>
+                          <MessageDivider
+                            newMessagesSeparatorTextColor={newMessagesSeparatorTextColor}
+                            newMessagesSeparatorFontSize={newMessagesSeparatorFontSize}
+                            newMessagesSeparatorWidth={newMessagesSeparatorWidth}
+                            newMessagesSeparatorBorder={newMessagesSeparatorBorder}
+                            newMessagesSeparatorBorderRadius={newMessagesSeparatorBorderRadius}
+                            newMessagesSeparatorBackground={newMessagesSeparatorBackground}
+                            newMessagesSeparatorLeftRightSpaceWidth={newMessagesSeparatorTextLeftRightSpacesWidth}
+                            newMessagesSeparatorSpaceColor={newMessagesSeparatorSpaceColor}
+                            dividerText={newMessagesSeparatorText || 'Unread Messages'}
+                            chatBackgroundColor={backgroundColor || themeBackgroundColor}
+                            unread
+                          />
+                        </div>
+                      )
+                    }
+
                     return (
-                      <div key={timelineItem.key} data-date-label={timelineItem.label}>
-                        <MessageDivider
-                          index={index}
-                          dividerText={timelineItem.label}
-                          dateDividerFontSize={dateDividerFontSize}
-                          dateDividerTextColor={dateDividerTextColor}
-                          dateDividerBorder={dateDividerBorder}
-                          dateDividerBackgroundColor={dateDividerBackgroundColor}
-                          dateDividerBorderRadius={dateDividerBorderRadius}
-                          marginTop={differentUserMessageSpacing}
-                          chatBackgroundColor={backgroundColor || themeBackgroundColor}
-                        />
+                      <div
+                        data-message-list-item-id={timelineItem.localRef}
+                        key={timelineItem.key}
+                        ref={timelineItem.registerItemElement}
+                      >
+                        {renderTimelineMessage({
+                          message: timelineItem.item,
+                          prevMessage: timelineItem.prevItem,
+                          nextMessage: timelineItem.nextItem,
+                          index: timelineItem.index,
+                          isUnreadMessage: timelineItem.isUnread && !channel.backToLinkedChannel,
+                          nextMessageStartsUnreadSection:
+                            timelineItem.nextItemStartsUnreadSection && !channel.backToLinkedChannel,
+                          isHighlighted: timelineItem.isHighlighted,
+                          ifLatestAndHasNotPreview: timelineItem.ifLatestAndHasNotPreview
+                        })}
                       </div>
                     )
-                  }
-
-                  if (timelineItem.type === 'unread-divider') {
-                    return (
-                      <div data-message-list-unread-divider='true' key={timelineItem.key}>
-                        <MessageDivider
-                          newMessagesSeparatorTextColor={newMessagesSeparatorTextColor}
-                          newMessagesSeparatorFontSize={newMessagesSeparatorFontSize}
-                          newMessagesSeparatorWidth={newMessagesSeparatorWidth}
-                          newMessagesSeparatorBorder={newMessagesSeparatorBorder}
-                          newMessagesSeparatorBorderRadius={newMessagesSeparatorBorderRadius}
-                          newMessagesSeparatorBackground={newMessagesSeparatorBackground}
-                          newMessagesSeparatorLeftRightSpaceWidth={newMessagesSeparatorTextLeftRightSpacesWidth}
-                          newMessagesSeparatorSpaceColor={newMessagesSeparatorSpaceColor}
-                          dividerText={newMessagesSeparatorText || 'Unread Messages'}
-                          chatBackgroundColor={backgroundColor || themeBackgroundColor}
-                          unread
-                        />
-                      </div>
-                    )
-                  }
-
-                  return (
-                    <div
-                      data-message-list-item-id={timelineItem.localRef}
-                      key={timelineItem.key}
-                      ref={timelineItem.registerItemElement}
-                    >
-                      {renderTimelineMessage({
-                        message: timelineItem.item,
-                        prevMessage: timelineItem.prevItem,
-                        nextMessage: timelineItem.nextItem,
-                        index: timelineItem.index,
-                        isUnreadMessage: timelineItem.isUnread && !channel.backToLinkedChannel,
-                        nextMessageStartsUnreadSection:
-                          timelineItem.nextItemStartsUnreadSection && !channel.backToLinkedChannel,
-                        isHighlighted: timelineItem.isHighlighted,
-                        ifLatestAndHasNotPreview: timelineItem.ifLatestAndHasNotPreview
-                      })}
-                    </div>
-                  )
-                })}
-              </MessagesBox>
-            ) : loadingPrevMessages === LOADING_STATE.LOADED && loadingNextMessages === LOADING_STATE.LOADED ? (
-              <NoMessagesContainer color={textPrimary}>
-                <NoMessagesIcon />
-                <NoMessagesTitle color={textPrimary}>No Messages yet</NoMessagesTitle>
-                <NoMessagesText color={textSecondary}>No messages yet, start the chat</NoMessagesText>
-              </NoMessagesContainer>
-            ) : (
-              <NoMessagesContainer color={textPrimary}>
-                <JumpSpinner $color={iconInactive} $size={32} />
-              </NoMessagesContainer>
-            )}
-            {attachmentsPreview?.show && mediaFile && (
-              <SliderPopup
-                channel={channel}
-                setIsSliderOpen={setMediaFile}
-                currentMediaFile={mediaFile}
-                attachmentsPreview={attachmentsPreview}
-              />
-            )}
-          </Container>
+                  })}
+                </MessagesBox>
+              ) : (
+                loadingPrevMessages === LOADING_STATE.LOADED &&
+                loadingNextMessages === LOADING_STATE.LOADED && (
+                  <NoMessagesContainer color={textPrimary}>
+                    <NoMessagesIcon />
+                    <NoMessagesTitle color={textPrimary}>No Messages yet</NoMessagesTitle>
+                    <NoMessagesText color={textSecondary}>No messages yet, start the chat</NoMessagesText>
+                  </NoMessagesContainer>
+                )
+              )}
+              {attachmentsPreview?.show && mediaFile && (
+                <SliderPopup
+                  channel={channel}
+                  setIsSliderOpen={setMediaFile}
+                  currentMediaFile={mediaFile}
+                  attachmentsPreview={attachmentsPreview}
+                />
+              )}
+            </Container>
+          )}
           {showTopFixedDate && stickyDate && (
             <StickyDateLabel
               dateDividerFontSize={dateDividerFontSize}

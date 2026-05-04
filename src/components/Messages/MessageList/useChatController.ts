@@ -203,6 +203,20 @@ const getHistoryEdgeScrollTop = (container: HTMLElement) => clampScrollTopToView
 const getLatestEdgeScrollTop = (container: HTMLElement) =>
   clampScrollTopToViewport(container, getMaxScrollTop(container) - LATEST_EDGE_GAP_PX)
 
+const getWheelDelta = (event: WheelEvent, container: HTMLElement) => {
+  if (event.deltaMode === 1) {
+    return event.deltaY * 16
+  }
+
+  if (event.deltaMode === 2) {
+    return event.deltaY * container.clientHeight
+  }
+
+  return event.deltaY
+}
+
+const shouldUseFirefoxWheelInterop = () => typeof window !== 'undefined' && /firefox/i.test(window.navigator.userAgent)
+
 const scrollToLatestEdge = (container: HTMLElement, behavior: ScrollBehavior = 'auto') => {
   setScrollTop(container, getLatestEdgeScrollTop(container), behavior)
 }
@@ -1821,6 +1835,38 @@ export function useChatController({
     el.addEventListener('scroll', onScroll, { passive: true })
     return () => {
       el.removeEventListener('scroll', onScroll)
+    }
+  }, [channel?.id, messages])
+
+  useEffect(() => {
+    const el = scrollRef.current
+    if (!el || !shouldUseFirefoxWheelInterop()) {
+      return
+    }
+
+    const onWheel = (event: WheelEvent) => {
+      if (event.ctrlKey) {
+        return
+      }
+
+      event.preventDefault()
+
+      if (isJumping.current || (jumpLockModeRef.current === 'item' && Date.now() < jumpLockUntilRef.current)) {
+        return
+      }
+
+      const nextScrollTop = clampScrollTopToViewport(el, el.scrollTop + getWheelDelta(event, el))
+      if (nextScrollTop !== el.scrollTop) {
+        setScrollTop(el, nextScrollTop, 'auto')
+      }
+      handleScrollRef.current()
+    }
+
+    // Firefox drops kinetic scrolling when scrollTop is corrected after prepending
+    // messages. Driving wheel deltas manually keeps the remaining momentum usable.
+    el.addEventListener('wheel', onWheel, { passive: false })
+    return () => {
+      el.removeEventListener('wheel', onWheel)
     }
   }, [channel?.id, messages])
 

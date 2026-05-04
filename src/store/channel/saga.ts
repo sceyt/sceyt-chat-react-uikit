@@ -1035,7 +1035,6 @@ function* markMessagesRead(action: IAction): any {
     }
     // const activeChannelId = yield call(getActiveChannelId)
     if (channel) {
-      console.log('Mark Messages As Read', messageIds)
       const messageListMarker = yield call(channel.markMessagesAsDisplayed, messageIds)
       // use updateChannelDataAC already changes unreadMessageCount no need in setChannelUnreadCount
       // yield put(setChannelUnreadCount(0, channel.id));
@@ -1184,7 +1183,6 @@ function* markMessagesDelivered(action: IAction): any {
     }
 
     if (channel) {
-      console.log('Mark Messages As Delivered', messageIds)
       const messageListMarker = yield call(channel.markMessagesAsReceived, messageIds)
       for (const messageId of messageListMarker.messageIds) {
         const updateParams = {
