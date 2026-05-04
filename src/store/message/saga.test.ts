@@ -40,6 +40,7 @@ import {
   addMessagesAC,
   cancelChannelMessageProcessesAC,
   deleteMessageAC,
+  deleteMessageFromListAC,
   editMessageAC,
   forwardMessageAC,
   loadAroundMessageAC,
@@ -2582,9 +2583,7 @@ describe('message saga message-list flows', () => {
       forwardMessageAC(sourceMessage, destinationChannel.id, CONNECTION_STATUS.CONNECTED, true)
     )
 
-    expect(mockStore.dispatch.mock.calls.some(([action]) => action.type === addMessagesAC([], 'next').type)).toBe(
-      false
-    )
+    expect(mockStore.dispatch.mock.calls.some(([action]) => action.type === addMessagesAC([], 'next').type)).toBe(false)
     expect(dispatched.some((action) => action.type === updateMessageAC(createdForward.tid, {}, true).type)).toBe(false)
     expect(getPendingMessagesFromMap(destinationChannel.id)).toEqual([])
     expect(getMessageFromMap(destinationChannel.id, confirmedForward.id)).toEqual(
@@ -2718,6 +2717,62 @@ describe('message saga message-list flows', () => {
     )
     expect(getChannelFromMap(channel.id)?.lastMessage).toEqual(
       expect.objectContaining({ id: message.id, state: MESSAGE_STATUS.DELETE, body: '' })
+    )
+  })
+
+  it('deletes a local pending latest message and restores the previous cached channel preview', async () => {
+    const currentUser = makeUser({ id: 'current-user' })
+    const previousMessage = makeMessage({
+      id: '7499',
+      channelId: 'channel-delete-local-pending',
+      body: 'previous confirmed',
+      createdAt: new Date('2026-04-11T09:55:00.000Z'),
+      user: currentUser
+    })
+    const pendingMessage = makePendingMessage({
+      channelId: 'channel-delete-local-pending',
+      tid: 'pending-delete-local',
+      body: 'pending latest',
+      createdAt: new Date('2026-04-11T10:00:00.000Z'),
+      user: currentUser
+    })
+    const channel = makeChannel({
+      id: 'channel-delete-local-pending',
+      lastMessage: pendingMessage
+    })
+
+    channel.deleteMessageById = jest.fn()
+
+    mockStoreState.UserReducer.connectionStatus = CONNECTION_STATUS.CONNECTED
+    setActiveChannelId(channel.id)
+    setChannelInMap(channel)
+    addChannelToAllChannels(channel)
+    addMessageToMap(channel.id, previousMessage)
+    addMessageToMap(channel.id, pendingMessage)
+
+    const dispatched = await runMessageSaga(
+      __messageSagaTestables.deleteMessage,
+      deleteMessageAC(channel.id, pendingMessage.tid!, 'forEveryone')
+    )
+
+    const updateChannelDataAction = getActionByType(dispatched, updateChannelDataAC(channel.id, {}, true).type)
+
+    expect(channel.deleteMessageById).not.toHaveBeenCalled()
+    expect(dispatched).toEqual(
+      expect.arrayContaining([
+        deleteMessageFromListAC(pendingMessage.tid!),
+        removePendingMessageMutationAC(pendingMessage.tid!)
+      ])
+    )
+    expect(updateChannelDataAction.payload.config).toEqual(
+      expect.objectContaining({
+        lastMessage: expect.objectContaining({ id: previousMessage.id, body: previousMessage.body })
+      })
+    )
+    expect(getMessageFromMap(channel.id, pendingMessage.tid!)).toBeNull()
+    expect(getChannelFromMap(channel.id)?.lastMessage).toEqual(expect.objectContaining({ id: previousMessage.id }))
+    expect(getChannelFromAllChannels(channel.id)?.lastMessage).toEqual(
+      expect.objectContaining({ id: previousMessage.id })
     )
   })
 
@@ -3455,7 +3510,7 @@ describe('message saga message-list flows', () => {
     ).toBe(true)
   })
 
-  it('keeps newest pending last message while older resend confirmations arrive and promotes only when the pending itself confirms', async () => {
+  it('keeps the newest pending preview until that same pending message confirms', async () => {
     const currentUser = makeUser({ id: 'current-user' })
     const channelId = 'channel-resend-last-text-order'
     const pendingMessages = [1, 2, 3, 4].map((index) =>
@@ -3537,9 +3592,7 @@ describe('message saga message-list flows', () => {
       resolvers[index](confirmedMessages[index])
       await flushAsyncWork()
 
-      expect(getChannelFromMap(channelId)?.lastMessage).toEqual(
-        expect.objectContaining({ tid: newestPending.tid })
-      )
+      expect(getChannelFromMap(channelId)?.lastMessage).toEqual(expect.objectContaining({ tid: newestPending.tid }))
       expect(getChannelFromMap(channelId)?.lastMessage?.id).toBeFalsy()
     }
 
@@ -3820,9 +3873,7 @@ describe('loadAroundMessage generic cache-first', () => {
       makeMessage({ id: '402', channelId: channel.id, body: 'server-402' })
     ]
     const query = createMessageQuery({
-      loadPreviousMessageId: jest.fn(() =>
-        resolveWithMockServerDelay({ messages: refreshedMessages, hasNext: false })
-      )
+      loadPreviousMessageId: jest.fn(() => resolveWithMockServerDelay({ messages: refreshedMessages, hasNext: false }))
     })
 
     mockStoreState.UserReducer.connectionStatus = CONNECTION_STATUS.CONNECTED

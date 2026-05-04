@@ -6,12 +6,9 @@ import { useDispatch, useSelector } from '../../../store/hooks'
 import { useColor } from 'hooks'
 import { THEME_COLORS } from 'UIHelper/constants'
 import { getChannelByInviteKeyAC } from 'store/channel/actions'
-import { setUpdateMessageAttachmentAC } from 'store/message/actions'
 import { attachmentUpdatedMapSelector } from 'store/message/selector'
 import { getAttachmentURLWithVersion } from 'helpers/attachmentsCache'
 import { isJSON } from 'helpers/message'
-
-const OG_IMAGE_CACHE = 'og-images-v1'
 
 const loadFromMetadata = (firstAttachment: IAttachment | undefined) => {
   if (!firstAttachment) {
@@ -39,7 +36,6 @@ const loadFromMetadata = (firstAttachment: IAttachment | undefined) => {
 }
 
 const useCachedOGImage = (url: string | undefined) => {
-  const dispatch = useDispatch()
   const attachmentUpdatedMap = useSelector(attachmentUpdatedMapSelector)
   const reduxCached = url ? attachmentUpdatedMap[getAttachmentURLWithVersion(url)] : undefined
   const [src, setSrc] = useState<string | undefined>(reduxCached || url)
@@ -52,63 +48,12 @@ const useCachedOGImage = (url: string | undefined) => {
       return
     }
     setSrc(url)
-    if (!('caches' in window)) return
-    caches
-      .open(OG_IMAGE_CACHE)
-      .then((cache) => cache.match(url))
-      .then((cached) => {
-        if (cached) {
-          cached.blob().then((blob) => {
-            const blobUrl = URL.createObjectURL(blob)
-            setSrc(blobUrl)
-            dispatch(setUpdateMessageAttachmentAC(url, blobUrl))
-          })
-        }
-      })
-      .catch(() => {})
   }, [url, reduxCached])
 
   const onImageLoad = useCallback(() => {
-    if (!url || !('caches' in window)) return
-    try {
-      if (new URL(url).origin !== window.location.origin) return
-    } catch {
-      return
-    }
-    fetch(url, { credentials: 'omit' })
-      .then((response) => {
-        if (response.ok) {
-          response
-            .clone()
-            .blob()
-            .then((blob) => {
-              const blobUrl = URL.createObjectURL(blob)
-              dispatch(setUpdateMessageAttachmentAC(url, blobUrl))
-              caches.open(OG_IMAGE_CACHE).then((cache) => cache.put(url, response))
-            })
-        }
-      })
-      .catch(() => {})
+    setSrc(url)
   }, [url])
-
-  const onImageError = useCallback(() => {
-    if (!url || !('caches' in window)) return
-    caches
-      .open(OG_IMAGE_CACHE)
-      .then((cache) => cache.match(url))
-      .then((cached) => {
-        if (cached) {
-          cached.blob().then((blob) => {
-            const blobUrl = URL.createObjectURL(blob)
-            setSrc(blobUrl)
-            dispatch(setUpdateMessageAttachmentAC(url, blobUrl))
-          })
-        }
-      })
-      .catch(() => {})
-  }, [url])
-
-  return { src, onImageLoad, onImageError }
+  return { src, onImageLoad }
 }
 
 const validateUrl = (url: string) => {
@@ -139,7 +84,7 @@ const OGMetadata = ({
   ogShowFavicon = true,
   order = { image: 1, title: 2, description: 3, link: 4 },
   maxWidth = 400,
-  maxHeight,
+  maxHeight = 240,
   ogContainerBorderRadius,
   ogContainerPadding,
   ogContainerClassName,
@@ -188,7 +133,7 @@ const OGMetadata = ({
   }, [attachment])
 
   const [imageLoadError, setImageLoadError] = useState(false)
-  const { src: cachedImageSrc, onImageLoad, onImageError } = useCachedOGImage(metadata?.og?.image?.[0]?.url)
+  const { src: cachedImageSrc, onImageLoad } = useCachedOGImage(metadata?.og?.image?.[0]?.url)
   const { src: cachedFaviconSrc, onImageLoad: onFaviconLoad } = useCachedOGImage(metadata?.og?.favicon?.url)
 
   useEffect(() => {
@@ -272,10 +217,9 @@ const OGMetadata = ({
   const resolvedOrder = useMemo(() => order || { image: 1, title: 2, description: 3, link: 4 }, [order])
 
   const MIN_IMAGE_HEIGHT = 180
-  const MAX_IMAGE_HEIGHT = 400
 
   const showImage = useMemo(() => {
-    return hasImage && calculatedImageHeight >= MIN_IMAGE_HEIGHT && calculatedImageHeight <= MAX_IMAGE_HEIGHT
+    return hasImage && calculatedImageHeight >= MIN_IMAGE_HEIGHT
   }, [hasImage, calculatedImageHeight])
 
   const elements = useMemo(
@@ -298,7 +242,6 @@ const OGMetadata = ({
                     alt='OG image'
                     onLoad={onImageLoad}
                     onError={() => {
-                      onImageError()
                       setImageLoadError(true)
                     }}
                   />
@@ -479,6 +422,7 @@ const ImageContainer = styled.div<{
   margin: 0 auto;
   border-radius: 8px 8px 0 0;
   overflow: hidden;
+  max-height: ${({ maxHeight }) => (maxHeight ? `${maxHeight}px` : '240px')};
 `
 
 const OGText = styled.div<{ margin: boolean }>`
@@ -496,6 +440,7 @@ const Title = styled.p<{ maxWidth: number; padding?: string; color: string }>`
   margin: 4px 0 0 0;
   padding: ${({ padding }) => padding ?? '0'};
   box-sizing: border-box;
+  overflow-wrap: anywhere;
   ${({ maxWidth }) =>
     maxWidth &&
     `
@@ -519,6 +464,7 @@ const Desc = styled.p<{
   -webkit-box-orient: vertical;
   overflow: hidden;
   box-sizing: border-box;
+  overflow-wrap: anywhere;
   ${({ maxWidth }) =>
     maxWidth &&
     `

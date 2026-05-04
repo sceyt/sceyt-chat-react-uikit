@@ -53,7 +53,7 @@ import {
 import VideoPlayer from '../../../components/VideoPlayer'
 import { CircularProgressbar } from 'react-circular-progressbar'
 import ForwardMessagePopup from '../forwardMessage'
-import { deletePendingMessage, getMessagesFromMap } from '../../../helpers/messagesHalper'
+import { getMessagesFromMap } from '../../../helpers/messagesHalper'
 import { getChannelFromMap } from '../../../helpers/channelHalper'
 import ConfirmPopup from '../delete'
 import { IAttachmentProperties } from '../../../components/Message/Message.types'
@@ -228,7 +228,11 @@ const SliderPopup: React.FC<IProps> = ({
           message = messages[0]
         }
         if (!message.deliveryStatus || message.deliveryStatus === MESSAGE_DELIVERY_STATUS.PENDING) {
-          deletePendingMessage(channel.id, message)
+          dispatch(deleteMessageAC(channel.id, message.id || message.tid!, 'forEveryone'))
+          if (currentFile.id) {
+            dispatch(removeAttachmentAC(currentFile.id))
+          }
+          setIsSliderOpen(false)
         } else {
           setMessageToDelete(message)
         }
@@ -238,7 +242,7 @@ const SliderPopup: React.FC<IProps> = ({
     } else {
       setMessageToDelete(undefined)
     }
-  }, [messageToDelete, currentFile.messageId, channel.id])
+  }, [messageToDelete, currentFile.id, currentFile.messageId, channel.id, dispatch, setIsSliderOpen])
 
   const handleDeleteMessage = (deleteOption: 'forMe' | 'forEveryone') => {
     dispatch(deleteMessageAC(channel.id, currentFile.messageId, deleteOption))

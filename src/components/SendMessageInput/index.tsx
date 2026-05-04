@@ -25,7 +25,6 @@ import log from 'loglevel'
 import {
   clearSelectedMessagesAC,
   deleteMessageAC,
-  deleteMessageFromListAC,
   editMessageAC,
   forwardMessageAC,
   sendMessageAC,
@@ -76,7 +75,6 @@ import { IMember, IMessage } from '../../types'
 import { getCustomUploader, getSendAttachmentsAsSeparateMessages } from '../../helpers/customUploader'
 import {
   checkDraftMessagesIsEmpty,
-  deletePendingMessage,
   deleteVideoThumb,
   draftMessagesMap,
   getAudioRecordingFromMap,
@@ -1096,8 +1094,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
   }
 
   const handleDeletePendingMessage = (message: IMessage) => {
-    deletePendingMessage(activeChannel.id, message)
-    dispatch(deleteMessageFromListAC(message.id || message.tid!))
+    dispatch(deleteMessageAC(activeChannel.id, message.id || message.tid!, 'forEveryone'))
   }
 
   const handleToggleDeleteMessagePopup = () => {
