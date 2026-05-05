@@ -370,10 +370,80 @@ export function* handleMessageMarkersReceivedEvent(
   }
 }
 
+export function* handleDeleteMessageEvent(args: { channel: IChannel; deletedMessage: IMessage }): any {
+  const { channel, deletedMessage } = args
+  const activeChannelId = yield call(getActiveChannelId)
+  const channelExists = checkChannelExists(channel.id)
+
+  if (channel.id === activeChannelId) {
+    yield put(updateMessageAC(deletedMessage.id, deletedMessage))
+  }
+  updateMessageOnMap(channel.id, {
+    messageId: deletedMessage.id,
+    params: deletedMessage
+  })
+  if (channelExists) {
+    yield put(
+      updateChannelDataAC(channel.id, {
+        newMessageCount: channel.newMessageCount,
+        muted: channel.muted,
+        mutedTill: channel.mutedTill
+      })
+    )
+    if (channel.lastMessage.id === deletedMessage.id) {
+      yield put(updateChannelLastMessageAC(deletedMessage, channel))
+    }
+  }
+  updateChannelOnAllChannels(
+    channel.id,
+    {
+      newMessageCount: channel.newMessageCount,
+      muted: channel.muted,
+      mutedTill: channel.mutedTill
+    },
+    deletedMessage
+  )
+  yield put(removePendingMessageMutationAC(deletedMessage.id))
+}
+
+export function* handleEditMessageEvent(args: { channel: IChannel; message: IMessage }): any {
+  const { channel, message } = args
+  const activeChannelId = yield call(getActiveChannelId)
+  const channelExists = checkChannelExists(channel.id)
+
+  if (channel.id === activeChannelId) {
+    yield put(
+      updateMessageAC(message.id, {
+        body: message.body,
+        state: message.state,
+        attachments: message.attachments,
+        bodyAttributes: message.bodyAttributes,
+        mentionedUsers: message.mentionedUsers,
+        updatedAt: message.updatedAt
+      })
+    )
+  }
+  if (channelExists) {
+    if (channel.lastMessage.id === message.id) {
+      yield put(updateChannelLastMessageAC(message, channel))
+    }
+  }
+  if (checkChannelExistsOnMessagesMap(channel.id)) {
+    updateMessageOnMap(channel.id, {
+      messageId: message.id,
+      params: message
+    })
+  }
+  updateChannelOnAllChannels(channel.id, {}, message)
+  yield put(removePendingMessageMutationAC(message.id))
+}
+
 export const __eventsTestables = {
   handleChannelMessageEvent,
   handleUnreadMessagesInfoEvent,
-  handleMessageMarkersReceivedEvent
+  handleMessageMarkersReceivedEvent,
+  handleDeleteMessageEvent,
+  handleEditMessageEvent
 }
 
 export default function* watchForEvents(): any {
@@ -1103,71 +1173,12 @@ export default function* watchForEvents(): any {
           break
         }
         case CHANNEL_EVENT_TYPES.DELETE_MESSAGE: {
-          const { channel, /* user, */ deletedMessage } = args
-          const activeChannelId = yield call(getActiveChannelId)
           log.info('channel DELETE_MESSAGE ... ')
-          const channelExists = checkChannelExists(channel.id)
-
-          if (channel.id === activeChannelId) {
-            yield put(updateMessageAC(deletedMessage.id, deletedMessage))
-          }
-          updateMessageOnMap(channel.id, {
-            messageId: deletedMessage.id,
-            params: deletedMessage
-          })
-          if (channelExists) {
-            yield put(
-              updateChannelDataAC(channel.id, {
-                newMessageCount: channel.newMessageCount,
-                muted: channel.muted,
-                mutedTill: channel.mutedTill
-              })
-            )
-            if (channel.lastMessage.id === deletedMessage.id) {
-              yield put(updateChannelLastMessageAC(deletedMessage, channel))
-            }
-          }
-          updateChannelOnAllChannels(
-            channel.id,
-            {
-              newMessageCount: channel.newMessageCount,
-              muted: channel.muted,
-              mutedTill: channel.mutedTill
-            },
-            deletedMessage
-          )
-          yield put(removePendingMessageMutationAC(deletedMessage.id))
+          yield call(handleDeleteMessageEvent, args)
           break
         }
         case CHANNEL_EVENT_TYPES.EDIT_MESSAGE: {
-          const { channel, /* user, */ message } = args
-          const activeChannelId = yield call(getActiveChannelId)
-          const channelExists = checkChannelExists(channel.id)
-          if (channel.id === activeChannelId) {
-            yield put(
-              updateMessageAC(message.id, {
-                body: message.body,
-                state: message.state,
-                attachments: message.attachments,
-                bodyAttributes: message.bodyAttributes,
-                mentionedUsers: message.mentionedUsers,
-                updatedAt: message.updatedAt
-              })
-            )
-          }
-          if (channelExists) {
-            if (channel.lastMessage.id === message.id) {
-              yield put(updateChannelLastMessageAC(message, channel))
-            }
-          }
-          if (checkChannelExistsOnMessagesMap(channel.id)) {
-            updateMessageOnMap(channel.id, {
-              messageId: message.id,
-              params: message
-            })
-          }
-          updateChannelOnAllChannels(channel.id, {}, message)
-          yield put(removePendingMessageMutationAC(message.id))
+          yield call(handleEditMessageEvent, args)
           break
         }
         case CHANNEL_EVENT_TYPES.REACTION_ADDED: {

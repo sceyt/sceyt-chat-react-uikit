@@ -173,6 +173,29 @@ interface IMessageBodyProps {
   collapsedLinesLimit?: number
 }
 
+const parentMessagePreviewEqual = (prevMessage: IMessage, nextMessage: IMessage) => {
+  const prevParent = prevMessage.parentMessage
+  const nextParent = nextMessage.parentMessage
+
+  if (prevParent === nextParent) {
+    return true
+  }
+
+  if (!prevParent || !nextParent) {
+    return false
+  }
+
+  return (
+    prevParent.id === nextParent.id &&
+    prevParent.tid === nextParent.tid &&
+    prevParent.body === nextParent.body &&
+    prevParent.state === nextParent.state &&
+    prevParent.attachments === nextParent.attachments &&
+    prevParent.updatedAt === nextParent.updatedAt &&
+    prevParent.user?.id === nextParent.user?.id
+  )
+}
+
 const MessageBody = ({
   message,
   channel,
@@ -1065,6 +1088,7 @@ export default React.memo(MessageBody, (prevProps, nextProps) => {
     prevProps.message.reactionTotals === nextProps.message.reactionTotals &&
     prevProps.message.attachments === nextProps.message.attachments &&
     prevProps.message.userMarkers === nextProps.message.userMarkers &&
+    parentMessagePreviewEqual(prevProps.message, nextProps.message) &&
     prevProps.prevMessage === nextProps.prevMessage &&
     prevProps.nextMessage === nextProps.nextMessage &&
     prevProps.selectedMessagesMap === nextProps.selectedMessagesMap &&

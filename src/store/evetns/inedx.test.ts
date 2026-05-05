@@ -25,7 +25,7 @@ import {
   makeUser,
   resetMessageListFixtureIds
 } from '../../testUtils/messageFixtures'
-import { MESSAGE_DELIVERY_STATUS } from '../../helpers/constants'
+import { MESSAGE_DELIVERY_STATUS, MESSAGE_STATUS } from '../../helpers/constants'
 import { updateChannelDataAC, updateChannelLastMessageAC, updateChannelLastMessageStatusAC } from '../channel/actions'
 import { addMessagesAC, updateMessagesMarkersAC, updateMessagesStatusAC } from '../message/actions'
 import { navigateToLatest } from '../../helpers/messageListNavigator'
@@ -601,5 +601,101 @@ describe('event message last-message handling', () => {
     ).toPromise()
 
     expect(getContiguousNextMessages(channelId, { id: '952' } as IMessage, 10)).toEqual([])
+  })
+
+  it('updates cached reply parent snapshots when an edit event arrives', async () => {
+    const channelId = 'channel-event-edit-reply'
+    const sourceMessage = makeMessage({
+      id: '930',
+      channelId,
+      body: 'before-edit'
+    })
+    const replyMessage = makeMessage({
+      id: '931',
+      channelId,
+      body: 'reply-message',
+      parentMessage: sourceMessage
+    })
+    const editedMessage = {
+      ...sourceMessage,
+      body: 'after-edit',
+      updatedAt: new Date('2026-04-02T12:10:00.000Z')
+    }
+    const channel = makeChannel({
+      id: channelId,
+      lastMessage: replyMessage
+    })
+
+    setChannelInMap(channel)
+    addChannelToAllChannels(channel)
+    addMessageToMap(channelId, sourceMessage)
+    addMessageToMap(channelId, replyMessage)
+
+    await runSaga(
+      {
+        getState: getSagaState,
+        dispatch: () => undefined
+      },
+      __eventsTestables.handleEditMessageEvent,
+      { channel, message: editedMessage }
+    ).toPromise()
+
+    expect(getMessagesFromMap(channelId)[replyMessage.id].parentMessage).toEqual(
+      expect.objectContaining({
+        id: sourceMessage.id,
+        body: 'after-edit',
+        updatedAt: editedMessage.updatedAt
+      })
+    )
+  })
+
+  it('updates cached reply parent snapshots when a delete event arrives', async () => {
+    const channelId = 'channel-event-delete-reply'
+    const sourceMessage = makeMessage({
+      id: '940',
+      channelId,
+      body: 'before-delete',
+      attachments: [{ id: 'att-delete' } as any]
+    })
+    const replyMessage = makeMessage({
+      id: '941',
+      channelId,
+      body: 'reply-message',
+      parentMessage: sourceMessage
+    })
+    const deletedMessage = {
+      ...sourceMessage,
+      state: MESSAGE_STATUS.DELETE,
+      body: '',
+      attachments: [],
+      updatedAt: new Date('2026-04-02T12:12:00.000Z')
+    }
+    const channel = makeChannel({
+      id: channelId,
+      lastMessage: replyMessage
+    })
+
+    setChannelInMap(channel)
+    addChannelToAllChannels(channel)
+    addMessageToMap(channelId, sourceMessage)
+    addMessageToMap(channelId, replyMessage)
+
+    await runSaga(
+      {
+        getState: getSagaState,
+        dispatch: () => undefined
+      },
+      __eventsTestables.handleDeleteMessageEvent,
+      { channel, deletedMessage }
+    ).toPromise()
+
+    expect(getMessagesFromMap(channelId)[replyMessage.id].parentMessage).toEqual(
+      expect.objectContaining({
+        id: sourceMessage.id,
+        state: MESSAGE_STATUS.DELETE,
+        body: '',
+        attachments: []
+      })
+    )
   })
 })

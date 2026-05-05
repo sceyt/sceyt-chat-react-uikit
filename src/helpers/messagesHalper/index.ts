@@ -806,12 +806,43 @@ export function updateMessageOnMap(
   let updatedMessageData = null
   if (messagesMap[channelId]) {
     const messagesList: IMessage[] = []
+
+    const syncParentMessageSnapshot = (message: IMessage) => {
+      if (
+        !message.parentMessage ||
+        (message.parentMessage.id !== updatedMessage.messageId &&
+          message.parentMessage.tid !== updatedMessage.messageId)
+      ) {
+        return message
+      }
+
+      const parentMessage =
+        updatedMessage.params?.state === MESSAGE_STATUS.DELETE
+          ? {
+              ...updatedMessage.params,
+              id: updatedMessage.params?.id || message.parentMessage.id,
+              tid: updatedMessage.params?.tid || message.parentMessage.tid
+            }
+          : {
+              ...message.parentMessage,
+              ...updatedMessage.params,
+              id: updatedMessage.params?.id || message.parentMessage.id,
+              tid: updatedMessage.params?.tid || message.parentMessage.tid
+            }
+
+      return {
+        ...message,
+        parentMessage
+      }
+    }
+
     for (const mes of Object.values(messagesMap[channelId] || {})) {
+      let nextMessage = mes
+
       if (mes.tid === updatedMessage.messageId || mes.id === updatedMessage.messageId) {
         if (updatedMessage.params.state === MESSAGE_STATUS.DELETE) {
           updatedMessageData = { ...updatedMessage.params }
-          messagesList.push({ ...mes, ...updatedMessageData })
-          continue
+          nextMessage = { ...mes, ...updatedMessageData }
         } else {
           const statusUpdatedMessage = updatedMessage.params?.deliveryStatus
             ? updateMessageDeliveryStatusAndMarkers(mes, updatedMessage.params)
@@ -829,11 +860,11 @@ export function updateMessageOnMap(
             ...updatedMessageData,
             pollDetails: voteDetailsData
           }
-          messagesList.push({ ...mes, ...updatedMessageData })
-          continue
+          nextMessage = { ...mes, ...updatedMessageData }
         }
       }
-      messagesList.push(mes)
+
+      messagesList.push(syncParentMessageSnapshot(nextMessage))
     }
     messagesList.forEach((msg) => {
       if (!messagesMap[channelId]) {

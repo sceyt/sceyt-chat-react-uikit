@@ -170,6 +170,7 @@ interface IChannelListProps {
   ) => any
   doNotShowMessageDeliveryTypes?: string[]
   showPhoneNumber?: boolean
+  channelListWidth?: number
 }
 
 const ChannelSkeletonList = ({ color, count = 12 }: { color: string; count?: number }) => (
@@ -245,7 +246,8 @@ const ChannelList: React.FC<IChannelListProps> = ({
   searchChannelsPadding,
   getCustomLatestMessage,
   doNotShowMessageDeliveryTypes = ['system'],
-  showPhoneNumber = false
+  showPhoneNumber = false,
+  channelListWidth
 }) => {
   const {
     [THEME_COLORS.BACKGROUND]: background,
@@ -276,6 +278,7 @@ const ChannelList: React.FC<IChannelListProps> = ({
   const [listWidthIsSet, setListWidthIsSet] = useState(false)
   const [profileIsOpen, setProfileIsOpen] = useState(false)
   const [isScrolling, setIsScrolling] = useState<boolean>(false)
+  const isCompact = channelListWidth !== undefined && channelListWidth < 280
 
   const handleSetChannelList = (updatedChannels: IChannel[], isRemove?: boolean): any => {
     if (isRemove) {
@@ -462,7 +465,13 @@ const ChannelList: React.FC<IChannelListProps> = ({
     } else {
       setListWidthIsSet(false)
     }
-  }, [channels])
+  }, [channels, channelListWidth])
+
+  useDidUpdate(() => {
+    if (channelListWidth !== undefined) {
+      dispatch(setChannelListWithAC((channelListRef.current && channelListRef.current?.clientWidth) || 0))
+    }
+  }, [channelListWidth])
 
   const setSelectedChannel = (channel: IChannel) => {
     if (activeChannel.id !== channel.id) {
@@ -501,6 +510,7 @@ const ChannelList: React.FC<IChannelListProps> = ({
     <Container
       className={className}
       withCustomList={!!List}
+      channelListWidth={channelListWidth || 0}
       ref={channelListRef}
       borderColor={borderColor}
       backgroundColor={backgroundColor || background}
@@ -514,6 +524,7 @@ const ChannelList: React.FC<IChannelListProps> = ({
         {Profile}
         {showSearch && searchChannelsPosition === 'inline' ? (
           <ChannelSearch
+            isCompact={isCompact}
             inline
             width={channelSearchWidth}
             borderRadius={searchInputBorderRadius}
@@ -527,7 +538,6 @@ const ChannelList: React.FC<IChannelListProps> = ({
         ) : (
           ChannelsTitle || <ChatsTitle color={textPrimary}>Chats</ChatsTitle>
         )}
-
         {showCreateChannelIcon &&
           (CreateChannel || (
             <CreateChannelButton
@@ -543,6 +553,7 @@ const ChannelList: React.FC<IChannelListProps> = ({
       </ChannelListHeader>
       {showSearch && searchChannelsPosition === 'bottom' && (
         <ChannelSearch
+          isCompact={isCompact}
           searchValue={searchValue}
           width={channelSearchWidth}
           borderRadius={searchInputBorderRadius}
@@ -598,6 +609,7 @@ const ChannelList: React.FC<IChannelListProps> = ({
                       getCustomLatestMessage={getCustomLatestMessage as any}
                       doNotShowMessageDeliveryTypes={doNotShowMessageDeliveryTypes}
                       showPhoneNumber={showPhoneNumber}
+                      channelListWidth={channelListWidth}
                     />
                   ))
               )}
@@ -613,7 +625,11 @@ const ChannelList: React.FC<IChannelListProps> = ({
                 <React.Fragment>
                   {!!(searchedChannels.chats_groups && searchedChannels.chats_groups.length) && (
                     <DirectChannels>
-                      <SearchedChannelsHeader color={textSecondary} fontSize={searchedChannelsTitleFontSize}>
+                      <SearchedChannelsHeader
+                        color={textSecondary}
+                        fontSize={searchedChannelsTitleFontSize}
+                        channelListWidth={channelListWidth}
+                      >
                         Chats & Groups
                       </SearchedChannelsHeader>
                       {searchedChannels.chats_groups.map((channel: IChannel) =>
@@ -648,6 +664,7 @@ const ChannelList: React.FC<IChannelListProps> = ({
                             getCustomLatestMessage={getCustomLatestMessage as any}
                             doNotShowMessageDeliveryTypes={doNotShowMessageDeliveryTypes}
                             showPhoneNumber={showPhoneNumber}
+                            channelListWidth={channelListWidth}
                           />
                         )
                       )}
@@ -655,7 +672,11 @@ const ChannelList: React.FC<IChannelListProps> = ({
                   )}
                   {!!(searchedChannels.contacts && searchedChannels.contacts.length) && (
                     <GroupChannels>
-                      <SearchedChannelsHeader color={textSecondary} fontSize={searchedChannelsTitleFontSize}>
+                      <SearchedChannelsHeader
+                        color={textSecondary}
+                        fontSize={searchedChannelsTitleFontSize}
+                        channelListWidth={channelListWidth}
+                      >
                         Contacts
                       </SearchedChannelsHeader>
                       {searchedChannels.contacts.map((contact: IContact) =>
@@ -688,6 +709,7 @@ const ChannelList: React.FC<IChannelListProps> = ({
                             createChatWithContact={handleCrateChatWithContact}
                             key={contact.id}
                             contactsMap={contactsMap}
+                            channelListWidth={channelListWidth}
                           />
                         )
                       )}
@@ -695,7 +717,11 @@ const ChannelList: React.FC<IChannelListProps> = ({
                   )}
                   {!!searchedChannels.channels?.length && (
                     <GroupChannels>
-                      <SearchedChannelsHeader color={textSecondary} fontSize={searchedChannelsTitleFontSize}>
+                      <SearchedChannelsHeader
+                        color={textSecondary}
+                        fontSize={searchedChannelsTitleFontSize}
+                        channelListWidth={channelListWidth}
+                      >
                         Channels
                       </SearchedChannelsHeader>
                       {searchedChannels.channels.map((channel: IChannel) =>
@@ -812,7 +838,11 @@ const ChannelList: React.FC<IChannelListProps> = ({
                 <SearchedChannels>
                   {!!searchedChannels.chats_groups.length && (
                     <DirectChannels>
-                      <SearchedChannelsHeader color={textSecondary} fontSize={searchedChannelsTitleFontSize}>
+                      <SearchedChannelsHeader
+                        color={textSecondary}
+                        fontSize={searchedChannelsTitleFontSize}
+                        channelListWidth={channelListWidth}
+                      >
                         Chats & Groups
                       </SearchedChannelsHeader>
                       {searchedChannels.chats_groups.map((channel: IChannel) =>
@@ -854,7 +884,11 @@ const ChannelList: React.FC<IChannelListProps> = ({
                   )}
                   {!!searchedChannels.channels.length && (
                     <GroupChannels>
-                      <SearchedChannelsHeader color={textSecondary} fontSize={searchedChannelsTitleFontSize}>
+                      <SearchedChannelsHeader
+                        color={textSecondary}
+                        fontSize={searchedChannelsTitleFontSize}
+                        channelListWidth={channelListWidth}
+                      >
                         Channels
                       </SearchedChannelsHeader>
                       {searchedChannels.channels.map((channel: IChannel) =>
@@ -919,13 +953,20 @@ const ChannelList: React.FC<IChannelListProps> = ({
 
 export default ChannelList
 
-const Container = styled.div<{ borderColor: string; withCustomList?: boolean; ref?: any; backgroundColor?: string }>`
+const Container = styled.div<{
+  borderColor: string
+  withCustomList?: boolean
+  ref?: any
+  backgroundColor?: string
+  channelListWidth?: number
+}>`
   position: relative;
   display: flex;
   flex-direction: column;
   width: ${(props: { withCustomList?: boolean; ref?: any; backgroundColor?: string }) =>
     props.withCustomList ? '' : '400px'};
-  min-width: ${(props) => (props.withCustomList ? '' : '400px')};
+  min-width: ${(props) =>
+    props.withCustomList ? '' : props.channelListWidth ? `${props.channelListWidth}px` : '400px'};
   border-right: ${(props) => (props.withCustomList ? '' : `1px solid ${props.borderColor}`)};
   background-color: ${(props) => props.backgroundColor};
   height: 100%;
@@ -977,15 +1018,21 @@ const SearchedChannels = styled.div`
   height: calc(100vh - 123px);
   overflow-x: hidden;
 `
-const SearchedChannelsHeader = styled.p<{ color: string; fontSize?: string }>`
-  padding-left: 16px;
+const SearchedChannelsHeader = styled.p<{ color: string; fontSize?: string; channelListWidth?: number }>`
+  padding-left: ${(props) => (props.channelListWidth !== undefined && props?.channelListWidth < 280 ? '0' : '16px')};
   font-weight: 500;
   font-size: ${(props: { fontSize?: string }) => props.fontSize || '15px'};
   line-height: 14px;
   color: ${(props) => props.color};
+  text-align: ${(props) =>
+    props.channelListWidth !== undefined && props?.channelListWidth < 280 ? 'center' : 'start'};
 `
-const DirectChannels = styled.div``
-const GroupChannels = styled.div``
+const DirectChannels = styled.div`
+  width: calc(100% - 8px);
+`
+const GroupChannels = styled.div`
+  width: calc(100% - 8px);
+`
 
 const ChatsTitle = styled.h3<{ color: string }>`
   font-family: Inter, sans-serif;
@@ -1051,7 +1098,7 @@ const SkeletonTopRow = styled.div`
 const SkeletonItem = styled.div`
   display: flex;
   align-items: center;
-  padding: 8px;
+  padding: 8px 0;
   margin: 0 8px;
 `
 

@@ -4,12 +4,16 @@ import { ClearTypedText, StyledSearchSvg } from '../../../UIHelper'
 import { THEME_COLORS } from '../../../UIHelper/constants'
 import { useColor } from '../../../hooks'
 
-const SearchInputContainer = styled.div<{ inline?: boolean; width?: string }>`
+const SearchInputContainer = styled.div<{ inline?: boolean; width?: string; isCompact?: boolean }>`
   position: relative;
   width: 100%;
   max-width: ${(props) => props.width || (props.inline && 'calc(100% - 24px)')};
   box-sizing: border-box;
   padding: ${(props) => !props.inline && '0 12px 16px'};
+  height: ${(props) =>
+    props.inline && !props.isCompact
+      ? '36px; transition: height 0.2s; overflow: hidden;'
+      : props.isCompact && '0; overflow: hidden; transition: height 0.2s; width: 0; opacity: 0;'};
 
   & ${ClearTypedText} {
     ${(props) => !props.inline && 'right: 20px'};
@@ -56,6 +60,7 @@ interface IChannelSearchProps {
   searchInputTextColor?: string
   fontSize?: string
   width?: string
+  isCompact?: boolean
 }
 
 const ChannelSearch: React.FC<IChannelSearchProps> = ({
@@ -67,7 +72,8 @@ const ChannelSearch: React.FC<IChannelSearchProps> = ({
   searchInputBackgroundColor,
   searchInputTextColor,
   fontSize,
-  width
+  width,
+  isCompact
 }) => {
   const {
     [THEME_COLORS.TEXT_PRIMARY]: textPrimary,
@@ -77,7 +83,7 @@ const ChannelSearch: React.FC<IChannelSearchProps> = ({
   } = useColor()
 
   return (
-    <SearchInputContainer inline={inline} width={width}>
+    <SearchInputContainer inline={inline} width={width} isCompact={isCompact}>
       <StyledSearchSvg left={!inline ? '22px' : ''} color={iconInactive} />
       <SearchInput
         backgroundColor={searchInputBackgroundColor || surface1}

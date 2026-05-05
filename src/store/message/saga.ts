@@ -756,6 +756,7 @@ const getEditMessageRequestPayload = (channel: IChannel, message: IMessage) => {
     const linkAttachmentToSend = linkAttachmentBuilder
       .setName(linkAttachment.name)
       .setUpload(linkAttachment.upload)
+      .setMetadata(linkAttachment.metadata)
       .create()
     linkAttachmentsToSend.push(linkAttachmentToSend)
   })
@@ -2723,6 +2724,9 @@ function* loadDefaultMessages(action: IAction): any {
       yield put(addMessagesAC(filteredPendingMessages, MESSAGE_LOAD_DIRECTION.NEXT))
       // Load OG metadata for link-only messages from cache
       yield call(loadOGMetadataForLinkMessages, filteredPendingMessages, true, false, false)
+      if (cachedMessages?.length && connectionState === CONNECTION_STATUS.CONNECTED) {
+        yield put(scrollToNewMessageAC(true, true, false))
+      }
       const waitToSendPendingMessages = store.getState().UserReducer.waitToSendPendingMessages
       if (connectionState === CONNECTION_STATUS.CONNECTED && waitToSendPendingMessages) {
         yield put(setWaitToSendPendingMessagesAC(false))

@@ -169,6 +169,34 @@ const mergeEquivalentMessages = (existingMessage: IMessage, nextMessage: IMessag
   return { ...existingMessage, ...nextMessage }
 }
 
+const messageMatchesIdOrTid = (message: Partial<Pick<IMessage, 'id' | 'tid'>> | null | undefined, messageId: string) =>
+  !!message && (message.id === messageId || message.tid === messageId)
+
+const syncParentMessageSnapshot = (
+  parentMessage: IMessage | null | undefined,
+  messageId: string,
+  params: Partial<IMessage>
+) => {
+  if (!messageMatchesIdOrTid(parentMessage, messageId)) {
+    return parentMessage || null
+  }
+
+  if (params.state === MESSAGE_STATUS.DELETE) {
+    return {
+      ...params,
+      id: params.id || parentMessage?.id || '',
+      tid: params.tid || parentMessage?.tid
+    } as IMessage
+  }
+
+  return {
+    ...parentMessage,
+    ...params,
+    id: params.id || parentMessage?.id || '',
+    tid: params.tid || parentMessage?.tid
+  } as IMessage
+}
+
 const getTrimmedConfirmedMessages = (messages: IMessage[], direction?: string) => {
   if (messages.length <= MESSAGES_MAX_PAGE_COUNT) {
     return messages
@@ -338,10 +366,12 @@ const messageSlice = createSlice({
       const { messageId, params, addIfNotExists, voteDetails } = action.payload
       let messageFound = false
       state.activeChannelMessages = state.activeChannelMessages.map((message) => {
+        let nextMessage = message
+
         if (message.tid === messageId || message.id === messageId) {
           messageFound = true
           if (params.state === MESSAGE_STATUS.DELETE) {
-            return { ...params }
+            nextMessage = { ...params } as IMessage
           } else {
             let statusUpdatedMessage = null
             if (params?.deliveryStatus) {
@@ -360,10 +390,19 @@ const messageSlice = createSlice({
                 pollDetails: handleVoteDetails(voteDetails, messageOldData)
               }
             }
-            return messageData
+            nextMessage = messageData
           }
         }
-        return message
+
+        const syncedParentMessage = syncParentMessageSnapshot(nextMessage.parentMessage, messageId, params)
+        if (syncedParentMessage !== nextMessage.parentMessage) {
+          nextMessage = {
+            ...nextMessage,
+            parentMessage: syncedParentMessage
+          }
+        }
+
+        return nextMessage
       })
       if (!messageFound && addIfNotExists) {
         state.activeChannelMessages.push(params)

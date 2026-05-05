@@ -23,6 +23,7 @@ import {
   prefetchMessagesAC,
   reloadActiveChannelAfterReconnectAC,
   refreshCacheAroundMessageAC,
+  scrollToNewMessageAC,
   setActivePaginationIntentAC,
   setStableUnreadAnchorAC,
   setUnreadMessageIdAC,
@@ -59,6 +60,11 @@ type HarnessProps = {
   unreadMessageId?: string
   stableUnreadAnchor?: { channelId: string; messageId: string }
   showScrollToNewMessageButton?: boolean
+  scrollToNewMessage?: {
+    scrollToBottom: boolean
+    isIncomingMessage: boolean
+    updateMessageList: boolean
+  }
   scrollToMentionedMessage?: boolean | string | null
   scrollToRepliedMessageId?: string | null
   jumpToItemId?: string | null
@@ -94,6 +100,11 @@ type AsyncControllerState = {
   unreadMessageId: string
   stableUnreadAnchor: { channelId: string; messageId: string }
   showScrollToNewMessageButton: boolean
+  scrollToNewMessage: {
+    scrollToBottom: boolean
+    isIncomingMessage: boolean
+    updateMessageList: boolean
+  }
 }
 
 type AsyncControllerServerResponse = Partial<AsyncControllerState>
@@ -216,6 +227,11 @@ const ControllerHarness = ({
   unreadMessageId = '',
   stableUnreadAnchor,
   showScrollToNewMessageButton = false,
+  scrollToNewMessage = {
+    scrollToBottom: false,
+    isIncomingMessage: false,
+    updateMessageList: false
+  },
   scrollToMentionedMessage = null,
   scrollToRepliedMessageId = null,
   jumpToItemId = null,
@@ -236,7 +252,8 @@ const ControllerHarness = ({
       channelId: stableUnreadAnchorChannelId,
       messageId: stableUnreadAnchorMessageId
     },
-    showScrollToNewMessageButton
+    showScrollToNewMessageButton,
+    scrollToNewMessage
   }))
 
   React.useEffect(() => {
@@ -247,9 +264,11 @@ const ControllerHarness = ({
         channelId: stableUnreadAnchorChannelId,
         messageId: stableUnreadAnchorMessageId
       },
-      showScrollToNewMessageButton
+      showScrollToNewMessageButton,
+      scrollToNewMessage
     })
   }, [
+    scrollToNewMessage,
     showScrollToNewMessageButton,
     stableUnreadAnchorChannelId,
     stableUnreadAnchorMessageId,
@@ -278,6 +297,11 @@ const ControllerHarness = ({
 
       if (action.type === showScrollToNewMessageButtonAC(false).type) {
         setControllerState((prev) => ({ ...prev, showScrollToNewMessageButton: action.payload.state }))
+        return
+      }
+
+      if (action.type === scrollToNewMessageAC(false, false, false).type) {
+        setControllerState((prev) => ({ ...prev, scrollToNewMessage: action.payload }))
       }
     },
     [dispatch]
@@ -291,11 +315,7 @@ const ControllerHarness = ({
     loadingPrevMessages,
     loadingNextMessages,
     connectionStatus,
-    scrollToNewMessage: {
-      scrollToBottom: false,
-      isIncomingMessage: false,
-      updateMessageList: false
-    },
+    scrollToNewMessage: controllerState.scrollToNewMessage,
     scrollToMentionedMessage,
     scrollToRepliedMessageId,
     scrollToMessageHighlight,
@@ -452,7 +472,12 @@ const buildAsyncControllerState = (props: AsyncHarnessProps): AsyncControllerSta
     channelId: props.channel.id,
     messageId: props.unreadMessageId ?? ''
   },
-  showScrollToNewMessageButton: props.showScrollToNewMessageButton ?? false
+  showScrollToNewMessageButton: props.showScrollToNewMessageButton ?? false,
+  scrollToNewMessage: {
+    scrollToBottom: false,
+    isIncomingMessage: false,
+    updateMessageList: false
+  }
 })
 
 const AsyncControllerHarness = ({ server, dispatch = jest.fn(), layoutSpec, ...props }: AsyncHarnessProps) => {
@@ -486,7 +511,12 @@ const AsyncControllerHarness = ({ server, dispatch = jest.fn(), layoutSpec, ...p
         channelId: props.channel.id,
         messageId: props.unreadMessageId ?? ''
       },
-      showScrollToNewMessageButton: props.showScrollToNewMessageButton ?? false
+      showScrollToNewMessageButton: props.showScrollToNewMessageButton ?? false,
+      scrollToNewMessage: {
+        scrollToBottom: false,
+        isIncomingMessage: false,
+        updateMessageList: false
+      }
     }))
   }, [
     props.channel,
@@ -556,6 +586,11 @@ const AsyncControllerHarness = ({ server, dispatch = jest.fn(), layoutSpec, ...p
 
       if (action.type === showScrollToNewMessageButtonAC(false).type) {
         setState((prev) => ({ ...prev, showScrollToNewMessageButton: action.payload.state }))
+        return
+      }
+
+      if (action.type === scrollToNewMessageAC(false, false, false).type) {
+        setState((prev) => ({ ...prev, scrollToNewMessage: action.payload }))
         return
       }
 
@@ -657,6 +692,53 @@ describe('useChatController', () => {
     })
 
     expect(scrollable.scrollTop).toBe(getLatestEdgeScrollTop())
+  })
+
+  it('keeps the channel pinned to the latest edge while the default boot refresh replaces the cached latest window', async () => {
+    const channel = makeChannel({
+      id: 'channel-boot-cache-refresh',
+      lastMessage: makeMessage({ id: '805', channelId: 'channel-boot-cache-refresh', body: 'latest-server' })
+    })
+    const cachedMessages = [
+      makeMessage({ id: '803', channelId: channel.id, body: 'cached-older' }),
+      makeMessage({ id: '804', channelId: channel.id, body: 'cached-latest' })
+    ]
+    const refreshedMessages = [
+      makeMessage({ id: '802', channelId: channel.id, body: 'server-oldest' }),
+      ...cachedMessages,
+      channel.lastMessage
+    ]
+
+    const rendered = renderAsyncController({
+      channel,
+      messages: cachedMessages,
+      connectionStatus: CONNECTION_STATUS.CONNECTED,
+      layoutSpec: (state) => ({
+        containerRect: { top: 0, left: 0, width: 320, height: 240 },
+        scrollMetrics: {
+          scrollHeight: state.messages.length > cachedMessages.length ? 1200 : 800,
+          clientHeight: 240,
+          offsetTop: 0,
+          offsetHeight: 240
+        }
+      }),
+      server: {
+        onLoadDefault: () => ({
+          messages: refreshedMessages
+        })
+      }
+    })
+
+    expect(rendered.scrollable.scrollTop).toBe(getLatestEdgeScrollTop(800, 240))
+
+    await flushMockServerDelay()
+    await flushEffects()
+    act(() => {
+      flushAnimationFrames()
+    })
+
+    expect(screen.getByText('latest-server')).toBeInTheDocument()
+    expect(rendered.scrollable.scrollTop).toBe(getLatestEdgeScrollTop(1200, 240))
   })
 
   it('renders the unread divider when unreadScrollTo is enabled', async () => {

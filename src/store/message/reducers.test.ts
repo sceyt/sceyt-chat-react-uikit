@@ -6,11 +6,12 @@ import {
   getAllPendingFromMap,
   getPendingMessagesFromMap,
   MESSAGE_LOAD_DIRECTION,
+  updateMessageOnMap,
   updateMessageDeliveryStatusAndMarkers,
   updateMessageStatusOnMap
 } from '../../helpers/messagesHalper'
 import { makeMessage, makePendingMessage, resetMessageListFixtureIds } from '../../testUtils/messageFixtures'
-import { MESSAGE_DELIVERY_STATUS } from '../../helpers/constants'
+import { MESSAGE_DELIVERY_STATUS, MESSAGE_STATUS } from '../../helpers/constants'
 
 describe('message pending ordering', () => {
   beforeEach(() => {
@@ -199,6 +200,132 @@ describe('message pending ordering', () => {
       'pending-earlier',
       'pending-later-updated'
     ])
+  })
+
+  it('updates reply parent snapshots when the source message is edited', () => {
+    const channelId = 'channel-reply-edit-reducer'
+    const sourceMessage = makeMessage({
+      id: '4001',
+      channelId,
+      body: 'before-edit'
+    })
+    const replyMessage = makeMessage({
+      id: '4002',
+      channelId,
+      body: 'reply-message',
+      parentMessage: sourceMessage
+    })
+
+    const initialState = MessageReducer(undefined, setMessages({ messages: [sourceMessage, replyMessage] }))
+    const nextState = MessageReducer(
+      initialState,
+      updateMessage({
+        messageId: sourceMessage.id,
+        params: {
+          body: 'after-edit',
+          updatedAt: new Date('2026-04-01T12:20:00.000Z')
+        }
+      })
+    )
+
+    expect(nextState.activeChannelMessages[1].parentMessage).toEqual(
+      expect.objectContaining({
+        id: sourceMessage.id,
+        body: 'after-edit'
+      })
+    )
+  })
+
+  it('updates reply parent snapshots when the source message is deleted', () => {
+    const channelId = 'channel-reply-delete-reducer'
+    const sourceMessage = makeMessage({
+      id: '4011',
+      channelId,
+      body: 'before-delete',
+      attachments: [{ id: 'att-1' } as any]
+    })
+    const replyMessage = makeMessage({
+      id: '4012',
+      channelId,
+      body: 'reply-message',
+      parentMessage: sourceMessage
+    })
+
+    const initialState = MessageReducer(undefined, setMessages({ messages: [sourceMessage, replyMessage] }))
+    const nextState = MessageReducer(
+      initialState,
+      updateMessage({
+        messageId: sourceMessage.id,
+        params: {
+          id: sourceMessage.id,
+          state: MESSAGE_STATUS.DELETE,
+          body: '',
+          attachments: []
+        }
+      })
+    )
+
+    expect(nextState.activeChannelMessages[1].parentMessage).toEqual(
+      expect.objectContaining({
+        id: sourceMessage.id,
+        state: MESSAGE_STATUS.DELETE,
+        body: '',
+        attachments: []
+      })
+    )
+  })
+
+  it('propagates reply parent snapshot updates in the message cache for edit and delete', () => {
+    const channelId = 'channel-reply-map'
+    const sourceMessage = makeMessage({
+      id: '4021',
+      channelId,
+      body: 'cache-before-edit',
+      attachments: [{ id: 'att-2' } as any]
+    })
+    const replyMessage = makeMessage({
+      id: '4022',
+      channelId,
+      body: 'reply-message',
+      parentMessage: sourceMessage
+    })
+
+    addMessageToMap(channelId, sourceMessage)
+    addMessageToMap(channelId, replyMessage)
+
+    updateMessageOnMap(channelId, {
+      messageId: sourceMessage.id,
+      params: {
+        body: 'cache-after-edit',
+        updatedAt: new Date('2026-04-01T12:22:00.000Z')
+      }
+    })
+
+    expect(getMessagesFromMap(channelId)[replyMessage.id].parentMessage).toEqual(
+      expect.objectContaining({
+        id: sourceMessage.id,
+        body: 'cache-after-edit'
+      })
+    )
+
+    updateMessageOnMap(channelId, {
+      messageId: sourceMessage.id,
+      params: {
+        id: sourceMessage.id,
+        state: MESSAGE_STATUS.DELETE,
+        body: '',
+        attachments: []
+      }
+    })
+
+    expect(getMessagesFromMap(channelId)[replyMessage.id].parentMessage).toEqual(
+      expect.objectContaining({
+        id: sourceMessage.id,
+        state: MESSAGE_STATUS.DELETE,
+        body: '',
+        attachments: []
+      })
+    )
   })
 
   it('keeps pending messages at the tail after paginating to older and newer pages around them', () => {

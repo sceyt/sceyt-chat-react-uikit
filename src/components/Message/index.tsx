@@ -1045,6 +1045,9 @@ const Message = ({
 }
 
 export default React.memo(Message, (prev, next) => {
+  const prevParent = prev.message.parentMessage
+  const nextParent = next.message.parentMessage
+
   // Message content
   if (prev.message.id !== next.message.id) return false
   if (prev.message.deliveryStatus !== next.message.deliveryStatus) return false
@@ -1058,6 +1061,16 @@ export default React.memo(Message, (prev, next) => {
   if (prev.message.metadata !== next.message.metadata) return false
   if (prev.message.userMarkers !== next.message.userMarkers) return false
   if (prev.message.pollDetails !== next.message.pollDetails) return false
+  if (prevParent !== nextParent) {
+    if (!prevParent || !nextParent) return false
+    if (prevParent.id !== nextParent.id) return false
+    if (prevParent.tid !== nextParent.tid) return false
+    if (prevParent.body !== nextParent.body) return false
+    if (prevParent.state !== nextParent.state) return false
+    if (prevParent.attachments !== nextParent.attachments) return false
+    if (prevParent.updatedAt !== nextParent.updatedAt) return false
+    if (prevParent.user?.id !== nextParent.user?.id) return false
+  }
 
   // Neighbor messages — only semantically relevant fields
   if (prev.prevMessage?.id !== next.prevMessage?.id) return false
