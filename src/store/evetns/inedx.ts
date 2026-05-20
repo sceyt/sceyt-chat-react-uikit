@@ -214,7 +214,7 @@ export function* handleChannelMessageEvent(args: { channel: IChannel; message: I
       } else {
         yield put(addMessagesAC([message], 'next'))
       }
-      yield put(loadOGMetadataForLinkAC([message], true))
+      yield put(loadOGMetadataForLinkAC([message]))
       const tabIsActive = yield select(browserTabIsActiveSelector)
       if (lastMessageIsVisible && tabIsActive) {
         setTimeout(() => {

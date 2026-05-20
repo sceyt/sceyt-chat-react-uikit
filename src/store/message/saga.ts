@@ -1284,7 +1284,10 @@ function* sendTextMessage(action: IAction): any {
     if (message.attachments && message.attachments.length) {
       const attachmentBuilder = channel.createAttachmentBuilder(attachments[0].data, attachments[0].type)
       attachmentBuilder.setMetadata(JSON.stringify(attachments[0].metadata))
-      const att = attachmentBuilder.setName('').setUpload(attachments[0].upload).create()
+      const att = attachmentBuilder
+        .setName(attachments[0]?.name || '')
+        .setUpload(attachments[0].upload)
+        .create()
       attachments = [att]
     }
     const messageBuilder = channel.createMessageBuilder()
@@ -1917,7 +1920,7 @@ function* loadFromMetadata(firstAttachment: IAttachment) {
     // Convert compact format to full OG format
     const fullMetadata: any = {
       og: {
-        title: compactMeta.ttl,
+        title: compactMeta.ttl || firstAttachment?.name,
         description: compactMeta.dsc,
         image: compactMeta.iur ? [{ url: compactMeta.iur }] : undefined,
         favicon: compactMeta.tur ? { url: compactMeta.tur } : undefined

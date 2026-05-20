@@ -22,7 +22,7 @@ const loadFromMetadata = (firstAttachment: IAttachment | undefined) => {
     }
     const fullMetadata: any = {
       og: {
-        title: compactMeta.ttl,
+        title: compactMeta.ttl || firstAttachment?.name,
         description: compactMeta.dsc,
         image: compactMeta.iur ? [{ url: compactMeta.iur }] : undefined,
         favicon: compactMeta.tur ? { url: compactMeta.tur } : undefined
