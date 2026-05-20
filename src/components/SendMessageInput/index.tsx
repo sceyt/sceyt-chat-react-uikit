@@ -128,7 +128,6 @@ import RecordingAnimation from './RecordingAnimation'
 import CreatePollPopup from './Poll/CreatePollPopup'
 import { MESSAGE_TYPE } from 'types/enum'
 import { getMembersAC } from 'store/member/actions'
-import { storeMetadata } from 'services/indexedDB/metadataService'
 
 function AutoFocusPlugin({ messageForReply }: any) {
   const [editor] = useLexicalComposerContext()
@@ -691,9 +690,9 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
               if (urlMetadata.imageWidth) metadata.szw = urlMetadata.imageWidth
               if (urlMetadata.imageHeight) metadata.szh = urlMetadata.imageHeight
               if (urlMetadata.og?.favicon?.url) metadata.tur = urlMetadata.og.favicon.url
-              if (urlMetadata.og?.description) metadata.dsc = urlMetadata.og.description
+              if (urlMetadata.og?.description) metadata.dsc = urlMetadata.og.description?.slice(0, 200)
               if (urlMetadata.og?.image?.[0]?.url) metadata.iur = urlMetadata.og.image[0].url
-              if (urlMetadata.og?.title) metadata.ttl = urlMetadata.og.title
+              if (urlMetadata.og?.title) metadata.ttl = urlMetadata.og.title?.slice(0, 100)
             }
 
             if (dismissedUrls.has(url)) {
@@ -704,7 +703,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
               type: attachmentTypes.link,
               data: url,
               upload: false,
-              ...(Object.keys(metadata).length > 0 ? { metadata } : { metadata: { hld: true } })
+              ...(Object.keys(metadata).length > 0 ? { metadata, name: metadata.ttl } : { metadata: { hld: true } })
             }
           }
         }
@@ -808,9 +807,9 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
             if (urlMetadata.imageWidth) metadata.szw = urlMetadata.imageWidth
             if (urlMetadata.imageHeight) metadata.szh = urlMetadata.imageHeight
             if (urlMetadata.og?.favicon?.url) metadata.tur = urlMetadata.og.favicon.url
-            if (urlMetadata.og?.description) metadata.dsc = urlMetadata.og.description
+            if (urlMetadata.og?.description) metadata.dsc = urlMetadata.og.description?.slice(0, 200)
             if (urlMetadata.og?.image?.[0]?.url) metadata.iur = urlMetadata.og.image[0].url
-            if (urlMetadata.og?.title) metadata.ttl = urlMetadata.og.title
+            if (urlMetadata.og?.title) metadata.ttl = urlMetadata.og.title?.slice(0, 100)
           }
 
           if (dismissedUrls.has(url)) {
@@ -821,7 +820,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
             type: attachmentTypes.link,
             data: url,
             upload: false,
-            ...(Object.keys(metadata).length > 0 ? { metadata } : { metadata: { hld: true } })
+            ...(Object.keys(metadata).length > 0 ? { metadata, name: metadata.ttl } : { metadata: { hld: true } })
           }
         }
       }
@@ -2045,11 +2044,6 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
                                   imageWidth: e.target.naturalWidth
                                 })
                               )
-                              storeMetadata(linkPreview.url, {
-                                ...linkPreview.metadata,
-                                imageHeight: e.target.naturalHeight,
-                                imageWidth: e.target.naturalWidth
-                              })
                             }
                           }}
                           src={linkPreview.metadata.og.image[0].url}

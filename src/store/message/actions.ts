@@ -737,10 +737,10 @@ export function setStableUnreadAnchorAC(channelId: string, messageId: string) {
   return setStableUnreadAnchor({ channelId, messageId })
 }
 
-export function loadOGMetadataForLinkAC(messages: IMessage[], setStore = false) {
+export function loadOGMetadataForLinkAC(messages: IMessage[]) {
   return {
     type: LOAD_OG_METADATA_FOR_LINK,
-    payload: { messages, setStore }
+    payload: { messages }
   }
 }
 
@@ -755,9 +755,9 @@ export function refreshCacheAroundMessageAC(channelId: string, messageId: string
   }
 }
 
-export function fetchOGMetadataForLinkAC(url: string, setStore = true) {
+export function fetchOGMetadataForLinkAC(url: string) {
   return {
     type: FETCH_OG_METADATA,
-    payload: { url, setStore }
+    payload: { url }
   }
 }

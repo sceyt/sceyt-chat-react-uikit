@@ -178,7 +178,6 @@ import { setAttachmentToCache } from '../../helpers/attachmentsCache'
 import store from '../index'
 import { IProgress } from '../../components/ChatContainer'
 import { canBeViewOnce, isJSON } from '../../helpers/message'
-import { getMetadata, storeMetadata } from '../../services/indexedDB/metadataService'
 import log from 'loglevel'
 import { getVideoFirstFrame } from 'helpers/getVideoFrame'
 import { MESSAGE_TYPE } from 'types/enum'
@@ -1064,7 +1063,7 @@ function* sendMessage(action: IAction): any {
             }
             pendingMessages.push(pending)
             if (action.type !== RESEND_MESSAGE) {
-              yield call(loadOGMetadataForLinkMessages, [pending], true, false, false)
+              yield call(loadOGMetadataForLinkMessages, [pending], true)
               yield call(updateMessage, action.type, pending, channel.id, true, message)
             }
           } else {
@@ -1111,7 +1110,7 @@ function* sendMessage(action: IAction): any {
           }
           pendingMessages.push(pending)
           if (action.type !== RESEND_MESSAGE) {
-            yield call(loadOGMetadataForLinkMessages, [pending], true, false, false)
+            yield call(loadOGMetadataForLinkMessages, [pending], true)
             yield call(updateMessage, action.type, pending, channel.id, true, message)
           }
 
@@ -1324,7 +1323,7 @@ function* sendTextMessage(action: IAction): any {
     }
     if (pendingMessage) {
       if (action.type !== RESEND_MESSAGE) {
-        yield call(loadOGMetadataForLinkMessages, [pendingMessage], true, true, false)
+        yield call(loadOGMetadataForLinkMessages, [pendingMessage], true)
         yield call(updateMessage, action.type, pendingMessage, channel.id, true, message)
       }
     }
@@ -1486,7 +1485,7 @@ function* forwardMessage(action: IAction): any {
 
       if (pendingMessage) {
         if (action.type !== RESEND_MESSAGE) {
-          yield call(loadOGMetadataForLinkMessages, [pendingMessage], true, false, false)
+          yield call(loadOGMetadataForLinkMessages, [pendingMessage], true)
           yield call(
             updateMessage,
             action.type,
@@ -1930,12 +1929,7 @@ function* loadFromMetadata(firstAttachment: IAttachment) {
   }
 }
 
-function* loadOGMetadataForLinkMessages(
-  messages: IMessage[],
-  setStore = true,
-  sendMessage?: boolean,
-  getFromServer = true
-): any {
+function* loadOGMetadataForLinkMessages(messages: IMessage[], getFromServer = true): any {
   if (!messages || messages.length === 0) return
   for (let i = 0; i < messages.length; i++) {
     const message = messages[i]
@@ -1965,24 +1959,12 @@ function* loadOGMetadataForLinkMessages(
         // Fallback to Redux state
         const storedData = store.getState().MessageReducer.oGMetadata?.[firstAttachment.url]
         if (storedData) {
-          if (sendMessage) {
-            if (setStore) yield call(storeMetadata, firstAttachment.url, storedData)
-          }
           continue
         }
-        try {
-          const cachedMetadata: any = yield call(getMetadata, firstAttachment.url)
-          if (cachedMetadata) {
-            yield put(setOGMetadataAC(firstAttachment.url, cachedMetadata))
-          } else {
-            yield call(loadFromMetadata, firstAttachment)
-          }
-        } catch (e) {
-          yield call(loadFromMetadata, firstAttachment)
-        }
+        yield call(loadFromMetadata, firstAttachment)
         // Fetch metadata from API
         if (getFromServer) {
-          store.dispatch(fetchOGMetadataForLinkAC(firstAttachment.url, setStore))
+          store.dispatch(fetchOGMetadataForLinkAC(firstAttachment.url))
         }
       }
     }
@@ -1990,7 +1972,7 @@ function* loadOGMetadataForLinkMessages(
 }
 
 function* fetchOGMetadata(action: IAction): any {
-  const { url, setStore } = action.payload
+  const { url } = action.payload
   const client = getClient()
   if (client && client.connectionState === CONNECTION_STATUS.CONNECTED) {
     try {
@@ -2002,19 +1984,13 @@ function* fetchOGMetadata(action: IAction): any {
       const imageUrl = metadata?.og?.image?.[0]?.url
       if (imageUrl) {
         try {
-          let metadataWithImage
-          if (setStore) {
-            const imageDimensions: any = yield call(loadImage, imageUrl)
-            metadataWithImage = {
-              ...metadata,
-              imageWidth: imageDimensions.width,
-              imageHeight: imageDimensions.height
-            }
-          } else {
-            metadataWithImage = metadata
+          const imageDimensions: any = yield call(loadImage, imageUrl)
+          const metadataWithImage = {
+            ...metadata,
+            imageWidth: imageDimensions.width,
+            imageHeight: imageDimensions.height
           }
           yield put(setOGMetadataAC(url, metadataWithImage))
-          if (setStore) yield call(storeMetadata, url, metadataWithImage)
         } catch (imageError) {
           // Image failed to load, try favicon
           const faviconUrl = metadata?.og?.favicon?.url
@@ -2023,11 +1999,9 @@ function* fetchOGMetadata(action: IAction): any {
               yield call(loadImage, faviconUrl)
               const metadataWithFavicon = { ...metadata, faviconLoaded: true }
               yield put(setOGMetadataAC(url, metadataWithFavicon))
-              if (setStore) yield call(storeMetadata, url, metadataWithFavicon)
             } catch (faviconError) {
               const metadataWithFavicon = { ...metadata, faviconLoaded: false }
               yield put(setOGMetadataAC(url, metadataWithFavicon))
-              if (setStore) yield call(storeMetadata, url, metadataWithFavicon)
             }
           }
         }
@@ -2038,15 +2012,12 @@ function* fetchOGMetadata(action: IAction): any {
             yield call(loadImage, faviconUrl)
             const metadataWithFavicon = { ...metadata, faviconLoaded: true }
             yield put(setOGMetadataAC(url, metadataWithFavicon))
-            if (setStore) yield call(storeMetadata, url, metadataWithFavicon)
           } catch (faviconError) {
             const metadataWithFavicon = { ...metadata, faviconLoaded: false }
             yield put(setOGMetadataAC(url, metadataWithFavicon))
-            if (setStore) yield call(storeMetadata, url, metadataWithFavicon)
           }
         } else {
           yield put(setOGMetadataAC(url, metadata))
-          if (setStore) yield call(storeMetadata, url, metadata)
         }
       }
     } catch (error) {
@@ -2079,8 +2050,8 @@ function loadImage(src: string): Promise<{ width: number; height: number }> {
 }
 
 function* loadOGMetadataForLinkSaga(action: IAction): any {
-  const { messages, setStore } = action.payload
-  yield call(loadOGMetadataForLinkMessages, messages, setStore)
+  const { messages } = action.payload
+  yield call(loadOGMetadataForLinkMessages, messages)
 }
 
 function* reloadActiveChannelAfterReconnect(action: IAction): any {
@@ -2214,13 +2185,13 @@ function* loadAroundMessageFromServer(
     yield spawn(prefetchMessages, channel.id, lastConfirmedMessageId, MESSAGE_LOAD_DIRECTION.NEXT, 2)
   }
   const appliedMessages = getCachedMessagesForResult(channel.id, resultMessages)
-  yield call(loadOGMetadataForLinkMessages, appliedMessages, true, false, false)
+  yield call(loadOGMetadataForLinkMessages, appliedMessages, true)
   yield put(setMessagesAC(JSON.parse(JSON.stringify(appliedMessages)), channel.id))
   yield put(setMessagesHasNextAC(true))
 
   const filteredPendingMessages = getFilteredPendingMessages(channel, appliedMessages)
   yield put(addMessagesAC(filteredPendingMessages, MESSAGE_LOAD_DIRECTION.NEXT))
-  yield call(loadOGMetadataForLinkMessages, filteredPendingMessages, true, false, false)
+  yield call(loadOGMetadataForLinkMessages, filteredPendingMessages, true)
   const waitToSendPendingMessages = store.getState().UserReducer.waitToSendPendingMessages
   if (connectionState === CONNECTION_STATUS.CONNECTED && waitToSendPendingMessages) {
     yield put(setWaitToSendPendingMessagesAC(false))
@@ -2273,7 +2244,7 @@ function* backgroundRefreshRestoreWindow(
       setActiveSegment(channel.id, firstId, lastId)
     }
 
-    yield call(loadOGMetadataForLinkMessages, refreshedMessages, true, false, false)
+    yield call(loadOGMetadataForLinkMessages, refreshedMessages, true)
 
     if (!isChannelStillActive(channel.id)) {
       return
@@ -2291,7 +2262,7 @@ function* backgroundRefreshRestoreWindow(
       yield put(setMessagesHasNextAC(true))
       const filteredPendingMessages = getFilteredPendingMessages(channel, appliedMessages)
       yield put(addMessagesAC(filteredPendingMessages, MESSAGE_LOAD_DIRECTION.NEXT))
-      yield call(loadOGMetadataForLinkMessages, filteredPendingMessages, true, false, false)
+      yield call(loadOGMetadataForLinkMessages, filteredPendingMessages, true)
     }
   } catch (e) {
     log.error('error in backgroundRefreshRestoreWindow', e)
@@ -2311,7 +2282,7 @@ function* loadAroundMessageWorker(action: IAction): any {
 
         if (cachedWindow.isFullyCached) {
           setActiveSegment(channel.id, restoreWindow.startId, restoreWindow.endId)
-          yield call(loadOGMetadataForLinkMessages, cachedWindow.messages, true, false, false)
+          yield call(loadOGMetadataForLinkMessages, cachedWindow.messages, true)
           yield put(setMessagesHasPrevAC(cachedWindow.hasPrevMessages))
           yield put(setMessagesHasNextAC(cachedWindow.hasNextMessages))
           yield put(setMessagesAC(JSON.parse(JSON.stringify(cachedWindow.messages)), channel.id))
@@ -2319,7 +2290,7 @@ function* loadAroundMessageWorker(action: IAction): any {
             hasNext: cachedWindow.hasNextMessages
           })
           yield put(addMessagesAC(filteredPendingMessages, MESSAGE_LOAD_DIRECTION.NEXT))
-          yield call(loadOGMetadataForLinkMessages, filteredPendingMessages, true, false, false)
+          yield call(loadOGMetadataForLinkMessages, filteredPendingMessages, true)
           if (connectionState === CONNECTION_STATUS.CONNECTED) {
             yield spawn(backgroundRefreshRestoreWindow, channel, restoreWindow, cachedWindow.messages)
           }
@@ -2349,14 +2320,14 @@ function* loadAroundMessageWorker(action: IAction): any {
 
         yield put(setMessagesHasPrevAC(cachedAroundWindow.hasPrevMessages))
         yield put(setMessagesHasNextAC(cachedAroundWindow.hasNextMessages))
-        yield call(loadOGMetadataForLinkMessages, cachedAroundWindow.messages, true, false, false)
+        yield call(loadOGMetadataForLinkMessages, cachedAroundWindow.messages, true)
         yield put(setMessagesAC(JSON.parse(JSON.stringify(cachedAroundWindow.messages)), channel.id))
 
         const filteredPendingMessages = getFilteredPendingMessages(channel, cachedAroundWindow.messages, {
           hasNext: cachedAroundWindow.hasNextMessages
         })
         yield put(addMessagesAC(filteredPendingMessages, MESSAGE_LOAD_DIRECTION.NEXT))
-        yield call(loadOGMetadataForLinkMessages, filteredPendingMessages, true, false, false)
+        yield call(loadOGMetadataForLinkMessages, filteredPendingMessages, true)
 
         const waitToSendPendingMessages = store.getState().UserReducer.waitToSendPendingMessages
         if (connectionState === CONNECTION_STATUS.CONNECTED && waitToSendPendingMessages) {
@@ -2426,13 +2397,13 @@ function* loadAroundMessageWorker(action: IAction): any {
         yield spawn(prefetchMessages, channel.id, lastConfirmedMessageId, MESSAGE_LOAD_DIRECTION.NEXT, 2)
       }
       const appliedMessages = getCachedMessagesForResult(channel.id, result.messages)
-      yield call(loadOGMetadataForLinkMessages, appliedMessages, true, false, false)
+      yield call(loadOGMetadataForLinkMessages, appliedMessages, true)
       yield put(setMessagesAC(JSON.parse(JSON.stringify(appliedMessages)), channel.id))
       yield put(setMessagesHasNextAC(true))
 
       const filteredPendingMessages = getFilteredPendingMessages(channel, appliedMessages)
       yield put(addMessagesAC(filteredPendingMessages, MESSAGE_LOAD_DIRECTION.NEXT))
-      yield call(loadOGMetadataForLinkMessages, filteredPendingMessages, true, false, false)
+      yield call(loadOGMetadataForLinkMessages, filteredPendingMessages, true)
       const waitToSendPendingMessages = store.getState().UserReducer.waitToSendPendingMessages
       if (connectionState === CONNECTION_STATUS.CONNECTED && waitToSendPendingMessages) {
         yield put(setWaitToSendPendingMessagesAC(false))
@@ -2531,7 +2502,7 @@ function* loadNearUnread(action: IAction): any {
         yield put(setUnreadMessageIdAC(channel.lastDisplayedMessageId))
         yield put(setMessagesHasPrevAC(cachedHasPrevMessages))
         yield put(setMessagesHasNextAC(cachedHasNextMessages))
-        yield call(loadOGMetadataForLinkMessages, cachedNearWindow.messages, true, false, false)
+        yield call(loadOGMetadataForLinkMessages, cachedNearWindow.messages, true)
         yield put(setMessagesAC(cachedNearWindow.messages, channel.id))
         yield put(scrollToNewMessageAC(false))
         yield put(setUnreadScrollToAC(true))
@@ -2540,7 +2511,7 @@ function* loadNearUnread(action: IAction): any {
           hasNext: cachedHasNextMessages
         })
         yield put(addMessagesAC(filteredPendingMessages, MESSAGE_LOAD_DIRECTION.NEXT))
-        yield call(loadOGMetadataForLinkMessages, filteredPendingMessages, true, false, false)
+        yield call(loadOGMetadataForLinkMessages, filteredPendingMessages, true)
       } else {
         yield call(setMessageListLoading, 'both', LOADING_STATE.LOADING)
       }
@@ -2601,7 +2572,7 @@ function* loadNearUnread(action: IAction): any {
       yield put(setMessagesHasPrevAC(hasPrevMessages))
       yield put(setMessagesHasNextAC(hasNextMessages))
       yield put(setUnreadMessageIdAC(channel.lastDisplayedMessageId))
-      yield call(loadOGMetadataForLinkMessages, appliedMessages, true, false, false)
+      yield call(loadOGMetadataForLinkMessages, appliedMessages, true)
 
       if (cacheWasShown && sameConfirmedWindow(lastAppliedWindow, appliedMessages)) {
         const changedMessages = getChangedActiveMessages(lastAppliedWindow, appliedMessages)
@@ -2617,7 +2588,7 @@ function* loadNearUnread(action: IAction): any {
           hasNext: hasNextMessages
         })
         yield put(addMessagesAC(filteredPendingMessages, MESSAGE_LOAD_DIRECTION.NEXT))
-        yield call(loadOGMetadataForLinkMessages, filteredPendingMessages, true, false, false)
+        yield call(loadOGMetadataForLinkMessages, filteredPendingMessages, true)
       }
 
       const waitToSendPendingMessages = store.getState().UserReducer.waitToSendPendingMessages
@@ -2651,13 +2622,13 @@ function* loadDefaultMessages(action: IAction): any {
       if (cachedMessages && cachedMessages.length) {
         // Cache available — show it immediately without a loading state
         const messages = cachedMessages
-        yield call(loadOGMetadataForLinkMessages, messages, true, false, false)
+        yield call(loadOGMetadataForLinkMessages, messages, true)
         yield put(setMessagesAC(messages, channel.id))
         const filteredPendingMessages = getFilteredPendingMessages(channel, messages, {
           isLatestWindow: true
         })
         yield put(addMessagesAC(filteredPendingMessages, MESSAGE_LOAD_DIRECTION.NEXT))
-        yield call(loadOGMetadataForLinkMessages, filteredPendingMessages, true, false, false)
+        yield call(loadOGMetadataForLinkMessages, filteredPendingMessages, true)
       } else {
         // No cache — show loading spinner while we wait for the server
         yield call(setMessageListLoading, 'both', LOADING_STATE.LOADING)
@@ -2695,7 +2666,7 @@ function* loadDefaultMessages(action: IAction): any {
           yield spawn(prefetchMessages, channel.id, firstConfirmedMessageId, MESSAGE_LOAD_DIRECTION.PREV, 2)
         }
         appliedMessages = getCachedMessagesForResult(channel.id, updatedMessages)
-        yield call(loadOGMetadataForLinkMessages, appliedMessages, true, false, false)
+        yield call(loadOGMetadataForLinkMessages, appliedMessages, true)
         yield put(setMessagesHasPrevAC(true))
         yield put(setMessagesHasNextAC(false))
         const shouldPatchShownCache =
@@ -2723,7 +2694,7 @@ function* loadDefaultMessages(action: IAction): any {
       })
       yield put(addMessagesAC(filteredPendingMessages, MESSAGE_LOAD_DIRECTION.NEXT))
       // Load OG metadata for link-only messages from cache
-      yield call(loadOGMetadataForLinkMessages, filteredPendingMessages, true, false, false)
+      yield call(loadOGMetadataForLinkMessages, filteredPendingMessages, true)
       if (cachedMessages?.length && connectionState === CONNECTION_STATUS.CONNECTED) {
         yield put(scrollToNewMessageAC(true, true, false))
       }
@@ -2775,7 +2746,7 @@ function* getMessagesQuery(action: IAction): any {
               ? yield call(messageQuery.loadPrevious)
               : { messages: [], hasNext: false }
         }
-        yield call(loadOGMetadataForLinkMessages, result.messages, true, false, false)
+        yield call(loadOGMetadataForLinkMessages, result.messages, true)
         yield put(setMessagesAC(JSON.parse(JSON.stringify(result.messages)), channel.id))
         const firstConfirmedMessageId = getFirstConfirmedMessageId(result.messages)
         const lastConfirmedMessageId = getLastConfirmedMessageId(result.messages)
@@ -2815,7 +2786,7 @@ function* getMessagesQuery(action: IAction): any {
       if (!appliedMessages.length) {
         appliedMessages = result.messages
       }
-      yield call(loadOGMetadataForLinkMessages, appliedMessages, true, false, false)
+      yield call(loadOGMetadataForLinkMessages, appliedMessages, true)
       const activeMessages: IMessage[] = store.getState().MessageReducer.activeChannelMessages || []
       const activeConfirmedMessages = activeMessages.filter((message: IMessage) => !!message.id)
       const sameVisibleWindow = sameConfirmedWindow(activeConfirmedMessages, appliedMessages)
@@ -2827,7 +2798,7 @@ function* getMessagesQuery(action: IAction): any {
           hasNext: false
         })
         yield put(addMessagesAC(filteredPendingMessages, MESSAGE_LOAD_DIRECTION.NEXT))
-        yield call(loadOGMetadataForLinkMessages, filteredPendingMessages, true, false, false)
+        yield call(loadOGMetadataForLinkMessages, filteredPendingMessages, true)
       } else if (sameVisibleWindow) {
         const activeById = new Map(activeConfirmedMessages.map((currentMessage) => [currentMessage.id, currentMessage]))
         const changedMessages = appliedMessages.filter((loadedMessage) => {
@@ -3193,7 +3164,7 @@ function* loadMoreMessages(action: IAction): any {
     }
 
     if (shouldApplyVisibleResult && result.messages && result.messages.length && result.messages.length > 0) {
-      yield call(loadOGMetadataForLinkMessages, result.messages, true, false, false)
+      yield call(loadOGMetadataForLinkMessages, result.messages, true)
       yield put(addMessagesAC(JSON.parse(JSON.stringify(result.messages)), direction))
     } else if (shouldApplyVisibleResult) {
       yield put(addMessagesAC([], direction))
@@ -3205,7 +3176,7 @@ function* loadMoreMessages(action: IAction): any {
       })
       if (filteredPendingMessages.length) {
         yield put(addMessagesAC(filteredPendingMessages, MESSAGE_LOAD_DIRECTION.NEXT))
-        yield call(loadOGMetadataForLinkMessages, filteredPendingMessages, true, false, false)
+        yield call(loadOGMetadataForLinkMessages, filteredPendingMessages, true)
       }
     }
   } catch (e) {
@@ -4149,7 +4120,7 @@ function* refreshCacheAroundMessage(action: IAction): any {
       setActiveSegment(channelId, firstId, lastId)
     }
 
-    yield call(loadOGMetadataForLinkMessages, loadedMessages, true, false, false)
+    yield call(loadOGMetadataForLinkMessages, loadedMessages, true)
 
     if (sameConfirmedWindow(activeConfirmedMessages, loadedMessages)) {
       const activeById = new Map(activeConfirmedMessages.map((currentMessage) => [currentMessage.id, currentMessage]))
@@ -4175,7 +4146,7 @@ function* refreshCacheAroundMessage(action: IAction): any {
     const filteredPendingMessages = getFilteredPendingMessages(channelId, loadedMessages)
     if (filteredPendingMessages.length > 0) {
       yield put(addMessagesAC(filteredPendingMessages, MESSAGE_LOAD_DIRECTION.NEXT))
-      yield call(loadOGMetadataForLinkMessages, filteredPendingMessages, true, false, false)
+      yield call(loadOGMetadataForLinkMessages, filteredPendingMessages, true)
     }
   } catch (e) {
     log.error('error in refreshCacheAroundMessage', e)
