@@ -168,6 +168,8 @@ interface IChannelListProps {
     user: IUser,
     MessageText: any
   ) => any
+  getCustomIconOnAvatar?: (channel: IChannel, user: IUser) => any
+
   doNotShowMessageDeliveryTypes?: string[]
   showPhoneNumber?: boolean
   channelListWidth?: number
@@ -245,6 +247,7 @@ const ChannelList: React.FC<IChannelListProps> = ({
   searchedChannelsTitleFontSize,
   searchChannelsPadding,
   getCustomLatestMessage,
+  getCustomIconOnAvatar,
   doNotShowMessageDeliveryTypes = ['system'],
   showPhoneNumber = false,
   channelListWidth
@@ -610,6 +613,7 @@ const ChannelList: React.FC<IChannelListProps> = ({
                       doNotShowMessageDeliveryTypes={doNotShowMessageDeliveryTypes}
                       showPhoneNumber={showPhoneNumber}
                       channelListWidth={channelListWidth}
+                      getCustomIconOnAvatar={getCustomIconOnAvatar as any}
                     />
                   ))
               )}
@@ -662,6 +666,7 @@ const ChannelList: React.FC<IChannelListProps> = ({
                             contactsMap={contactsMap}
                             setSelectedChannel={setSelectedChannel}
                             getCustomLatestMessage={getCustomLatestMessage as any}
+                            getCustomIconOnAvatar={getCustomIconOnAvatar as any}
                             doNotShowMessageDeliveryTypes={doNotShowMessageDeliveryTypes}
                             showPhoneNumber={showPhoneNumber}
                             channelListWidth={channelListWidth}
@@ -754,6 +759,7 @@ const ChannelList: React.FC<IChannelListProps> = ({
                             contactsMap={contactsMap}
                             setSelectedChannel={setSelectedChannel}
                             getCustomLatestMessage={getCustomLatestMessage as any}
+                            getCustomIconOnAvatar={getCustomIconOnAvatar as any}
                             doNotShowMessageDeliveryTypes={doNotShowMessageDeliveryTypes}
                             showPhoneNumber={showPhoneNumber}
                           />
@@ -814,6 +820,7 @@ const ChannelList: React.FC<IChannelListProps> = ({
                       contactsMap={contactsMap}
                       setSelectedChannel={setSelectedChannel}
                       getCustomLatestMessage={getCustomLatestMessage as any}
+                      getCustomIconOnAvatar={getCustomIconOnAvatar as any}
                       doNotShowMessageDeliveryTypes={doNotShowMessageDeliveryTypes}
                       showPhoneNumber={showPhoneNumber}
                     />
@@ -875,6 +882,7 @@ const ChannelList: React.FC<IChannelListProps> = ({
                             key={channel.id}
                             setSelectedChannel={setSelectedChannel}
                             getCustomLatestMessage={getCustomLatestMessage as any}
+                            getCustomIconOnAvatar={getCustomIconOnAvatar as any}
                             doNotShowMessageDeliveryTypes={doNotShowMessageDeliveryTypes}
                             showPhoneNumber={showPhoneNumber}
                           />
@@ -921,6 +929,7 @@ const ChannelList: React.FC<IChannelListProps> = ({
                             contactsMap={contactsMap}
                             setSelectedChannel={setSelectedChannel}
                             getCustomLatestMessage={getCustomLatestMessage as any}
+                            getCustomIconOnAvatar={getCustomIconOnAvatar as any}
                             doNotShowMessageDeliveryTypes={doNotShowMessageDeliveryTypes}
                             showPhoneNumber={showPhoneNumber}
                           />

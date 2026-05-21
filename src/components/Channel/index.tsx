@@ -84,6 +84,7 @@ interface IChannelProps {
   doNotShowMessageDeliveryTypes: string[]
   showPhoneNumber?: boolean
   channelListWidth?: number
+  getCustomIconOnAvatar?: (args: { channel: IChannel; user: IUser }) => any
 }
 
 const LastMessageAttachments = ({ lastMessage }: { lastMessage: IMessage }) => {
@@ -312,7 +313,8 @@ const Channel: React.FC<IChannelProps> = ({
   getCustomLatestMessage,
   doNotShowMessageDeliveryTypes,
   showPhoneNumber,
-  channelListWidth
+  channelListWidth,
+  getCustomIconOnAvatar
 }) => {
   const {
     [THEME_COLORS.ACCENT]: accentColor,
@@ -597,6 +599,7 @@ const Channel: React.FC<IChannelProps> = ({
             )}
         </AvatarWrapper>
       )}
+      {getCustomIconOnAvatar ? getCustomIconOnAvatar({ channel, user }) : <React.Fragment />}
       {channelListWidth === undefined || channelListWidth >= 280 ? (
         <React.Fragment>
           <ChannelInfo
