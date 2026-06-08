@@ -1,9 +1,5 @@
 import '@testing-library/jest-dom/extend-expect'
 
-jest.mock('./services/indexedDB/metadataService', () => ({
-  cleanupOldMonthsMetadata: jest.fn()
-}))
-
 jest.mock('store', () => ({
   getState: () => ({
     MessageReducer: {

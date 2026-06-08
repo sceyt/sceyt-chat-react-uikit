@@ -422,6 +422,7 @@ export function useChatController({
   const visibleUnreadReportedRef = useRef<Set<string>>(new Set())
   const restoreRef = useRef<RestoreState | null>(null)
   const lastBootKeyRef = useRef<string | null>(null)
+  const pendingBootScrolledRef = useRef(false)
   const highlightedItemIdRef = useRef<string | null>(null)
   const highlightTimeoutRef = useRef<NodeJS.Timeout | number | null>(null)
   const unreadRestoreCompletedRef = useRef(false)
@@ -1918,6 +1919,7 @@ export function useChatController({
 
     activeChannelIdRef.current = channel.id
     lastBootKeyRef.current = null
+    pendingBootScrolledRef.current = false
     restoreRef.current = null
     windowLoadScopeRef.current = null
     activeEdgeIntentRef.current = null
@@ -2018,17 +2020,26 @@ export function useChatController({
     }
 
     if (!lastBootKeyRef.current) {
-      lastBootKeyRef.current = `${channel.id}:${getMessageLocalRef(messages[0])}`
-      const preservePendingHistoryEdge =
-        pendingEdgeCheckAfterLoadRef.current && activeEdgeIntentRef.current === 'previous'
-      restoreRef.current =
-        unreadScrollTo && unreadMessageId
-          ? { mode: 'reveal-unread-separator' }
-          : preservePendingHistoryEdge
-            ? null
-            : isScrollInteractionActive()
+      const hasConfirmedMessages = messages.some((m) => !!m.id)
+      if (hasConfirmedMessages) {
+        lastBootKeyRef.current = `${channel.id}:${getMessageLocalRef(messages[0])}`
+        pendingBootScrolledRef.current = false
+        const preservePendingHistoryEdge =
+          pendingEdgeCheckAfterLoadRef.current && activeEdgeIntentRef.current === 'previous'
+        restoreRef.current =
+          unreadScrollTo && unreadMessageId
+            ? { mode: 'reveal-unread-separator' }
+            : preservePendingHistoryEdge
               ? null
-              : { mode: 'to-bottom' }
+              : isScrollInteractionActive()
+                ? null
+                : { mode: 'to-bottom' }
+      } else if (!pendingBootScrolledRef.current) {
+        pendingBootScrolledRef.current = true
+        if (!restoreRef.current) {
+          restoreRef.current = { mode: 'to-bottom' }
+        }
+      }
     }
 
     const restoreState = restoreRef.current
