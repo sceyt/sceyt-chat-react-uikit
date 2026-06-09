@@ -792,6 +792,12 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
 
   const handleEditMessage = () => {
     const messageTexToSend = editMessageText.trim()
+    const hasTextChanged = messageTexToSend !== messageToEdit.body
+    const hasAttributesChanged = !compareMessageBodyAttributes(messageBodyAttributes, messageToEdit.bodyAttributes)
+    if (!hasTextChanged && !hasAttributesChanged) {
+      handleCloseEditMode()
+      return
+    }
     if (messageTexToSend) {
       let linkAttachment: any
       if (messageTexToSend) {
