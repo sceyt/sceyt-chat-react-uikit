@@ -447,7 +447,7 @@ const Message = ({
   }, [dispatch, message.id])
 
   const handleMouseEnter = useCallback(() => {
-    if (message.state !== MESSAGE_STATUS.DELETE && !selectionIsActive) {
+    if (message.state !== MESSAGE_STATUS.DELETE && !selectionIsActive && !infoPopupOpen) {
       messageActionsTimeout.current = setTimeout(() => {
         const msgTop = messageItemRef.current?.getBoundingClientRect().top ?? 0
         if (msgTop < 110) return
@@ -455,7 +455,7 @@ const Message = ({
         dispatch(setMessageMenuOpenedAC(message.id || message.tid!))
       }, MESSAGE_ACTIONS_HOVER_DELAY)
     }
-  }, [dispatch, message.state, message.id, message.tid, selectionIsActive])
+  }, [dispatch, message.state, message.id, message.tid, selectionIsActive, infoPopupOpen])
 
   const closeMessageActions = useCallback(
     (close?: boolean) => {
