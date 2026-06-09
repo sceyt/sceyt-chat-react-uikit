@@ -2477,7 +2477,7 @@ export function useChatController({
 
     const forceLatest = scrollToNewMessage.updateMessageList
 
-    if (!forceLatest && scrollToNewMessage.isIncomingMessage && !isViewingLatest) {
+    if (!isViewingLatest && (forceLatest || scrollToNewMessage.isIncomingMessage)) {
       dispatch(scrollToNewMessageAC(false, false, false))
       return
     }
