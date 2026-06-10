@@ -851,9 +851,15 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
           })
         }
       }
+      const existingMediaAttachments = (messageToEdit.attachments || []).filter(
+        (att: any) => att.type !== attachmentTypes.link
+      )
+      const updatedAttachments = linkAttachment
+        ? [...existingMediaAttachments, linkAttachment]
+        : existingMediaAttachments
       const messageToSend = {
         ...messageToEdit,
-        ...(linkAttachment ? { attachments: [linkAttachment] } : {}),
+        attachments: updatedAttachments,
         metadata: mentionedUsersPositions,
         bodyAttributes: messageBodyAttributes,
         mentionedUsers: mentionUsersToSend,
