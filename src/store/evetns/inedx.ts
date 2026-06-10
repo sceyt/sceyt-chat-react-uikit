@@ -20,6 +20,7 @@ import {
   removeChannelFromMap,
   setChannelInMap,
   updateChannelLastMessageOnAllChannels,
+  updateChannelMemberInAllChannels,
   updateChannelOnAllChannels
 } from '../../helpers/channelHalper'
 import {
@@ -82,7 +83,8 @@ import {
 } from '../member/actions'
 import { browserTabIsActiveSelector, contactsMapSelector } from '../user/selector'
 import { getShowOnlyContactUsers } from '../../helpers/contacts'
-import { attachmentTypes, MESSAGE_STATUS } from '../../helpers/constants'
+import { attachmentTypes, DEFAULT_CHANNEL_TYPE, MESSAGE_STATUS } from '../../helpers/constants'
+import { updateTabAttachmentCache } from '../message/saga'
 import { MessageTextFormat } from '../../messageUtils'
 import { isJSON } from '../../helpers/message'
 import log from 'loglevel'
@@ -293,6 +295,10 @@ export function* handleChannelMessageEvent(args: { channel: IChannel; message: I
   if (shouldUpdateLastMessage) {
     updateChannelLastMessageOnAllChannels(channel.id, resolvedLastMessageUpdate!)
   }
+
+  if (message.attachments?.length) {
+    updateTabAttachmentCache(channel.id, message.attachments, message.user)
+  }
 }
 
 export function* handleUnreadMessagesInfoEvent(args: { channel: IChannel }): any {
@@ -493,21 +499,19 @@ export default function* watchForEvents(): any {
         }
       })
     }
-    channelListener.onBlocked = (channel: IChannel) => {
-      if (shouldSkip(channel)) return
+    channelListener.onBlocked = (users: IUser[]) => {
       emitter({
         type: CHANNEL_EVENT_TYPES.BLOCK,
         args: {
-          channel
+          users
         }
       })
     }
-    channelListener.onUnblocked = (channel: IChannel) => {
-      if (shouldSkip(channel)) return
+    channelListener.onUnblocked = (users: IUser[]) => {
       emitter({
         type: CHANNEL_EVENT_TYPES.UNBLOCK,
         args: {
-          channel
+          users
         }
       })
     }
@@ -985,16 +989,39 @@ export default function* watchForEvents(): any {
           break
         }
         case CHANNEL_EVENT_TYPES.BLOCK: {
-          log.info('channel BLOCK ... ')
-          const { channel } = args
-          const channelExists = checkChannelExists(channel.id)
-          if (channelExists) {
-            yield put(removeChannelAC(channel.id))
+          log.info('user BLOCK ... ')
+          const { users } = args as { users: IUser[] }
+          const blockedUsers = users.map((u) => ({ ...u, blocked: true }))
+          updateChannelMemberInAllChannels(blockedUsers)
+          const allChannels: IChannel[] = store.getState().ChannelReducer.channels
+          for (const user of blockedUsers) {
+            const directChannel = allChannels.find(
+              (ch) => ch.type === DEFAULT_CHANNEL_TYPE.DIRECT && ch.members?.some((m) => m.id === user.id)
+            )
+            if (directChannel) {
+              const updatedMembers = directChannel.members?.map((m) => (m.id === user.id ? { ...m, blocked: true } : m))
+              yield put(updateChannelDataAC(directChannel.id, { members: updatedMembers }))
+            }
           }
           break
         }
         case CHANNEL_EVENT_TYPES.UNBLOCK: {
-          log.info('channel UNBLOCK ... ')
+          log.info('user UNBLOCK ... ')
+          const { users } = args as { users: IUser[] }
+          const unblockedUsers = users.map((u) => ({ ...u, blocked: false }))
+          updateChannelMemberInAllChannels(unblockedUsers)
+          const allChannels: IChannel[] = store.getState().ChannelReducer.channels
+          for (const user of unblockedUsers) {
+            const directChannel = allChannels.find(
+              (ch) => ch.type === DEFAULT_CHANNEL_TYPE.DIRECT && ch.members?.some((m) => m.id === user.id)
+            )
+            if (directChannel) {
+              const updatedMembers = directChannel.members?.map((m) =>
+                m.id === user.id ? { ...m, blocked: false } : m
+              )
+              yield put(updateChannelDataAC(directChannel.id, { members: updatedMembers }))
+            }
+          }
           break
         }
         case CHANNEL_EVENT_TYPES.KICK_MEMBERS: {
@@ -1120,7 +1147,9 @@ export default function* watchForEvents(): any {
             if (channel.mutedTill !== mutedTill) {
               fields.push('mutedTill')
             }
-            if (channel.metadata !== isJSON(metadata) ? JSON.parse(metadata) : metadata) {
+            const parsedChannelMeta = isJSON(channel.metadata) ? JSON.parse(channel.metadata) : channel.metadata
+            const parsedMeta = isJSON(metadata) ? JSON.parse(metadata) : metadata
+            if (JSON.stringify(parsedChannelMeta) !== JSON.stringify(parsedMeta)) {
               fields.push('metadata')
             }
           }
@@ -1529,6 +1558,11 @@ export default function* watchForEvents(): any {
           const { channel } = args
           log.info('channel HIDE ... ')
           yield put(setChannelToHideAC(channel))
+          const activeChannelId = yield call(getActiveChannelId)
+          if (activeChannelId === channel.id) {
+            const lastChannel = yield call(getLastChannelFromMap, true)
+            yield put(switchChannelActionAC(lastChannel || null))
+          }
           break
         }
         case CHANNEL_EVENT_TYPES.UNHIDE: {

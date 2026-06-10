@@ -49,6 +49,7 @@ export interface IMessageStore {
   activeChannelMessages: IMessage[]
   activeChannelNewMessage: IMessage | null
   activeTabAttachments: any[]
+  tabAttachmentsCache: { [key: string]: any[] }
   attachmentsForPopup: any[]
   attachmentHasNext: boolean
   attachmentForPopupHasPrev: boolean
@@ -109,6 +110,7 @@ const initialState: IMessageStore = {
   activeChannelMessages: [],
   attachmentsForPopup: [],
   activeTabAttachments: [],
+  tabAttachmentsCache: {},
   attachmentHasNext: true,
   attachmentForPopupHasNext: true,
   attachmentForPopupHasPrev: true,
@@ -492,6 +494,14 @@ const messageSlice = createSlice({
 
     emptyChannelAttachments: (state) => {
       state.activeTabAttachments = []
+    },
+
+    setCachedTabAttachments: (state, action: PayloadAction<{ key: string; attachments: any[] }>) => {
+      state.tabAttachmentsCache[action.payload.key] = action.payload.attachments
+    },
+
+    clearTabAttachmentsCache: (state) => {
+      state.tabAttachmentsCache = {}
     },
 
     setAttachments: (state, action: PayloadAction<{ attachments: any[] }>) => {
@@ -937,6 +947,8 @@ export const {
   setMessagesHasNext,
   clearMessages,
   emptyChannelAttachments,
+  setCachedTabAttachments,
+  clearTabAttachmentsCache,
   setAttachments,
   removeAttachment,
   setAttachmentsForPopup,

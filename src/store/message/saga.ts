@@ -102,6 +102,7 @@ import {
   updatePendingPollActionAC,
   setUnreadScrollToAC,
   setAttachmentsLoadingStateAC,
+  setCachedTabAttachmentsAC,
   setUpdateMessageAttachmentAC,
   setOGMetadataAC,
   fetchOGMetadataForLinkAC,
@@ -192,6 +193,42 @@ const queuedPrefetchRequests = new Map<string, { fromMessageId: string; pages: n
 const prefetchCompletionWaiters = new Map<string, Array<() => void>>()
 const prefetchCancelVersions = new Map<string, number>()
 const ACTIVE_CHANNEL_RECONNECT_REFRESH_TIMEOUT_MS = 1500
+
+let activeDisplayedCacheKey: string | null = null
+
+export const updateTabAttachmentCache = (channelId: string, attachments: IAttachment[], messageUser?: any) => {
+  if (!attachments?.length) return
+  const cache = store.getState().MessageReducer.tabAttachmentsCache
+  const tabForType = (type: string) => {
+    if (type === attachmentTypes.video || type === attachmentTypes.image) return channelDetailsTabs.media
+    if (type === attachmentTypes.file) return channelDetailsTabs.file
+    if (type === attachmentTypes.link) return channelDetailsTabs.link
+    if (type === attachmentTypes.voice) return channelDetailsTabs.voice
+    return null
+  }
+  const tabUpdates: { [key: string]: IAttachment[] } = {}
+  for (const att of attachments) {
+    const tab = tabForType(att.type)
+    if (!tab) continue
+    const cacheKey = `${channelId}_${tab}`
+    if (!(cacheKey in cache)) continue
+    const attWithUser = messageUser && !att.user ? { ...att, user: messageUser } : att
+    if (!tabUpdates[cacheKey]) tabUpdates[cacheKey] = []
+    tabUpdates[cacheKey].push(attWithUser)
+  }
+  for (const [cacheKey, newAtts] of Object.entries(tabUpdates)) {
+    const existing: IAttachment[] = cache[cacheKey] || []
+    const existingIds = new Set(existing.map((a) => a.id).filter(Boolean))
+    const toAdd = newAtts.filter((a) => !a.id || !existingIds.has(a.id))
+    if (toAdd.length) {
+      const updated = [...toAdd, ...existing]
+      store.dispatch(setCachedTabAttachmentsAC(cacheKey, updated))
+      if (cacheKey === activeDisplayedCacheKey) {
+        store.dispatch(setAttachmentsAC(updated))
+      }
+    }
+  }
+}
 
 type ActivePaginationIntent = {
   channelId: string
@@ -875,7 +912,7 @@ function* sendMessage(action: IAction): any {
       const createChannelData = {
         type: channel.type,
         members: channel.members,
-        metadata: ''
+        metadata: channel?.metadata || ''
       }
       channel = yield call(SceytChatClient.Channel.create, createChannelData)
       yield put(switchChannelActionAC(JSON.parse(JSON.stringify(channel))))
@@ -1204,6 +1241,7 @@ function* sendMessage(action: IAction): any {
             }
             const messageToUpdate = JSON.parse(JSON.stringify(messageResponse))
             addConfirmedMessageToCache(channel.id, messageToUpdate)
+            updateTabAttachmentCache(channel.id, attachmentsToUpdate, messageResponse.user)
             if (channel.unread) {
               yield put(markChannelAsReadAC(channel.id))
             }
@@ -1271,7 +1309,7 @@ function* sendTextMessage(action: IAction): any {
       const createChannelData = {
         type: channel.type,
         members: channel.members,
-        metadata: ''
+        metadata: channel?.metadata || ''
       }
       channel = yield call(SceytChatClient.Channel.create, createChannelData)
       yield put(switchChannelActionAC(JSON.parse(JSON.stringify(channel))))
@@ -1348,6 +1386,9 @@ function* sendTextMessage(action: IAction): any {
       const stringifiedMessageUpdateData = JSON.parse(JSON.stringify(messageUpdateData))
       yield put(updatePendingPollActionAC(messageToSend.tid as string, stringifiedMessageUpdateData))
       addConfirmedMessageToCache(channel.id, stringifiedMessageUpdateData)
+      if (messageResponse.attachments?.length) {
+        updateTabAttachmentCache(channel.id, messageResponse.attachments, messageResponse.user)
+      }
       const messageToUpdate = JSON.parse(JSON.stringify(messageResponse))
       if (channel.unread) {
         yield put(markChannelAsReadAC(channel.id))
@@ -3309,8 +3350,17 @@ function* loadMoreReactions(action: IAction): any {
 
 function* getMessageAttachments(action: IAction): any {
   const { channelId, attachmentType, limit, direction, attachmentId, forPopup } = action.payload
+  const cacheKey = `${channelId}_${attachmentType}`
+  const cachedAttachments = !forPopup ? store.getState().MessageReducer.tabAttachmentsCache?.[cacheKey] : undefined
+  if (!forPopup) {
+    activeDisplayedCacheKey = cacheKey
+  }
   try {
-    yield put(setAttachmentsLoadingStateAC(LOADING_STATE.LOADING, forPopup))
+    if (cachedAttachments !== undefined) {
+      yield put(setAttachmentsAC(cachedAttachments))
+    } else {
+      yield put(setAttachmentsLoadingStateAC(LOADING_STATE.LOADING, forPopup))
+    }
     const SceytChatClient = getClient()
     let typeList = [
       attachmentTypes.video,
@@ -3366,7 +3416,9 @@ function* getMessageAttachments(action: IAction): any {
     } else {
       query.AttachmentByTypeQuery = AttachmentByTypeQuery
       yield put(setAttachmentsCompleteAC(result.hasNext))
-      yield put(setAttachmentsAC(JSON.parse(JSON.stringify(attachments))))
+      const freshAttachments = JSON.parse(JSON.stringify(attachments))
+      yield put(setCachedTabAttachmentsAC(cacheKey, freshAttachments))
+      yield put(setAttachmentsAC(freshAttachments))
     }
   } catch (e) {
     log.error('error in message attachment query', e)

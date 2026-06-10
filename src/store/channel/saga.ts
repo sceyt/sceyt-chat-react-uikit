@@ -27,7 +27,8 @@ import {
   setMutualChannelsAC,
   setMutualChannelsLoadingStateAC,
   updateMessageAsOpenedAC,
-  markMessagesAsDeliveredAC
+  markMessagesAsDeliveredAC,
+  setChannelToHideAC
 } from './actions'
 import {
   BLOCK_CHANNEL,
@@ -176,7 +177,7 @@ function* createChannel(action: IAction): any {
           id: uuidv4(),
           lastMessage: null,
           memberCount: 2,
-          metadata: '',
+          metadata: createChannelData?.metadata || '',
           newMentionCount: 0,
           newMessageCount: 0,
           newReactedMessageCount: 0,
@@ -1457,12 +1458,21 @@ function* deleteChannel(action: IAction): any {
       return
     }
     if (channel) {
-      yield call(channel.delete)
-      yield put(setChannelToRemoveAC(channel))
-
-      yield put(removeChannelAC(channelId))
-
-      yield put(removeChannelCachesAC(channelId))
+      if (channel.type === DEFAULT_CHANNEL_TYPE.DIRECT) {
+        yield call(channel.deleteAllMessages)
+        yield call(channel.hide)
+        yield put(clearMessagesAC())
+        removeMessagesFromMap(channelId)
+        removeAllMessages()
+        yield put(clearSelectedMessagesAC())
+        yield put(setChannelToHideAC(channel))
+        yield put(removeChannelCachesAC(channelId))
+      } else {
+        yield call(channel.delete)
+        yield put(setChannelToRemoveAC(channel))
+        yield put(removeChannelAC(channelId))
+        yield put(removeChannelCachesAC(channelId))
+      }
     }
   } catch (e) {
     log.error('ERROR in delete channel', e)

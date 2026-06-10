@@ -1,4 +1,4 @@
-import styled from 'styled-components'
+import styled, { keyframes } from 'styled-components'
 import React, { useEffect, useState } from 'react'
 import { useDispatch, useSelector } from 'store/hooks'
 // Store
@@ -9,7 +9,7 @@ import {
   kickMemberAC,
   setOpenInviteModalAC
 } from '../../../../store/member/actions'
-import { openInviteModalSelector, rolesMapSelector } from '../../../../store/member/selector'
+import { channelsMembersLoadingStateSelector, openInviteModalSelector, rolesMapSelector } from '../../../../store/member/selector'
 import { getContactsAC } from '../../../../store/user/actions'
 import { connectionStatusSelector, contactsMapSelector } from '../../../../store/user/selector'
 import { createChannelAC } from '../../../../store/channel/actions'
@@ -24,7 +24,7 @@ import {
   getOpenChatOnUserInteraction
 } from '../../../../helpers/channelHalper'
 import { makeUsername } from '../../../../helpers/message'
-import { DEFAULT_CHANNEL_TYPE, USER_PRESENCE_STATUS } from '../../../../helpers/constants'
+import { DEFAULT_CHANNEL_TYPE, LOADING_STATE, USER_PRESENCE_STATUS } from '../../../../helpers/constants'
 import { IChannel, IContact, IContactsMap, IMember } from '../../../../types'
 import { UserStatus } from '../../../Channel'
 import { BoltText, DropdownOptionLi, DropdownOptionsUl, SubTitle } from '../../../../UIHelper'
@@ -101,6 +101,8 @@ const Members = ({
   const openInviteModal = useSelector(openInviteModalSelector)
   const rolesMap = useSelector(rolesMapSelector, shallowEqual)
   const connectionStatus = useSelector(connectionStatusSelector)
+  const membersLoadingStateMap = useSelector(channelsMembersLoadingStateSelector, shallowEqual)
+  const membersLoadingState = membersLoadingStateMap?.[channel.id]
 
   const user = getClient().user
   const memberDisplayText = getChannelTypesMemberDisplayTextMap()
@@ -268,6 +270,17 @@ const Members = ({
               {`Add ${displayMemberText}`}
             </MemberItem>
           )}
+
+          {membersLoadingState === LOADING_STATE.LOADING && !members.length &&
+            Array.from({ length: 6 }).map((_, i) => (
+              <SkeletonMemberRow key={i}>
+                <SkeletonAvatar color={surface1} />
+                <SkeletonTextGroup>
+                  <SkeletonLine color={surface1} width='55%' />
+                  <SkeletonLine color={surface1} width='35%' height='12px' />
+                </SkeletonTextGroup>
+              </SkeletonMemberRow>
+            ))}
 
           {!!members.length &&
             members.map((member, index) => (
@@ -605,6 +618,52 @@ const MemberItem = styled.li<{
     right: -1px;
     bottom: -1px;
   }
+`
+
+const shimmer = keyframes`
+  0% { background-position: -600px 0; }
+  100% { background-position: 600px 0; }
+`
+
+const SkeletonBlock = styled.div<{ color: string }>`
+  background-color: ${(p) => p.color};
+  background-image: linear-gradient(
+    90deg,
+    ${(p) => p.color} 0px,
+    rgba(255, 255, 255, 0.65) 100px,
+    ${(p) => p.color} 200px
+  );
+  background-size: 600px 100%;
+  background-repeat: no-repeat;
+  animation: ${shimmer} 1.1s ease infinite;
+`
+
+const SkeletonMemberRow = styled.div`
+  display: flex;
+  align-items: center;
+  padding: 6px 16px;
+  gap: 12px;
+  height: 56px;
+`
+
+const SkeletonAvatar = styled(SkeletonBlock)`
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  flex-shrink: 0;
+`
+
+const SkeletonTextGroup = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex: 1;
+`
+
+const SkeletonLine = styled(SkeletonBlock)<{ width: string; height?: string }>`
+  width: ${(p) => p.width};
+  height: ${(p) => p.height || '14px'};
+  border-radius: 7px;
 `
 
 const RoleBadge = styled.span<{ color: string; backgroundColor: string }>`

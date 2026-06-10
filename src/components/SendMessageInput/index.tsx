@@ -793,7 +793,11 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
   const handleEditMessage = () => {
     const messageTexToSend = editMessageText.trim()
     const hasTextChanged = messageTexToSend !== messageToEdit.body
-    const hasAttributesChanged = !compareMessageBodyAttributes(messageBodyAttributes, messageToEdit.bodyAttributes)
+    const normalizeAttrs = (attrs: any) => (!attrs || attrs.length === 0 ? [] : attrs)
+    const hasAttributesChanged = !compareMessageBodyAttributes(
+      normalizeAttrs(messageBodyAttributes),
+      normalizeAttrs(messageToEdit.bodyAttributes)
+    )
     if (!hasTextChanged && !hasAttributesChanged) {
       handleCloseEditMode()
       return
@@ -1496,15 +1500,8 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
         setSendMessageIsActive(true)
       }
     } else {
-      if (editMessageText) {
-        if (
-          editMessageText.trim() !== messageToEdit.body ||
-          !compareMessageBodyAttributes(messageBodyAttributes, messageToEdit.bodyAttributes)
-        ) {
-          setSendMessageIsActive(true)
-        } else {
-          setSendMessageIsActive(false)
-        }
+      if (messageToEdit) {
+        setSendMessageIsActive(true)
       } else {
         setSendMessageIsActive(false)
       }
@@ -2319,6 +2316,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
                   )}
 
                   {sendMessageIsActive ||
+                  attachments.length > 0 ||
                   (!voiceMessage && !getAudioRecordingFromMap(activeChannel?.id)?.file) ||
                   messageToEdit ? (
                     <SendMessageButton

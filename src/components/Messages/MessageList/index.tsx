@@ -65,7 +65,7 @@ import {
   registerJumpToLatest,
   unregisterJumpToLatest
 } from '../../../helpers/messageListNavigator'
-import { getMessageLocalRef } from '../../../helpers/messagesHalper'
+import { getAudioRecordingFromMap, getMessageLocalRef } from '../../../helpers/messagesHalper'
 import { createMessageMarkerBatcher, DEFAULT_MARKER_BATCH_DEBOUNCE_MS } from '../../../helpers/messageMarkerBatcher'
 
 interface MessagesProps {
@@ -638,6 +638,7 @@ const MessageList: React.FC<MessagesProps> = ({
     e.preventDefault()
     if (isDragging) return
     if (!e.dataTransfer.types.includes('Files')) return
+    if (getAudioRecordingFromMap(channel.id)) return
 
     let filesType: string
 

@@ -56,6 +56,8 @@ import {
   setMessagesHasNext,
   clearMessages,
   emptyChannelAttachments,
+  setCachedTabAttachments,
+  clearTabAttachmentsCache,
   setAttachments,
   removeAttachment,
   setAttachmentsForPopup,
@@ -355,6 +357,14 @@ export function removeAttachmentProgressAC(attachmentId: any) {
 
 export function emptyChannelAttachmentsAC() {
   return emptyChannelAttachments()
+}
+
+export function setCachedTabAttachmentsAC(key: string, attachments: any[]) {
+  return setCachedTabAttachments({ key, attachments })
+}
+
+export function clearTabAttachmentsCacheAC() {
+  return clearTabAttachmentsCache()
 }
 
 export function addMessageAC(message: IMessage) {
