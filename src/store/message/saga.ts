@@ -360,7 +360,7 @@ const getReconnectReloadAction = (
 ) => {
   if (visibleAnchorId) {
     if (wasViewingLatest) {
-      return loadLatestMessagesAC(channel, undefined, false, applyVisibleWindow)
+      return loadLatestMessagesAC(channel, undefined, true, applyVisibleWindow)
     }
     if (isAtHistoryTop) {
       return loadAroundMessageAC(channel, visibleAnchorId)
@@ -372,14 +372,14 @@ const getReconnectReloadAction = (
   }
 
   if (wasViewingLatest) {
-    return loadLatestMessagesAC(channel, undefined, false, applyVisibleWindow)
+    return loadLatestMessagesAC(channel, undefined, true, applyVisibleWindow)
   }
 
   if (channel.newMessageCount && channel.lastDisplayedMessageId) {
     return loadNearUnreadAC(channel)
   }
 
-  return loadLatestMessagesAC(channel)
+  return loadLatestMessagesAC(channel, undefined, true)
 }
 
 const getReconnectChannelSnapshot = (channelId: string): IChannel | null => {
@@ -2803,7 +2803,9 @@ function* getMessagesQuery(action: IAction): any {
       } else {
         const cachedMessages = getLatestMessagesFromMap(channel.id, MESSAGES_MAX_PAGE_COUNT)
         const cacheIsCurrent =
-          cachedMessages.length > 0 && getLastConfirmedMessageId(cachedMessages) === channel.lastMessage?.id
+          !networkChanged &&
+          cachedMessages.length > 0 &&
+          getLastConfirmedMessageId(cachedMessages) === channel.lastMessage?.id
 
         if (cacheIsCurrent) {
           result.messages = cachedMessages
