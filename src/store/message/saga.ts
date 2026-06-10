@@ -2739,7 +2739,7 @@ function* loadDefaultMessages(action: IAction): any {
       yield put(addMessagesAC(filteredPendingMessages, MESSAGE_LOAD_DIRECTION.NEXT))
       // Load OG metadata for link-only messages from cache
       yield call(loadOGMetadataForLinkMessages, filteredPendingMessages, true)
-      if (cachedMessages?.length && connectionState === CONNECTION_STATUS.CONNECTED) {
+      if (!cachedMessages?.length && connectionState === CONNECTION_STATUS.CONNECTED) {
         yield put(scrollToNewMessageAC(true, true, false))
       }
       const waitToSendPendingMessages = store.getState().UserReducer.waitToSendPendingMessages

@@ -422,7 +422,6 @@ export function useChatController({
   const visibleUnreadReportedRef = useRef<Set<string>>(new Set())
   const restoreRef = useRef<RestoreState | null>(null)
   const lastBootKeyRef = useRef<string | null>(null)
-  const pendingBootScrolledRef = useRef(false)
   const highlightedItemIdRef = useRef<string | null>(null)
   const highlightTimeoutRef = useRef<NodeJS.Timeout | number | null>(null)
   const unreadRestoreCompletedRef = useRef(false)
@@ -1919,7 +1918,6 @@ export function useChatController({
 
     activeChannelIdRef.current = channel.id
     lastBootKeyRef.current = null
-    pendingBootScrolledRef.current = false
     restoreRef.current = null
     windowLoadScopeRef.current = null
     activeEdgeIntentRef.current = null
@@ -2020,26 +2018,17 @@ export function useChatController({
     }
 
     if (!lastBootKeyRef.current) {
-      const hasConfirmedMessages = messages.some((m) => !!m.id)
-      if (hasConfirmedMessages) {
-        lastBootKeyRef.current = `${channel.id}:${getMessageLocalRef(messages[0])}`
-        pendingBootScrolledRef.current = false
-        const preservePendingHistoryEdge =
-          pendingEdgeCheckAfterLoadRef.current && activeEdgeIntentRef.current === 'previous'
-        restoreRef.current =
-          unreadScrollTo && unreadMessageId
-            ? { mode: 'reveal-unread-separator' }
-            : preservePendingHistoryEdge
+      lastBootKeyRef.current = `${channel.id}:${getMessageLocalRef(messages[0])}`
+      const preservePendingHistoryEdge =
+        pendingEdgeCheckAfterLoadRef.current && activeEdgeIntentRef.current === 'previous'
+      restoreRef.current =
+        unreadScrollTo && unreadMessageId
+          ? { mode: 'reveal-unread-separator' }
+          : preservePendingHistoryEdge
+            ? null
+            : isScrollInteractionActive()
               ? null
-              : isScrollInteractionActive()
-                ? null
-                : { mode: 'to-bottom' }
-      } else if (!pendingBootScrolledRef.current) {
-        pendingBootScrolledRef.current = true
-        if (!restoreRef.current) {
-          restoreRef.current = { mode: 'to-bottom' }
-        }
-      }
+              : { mode: 'to-bottom' }
     }
 
     const restoreState = restoreRef.current
@@ -2477,7 +2466,7 @@ export function useChatController({
 
     const forceLatest = scrollToNewMessage.updateMessageList
 
-    if (!isViewingLatest && (forceLatest || scrollToNewMessage.isIncomingMessage)) {
+    if (!forceLatest && scrollToNewMessage.isIncomingMessage && !isViewingLatest) {
       dispatch(scrollToNewMessageAC(false, false, false))
       return
     }
