@@ -84,6 +84,7 @@ const mockStoreState = {
   MessageReducer: {
     activeChannelMessages: [],
     activePaginationIntent: null,
+    tabAttachmentsCache: {},
     pendingPollActions: {},
     pendingMessageMutations: {},
     oGMetadata: {}
@@ -197,6 +198,7 @@ describe('message saga message-list flows', () => {
     mockStoreState.MessageReducer = {
       activeChannelMessages: [],
       activePaginationIntent: null,
+      tabAttachmentsCache: {},
       stableUnreadAnchor: {
         channelId: '',
         messageId: ''
@@ -638,7 +640,7 @@ describe('message saga message-list flows', () => {
             lastDisplayedMessageId: refreshedChannel.lastDisplayedMessageId,
             lastMessage: expect.objectContaining({ id: refreshedChannel.lastMessage.id })
           }),
-          networkChanged: false,
+          networkChanged: true,
           applyVisibleWindow: true
         })
       )
@@ -682,7 +684,7 @@ describe('message saga message-list flows', () => {
 
       const dispatched = await dispatchedPromise
 
-      expect(dispatched).toEqual([loadLatestMessagesAC(channel)])
+      expect(dispatched).toEqual([loadLatestMessagesAC(channel, undefined, true)])
     } finally {
       jest.useRealTimers()
     }
@@ -3636,6 +3638,7 @@ describe('loadAroundMessage generic cache-first', () => {
     mockStoreState.MessageReducer = {
       activeChannelMessages: [],
       activePaginationIntent: null,
+      tabAttachmentsCache: {},
       stableUnreadAnchor: { channelId: '', messageId: '' },
       pendingPollActions: {},
       pendingMessageMutations: {},
@@ -3923,6 +3926,7 @@ describe('loadAroundMessage cache-first restore (restoreWindow)', () => {
     mockStoreState.MessageReducer = {
       activeChannelMessages: [],
       activePaginationIntent: null,
+      tabAttachmentsCache: {},
       stableUnreadAnchor: { channelId: '', messageId: '' },
       pendingPollActions: {},
       pendingMessageMutations: {},

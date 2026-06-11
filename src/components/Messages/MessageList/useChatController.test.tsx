@@ -133,6 +133,80 @@ type AsyncHarnessProps = Omit<HarnessProps, 'layoutSpec'> & {
   server: AsyncControllerServer
 }
 
+type ControllerHarnessState = Pick<
+  AsyncControllerState,
+  'unreadScrollTo' | 'unreadMessageId' | 'stableUnreadAnchor' | 'showScrollToNewMessageButton' | 'scrollToNewMessage'
+>
+
+const DEFAULT_SCROLL_TO_NEW_MESSAGE: ControllerHarnessState['scrollToNewMessage'] = {
+  scrollToBottom: false,
+  isIncomingMessage: false,
+  updateMessageList: false
+}
+
+const EMPTY_SELECTED_MESSAGES_MAP = new Map<string, any>()
+
+const hasOwnProp = <T extends object>(value: T, key: keyof T) => Object.prototype.hasOwnProperty.call(value, key)
+
+const buildControllerHarnessState = ({
+  channel,
+  unreadScrollTo,
+  unreadMessageId,
+  stableUnreadAnchor,
+  showScrollToNewMessageButton,
+  scrollToNewMessage
+}: Pick<
+  HarnessProps,
+  | 'channel'
+  | 'unreadScrollTo'
+  | 'unreadMessageId'
+  | 'stableUnreadAnchor'
+  | 'showScrollToNewMessageButton'
+  | 'scrollToNewMessage'
+>): ControllerHarnessState => ({
+  unreadScrollTo: unreadScrollTo ?? false,
+  unreadMessageId: unreadMessageId ?? '',
+  stableUnreadAnchor: stableUnreadAnchor ?? {
+    channelId: channel.id,
+    messageId: unreadMessageId ?? ''
+  },
+  showScrollToNewMessageButton: showScrollToNewMessageButton ?? false,
+  scrollToNewMessage: scrollToNewMessage ?? DEFAULT_SCROLL_TO_NEW_MESSAGE
+})
+
+const getControlledControllerState = (props: HarnessProps): Partial<ControllerHarnessState> => {
+  const nextState = buildControllerHarnessState(props)
+  const controlledState: Partial<ControllerHarnessState> = {}
+
+  if (hasOwnProp(props, 'unreadScrollTo')) {
+    controlledState.unreadScrollTo = nextState.unreadScrollTo
+  }
+  if (hasOwnProp(props, 'unreadMessageId')) {
+    controlledState.unreadMessageId = nextState.unreadMessageId
+  }
+  if (hasOwnProp(props, 'stableUnreadAnchor')) {
+    controlledState.stableUnreadAnchor = nextState.stableUnreadAnchor
+  }
+  if (hasOwnProp(props, 'showScrollToNewMessageButton')) {
+    controlledState.showScrollToNewMessageButton = nextState.showScrollToNewMessageButton
+  }
+  if (hasOwnProp(props, 'scrollToNewMessage')) {
+    controlledState.scrollToNewMessage = nextState.scrollToNewMessage
+  }
+
+  return controlledState
+}
+
+const areControllerStatesEqual = (left: ControllerHarnessState, right: ControllerHarnessState) =>
+  left.unreadScrollTo === right.unreadScrollTo &&
+  left.unreadMessageId === right.unreadMessageId &&
+  left.showScrollToNewMessageButton === right.showScrollToNewMessageButton &&
+  left.stableUnreadAnchor.channelId === right.stableUnreadAnchor.channelId &&
+  left.stableUnreadAnchor.messageId === right.stableUnreadAnchor.messageId &&
+  left.scrollToNewMessage.scrollToBottom === right.scrollToNewMessage.scrollToBottom &&
+  left.scrollToNewMessage.isIncomingMessage === right.scrollToNewMessage.isIncomingMessage &&
+  left.scrollToNewMessage.updateMessageList === right.scrollToNewMessage.updateMessageList
+
 const flushEffects = async () => {
   await act(async () => {
     await new Promise((resolve) => window.setTimeout(resolve, 0))
@@ -215,65 +289,55 @@ const layoutTimeline = (
   }
 }
 
-const ControllerHarness = ({
-  messages,
-  channel,
-  hasPrevMessages = false,
-  hasNextMessages = false,
-  loadingPrevMessages = LOADING_STATE.LOADED,
-  loadingNextMessages = LOADING_STATE.LOADED,
-  connectionStatus = CONNECTION_STATUS.CONNECTED,
-  unreadScrollTo = false,
-  unreadMessageId = '',
-  stableUnreadAnchor,
-  showScrollToNewMessageButton = false,
-  scrollToNewMessage = {
-    scrollToBottom: false,
-    isIncomingMessage: false,
-    updateMessageList: false
-  },
-  scrollToMentionedMessage = null,
-  scrollToRepliedMessageId = null,
-  jumpToItemId = null,
-  jumpToItemSmooth = false,
-  scrollToMessageHighlight = true,
-  scrollToMessageBehavior = 'smooth',
-  tabIsActive = true,
-  dispatch = jest.fn(),
-  layoutSpec
-}: HarnessProps) => {
-  const stableUnreadAnchorChannelId = stableUnreadAnchor?.channelId ?? channel.id
-  const stableUnreadAnchorMessageId = stableUnreadAnchor?.messageId ?? unreadMessageId
+const ControllerHarness = (props: HarnessProps) => {
+  const {
+    messages,
+    channel,
+    hasPrevMessages = false,
+    hasNextMessages = false,
+    loadingPrevMessages = LOADING_STATE.LOADED,
+    loadingNextMessages = LOADING_STATE.LOADED,
+    connectionStatus = CONNECTION_STATUS.CONNECTED,
+    scrollToMentionedMessage = null,
+    scrollToRepliedMessageId = null,
+    jumpToItemId = null,
+    jumpToItemSmooth = false,
+    scrollToMessageHighlight = true,
+    scrollToMessageBehavior = 'smooth',
+    tabIsActive = true,
+    dispatch = jest.fn(),
+    layoutSpec
+  } = props
 
-  const [controllerState, setControllerState] = React.useState(() => ({
-    unreadScrollTo,
-    unreadMessageId,
-    stableUnreadAnchor: {
-      channelId: stableUnreadAnchorChannelId,
-      messageId: stableUnreadAnchorMessageId
-    },
-    showScrollToNewMessageButton,
-    scrollToNewMessage
-  }))
+  const [controllerState, setControllerState] = React.useState<ControllerHarnessState>(() =>
+    buildControllerHarnessState(props)
+  )
 
   React.useEffect(() => {
-    setControllerState({
-      unreadScrollTo,
-      unreadMessageId,
-      stableUnreadAnchor: {
-        channelId: stableUnreadAnchorChannelId,
-        messageId: stableUnreadAnchorMessageId
-      },
-      showScrollToNewMessageButton,
-      scrollToNewMessage
+    const nextState = buildControllerHarnessState(props)
+    setControllerState((prev) => (areControllerStatesEqual(prev, nextState) ? prev : nextState))
+  }, [channel.id])
+
+  React.useEffect(() => {
+    const controlledState = getControlledControllerState(props)
+    if (!Object.keys(controlledState).length) {
+      return
+    }
+
+    setControllerState((prev) => {
+      const nextState = {
+        ...prev,
+        ...controlledState
+      }
+
+      return areControllerStatesEqual(prev, nextState) ? prev : nextState
     })
   }, [
-    scrollToNewMessage,
-    showScrollToNewMessageButton,
-    stableUnreadAnchorChannelId,
-    stableUnreadAnchorMessageId,
-    unreadMessageId,
-    unreadScrollTo
+    props.unreadScrollTo,
+    props.unreadMessageId,
+    props.stableUnreadAnchor,
+    props.showScrollToNewMessageButton,
+    props.scrollToNewMessage
   ])
 
   const controlledDispatch = React.useCallback(
@@ -323,7 +387,7 @@ const ControllerHarness = ({
     showScrollToNewMessageButton: controllerState.showScrollToNewMessageButton,
     unreadScrollTo: controllerState.unreadScrollTo,
     unreadMessageId: controllerState.unreadMessageId,
-    selectedMessagesMap: new Map(),
+    selectedMessagesMap: EMPTY_SELECTED_MESSAGES_MAP,
     allowEditDeleteIncomingMessage: true,
     tabIsActive,
     dispatch: controlledDispatch
@@ -473,11 +537,7 @@ const buildAsyncControllerState = (props: AsyncHarnessProps): AsyncControllerSta
     messageId: props.unreadMessageId ?? ''
   },
   showScrollToNewMessageButton: props.showScrollToNewMessageButton ?? false,
-  scrollToNewMessage: {
-    scrollToBottom: false,
-    isIncomingMessage: false,
-    updateMessageList: false
-  }
+  scrollToNewMessage: props.scrollToNewMessage ?? DEFAULT_SCROLL_TO_NEW_MESSAGE
 })
 
 const AsyncControllerHarness = ({ server, dispatch = jest.fn(), layoutSpec, ...props }: AsyncHarnessProps) => {
@@ -512,11 +572,7 @@ const AsyncControllerHarness = ({ server, dispatch = jest.fn(), layoutSpec, ...p
         messageId: props.unreadMessageId ?? ''
       },
       showScrollToNewMessageButton: props.showScrollToNewMessageButton ?? false,
-      scrollToNewMessage: {
-        scrollToBottom: false,
-        isIncomingMessage: false,
-        updateMessageList: false
-      }
+      scrollToNewMessage: props.scrollToNewMessage ?? DEFAULT_SCROLL_TO_NEW_MESSAGE
     }))
   }, [
     props.channel,
@@ -528,7 +584,8 @@ const AsyncControllerHarness = ({ server, dispatch = jest.fn(), layoutSpec, ...p
     props.unreadScrollTo,
     props.unreadMessageId,
     props.stableUnreadAnchor,
-    props.showScrollToNewMessageButton
+    props.showScrollToNewMessageButton,
+    props.scrollToNewMessage
   ])
 
   const applyServerResponse = React.useCallback((response: AsyncControllerServerResponse) => {

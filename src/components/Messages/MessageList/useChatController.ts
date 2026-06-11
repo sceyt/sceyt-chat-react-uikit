@@ -445,6 +445,7 @@ export function useChatController({
   const edgeRequestSequenceRef = useRef(0)
   const activeChannelIdRef = useRef<string | null>(null)
   const lastScrollActivityAtRef = useRef(0)
+  const lastMeasuredLatestEdgeRef = useRef(0)
   const jumpToLatestFrameRef = useRef<number | null>(null)
   const loadPrevFrameRef = useRef<number | null>(null)
   const loadNextFrameRef = useRef<number | null>(null)
@@ -1664,7 +1665,13 @@ export function useChatController({
       currentScrollTop = latestEdgeScrollTop
     }
 
+    // Snap within the edge threshold so follow-up calculations and DOM state stay in sync.
+    if (currentScrollTop !== container.scrollTop) {
+      setScrollTop(container, currentScrollTop, 'auto')
+    }
+
     const distanceFromLatest = latestEdgeScrollTop - currentScrollTop
+    lastMeasuredLatestEdgeRef.current = latestEdgeScrollTop
 
     if (Date.now() < jumpLockUntilRef.current) {
       if (jumpLockModeRef.current === 'latest' && distanceFromLatest > PRELOAD_RESET_PX) {
@@ -2003,10 +2010,17 @@ export function useChatController({
       return
     }
 
+    const rememberLatestEdge = () => {
+      lastMeasuredLatestEdgeRef.current = getLatestEdgeScrollTop(container)
+    }
+
+    const isChannelSwitch = activeChannelIdRef.current !== null && activeChannelIdRef.current !== channel.id
+    const hasCurrentBootKey = lastBootKeyRef.current?.startsWith(`${channel.id}:`) || false
+
     // Saved-interval restore: apply raw scrollTop before the default boot logic can override it.
     if (restoreRef.current?.mode === 'restore-scroll-top') {
       const savedScrollTop = restoreRef.current.scrollTop
-      if (!lastBootKeyRef.current) {
+      if (!hasCurrentBootKey) {
         lastBootKeyRef.current = `${channel.id}:${getMessageLocalRef(messages[0])}`
       }
       restoreRef.current = null
@@ -2014,10 +2028,11 @@ export function useChatController({
       setIsViewingLatest(false)
       const maxScrollTop = getMaxScrollTop(container)
       setScrollTop(container, Math.min(savedScrollTop, maxScrollTop), 'auto')
+      rememberLatestEdge()
       return
     }
 
-    if (!lastBootKeyRef.current) {
+    if (!hasCurrentBootKey) {
       lastBootKeyRef.current = `${channel.id}:${getMessageLocalRef(messages[0])}`
       const preservePendingHistoryEdge =
         pendingEdgeCheckAfterLoadRef.current && activeEdgeIntentRef.current === 'previous'
@@ -2026,13 +2041,21 @@ export function useChatController({
           ? { mode: 'reveal-unread-separator' }
           : preservePendingHistoryEdge
             ? null
-            : isScrollInteractionActive()
-              ? null
-              : { mode: 'to-bottom' }
+            : isChannelSwitch
+              ? { mode: 'to-bottom' }
+              : isScrollInteractionActive()
+                ? null
+                : { mode: 'to-bottom' }
     }
 
     const restoreState = restoreRef.current
     if (!restoreState) {
+      const wasPinnedToPreviousLatestEdge =
+        Math.abs(container.scrollTop - lastMeasuredLatestEdgeRef.current) <= PRELOAD_TRIGGER_PX
+      if ((viewIsAtLatestRef.current || wasPinnedToPreviousLatestEdge) && !hasNext) {
+        scrollToLatestEdge(container, 'auto')
+      }
+      rememberLatestEdge()
       return
     }
 
@@ -2062,6 +2085,7 @@ export function useChatController({
         jumpObserverRef.current = observer
         observer.observe(target)
       }
+      rememberLatestEdge()
       return
     }
 
@@ -2079,6 +2103,7 @@ export function useChatController({
       } else {
         return
       }
+      rememberLatestEdge()
       return
     }
 
@@ -2087,6 +2112,7 @@ export function useChatController({
       viewIsAtLatestRef.current = true
       setIsViewingLatest(true)
       scrollToLatestEdge(container, 'auto')
+      rememberLatestEdge()
       return
     }
 
@@ -2095,6 +2121,7 @@ export function useChatController({
       viewIsAtLatestRef.current = true
       setIsViewingLatest(true)
       scrollToLatestEdge(container, 'smooth')
+      rememberLatestEdge()
       return
     }
 
@@ -2104,6 +2131,7 @@ export function useChatController({
         viewIsAtLatestRef.current = true
         setIsViewingLatest(true)
         scrollToLatestEdge(container, 'auto')
+        rememberLatestEdge()
         return
       }
 
@@ -2120,6 +2148,7 @@ export function useChatController({
       if (offsetDelta !== 0) {
         setScrollTop(container, clampScrollTopToViewport(container, container.scrollTop + offsetDelta), 'auto')
       }
+      rememberLatestEdge()
       return
     }
 
@@ -2157,6 +2186,7 @@ export function useChatController({
         const nextScrollTop = clampScrollTopToViewport(container, container.scrollTop + offsetDelta)
         setScrollTop(container, nextScrollTop, 'auto')
       }
+      rememberLatestEdge()
     }
   }, [
     channel.id,
@@ -2166,7 +2196,7 @@ export function useChatController({
     messages,
     unreadScrollTo,
     clearJumpBlur,
-    hasNextMessages,
+    hasNext,
     isScrollInteractionActive
   ])
 
