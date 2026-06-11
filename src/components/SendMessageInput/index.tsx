@@ -1421,15 +1421,15 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
         }
         const sendAttachmentsAsSeparateMessage = getSendAttachmentsAsSeparateMessages()
         dispatch(sendMessageAC(messageToSend, id, connectionStatus, connectionStatus, sendAttachmentsAsSeparateMessage))
-        // Reset viewOnce after sending
-        setViewOnce(false)
-        setAttachments([])
-        handleCloseReply()
       }
 
       reader.onerror = (e: any) => {
         log.info(' error on read file onError', e)
       }
+      setViewOnce(false)
+      setAttachments([])
+      attachmentsUpdate = []
+      handleCloseReply()
       reader.readAsBinaryString(recordedFile.file)
     }
   }
