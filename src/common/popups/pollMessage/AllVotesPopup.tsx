@@ -53,9 +53,7 @@ const AllVotesPopup = ({ onClose, poll, messageId, optionId, optionName }: AllVo
   const [isScrolling, setIsScrolling] = useState<boolean>(false)
 
   useEffect(() => {
-    if (allVotes.length === 0 && totalVotes > 0 && !isLoading) {
-      dispatch(getPollVotesAC(messageId, poll.id, optionId, POLL_VOTES_LIMIT))
-    }
+    dispatch(getPollVotesAC(messageId, poll.id, optionId, POLL_VOTES_LIMIT))
   }, [])
 
   useEffect(() => {
