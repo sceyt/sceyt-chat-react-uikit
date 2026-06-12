@@ -285,10 +285,12 @@ export function* handleChannelMessageEvent(args: { channel: IChannel; message: I
       }
     }
   }
-  if (message.repliedInThread && message.parentMessage?.id) {
-    yield put(markMessagesAsDeliveredAC(message.parentMessage.id, [message.id]))
-  } else {
-    yield put(markMessagesAsDeliveredAC(channel.id, [message.id]))
+  if (message.user.id !== SceytChatClient.user.id) {
+    if (message.repliedInThread && message.parentMessage?.id) {
+      yield put(markMessagesAsDeliveredAC(message.parentMessage.id, [message.id]))
+    } else {
+      yield put(markMessagesAsDeliveredAC(channel.id, [message.id]))
+    }
   }
 
   updateChannelOnAllChannels(channel.id, channelDataUpdate)
