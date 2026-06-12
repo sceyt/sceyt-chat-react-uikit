@@ -401,6 +401,9 @@ const channelSlice = createSlice({
           state.channels = sortChannelByLastMessage([updateChannel, ...updatedChannels])
         }
       }
+      if (updateChannel?.id && updateChannel?.id === (state.activeChannel as any)?.id) {
+        state.activeChannel = updateChannel
+      }
     },
 
     updateChannelLastMessageStatus: (state, action: PayloadAction<{ message: IMessage; channel: IChannel }>) => {

@@ -4,6 +4,8 @@ import { DESTROY_SESSION } from '../channel/constants'
 import {
   comparePendingMessages,
   compareMessagesForList,
+  getMessageLocalRef,
+  getMessageSortKey,
   MESSAGE_LOAD_DIRECTION,
   MESSAGES_MAX_PAGE_COUNT,
   PendingPollAction,
@@ -97,6 +99,17 @@ export interface IMessageStore {
     channelId: string
     messageId: string
   }
+  visibleMessagesMap: VisibleMessagesMap
+}
+
+export type VisibleMessageEntry = {
+  id?: string
+  localRef: string
+  sortKey: string
+}
+
+export type VisibleMessagesMap = {
+  [key: string]: VisibleMessageEntry
 }
 
 const initialState: IMessageStore = {
@@ -151,7 +164,8 @@ const initialState: IMessageStore = {
   stableUnreadAnchor: {
     channelId: '',
     messageId: ''
-  }
+  },
+  visibleMessagesMap: {}
 }
 
 const isPendingMessage = (message: IMessage) => !message.id && !!message.tid
@@ -286,6 +300,28 @@ const messageSlice = createSlice({
 
     setShowScrollToNewMessageButton: (state, action: PayloadAction<{ state: boolean }>) => {
       state.showScrollToNewMessageButton = action.payload.state
+    },
+
+    setVisibleMessage: (state, action: PayloadAction<{ message: IMessage }>) => {
+      const { message } = action.payload
+      const localRef = getMessageLocalRef(message)
+      if (!localRef) {
+        return
+      }
+
+      state.visibleMessagesMap[localRef] = {
+        id: message.id,
+        localRef,
+        sortKey: getMessageSortKey(message).toString()
+      }
+    },
+
+    removeVisibleMessage: (state, action: PayloadAction<{ message: IMessage }>) => {
+      delete state.visibleMessagesMap[getMessageLocalRef(action.payload.message)]
+    },
+
+    clearVisibleMessagesMap: (state) => {
+      state.visibleMessagesMap = {}
     },
 
     setUnreadScrollTo: (state, action: PayloadAction<{ state: boolean }>) => {
@@ -934,6 +970,9 @@ export const {
   setScrollToMentionedMessage,
   setScrollToNewMessage,
   setShowScrollToNewMessageButton,
+  setVisibleMessage,
+  removeVisibleMessage,
+  clearVisibleMessagesMap,
   setUnreadScrollTo,
   setMessages,
   addMessages,

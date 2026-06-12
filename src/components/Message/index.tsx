@@ -12,9 +12,11 @@ import {
   deleteMessageAC,
   deleteReactionAC,
   forwardMessageAC,
+  removeVisibleMessageAC,
   removeSelectedMessageAC,
   resendMessageAC,
   scrollToNewMessageAC,
+  setVisibleMessageAC,
   setMessageForReplyAC,
   setMessageMenuOpenedAC,
   setMessageToEditAC,
@@ -34,11 +36,7 @@ import { useDidUpdate, useOnScreen, useColor } from 'hooks'
 // Assets
 import { ReactComponent as ErrorIcon } from '../../assets/svg/errorIcon.svg'
 // Helpers
-import {
-  compareMessagesForList,
-  removeMessageFromVisibleMessagesMap,
-  setMessageToVisibleMessagesMap
-} from 'helpers/messagesHalper'
+import { compareMessagesForList } from 'helpers/messagesHalper'
 import { getOpenChatOnUserInteraction } from 'helpers/channelHalper'
 import { DEFAULT_CHANNEL_TYPE, MESSAGE_DELIVERY_STATUS, MESSAGE_STATUS } from 'helpers/constants'
 import { THEME_COLORS } from 'UIHelper/constants'
@@ -602,7 +600,7 @@ const Message = ({
       }
       handleSendReadMarker()
       if (!channel.isLinkedChannel) {
-        setMessageToVisibleMessagesMap(message)
+        dispatch(setVisibleMessageAC(message))
       }
 
       if (
@@ -614,7 +612,7 @@ const Message = ({
       }
     } else {
       if (!channel.isLinkedChannel) {
-        removeMessageFromVisibleMessagesMap(message)
+        dispatch(removeVisibleMessageAC(message))
       }
     }
   }, [
@@ -633,10 +631,10 @@ const Message = ({
   useEffect(() => {
     return () => {
       if (!channel.isLinkedChannel) {
-        removeMessageFromVisibleMessagesMap(message)
+        dispatch(removeVisibleMessageAC(message))
       }
     }
-  }, [channel.isLinkedChannel, message])
+  }, [channel.isLinkedChannel, dispatch, message])
 
   useEffect(() => {
     if (!isVisible && infoPopupOpen) {

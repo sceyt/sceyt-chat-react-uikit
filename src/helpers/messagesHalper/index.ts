@@ -171,14 +171,6 @@ type draftMessagesMap = {
   [key: string]: { text: string; mentionedUsers: any; messageForReply?: IMessage; bodyAttributes?: any }
 }
 type audioRecordingMap = { [key: string]: any }
-type visibleMessagesMap = {
-  [key: string]: {
-    id?: string
-    localRef: string
-    sortKey: string
-  }
-}
-
 type messagesMap = {
   [key: string]: { [key: string]: IMessage }
 }
@@ -1146,30 +1138,6 @@ export const setDraftMessageToMap = (
   }
 ) => {
   draftMessagesMap[channelId] = draftMessage
-}
-
-let visibleMessagesMap: visibleMessagesMap = {}
-
-export const getVisibleMessagesMap = () => visibleMessagesMap
-
-export const clearVisibleMessagesMap = () => {
-  visibleMessagesMap = {}
-}
-
-export const setMessageToVisibleMessagesMap = (message: IMessage) => {
-  const localRef = getMessageLocalRef(message)
-  if (!localRef) {
-    return
-  }
-  visibleMessagesMap[localRef] = {
-    id: message.id,
-    localRef,
-    sortKey: getMessageSortKey(message).toString()
-  }
-}
-
-export const removeMessageFromVisibleMessagesMap = (message: IMessage) => {
-  delete visibleMessagesMap[getMessageLocalRef(message)]
 }
 
 export type PendingPollAction = {

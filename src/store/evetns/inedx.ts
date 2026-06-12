@@ -63,7 +63,6 @@ import {
   appendMessageToLatestSegment,
   addReactionToMessageOnMap,
   checkChannelExistsOnMessagesMap,
-  getVisibleMessagesMap,
   messagesShareReference,
   removeAllMessages,
   removeMessagesFromMap,
@@ -192,9 +191,10 @@ export function* handleChannelMessageEvent(args: { channel: IChannel; message: I
   }
 
   if (channel.id === activeChannelId) {
+    const visibleMessagesMap = store.getState().MessageReducer?.visibleMessagesMap || {}
     const lastMessageIsVisible = storedChannel?.lastMessage?.id
-      ? Object.values(getVisibleMessagesMap()).some(
-          (visibleMessage) => visibleMessage.id === storedChannel.lastMessage?.id
+      ? Object.values(visibleMessagesMap as any).some(
+          (visibleMessage: any) => visibleMessage.id === storedChannel.lastMessage?.id
         )
       : false
 
@@ -286,11 +286,7 @@ export function* handleChannelMessageEvent(args: { channel: IChannel; message: I
     }
   }
   if (message.user.id !== SceytChatClient.user.id) {
-    if (message.repliedInThread && message.parentMessage?.id) {
-      yield put(markMessagesAsDeliveredAC(message.parentMessage.id, [message.id]))
-    } else {
-      yield put(markMessagesAsDeliveredAC(channel.id, [message.id]))
-    }
+    yield put(markMessagesAsDeliveredAC(channel.id, [message.id]))
   }
 
   updateChannelOnAllChannels(channel.id, channelDataUpdate)

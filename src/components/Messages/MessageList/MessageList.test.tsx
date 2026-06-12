@@ -244,6 +244,11 @@ const attachDelayedServerToMessageListStore = (
   }
 ) => {
   const originalDispatch = store.dispatch.bind(store)
+  const loadDefaultType = loadDefaultMessagesAC({} as any).type
+  const loadLatestType = loadLatestMessagesAC({} as any).type
+  const loadNearUnreadType = loadNearUnreadAC({} as any).type
+  const loadAroundType = loadAroundMessageAC({} as any, '').type
+  const reloadAfterReconnectType = reloadActiveChannelAfterReconnectAC({} as any).type
   const delayedDispatch = jest.fn((action: any) => {
     const result = originalDispatch(action)
 
@@ -333,19 +338,19 @@ const attachDelayedServerToMessageListStore = (
       delayedDispatch(loadLatestMessagesAC(reloadedChannel))
     }
 
-    if (action.type === loadDefaultMessagesAC(action.payload.channel).type) {
+    if (action.type === loadDefaultType) {
       scheduleResponse('both', handlers.onLoadDefault).catch(() => undefined)
     }
 
-    if (action.type === loadLatestMessagesAC(action.payload.channel).type) {
+    if (action.type === loadLatestType) {
       scheduleResponse('both', handlers.onLoadLatest).catch(() => undefined)
     }
 
-    if (action.type === loadNearUnreadAC(action.payload.channel).type) {
+    if (action.type === loadNearUnreadType) {
       scheduleResponse('both', handlers.onLoadNearUnread).catch(() => undefined)
     }
 
-    if (action.type === loadAroundMessageAC(action.payload.channel, action.payload.messageId).type) {
+    if (action.type === loadAroundType) {
       scheduleResponse('both', handlers.onLoadAround).catch(() => undefined)
     }
 
@@ -393,7 +398,7 @@ const attachDelayedServerToMessageListStore = (
       ).catch(() => undefined)
     }
 
-    if (action.type === reloadActiveChannelAfterReconnectAC(action.payload.channel).type) {
+    if (action.type === reloadAfterReconnectType) {
       scheduleReconnect(handlers.onReconnect).catch(() => undefined)
     }
 

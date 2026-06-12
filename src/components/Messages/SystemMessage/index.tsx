@@ -11,12 +11,8 @@ import { IChannel, IMessage } from '../../../types'
 import { getShowOnlyContactUsers } from '../../../helpers/contacts'
 import { THEME_COLORS } from '../../../UIHelper/constants'
 import { getClient } from '../../../common/client'
-import {
-  compareMessagesForList,
-  removeMessageFromVisibleMessagesMap,
-  setMessageToVisibleMessagesMap
-} from 'helpers/messagesHalper'
-import { scrollToNewMessageAC } from 'store/message/actions'
+import { compareMessagesForList } from 'helpers/messagesHalper'
+import { removeVisibleMessageAC, scrollToNewMessageAC, setVisibleMessageAC } from 'store/message/actions'
 import { scrollToNewMessageSelector, unreadScrollToSelector } from 'store/message/selector'
 import { MESSAGE_TYPE } from 'types/enum'
 
@@ -68,7 +64,7 @@ const Message = ({
         setLastVisibleMessageId(message)
       }
       if (!channel.isLinkedChannel) {
-        setMessageToVisibleMessagesMap(message)
+        dispatch(setVisibleMessageAC(message))
       }
 
       if (
@@ -80,7 +76,7 @@ const Message = ({
       }
     } else {
       if (!channel.isLinkedChannel) {
-        removeMessageFromVisibleMessagesMap(message)
+        dispatch(removeVisibleMessageAC(message))
       }
     }
   }, [
@@ -97,10 +93,10 @@ const Message = ({
   useEffect(() => {
     return () => {
       if (!channel.isLinkedChannel) {
-        removeMessageFromVisibleMessagesMap(message)
+        dispatch(removeVisibleMessageAC(message))
       }
     }
-  }, [channel.isLinkedChannel, message])
+  }, [channel.isLinkedChannel, dispatch, message])
 
   return (
     <Container

@@ -4,6 +4,7 @@ import {
   cancelChannelMessageProcessesAC,
   cancelWindowLoadAC,
   clearActivePaginationIntentAC,
+  clearVisibleMessagesMapAC,
   clearSelectedMessagesAC,
   loadAroundMessageAC,
   loadDefaultMessagesAC,
@@ -24,7 +25,6 @@ import {
 import {
   compareMessagesForList,
   compareMessageIds,
-  clearVisibleMessagesMap,
   getContiguousNextMessages,
   getContiguousPrevMessages,
   getClosestConfirmedMessageId,
@@ -36,7 +36,6 @@ import {
   getMessageLocalRef,
   getMessagesFromMap,
   getPendingMessagesFromMap,
-  getVisibleMessagesMap,
   hasNextContiguousInMap,
   hasPrevContiguousInMap,
   LOAD_MAX_MESSAGE_COUNT,
@@ -48,6 +47,7 @@ import { CONNECTION_STATUS } from '../../../store/user/constants'
 import { LOADING_STATE, MESSAGE_DELIVERY_STATUS } from '../../../helpers/constants'
 import { markMessagesAsReadAC } from '../../../store/channel/actions'
 import { IChannel, IMessage } from '../../../types'
+import { VisibleMessagesMap } from '../../../store/message/reducers'
 
 export const PRELOAD_TRIGGER_PX = 5
 const PRELOAD_RESET_PX = 50
@@ -154,6 +154,7 @@ export interface UseChatControllerParams {
   showScrollToNewMessageButton: boolean
   unreadScrollTo: boolean | string
   unreadMessageId: string
+  visibleMessagesMap: VisibleMessagesMap
   selectedMessagesMap: Map<string, any>
   allowEditDeleteIncomingMessage: boolean
   dispatch: (...args: any[]) => void
@@ -392,6 +393,7 @@ export function useChatController({
   showScrollToNewMessageButton,
   unreadScrollTo,
   unreadMessageId,
+  visibleMessagesMap,
   selectedMessagesMap,
   allowEditDeleteIncomingMessage,
   tabIsActive = true,
@@ -401,6 +403,7 @@ export function useChatController({
   const itemElementsRef = useRef<Map<string, HTMLElement>>(new Map())
   const messagesIndexMapRef = useRef<Record<string, number>>({})
   const messagesRef = useRef<IMessage[]>(messages)
+  const visibleMessagesMapRef = useRef(visibleMessagesMap)
   const channelRef = useRef(channel)
   const lastVisibleMessageIdRef = useRef<string>('')
   const lastVisibleAnchorIdRef = useRef<string>('')
@@ -530,6 +533,7 @@ export function useChatController({
 
   useLayoutEffect(() => {
     messagesRef.current = messages
+    visibleMessagesMapRef.current = visibleMessagesMap
     channelRef.current = channel
     connectionStatusRef.current = connectionStatus
   })
@@ -2358,7 +2362,7 @@ export function useChatController({
     const savedRestoreWindow = channelRestoreWindowMap.get(channel.id)
     if (savedRestoreWindow) {
       if (!channel.isLinkedChannel) {
-        clearVisibleMessagesMap()
+        dispatch(clearVisibleMessagesMapAC())
       }
       if (channel.backToLinkedChannel) {
         restoreRef.current = { mode: 'restore-scroll-top', scrollTop: savedRestoreWindow.scrollTop }
@@ -2378,7 +2382,7 @@ export function useChatController({
 
     // Priority 2: linked-channel special return
     if (channel.backToLinkedChannel) {
-      const visibleMessages = getVisibleMessagesMap()
+      const visibleMessages = visibleMessagesMapRef.current
       const visibleMessagesIds = Object.values(visibleMessages)
         .filter((message) => !!message.id)
         .sort((left, right) => (BigInt(left.sortKey) < BigInt(right.sortKey) ? -1 : 1))
@@ -2393,7 +2397,7 @@ export function useChatController({
 
     // Priority 3: unread boot; Priority 4: default/latest boot
     if (!channel.isLinkedChannel) {
-      clearVisibleMessagesMap()
+      dispatch(clearVisibleMessagesMapAC())
     }
     if (channel.newMessageCount && channel.lastDisplayedMessageId) {
       suppressNextMessageChange()
@@ -2449,7 +2453,7 @@ export function useChatController({
     suppressNextMessageChange()
 
     const isHistoryTopVisible = messagesRef.current[0]
-      ? Object.values(getVisibleMessagesMap()).some(
+      ? Object.values(visibleMessagesMapRef.current).some(
           (visibleMessage) => visibleMessage.id === messagesRef.current[0]?.id
         )
       : false
@@ -2507,7 +2511,7 @@ export function useChatController({
 
   useEffect(() => {
     const latestLocalRef = getMessageLocalRef(channel.lastMessage)
-    const latestVisibleMessages = Object.values(getVisibleMessagesMap())
+    const latestVisibleMessages = Object.values(visibleMessagesMap)
     const isLatestInView = latestVisibleMessages.find(
       (m) => m.sortKey === latestLocalRef || m.localRef === latestLocalRef
     )
@@ -2522,9 +2526,9 @@ export function useChatController({
     lastVisibleMessageId,
     pendingNewestCount,
     scrollToMentionedMessage,
-    showScrollToNewMessageButton
+    showScrollToNewMessageButton,
+    visibleMessagesMap
   ])
-
   useEffect(() => {
     if (
       !unreadScrollTo ||

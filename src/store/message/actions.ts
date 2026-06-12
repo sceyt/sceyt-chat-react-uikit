@@ -44,6 +44,9 @@ import {
   setScrollToMentionedMessage,
   setScrollToNewMessage,
   setShowScrollToNewMessageButton,
+  setVisibleMessage,
+  removeVisibleMessage,
+  clearVisibleMessagesMap,
   setUnreadScrollTo,
   setMessages,
   addMessages,
@@ -385,6 +388,18 @@ export function scrollToNewMessageAC(
 
 export function showScrollToNewMessageButtonAC(state: boolean) {
   return setShowScrollToNewMessageButton({ state })
+}
+
+export function setVisibleMessageAC(message: IMessage) {
+  return setVisibleMessage({ message })
+}
+
+export function removeVisibleMessageAC(message: IMessage) {
+  return removeVisibleMessage({ message })
+}
+
+export function clearVisibleMessagesMapAC() {
+  return clearVisibleMessagesMap()
 }
 
 export function setUnreadScrollToAC(state: boolean) {

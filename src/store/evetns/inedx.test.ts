@@ -10,11 +10,11 @@ import {
 import {
   addMessageToMap,
   clearMessagesMap,
-  clearVisibleMessagesMap,
   getActiveSegment,
   getContiguousNextMessages,
+  getMessageLocalRef,
+  getMessageSortKey,
   getMessagesFromMap,
-  setMessageToVisibleMessagesMap,
   setActiveSegment
 } from '../../helpers/messagesHalper'
 import { IMessage } from '../../types'
@@ -26,7 +26,12 @@ import {
   resetMessageListFixtureIds
 } from '../../testUtils/messageFixtures'
 import { MESSAGE_DELIVERY_STATUS, MESSAGE_STATUS } from '../../helpers/constants'
-import { updateChannelDataAC, updateChannelLastMessageAC, updateChannelLastMessageStatusAC } from '../channel/actions'
+import {
+  markMessagesAsDeliveredAC,
+  updateChannelDataAC,
+  updateChannelLastMessageAC,
+  updateChannelLastMessageStatusAC
+} from '../channel/actions'
 import { addMessagesAC, updateMessagesMarkersAC, updateMessagesStatusAC } from '../message/actions'
 import { navigateToLatest } from '../../helpers/messageListNavigator'
 import { __eventsTestables } from './inedx'
@@ -43,7 +48,8 @@ describe('event message last-message handling', () => {
   const defaultStoreState = {
     MessageReducer: {
       pendingPollActions: {},
-      messagesHasNext: false
+      messagesHasNext: false,
+      visibleMessagesMap: {}
     },
     UserReducer: {
       browserTabIsActive: true
@@ -55,11 +61,26 @@ describe('event message last-message handling', () => {
     'restores confirmed channel last message when an older resend confirmation arrives as a channel message event'
   const keepsNewestPendingUnreadInfoTitle =
     'restores confirmed channel last message when unread info arrives with an older confirmed last message'
+  const setVisibleMessages = (...messages: IMessage[]) => {
+    defaultStoreState.MessageReducer.visibleMessagesMap = messages.reduce<Record<string, any>>((result, message) => {
+      const localRef = getMessageLocalRef(message)
+      if (!localRef) {
+        return result
+      }
+
+      result[localRef] = {
+        id: message.id,
+        localRef,
+        sortKey: getMessageSortKey(message).toString()
+      }
+      return result
+    }, {})
+  }
 
   beforeEach(() => {
     resetMessageListFixtureIds()
     clearMessagesMap()
-    clearVisibleMessagesMap()
+    defaultStoreState.MessageReducer.visibleMessagesMap = {}
     destroyChannelsMap()
     setActiveChannelId('')
     setClient({
@@ -69,11 +90,14 @@ describe('event message last-message handling', () => {
     mockStore.getState = jest.fn(() => defaultStoreState)
     mockStore.dispatch.mockClear()
     ;(navigateToLatest as jest.Mock).mockClear()
+    if (typeof Notification === 'undefined') {
+      ;(global as any).Notification = { permission: 'default' }
+    }
   })
 
   afterEach(() => {
     clearMessagesMap()
-    clearVisibleMessagesMap()
+    defaultStoreState.MessageReducer.visibleMessagesMap = {}
     destroyChannelsMap()
     setActiveChannelId('')
   })
@@ -358,11 +382,12 @@ describe('event message last-message handling', () => {
     addMessageToMap(channelId, makeMessage({ id: '900', channelId, body: 'cached-900', incoming: true }))
     addMessageToMap(channelId, makeMessage({ id: '901', channelId, body: 'cached-901', incoming: true }))
     addMessageToMap(channelId, storedChannel.lastMessage!)
-    setMessageToVisibleMessagesMap(storedChannel.lastMessage!)
+    setVisibleMessages(storedChannel.lastMessage!)
     setActiveSegment(channelId, '900', '902')
     mockStore.getState = jest.fn(() => ({
+      ...defaultStoreState,
       MessageReducer: {
-        pendingPollActions: {},
+        ...defaultStoreState.MessageReducer,
         messagesHasNext: false,
         activeChannelMessages: [
           makeMessage({ id: '900', channelId, body: 'cached-900', incoming: true }),
@@ -422,8 +447,9 @@ describe('event message last-message handling', () => {
     addMessageToMap(channelId, storedChannel.lastMessage!)
     setActiveSegment(channelId, '910', '912')
     mockStore.getState = jest.fn(() => ({
+      ...defaultStoreState,
       MessageReducer: {
-        pendingPollActions: {},
+        ...defaultStoreState.MessageReducer,
         messagesHasNext: false,
         activeChannelMessages: [
           makeMessage({ id: '910', channelId, body: 'cached-910', incoming: true }),
@@ -477,8 +503,9 @@ describe('event message last-message handling', () => {
     addMessageToMap(channelId, storedChannel.lastMessage!)
     setActiveSegment(channelId, '900', '902')
     mockStore.getState = jest.fn(() => ({
+      ...defaultStoreState,
       MessageReducer: {
-        pendingPollActions: {},
+        ...defaultStoreState.MessageReducer,
         messagesHasNext: true,
         activeChannelMessages: [
           makeMessage({ id: '900', channelId, body: 'cached-900', incoming: true }),
@@ -536,8 +563,9 @@ describe('event message last-message handling', () => {
     addMessageToMap(channelId, previousLatest)
     setActiveSegment(channelId, '950', '952')
     mockStore.getState = jest.fn(() => ({
+      ...defaultStoreState,
       MessageReducer: {
-        pendingPollActions: {},
+        ...defaultStoreState.MessageReducer,
         messagesHasNext: false
       }
     }))
@@ -555,6 +583,105 @@ describe('event message last-message handling', () => {
     expect(getContiguousNextMessages(channelId, { id: '952' } as IMessage, 10).map((message) => message.id)).toEqual([
       '953'
     ])
+  })
+
+  // --- markMessagesAsDeliveredAC dispatch tests ---
+  // These tests cover the bug where a thread-reply message uses message.parentMessage.id
+  // (a message ID) as the channelId argument to markMessagesAsDeliveredAC instead of
+  // channel.id. Using the wrong ID means the delivery marker never fires for the real
+  // channel, so MESSAGE_MARKERS_RECEIVED is never dispatched for the correct channel and
+  // channel.lastMessage.deliveryStatus stays stale while the chat view shows the update.
+
+  it('dispatches markMessagesAsDeliveredAC with channel.id for a regular incoming message', async () => {
+    const channelId = 'channel-deliver-regular'
+    const incomingMessage = makeMessage({
+      id: '1000',
+      channelId,
+      incoming: true,
+      deliveryStatus: MESSAGE_DELIVERY_STATUS.SENT
+    })
+    const channel = makeChannel({ id: channelId, lastMessage: incomingMessage })
+    const dispatched: any[] = []
+
+    setChannelInMap(channel)
+    addChannelToAllChannels(channel)
+
+    await runSaga(
+      { getState: getSagaState, dispatch: (action) => dispatched.push(action) },
+      __eventsTestables.handleChannelMessageEvent,
+      { channel: { ...channel, lastMessage: incomingMessage }, message: incomingMessage },
+      // SceytChatClient: current user is different from the message sender
+      { user: { id: 'current-user' } }
+    ).toPromise()
+
+    const deliverAction = dispatched.find((action) => action.type === markMessagesAsDeliveredAC('', []).type)
+    expect(deliverAction).toBeDefined()
+    expect(deliverAction.payload.channelId).toBe(channelId)
+    expect(deliverAction.payload.messageIds).toEqual([incomingMessage.id])
+  })
+
+  // BUG REPRODUCTION: currently FAILS because the code passes message.parentMessage.id
+  // (a message ID) instead of channel.id as channelId.
+  // The fix is to change line 290 in events/inedx.ts from:
+  //   markMessagesAsDeliveredAC(message.parentMessage.id, [message.id])
+  // to:
+  //   markMessagesAsDeliveredAC(channel.id, [message.id])
+  it('dispatches markMessagesAsDeliveredAC with channel.id for a thread-reply incoming message', async () => {
+    const channelId = 'channel-deliver-thread'
+    const parentMessage = makeMessage({ id: '990', channelId, incoming: true })
+    const threadMessage = makeMessage({
+      id: '1001',
+      channelId,
+      incoming: true,
+      deliveryStatus: MESSAGE_DELIVERY_STATUS.SENT,
+      repliedInThread: true,
+      parentMessage,
+      parentId: parentMessage.id
+    })
+    const channel = makeChannel({ id: channelId, lastMessage: parentMessage })
+    const dispatched: any[] = []
+
+    setChannelInMap(channel)
+    addChannelToAllChannels(channel)
+
+    await runSaga(
+      { getState: getSagaState, dispatch: (action) => dispatched.push(action) },
+      __eventsTestables.handleChannelMessageEvent,
+      { channel: { ...channel, lastMessage: threadMessage }, message: threadMessage },
+      { user: { id: 'current-user' } }
+    ).toPromise()
+
+    const deliverAction = dispatched.find((action) => action.type === markMessagesAsDeliveredAC('', []).type)
+    expect(deliverAction).toBeDefined()
+    // BUG: currently fails — channelId is message.parentMessage.id ('990') instead of channel.id
+    expect(deliverAction.payload.channelId).toBe(channelId)
+    expect(deliverAction.payload.messageIds).toEqual([threadMessage.id])
+  })
+
+  it('does not dispatch markMessagesAsDeliveredAC for own messages', async () => {
+    const channelId = 'channel-deliver-own'
+    const ownMessage = makeMessage({
+      id: '1002',
+      channelId,
+      incoming: false,
+      deliveryStatus: MESSAGE_DELIVERY_STATUS.SENT
+    })
+    const channel = makeChannel({ id: channelId, lastMessage: ownMessage })
+    const dispatched: any[] = []
+
+    setChannelInMap(channel)
+    addChannelToAllChannels(channel)
+
+    await runSaga(
+      { getState: getSagaState, dispatch: (action) => dispatched.push(action) },
+      __eventsTestables.handleChannelMessageEvent,
+      { channel: { ...channel, lastMessage: ownMessage }, message: ownMessage },
+      // SceytChatClient.user.id matches the message sender — own message
+      { user: { id: ownMessage.user.id } }
+    ).toPromise()
+
+    const deliverAction = dispatched.find((action) => action.type === markMessagesAsDeliveredAC('', []).type)
+    expect(deliverAction).toBeUndefined()
   })
 
   it('does not extend an inactive channel cached segment when the cached range is not the channel latest edge', async () => {
@@ -584,8 +711,9 @@ describe('event message last-message handling', () => {
     addMessageToMap(channelId, makeMessage({ id: '952', channelId, body: 'cached-952', incoming: true }))
     setActiveSegment(channelId, '950', '952')
     mockStore.getState = jest.fn(() => ({
+      ...defaultStoreState,
       MessageReducer: {
-        pendingPollActions: {},
+        ...defaultStoreState.MessageReducer,
         messagesHasNext: false
       }
     }))

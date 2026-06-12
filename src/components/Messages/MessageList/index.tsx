@@ -23,7 +23,8 @@ import {
   selectedMessagesMapSelector,
   showScrollToNewMessageButtonSelector,
   unreadScrollToSelector,
-  unreadMessageIdSelector
+  unreadMessageIdSelector,
+  visibleMessagesMapSelector
 } from '../../../store/message/selector'
 import { activeChannelSelector, isDraggingSelector } from '../../../store/channel/selector'
 import { browserTabIsActiveSelector, connectionStatusSelector, contactsMapSelector } from '../../../store/user/selector'
@@ -454,6 +455,7 @@ const MessageList: React.FC<MessagesProps> = ({
   const unreadScrollTo = useSelector(unreadScrollToSelector, shallowEqual)
   const messages = useSelector(activeChannelMessagesSelector, shallowEqual) || []
   const unreadMessageId = useSelector(unreadMessageIdSelector, shallowEqual)
+  const visibleMessagesMap = useSelector(visibleMessagesMapSelector, shallowEqual)
   const [mediaFile, setMediaFile] = useState<any>(null)
   const [isDragging, setIsDragging] = useState<any>(null)
   const [stopScrolling, setStopScrolling] = useState<any>(false)
@@ -495,6 +497,7 @@ const MessageList: React.FC<MessagesProps> = ({
     showScrollToNewMessageButton,
     unreadScrollTo,
     unreadMessageId,
+    visibleMessagesMap,
     selectedMessagesMap,
     allowEditDeleteIncomingMessage,
     dispatch,
