@@ -3613,6 +3613,91 @@ describe('message saga message-list flows', () => {
       )
     ).toBe(true)
   })
+
+  it('updates channel list lastMessage after pending message confirmed while user is in a different channel', async () => {
+    const currentUser = makeUser({ id: 'current-user' })
+    const channelId = 'channel-offline-send'
+    const pendingMsg = makePendingMessage({
+      channelId,
+      tid: 'offline-msg-tid',
+      body: 'offline-message',
+      metadata: '{}',
+      createdAt: new Date('2026-06-01T10:00:00.000Z'),
+      user: currentUser
+    })
+    const confirmedMsg = makeMessage({
+      id: '777',
+      tid: pendingMsg.tid,
+      channelId,
+      body: 'offline-message',
+      metadata: {} as any,
+      user: currentUser
+    })
+    const channel = makeChannel({ id: channelId, lastMessage: pendingMsg as any })
+    const builder = {
+      setBody: jest.fn().mockReturnThis(),
+      setBodyAttributes: jest.fn().mockReturnThis(),
+      setAttachments: jest.fn().mockReturnThis(),
+      setMentionUserIds: jest.fn().mockReturnThis(),
+      setType: jest.fn().mockReturnThis(),
+      setDisplayCount: jest.fn().mockReturnThis(),
+      setSilent: jest.fn().mockReturnThis(),
+      setMetadata: jest.fn().mockReturnThis(),
+      setPollDetails: jest.fn().mockReturnThis(),
+      setParentMessageId: jest.fn().mockReturnThis(),
+      setReplyInThread: jest.fn().mockReturnThis(),
+      create: jest.fn()
+    }
+
+    let resolveSend!: (value: any) => void
+    const sendPromise = new Promise((resolve) => {
+      resolveSend = resolve
+    })
+
+    channel.createMessageBuilder = jest.fn(() => builder as any)
+    channel.sendMessage = jest.fn(() => sendPromise)
+
+    setChannelInMap(channel)
+    addMessageToMap(channelId, pendingMsg)
+    setActiveChannelId('channel-B')
+    setClient({ user: { id: 'current-user' }, Channel: { create: jest.fn() } })
+
+    const dispatched: any[] = []
+    const task = runSaga(
+      {
+        dispatch: (action) => {
+          dispatched.push(action)
+        },
+        getState: () => mockStoreState
+      },
+      __messageSagaTestables.sendPendingMessages,
+      CONNECTION_STATUS.CONNECTED
+    )
+
+    await flushAsyncWork()
+
+    resolveSend(confirmedMsg)
+    await task.toPromise()
+
+    // In-memory channel map must have the confirmed id
+    expect(getChannelFromMap(channelId)?.lastMessage).toEqual(
+      expect.objectContaining({ id: confirmedMsg.id })
+    )
+
+    // Redux must dispatch the channel-list update regardless of active channel
+    expect(
+      dispatched.some(
+        (action) =>
+          action.type ===
+            updateChannelDataAC(channelId, { lastMessage: confirmedMsg, lastReactedMessage: null }, true).type &&
+          action.payload.channelId === channelId &&
+          action.payload.config?.lastMessage?.id === confirmedMsg.id
+      )
+    ).toBe(true)
+
+    // updateMessageAC must NOT be dispatched (user is in a different channel)
+    expect(dispatched.some((action) => action.type === updateMessageAC('', {}).type)).toBe(false)
+  })
 })
 
 describe('loadAroundMessage generic cache-first', () => {

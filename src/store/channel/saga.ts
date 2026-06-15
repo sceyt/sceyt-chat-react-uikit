@@ -327,13 +327,24 @@ function* getChannels(action: IAction): any {
     let { channels: mappedChannels, channelsForUpdateLastReactionMessage } = yield call(setChannelsInMap, channelList)
     for (const channelId of Object.keys(pendingLastMessages)) {
       const pendingLastMessage = pendingLastMessages[channelId]
+
+      // sendPendingMessages may have confirmed this message concurrently while
+      // getChannels was running (e.g. the reconnect handler spawned it before
+      // setChannelsAC was dispatched).  Re-read Redux state so we don't
+      // overwrite a confirmed lastMessage with the stale pending version.
+      const currentReduxLastMessage = (store.getState().ChannelReducer.channels as IChannel[]).find(
+        (ch) => ch.id === channelId
+      )?.lastMessage
+      const resolvedLastMessage =
+        currentReduxLastMessage?.id && !pendingLastMessage.id ? currentReduxLastMessage : pendingLastMessage
+
       const mappedChannel = mappedChannels.find((ch: IChannel) => ch.id === channelId)
       if (mappedChannel) {
-        mappedChannel.lastMessage = pendingLastMessage
+        mappedChannel.lastMessage = resolvedLastMessage
       }
       const mapEntry = getChannelFromMap(channelId)
       if (mapEntry) {
-        setChannelInMap({ ...mapEntry, lastMessage: pendingLastMessage })
+        setChannelInMap({ ...mapEntry, lastMessage: resolvedLastMessage })
       }
     }
     log.info(
@@ -2035,5 +2046,6 @@ export default function* ChannelsSaga() {
 
 export const __channelSagaTestables = {
   markMessagesRead,
-  markChannelAsRead
+  markChannelAsRead,
+  getChannels
 }
