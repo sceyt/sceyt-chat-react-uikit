@@ -667,8 +667,13 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
         if (messageBodyAttributes && messageBodyAttributes.length) {
           messageBodyAttributes.forEach((att: any) => {
             if (att.type === 'mention') {
-              const user = mentionedUsers?.find((u: IUser) => u.id === att.metadata)
-              mentionUsersToSend.push(user || { id: att.metadata })
+              let mentionsToFind = [...mentionedUsers]
+              const draftMessage = getDraftMessageFromMap(activeChannel.id)
+              if (draftMessage) {
+                mentionsToFind = [...draftMessage.mentionedUsers, ...mentionedUsers]
+              }
+              const mentionToAdd = mentionsToFind.find((mention: IUser) => mention.id === att.metadata)
+              mentionUsersToSend.push(mentionToAdd || { id: att.metadata })
             }
           })
         }
@@ -846,7 +851,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
               if (draftMessage) {
                 mentionsToFind = [...draftMessage.mentionedUsers, ...mentionedUsers]
               }
-              const mentionToAdd = mentionsToFind.find((mention: any) => mention.id === att.metadata)
+              const mentionToAdd = mentionsToFind.find((mention: IUser) => mention.id === att.metadata)
               mentionUsersToSend.push(mentionToAdd)
             }
           })
