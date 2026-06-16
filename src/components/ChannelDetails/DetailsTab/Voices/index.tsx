@@ -62,7 +62,7 @@ const Voices = ({
 
   return (
     <Container>
-      {loadingState === LOADING_STATE.LOADING ? (
+      {loadingState === LOADING_STATE.LOADING && attachments.length === 0 ? (
         <React.Fragment>
           {Array.from({ length: 5 }).map((_, i) => (
             <SkeletonRow key={i}>
@@ -77,26 +77,37 @@ const Voices = ({
       ) : loadingState === LOADING_STATE.LOADED && attachments.length === 0 ? (
         <EmptyState color={textSecondary}>No shared voice messages.</EmptyState>
       ) : (
-        groups.map((group) => (
-          <MonthSection key={group.key}>
-            <StickyMonthHeader color={textSecondary} background={background}>
-              {group.date.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
-            </StickyMonthHeader>
-            {group.items.map((file: IAttachment) => (
-              <VoiceItem
-                key={file.id}
-                file={{ ...file, metadata: isJSON(file.metadata) ? JSON.parse(file.metadata) : file.metadata }}
-                voicePreviewDateAndTimeColor={voicePreviewDateAndTimeColor}
-                voicePreviewHoverBackgroundColor={voicePreviewHoverBackgroundColor}
-                voicePreviewPlayHoverIcon={voicePreviewPlayIcon}
-                voicePreviewPlayIcon={voicePreviewPlayHoverIcon}
-                voicePreviewPauseIcon={voicePreviewPauseIcon}
-                voicePreviewPauseHoverIcon={voicePreviewPauseHoverIcon}
-                voicePreviewTitleColor={voicePreviewTitleColor}
-              />
-            ))}
-          </MonthSection>
-        ))
+        <React.Fragment>
+          {groups.map((group) => (
+            <MonthSection key={group.key}>
+              <StickyMonthHeader color={textSecondary} background={background}>
+                {group.date.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
+              </StickyMonthHeader>
+              {group.items.map((file: IAttachment) => (
+                <VoiceItem
+                  key={file.id}
+                  file={{ ...file, metadata: isJSON(file.metadata) ? JSON.parse(file.metadata) : file.metadata }}
+                  voicePreviewDateAndTimeColor={voicePreviewDateAndTimeColor}
+                  voicePreviewHoverBackgroundColor={voicePreviewHoverBackgroundColor}
+                  voicePreviewPlayHoverIcon={voicePreviewPlayIcon}
+                  voicePreviewPlayIcon={voicePreviewPlayHoverIcon}
+                  voicePreviewPauseIcon={voicePreviewPauseIcon}
+                  voicePreviewPauseHoverIcon={voicePreviewPauseHoverIcon}
+                  voicePreviewTitleColor={voicePreviewTitleColor}
+                />
+              ))}
+            </MonthSection>
+          ))}
+          {loadingState === LOADING_STATE.LOADING && (
+            <SkeletonRow>
+              <SkeletonCircle color={surface1} />
+              <SkeletonTextGroup>
+                <SkeletonLine color={surface1} width='50%' />
+                <SkeletonLine color={surface1} width='30%' height='12px' />
+              </SkeletonTextGroup>
+            </SkeletonRow>
+          )}
+        </React.Fragment>
       )}
     </Container>
   )

@@ -58,7 +58,7 @@ const Media = ({ channel }: IProps) => {
 
   return (
     <Container>
-      {loadingState === LOADING_STATE.LOADING ? (
+      {loadingState === LOADING_STATE.LOADING && attachments.length === 0 ? (
         <SkeletonGrid>
           {Array.from({ length: 9 }).map((_, i) => (
             <SkeletonTile key={i} color={surface1} />
@@ -67,29 +67,38 @@ const Media = ({ channel }: IProps) => {
       ) : loadingState === LOADING_STATE.LOADED && attachments.length === 0 ? (
         <EmptyState color={textSecondary}>No shared media.</EmptyState>
       ) : (
-        groups.map((group) => (
-          <MonthSection key={group.key}>
-            <StickyMonthHeader color={textSecondary} background={background}>
-              {group.date.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
-            </StickyMonthHeader>
-            <ItemsGrid>
-              {group.items.map((file: IAttachment, index: number) => (
-                <MediaItem key={`${file.id}_${index}`}>
-                  <Attachment
-                    attachment={{
-                      ...file,
-                      metadata: isJSON(file.metadata) ? JSON.parse(file.metadata) : file.metadata
-                    }}
-                    handleMediaItemClick={handleMediaItemClick}
-                    backgroundColor={background}
-                    borderRadius='8px'
-                    isDetailsView
-                  />
-                </MediaItem>
+        <React.Fragment>
+          {groups.map((group) => (
+            <MonthSection key={group.key}>
+              <StickyMonthHeader color={textSecondary} background={background}>
+                {group.date.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
+              </StickyMonthHeader>
+              <ItemsGrid>
+                {group.items.map((file: IAttachment, index: number) => (
+                  <MediaItem key={`${file.id}_${index}`}>
+                    <Attachment
+                      attachment={{
+                        ...file,
+                        metadata: isJSON(file.metadata) ? JSON.parse(file.metadata) : file.metadata
+                      }}
+                      handleMediaItemClick={handleMediaItemClick}
+                      backgroundColor={background}
+                      borderRadius='8px'
+                      isDetailsView
+                    />
+                  </MediaItem>
+                ))}
+              </ItemsGrid>
+            </MonthSection>
+          ))}
+          {loadingState === LOADING_STATE.LOADING && (
+            <SkeletonGrid>
+              {Array.from({ length: 3 }).map((_, i) => (
+                <SkeletonTile key={i} color={surface1} />
               ))}
-            </ItemsGrid>
-          </MonthSection>
-        ))
+            </SkeletonGrid>
+          )}
+        </React.Fragment>
       )}
       {mediaFile && <SliderPopup channel={channel} setIsSliderOpen={setMediaFile} currentMediaFile={mediaFile} />}
     </Container>

@@ -9,7 +9,11 @@ import {
   kickMemberAC,
   setOpenInviteModalAC
 } from '../../../../store/member/actions'
-import { channelsMembersLoadingStateSelector, openInviteModalSelector, rolesMapSelector } from '../../../../store/member/selector'
+import {
+  channelsMembersLoadingStateSelector,
+  openInviteModalSelector,
+  rolesMapSelector
+} from '../../../../store/member/selector'
 import { getContactsAC } from '../../../../store/user/actions'
 import { connectionStatusSelector, contactsMapSelector } from '../../../../store/user/selector'
 import { createChannelAC } from '../../../../store/channel/actions'
@@ -271,7 +275,8 @@ const Members = ({
             </MemberItem>
           )}
 
-          {membersLoadingState === LOADING_STATE.LOADING && !members.length &&
+          {membersLoadingState === LOADING_STATE.LOADING &&
+            !members.length &&
             Array.from({ length: 6 }).map((_, i) => (
               <SkeletonMemberRow key={i}>
                 <SkeletonAvatar color={surface1} />

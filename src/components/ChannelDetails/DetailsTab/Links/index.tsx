@@ -60,7 +60,7 @@ const Links = ({
 
   return (
     <Container>
-      {loadingState === LOADING_STATE.LOADING ? (
+      {loadingState === LOADING_STATE.LOADING && attachments.length === 0 ? (
         <React.Fragment>
           {Array.from({ length: 5 }).map((_, i) => (
             <SkeletonRow key={i}>
@@ -72,24 +72,32 @@ const Links = ({
       ) : loadingState === LOADING_STATE.LOADED && attachments.length === 0 ? (
         <EmptyState color={textSecondary}>No shared links.</EmptyState>
       ) : (
-        groups.map((group) => (
-          <MonthSection key={group.key}>
-            <StickyMonthHeader color={textSecondary} background={background}>
-              {group.date.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
-            </StickyMonthHeader>
-            {group.items.map((file: IAttachment) => (
-              <LinkItem
-                key={file.id}
-                link={file.url}
-                linkPreviewColor={linkPreviewColor}
-                linkPreviewHoverBackgroundColor={linkPreviewHoverBackgroundColor}
-                linkPreviewHoverIcon={linkPreviewHoverIcon}
-                linkPreviewTitleColor={linkPreviewTitleColor}
-                linkPreviewIcon={linkPreviewIcon}
-              />
-            ))}
-          </MonthSection>
-        ))
+        <React.Fragment>
+          {groups.map((group) => (
+            <MonthSection key={group.key}>
+              <StickyMonthHeader color={textSecondary} background={background}>
+                {group.date.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
+              </StickyMonthHeader>
+              {group.items.map((file: IAttachment) => (
+                <LinkItem
+                  key={file.id}
+                  link={file.url}
+                  linkPreviewColor={linkPreviewColor}
+                  linkPreviewHoverBackgroundColor={linkPreviewHoverBackgroundColor}
+                  linkPreviewHoverIcon={linkPreviewHoverIcon}
+                  linkPreviewTitleColor={linkPreviewTitleColor}
+                  linkPreviewIcon={linkPreviewIcon}
+                />
+              ))}
+            </MonthSection>
+          ))}
+          {loadingState === LOADING_STATE.LOADING && (
+            <SkeletonRow>
+              <SkeletonSquare color={surface1} />
+              <SkeletonLine color={surface1} width='65%' />
+            </SkeletonRow>
+          )}
+        </React.Fragment>
       )}
     </Container>
   )
