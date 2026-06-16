@@ -71,7 +71,7 @@ import { DropdownOptionLi, DropdownOptionsUl, TextInOneLine, UploadFile, ViewOnc
 import { THEME_COLORS } from '../../UIHelper/constants'
 import { createImageThumbnail, resizeImage } from '../../helpers/resizeImage'
 import { calculateRenderedImageWidth, detectBrowser, detectOS } from '../../helpers'
-import { IMember, IMessage } from '../../types'
+import { IMember, IMessage, IUser } from '../../types'
 import { getCustomUploader, getSendAttachmentsAsSeparateMessages } from '../../helpers/customUploader'
 import {
   checkDraftMessagesIsEmpty,
@@ -667,7 +667,8 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
         if (messageBodyAttributes && messageBodyAttributes.length) {
           messageBodyAttributes.forEach((att: any) => {
             if (att.type === 'mention') {
-              mentionUsersToSend.push({ id: att.metadata })
+              const user = mentionedUsers?.find((u: IUser) => u.id === att.metadata)
+              mentionUsersToSend.push(user || { id: att.metadata })
             }
           })
         }
