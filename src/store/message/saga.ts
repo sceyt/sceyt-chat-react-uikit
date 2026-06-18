@@ -2758,7 +2758,7 @@ function* loadDefaultMessages(action: IAction): any {
 function* getMessagesQuery(action: IAction): any {
   try {
     yield call(setMessageListLoading, 'both', LOADING_STATE.LOADING)
-    const { channel, limit, networkChanged, applyVisibleWindow = true } = action.payload
+    const { channel, limit, networkChanged, applyVisibleWindow = true, forceLatestWindow = false } = action.payload
     const channelNewMessageCount = channel?.newMessageCount || 0
     const connectionState = store.getState().UserReducer.connectionStatus
     if (channel?.id && !channel?.isMockChannel) {
@@ -2777,7 +2777,7 @@ function* getMessagesQuery(action: IAction): any {
       query.messageQuery = messageQuery
       let result: { messages: IMessage[]; hasNext: boolean } = { messages: [], hasNext: false }
       let appliedMessages: IMessage[] = []
-      if (!networkChanged && channelNewMessageCount && channelNewMessageCount > 0) {
+      if (!networkChanged && !forceLatestWindow && channelNewMessageCount && channelNewMessageCount > 0) {
         messageQuery.limit = MESSAGES_MAX_LENGTH
         if (Number(channel.lastDisplayedMessageId)) {
           result =

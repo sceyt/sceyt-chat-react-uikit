@@ -1254,6 +1254,56 @@ describe('message saga message-list flows', () => {
     expect(getMessageFromMap(channel.id, '703')?.body).toBe('server-703')
   })
 
+  it('forces the true latest window when jump-to-latest bypasses unread state', async () => {
+    const channel = makeChannel({
+      id: 'channel-force-latest-window',
+      newMessageCount: 93,
+      lastDisplayedMessageId: '703',
+      lastMessage: makeMessage({
+        id: '705',
+        channelId: 'channel-force-latest-window',
+        body: 'server-latest'
+      })
+    })
+    const unreadWindow = [
+      makeMessage({ id: '703', channelId: channel.id, body: 'unread-anchor', incoming: true }),
+      makeMessage({ id: '704', channelId: channel.id, body: 'unread-follow-up', incoming: true })
+    ]
+    const latestWindow = [
+      makeMessage({ id: '704', channelId: channel.id, body: 'latest-704', incoming: true }),
+      makeMessage({ id: '705', channelId: channel.id, body: 'latest-705', incoming: true })
+    ]
+    const query = createMessageQuery({
+      loadNearMessageId: jest.fn(() => resolveWithMockServerDelay({ messages: unreadWindow, hasNext: false })),
+      loadPrevious: jest.fn(() => resolveWithMockServerDelay({ messages: latestWindow, hasNext: false }))
+    })
+
+    mockStoreState.UserReducer.connectionStatus = CONNECTION_STATUS.CONNECTED
+    setActiveChannelId(channel.id)
+    setChannelInMap(channel)
+    setClient(createClient(query, { ...channel, lastMessage: channel.lastMessage }))
+
+    const dispatched = await runMessageSaga(
+      __messageSagaTestables.getMessagesQuery,
+      loadLatestMessagesAC(channel, undefined, undefined, true, true)
+    )
+
+    expect(query.loadNearMessageId).not.toHaveBeenCalled()
+    expect(query.loadPrevious).toHaveBeenCalledTimes(1)
+    expect(dispatched).toEqual(
+      expect.arrayContaining([
+        ...bothDirectionLoadingActions(LOADING_STATE.LOADING),
+        setMessagesHasPrevAC(true),
+        setMessagesHasNextAC(false),
+        ...bothDirectionLoadingActions(LOADING_STATE.LOADED)
+      ])
+    )
+
+    const setMessagesAction = getActionByType(dispatched, setMessagesAC([], channel.id).type)
+    expect(setMessagesAction.payload.messages.map((message: any) => message.body)).toEqual(['latest-704', 'latest-705'])
+    expect(getMessageFromMap(channel.id, '705')?.body).toBe('latest-705')
+  })
+
   it('replaces the cached latest window on reconnect when the server returns newer received ids beyond the offline cache', async () => {
     const currentUser = makeUser({ id: 'current-user' })
     const remoteUser = makeUser({ id: 'remote-user' })

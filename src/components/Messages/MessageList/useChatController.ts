@@ -1107,7 +1107,7 @@ export function useChatController({
       await beginWindowPagedRequest(
         () => {
           if (connectionStatus === CONNECTION_STATUS.CONNECTED) {
-            dispatch(loadLatestMessagesAC(channelRef.current))
+            dispatch(loadLatestMessagesAC(channelRef.current, undefined, undefined, true, true))
             return
           }
 
@@ -1665,11 +1665,8 @@ export function useChatController({
 
     if (currentScrollTop <= historyEdgeScrollTop + PRELOAD_TRIGGER_PX) {
       currentScrollTop = historyEdgeScrollTop
-    } else if (currentScrollTop >= latestEdgeScrollTop - PRELOAD_TRIGGER_PX) {
-      currentScrollTop = latestEdgeScrollTop
     }
 
-    // Snap within the edge threshold so follow-up calculations and DOM state stay in sync.
     if (currentScrollTop !== container.scrollTop) {
       setScrollTop(container, currentScrollTop, 'auto')
     }

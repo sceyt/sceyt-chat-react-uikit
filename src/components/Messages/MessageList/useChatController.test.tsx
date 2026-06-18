@@ -1533,7 +1533,7 @@ describe('useChatController', () => {
 
     fireEvent.click(screen.getByTestId('jump-to-latest'))
 
-    expect(dispatch).toHaveBeenCalledWith(loadLatestMessagesAC(channel))
+    expect(dispatch).toHaveBeenCalledWith(loadLatestMessagesAC(channel, undefined, undefined, true, true))
   })
 
   it('dispatches loadDefaultMessages when jumpToLatest is used while disconnected and latest is outside the window', () => {
@@ -1720,7 +1720,7 @@ describe('useChatController', () => {
     )
 
     await flushEffects()
-    expect(dispatch).toHaveBeenCalledWith(loadLatestMessagesAC(channel))
+    expect(dispatch).toHaveBeenCalledWith(loadLatestMessagesAC(channel, undefined, undefined, true, true))
 
     rendered.rerender(
       <ControllerHarness
@@ -3200,7 +3200,7 @@ describe('useChatController', () => {
       fireEvent.scroll(scrollable)
     })
 
-    expect(scrollable.scrollTop).toBe(getLatestEdgeScrollTop())
+    expect(scrollable.scrollTop).toBe(toNativeScrollTop(2, 800, 240))
     expect(dispatch).toHaveBeenCalledWith(
       loadMoreMessagesAC(channel.id, LOAD_MAX_MESSAGE_COUNT, MESSAGE_LOAD_DIRECTION.NEXT, '501', true)
     )
@@ -3556,7 +3556,7 @@ describe('useChatController', () => {
       fireEvent.scroll(rendered.scrollable)
     })
 
-    expect(rendered.scrollable.scrollTop).toBe(getLatestEdgeScrollTop())
+    expect(rendered.scrollable.scrollTop).toBe(toNativeScrollTop(2, 800, 240))
     expect(dispatch).toHaveBeenCalledWith(
       loadMoreMessagesAC(channel.id, LOAD_MAX_MESSAGE_COUNT, MESSAGE_LOAD_DIRECTION.NEXT, '121', true)
     )
@@ -3818,7 +3818,7 @@ describe('useChatController', () => {
       flushAnimationFrames()
     })
 
-    expect(rendered.scrollable.scrollTop).toBe(getLatestEdgeScrollTop())
+    expect(rendered.scrollable.scrollTop).toBe(toNativeScrollTop(2, 800, 240))
     expect(screen.queryByText('older-118')).not.toBeInTheDocument()
     expect(screen.queryByText('older-119')).not.toBeInTheDocument()
   })
@@ -4702,7 +4702,7 @@ describe('useChatController', () => {
 
     fireEvent.click(screen.getByTestId('jump-to-latest'))
 
-    expect(dispatch).toHaveBeenCalledWith(loadLatestMessagesAC(channel))
+    expect(dispatch).toHaveBeenCalledWith(loadLatestMessagesAC(channel, undefined, undefined, true, true))
 
     dispatch.mockClear()
 
@@ -5168,7 +5168,7 @@ describe('useChatController', () => {
     )
   })
 
-  it('clamps the latest edge gap when the scroll position drifts too close to the latest boundary', () => {
+  it('preserves a tiny manual offset near latest when no newer page exists', () => {
     const confirmedOlder = makeMessage({ id: '610', channelId: 'channel-latest-gap-clamp', body: 'confirmed-610' })
     const confirmedLatest = makeMessage({ id: '611', channelId: 'channel-latest-gap-clamp', body: 'confirmed-611' })
     const channel = makeChannel({
@@ -5193,7 +5193,7 @@ describe('useChatController', () => {
       fireEvent.scroll(scrollable)
     })
 
-    expect(scrollable.scrollTop).toBe(getLatestEdgeScrollTop())
+    expect(scrollable.scrollTop).toBe(toNativeScrollTop(2, 800, 240))
     expect(dispatch).not.toHaveBeenCalled()
   })
 
@@ -5232,7 +5232,7 @@ describe('useChatController', () => {
       fireEvent.scroll(scrollable)
     })
 
-    expect(scrollable.scrollTop).toBe(getLatestEdgeScrollTop())
+    expect(scrollable.scrollTop).toBe(toNativeScrollTop(2, 800, 240))
     expect(dispatch).toHaveBeenCalledWith(addMessagesAC([pendingTail], MESSAGE_LOAD_DIRECTION.NEXT))
     expect(dispatch).not.toHaveBeenCalledWith(
       loadMoreMessagesAC(channel.id, LOAD_MAX_MESSAGE_COUNT, MESSAGE_LOAD_DIRECTION.NEXT, confirmedLatest.id, false)
@@ -5278,7 +5278,7 @@ describe('useChatController', () => {
       fireEvent.scroll(scrollable)
     })
 
-    expect(scrollable.scrollTop).toBe(getLatestEdgeScrollTop(1400, 240))
+    expect(scrollable.scrollTop).toBe(toNativeScrollTop(2, 1400, 240))
     expect(dispatch).toHaveBeenCalledWith(addMessagesAC(secondPendingPage, MESSAGE_LOAD_DIRECTION.NEXT))
     expect(dispatch).not.toHaveBeenCalledWith(
       loadMoreMessagesAC(channel.id, LOAD_MAX_MESSAGE_COUNT, MESSAGE_LOAD_DIRECTION.NEXT, confirmedLatest.id, false)
@@ -5356,7 +5356,7 @@ describe('useChatController', () => {
       fireEvent.scroll(scrollable)
     })
 
-    expect(scrollable.scrollTop).toBe(getLatestEdgeScrollTop())
+    expect(scrollable.scrollTop).toBe(toNativeScrollTop(2, 800, 240))
     expect(dispatch).toHaveBeenCalledWith(
       loadMoreMessagesAC(channel.id, LOAD_MAX_MESSAGE_COUNT, MESSAGE_LOAD_DIRECTION.NEXT, '621', true)
     )
@@ -5460,7 +5460,7 @@ describe('useChatController', () => {
       fireEvent.scroll(scrollable)
     })
 
-    expect(scrollable.scrollTop).toBe(getLatestEdgeScrollTop())
+    expect(scrollable.scrollTop).toBe(toNativeScrollTop(2, 800, 240))
     expect(dispatch).toHaveBeenCalledWith(
       loadMoreMessagesAC(channel.id, LOAD_MAX_MESSAGE_COUNT, MESSAGE_LOAD_DIRECTION.NEXT, '931', true)
     )
@@ -5909,7 +5909,7 @@ describe('useChatController', () => {
     }
   })
 
-  it('keeps exact scrollTop pixel targets for latest-edge correction and preserves in-range history positions', () => {
+  it('preserves tiny latest offsets while still correcting history-edge positions exactly', () => {
     const channel = makeChannel({
       id: 'channel-exact-scroll-px'
     })
@@ -5924,10 +5924,9 @@ describe('useChatController', () => {
     ]
     const scrollHeight = 1234
     const clientHeight = 321
-    const expectedLatestEdgeTop = getLatestEdgeScrollTop(scrollHeight, clientHeight)
     const expectedHistoryTop = getHistoryEdgeScrollTop(scrollHeight, clientHeight)
 
-    const { scrollable } = renderController({
+    const { scrollable, dispatch } = renderController({
       channel,
       messages,
       hasPrevMessages: true,
@@ -5943,7 +5942,12 @@ describe('useChatController', () => {
       fireEvent.scroll(scrollable)
     })
 
-    expect(scrollable.scrollTop).toBe(expectedLatestEdgeTop)
+    expect(scrollable.scrollTop).toBe(toNativeScrollTop(2, scrollHeight, clientHeight))
+    expect(dispatch).toHaveBeenCalledWith(
+      loadMoreMessagesAC(channel.id, LOAD_MAX_MESSAGE_COUNT, MESSAGE_LOAD_DIRECTION.NEXT, '951', true)
+    )
+
+    dispatch.mockClear()
 
     act(() => {
       setScrollMetrics(scrollable, {

@@ -178,11 +178,12 @@ export function loadLatestMessagesAC(
   channel: IChannel,
   messageId?: string,
   networkChanged?: boolean,
-  applyVisibleWindow: boolean = true
+  applyVisibleWindow: boolean = true,
+  forceLatestWindow: boolean = false
 ) {
   return {
     type: LOAD_LATEST_MESSAGES,
-    payload: { channel, messageId, networkChanged, applyVisibleWindow }
+    payload: { channel, messageId, networkChanged, applyVisibleWindow, forceLatestWindow }
   }
 }
 
