@@ -1067,6 +1067,9 @@ function* sendMessage(action: IAction): any {
               .setDisplayCount(message.type === MESSAGE_TYPE.SYSTEM ? 0 : 1)
               .setSilent(message.type === MESSAGE_TYPE.SYSTEM)
               .setMetadata(i === 0 ? JSON.stringify(message.metadata) : '')
+            if (channel.type === DEFAULT_CHANNEL_TYPE.DIRECT) {
+              messageBuilder.setDisableMentionsCount(true)
+            }
             if (message.parentMessage) {
               messageBuilder.setParentMessageId(message.parentMessage ? message.parentMessage.id : null)
             }
@@ -1122,6 +1125,10 @@ function* sendMessage(action: IAction): any {
             .setDisplayCount(message.type === MESSAGE_TYPE.SYSTEM ? 0 : 1)
             .setSilent(message.type === MESSAGE_TYPE.SYSTEM)
             .setMetadata(JSON.stringify(message.metadata))
+
+          if (channel.type === DEFAULT_CHANNEL_TYPE.DIRECT) {
+            messageBuilder.setDisableMentionsCount(true)
+          }
 
           if (message.parentMessage) {
             messageBuilder.setParentMessageId(message.parentMessage ? message.parentMessage.id : null)
@@ -1341,6 +1348,9 @@ function* sendTextMessage(action: IAction): any {
       .setSilent(message?.silent !== undefined ? message.silent : message.type === MESSAGE_TYPE.SYSTEM)
       .setMetadata(JSON.stringify(message.metadata))
       .setPollDetails(message.pollDetails ? message.pollDetails : null)
+    if (channel.type === DEFAULT_CHANNEL_TYPE.DIRECT) {
+      messageBuilder.setDisableMentionsCount(true)
+    }
     if (message.parentMessage) {
       messageBuilder.setParentMessageId(message.parentMessage ? message.parentMessage.id : null)
     }

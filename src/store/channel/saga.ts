@@ -1068,8 +1068,10 @@ function* channelsForForwardLoadMore(action: IAction): any {
 function* markMessagesRead(action: IAction): any {
   const { payload } = action
   const { channelId, messageIds } = payload
+  log.info(`[READ_MESSAGE] saga ch=${channelId} ids=[${messageIds.join(',')}]`)
   const connectionStatus = store.getState().UserReducer.connectionStatus
   if (connectionStatus !== CONNECTION_STATUS.CONNECTED) {
+    log.warn(`[READ_MESSAGE] saga skip — not connected (${connectionStatus})`)
     return
   }
   let channel = yield call(getChannelFromMap, channelId)
@@ -1084,6 +1086,7 @@ function* markMessagesRead(action: IAction): any {
     if (channel) {
       const previousLastDisplayedMessageId = channel.lastDisplayedMessageId || ''
       const latestUnreadBoundaryId = getLatestUnreadBoundaryId(channel)
+      log.info(`[READ_MESSAGE] calling markMessagesAsDisplayed ch=${channelId}`)
       const messageListMarker = (yield call(channel.markMessagesAsDisplayed, messageIds)) as IMessageListMarker | void
       const readMessageIds = getUniqueMessageIds(((messageListMarker as any)?.messageIds as string[]) || messageIds)
       const nextLastDisplayedMessageId =
@@ -1111,6 +1114,7 @@ function* markMessagesRead(action: IAction): any {
               ...(newlyCoveredUnreadCount > 0 ? { newMessageCount: nextNewMessageCount } : {})
             }
 
+      log.info(`[READ_MESSAGE] marked ${readMessageIds.length} msgs, newCount=${nextNewMessageCount}`)
       yield put(updateChannelDataAC(channel.id, updateData))
       updateChannelOnAllChannels(channel.id, updateData)
 
@@ -1129,9 +1133,11 @@ function* markMessagesRead(action: IAction): any {
         yield put(updateMessageAC(messageId, updateParams))
         updateMessageOnMap(channel.id, { messageId, params: updateParams })
       }
+    } else {
+      log.warn(`[READ_MESSAGE] saga skip — channel not found ch=${channelId}`)
     }
   } catch (e) {
-    log.error(e, 'Error on mark messages read')
+    log.error(e, '[READ_MESSAGE] Error on mark messages read')
   }
 }
 

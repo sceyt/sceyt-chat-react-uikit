@@ -465,6 +465,7 @@ const MessageList: React.FC<MessagesProps> = ({
     markerBatcherRef.current = createMessageMarkerBatcher({
       debounceMs: DEFAULT_MARKER_BATCH_DEBOUNCE_MS,
       onFlushRead: (channelId, messageIds) => {
+        console.log(`[READ_MESSAGE] dispatch markAsRead ch=${channelId} ids=[${messageIds.join(',')}]`)
         dispatch(markMessagesAsReadAC(channelId, messageIds))
       },
       onFlushDelivered: (channelId, messageIds) => {
@@ -519,6 +520,7 @@ const MessageList: React.FC<MessagesProps> = ({
   }, [browserTabIsActive])
 
   const queueReadMarker = useCallback((channelId: string, messageId?: string) => {
+    console.log(`[READ_MESSAGE] queueReadMarker ch=${channelId} msgId=${messageId}`)
     markerBatcherRef.current?.enqueueRead(channelId, messageId)
   }, [])
 
@@ -583,6 +585,7 @@ const MessageList: React.FC<MessagesProps> = ({
     }
 
     if (channel.lastMessage.id && String(channel.lastMessage.user.id) !== currentUserId) {
+      console.log(`[READ_MESSAGE] scrollToBottom enqueue ch=${channel.id} msgId=${channel.lastMessage.id}`)
       markerBatcherRef.current?.enqueueRead(channel.id, channel.lastMessage.id)
     }
 

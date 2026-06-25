@@ -230,20 +230,15 @@ function useFormatMessage(
             segments.forEach((segment) => {
               if (segment.mentionUserId) {
                 const member = activeChannelMembers.find((m: any) => m.id === segment.mentionUserId)
-                if (member) {
-                  setMentionedMember(member)
-                  const mentionNode = $createMentionNode({ ...member, name: segment.text })
-                  if (segment.format > 0) {
-                    mentionNode.setFormat(segment.format)
-                  }
-                  nodes.push(mentionNode)
-                } else {
-                  const textNode = $createTextNode(segment.text)
-                  if (segment.format > 0) {
-                    textNode.setFormat(segment.format)
-                  }
-                  nodes.push(textNode)
+                const mentionData = member
+                  ? { ...member, name: segment.text }
+                  : { id: segment.mentionUserId, name: segment.text }
+                setMentionedMember(mentionData)
+                const mentionNode = $createMentionNode(mentionData)
+                if (segment.format > 0) {
+                  mentionNode.setFormat(segment.format)
                 }
+                nodes.push(mentionNode)
               } else {
                 const textNode = $createTextNode(segment.text)
                 if (segment.format > 0) {

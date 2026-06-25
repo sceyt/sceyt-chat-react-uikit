@@ -705,6 +705,12 @@ export function useChatController({
 
   const queueVisibleUnreadCheck = useCallback(() => {
     if (pendingVisibleUnreadFrameRef.current !== null || unreadScrollTo || !tabIsActive) {
+      console.log(
+        `[READ_MESSAGE] queueVisibleUnreadCheck blocked`,
+        `pendingRaf=${
+          pendingVisibleUnreadFrameRef.current !== null
+        } unreadScrollTo=${unreadScrollTo} tabActive=${tabIsActive}`
+      )
       return
     }
 
@@ -717,6 +723,7 @@ export function useChatController({
 
       const unreadStartIndex = getUnreadTrackingStartIndex(messages)
       if (unreadStartIndex < 0) {
+        console.log('[READ_MESSAGE] queueVisibleUnreadCheck: no unread start index, skip')
         return
       }
 
@@ -747,9 +754,13 @@ export function useChatController({
 
       const ids = visibleUnreadMessages.filter(isUnreadIncomingMessage).map((message) => message.id)
       if (!ids.length || !channel.id || !channel.newMessageCount) {
+        console.log(
+          `[READ_MESSAGE] queueVisibleUnreadCheck: nothing to mark ids=${ids.length} newMsgCount=${channel.newMessageCount}`
+        )
         return
       }
 
+      console.log(`[READ_MESSAGE] queueVisibleUnreadCheck: marking ch=${channel.id} ids=[${ids.join(',')}]`)
       ids.forEach((id) => {
         visibleUnreadReportedRef.current.add(id)
       })

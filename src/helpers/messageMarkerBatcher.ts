@@ -56,7 +56,9 @@ export const createMessageMarkerBatcher = ({
     }
 
     if (queue.readIds.size > 0) {
-      onFlushRead(channelId, Array.from(queue.readIds))
+      const ids = Array.from(queue.readIds)
+      console.log(`[READ_MESSAGE] flush ch=${channelId} ids=[${ids.join(',')}]`)
+      onFlushRead(channelId, ids)
     }
 
     channelQueues.delete(channelId)
@@ -76,6 +78,7 @@ export const createMessageMarkerBatcher = ({
     }
     const queue = getQueue(channelId)
     queue.readIds.add(messageId)
+    console.log(`[READ_MESSAGE] enqueue msgId=${messageId} ch=${channelId} queueSize=${queue.readIds.size}`)
     scheduleFlush(channelId)
   }
 
