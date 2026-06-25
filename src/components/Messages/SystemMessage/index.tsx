@@ -63,9 +63,7 @@ const Message = ({
       if (setLastVisibleMessageId) {
         setLastVisibleMessageId(message)
       }
-      if (!channel.isLinkedChannel) {
-        dispatch(setVisibleMessageAC(message))
-      }
+      dispatch(setVisibleMessageAC(message))
 
       if (
         scrollToNewMessage.scrollToBottom &&
@@ -75,12 +73,9 @@ const Message = ({
         dispatch(scrollToNewMessageAC(false, false, false))
       }
     } else {
-      if (!channel.isLinkedChannel) {
-        dispatch(removeVisibleMessageAC(message))
-      }
+      dispatch(removeVisibleMessageAC(message))
     }
   }, [
-    channel.isLinkedChannel,
     channel.lastMessage,
     dispatch,
     isVisible,
@@ -92,11 +87,9 @@ const Message = ({
 
   useEffect(() => {
     return () => {
-      if (!channel.isLinkedChannel) {
-        dispatch(removeVisibleMessageAC(message))
-      }
+      dispatch(removeVisibleMessageAC(message))
     }
-  }, [channel.isLinkedChannel, dispatch, message])
+  }, [dispatch, message])
 
   return (
     <Container

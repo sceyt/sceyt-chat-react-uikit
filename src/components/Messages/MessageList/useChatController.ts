@@ -2369,9 +2369,7 @@ export function useChatController({
     // Priority 1: saved per-channel restore window (wins over all other boot paths)
     const savedRestoreWindow = channelRestoreWindowMap.get(channel.id)
     if (savedRestoreWindow) {
-      if (!channel.isLinkedChannel) {
-        dispatch(clearVisibleMessagesMapAC())
-      }
+      dispatch(clearVisibleMessagesMapAC())
       if (channel.backToLinkedChannel) {
         restoreRef.current = { mode: 'restore-scroll-top', scrollTop: savedRestoreWindow.scrollTop }
         const restoreWindowPayload: RestoreWindowPayload = {
@@ -2404,9 +2402,7 @@ export function useChatController({
     }
 
     // Priority 3: unread boot; Priority 4: default/latest boot
-    if (!channel.isLinkedChannel) {
-      dispatch(clearVisibleMessagesMapAC())
-    }
+    dispatch(clearVisibleMessagesMapAC())
     if (channel.newMessageCount && channel.lastDisplayedMessageId) {
       suppressNextMessageChange()
       dispatch(loadNearUnreadAC(channel))
@@ -2414,7 +2410,7 @@ export function useChatController({
       suppressNextMessageChange()
       dispatch(loadDefaultMessagesAC(channel))
     }
-  }, [dispatch, channel?.id, channel.backToLinkedChannel, channel.isLinkedChannel, suppressNextMessageChange])
+  }, [dispatch, channel?.id, channel.backToLinkedChannel, suppressNextMessageChange])
 
   useEffect(() => {
     if (!channel?.id || clearedSelectionChannelIdRef.current === channel.id) {
@@ -2524,6 +2520,16 @@ export function useChatController({
       (m) => m.sortKey === latestLocalRef || m.localRef === latestLocalRef
     )
     const shouldShow = !isLatestInView || (!isViewingLatest && (pendingNewestCount > 0 || !!scrollToMentionedMessage))
+    console.log('[scrollToNewMsg]', {
+      latestLocalRef,
+      isLatestInView: !!isLatestInView,
+      isViewingLatest,
+      pendingNewestCount,
+      scrollToMentionedMessage,
+      shouldShow,
+      showScrollToNewMessageButton,
+      latestVisibleMessages
+    })
     if (showScrollToNewMessageButton !== shouldShow) {
       dispatch(showScrollToNewMessageButtonAC(shouldShow))
     }
