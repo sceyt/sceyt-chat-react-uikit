@@ -358,6 +358,123 @@ describe('event message last-message handling', () => {
     expect(updateChannelDataAction?.payload.config?.lastMessage).toBeUndefined()
   })
 
+  it('clears badge-driving unread fields when a channel-marked-as-read event arrives without unread-info reconciliation', async () => {
+    const channelId = 'channel-marked-as-read-event'
+    const channel = makeChannel({
+      id: channelId,
+      unread: true,
+      newMessageCount: 7,
+      newMentionCount: 2,
+      lastReceivedMsgId: '1507',
+      lastDisplayedMessageId: '1507'
+    })
+    const dispatched: any[] = []
+
+    setChannelInMap(channel)
+    addChannelToAllChannels(channel)
+
+    await runSaga(
+      {
+        getState: getSagaState,
+        dispatch: (action) => {
+          dispatched.push(action)
+        }
+      },
+      __eventsTestables.handleChannelMarkedAsReadEvent,
+      { channel }
+    ).toPromise()
+
+    expect(dispatched).toContainEqual(
+      updateChannelDataAC(channelId, {
+        unread: false,
+        newMessageCount: 0,
+        newMentionCount: 0,
+        muted: channel.muted,
+        mutedTill: channel.mutedTill,
+        lastReceivedMsgId: '1507',
+        lastDisplayedMessageId: '1507'
+      })
+    )
+    expect(getChannelFromMap(channelId)).toEqual(
+      expect.objectContaining({
+        unread: false,
+        newMessageCount: 0,
+        newMentionCount: 0,
+        lastReceivedMsgId: '1507',
+        lastDisplayedMessageId: '1507'
+      })
+    )
+  })
+
+  it('lets unread-messages-info re-apply the authoritative unread state after a local read-all clear', async () => {
+    const channelId = 'channel-marked-read-then-unread-info'
+    const storedChannel = makeChannel({
+      id: channelId,
+      unread: true,
+      newMessageCount: 9,
+      newMentionCount: 3,
+      lastReceivedMsgId: '1609',
+      lastDisplayedMessageId: '1600'
+    })
+
+    setChannelInMap(storedChannel)
+    addChannelToAllChannels(storedChannel)
+
+    await runSaga(
+      {
+        getState: getSagaState,
+        dispatch: () => undefined
+      },
+      __eventsTestables.handleChannelMarkedAsReadEvent,
+      {
+        channel: {
+          ...storedChannel,
+          unread: true,
+          newMessageCount: 9,
+          newMentionCount: 3,
+          lastDisplayedMessageId: '1609'
+        } as any
+      }
+    ).toPromise()
+
+    expect(getChannelFromMap(channelId)).toEqual(
+      expect.objectContaining({
+        unread: false,
+        newMessageCount: 0,
+        newMentionCount: 0,
+        lastDisplayedMessageId: '1609'
+      })
+    )
+
+    await runSaga(
+      {
+        getState: getSagaState,
+        dispatch: () => undefined
+      },
+      __eventsTestables.handleUnreadMessagesInfoEvent,
+      {
+        channel: {
+          ...storedChannel,
+          unread: true,
+          newMessageCount: 2,
+          newMentionCount: 1,
+          lastReceivedMsgId: '1611',
+          lastDisplayedMessageId: '1609'
+        } as any
+      }
+    ).toPromise()
+
+    expect(getChannelFromMap(channelId)).toEqual(
+      expect.objectContaining({
+        unread: true,
+        newMessageCount: 2,
+        newMentionCount: 1,
+        lastReceivedMsgId: '1611',
+        lastDisplayedMessageId: '1609'
+      })
+    )
+  })
+
   it('extends the cached latest segment when an incoming message arrives in the active latest window', async () => {
     const channelId = 'channel-event-segment-latest'
     const incomingMessage = makeMessage({

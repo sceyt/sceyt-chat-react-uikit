@@ -1,5 +1,6 @@
 import { runSaga } from 'redux-saga'
 import { destroyChannelsMap, getChannelFromMap, setChannelInMap } from '../../helpers/channelHalper'
+import { addMessageToMap } from '../../helpers/messagesHalper'
 import { MESSAGE_DELIVERY_STATUS } from '../../helpers/constants'
 import { makeChannel, makeMessage, makePendingMessage, makeUser } from '../../testUtils/messageFixtures'
 import { updateMessageAC } from '../message/actions'
@@ -61,6 +62,7 @@ describe('channel saga read markers', () => {
       id: 'channel-read-boundary',
       lastMessage: makeMessage({ id: '104', channelId: 'channel-read-boundary', incoming: true }),
       lastDisplayedMessageId: '100',
+      unread: true,
       newMessageCount: 4,
       markMessagesAsDisplayed: jest.fn(async () => ({
         messageIds: ['101', '103'],
@@ -79,7 +81,7 @@ describe('channel saga read markers', () => {
     expect(dispatched).toContainEqual(
       updateChannelDataAC(channel.id, {
         lastDisplayedMessageId: '103',
-        lastReadMessageId: '103'
+        newMessageCount: 2
       })
     )
     expect(dispatched).toContainEqual(
@@ -91,9 +93,46 @@ describe('channel saga read markers', () => {
       )
     )
     expect(getChannelFromMap(channel.id).lastDisplayedMessageId).toBe('103')
+    expect(getChannelFromMap(channel.id).newMessageCount).toBe(2)
+    expect(getChannelFromMap(channel.id).unread).toBe(true)
   })
 
-  it('uses the channel last message as the displayed boundary when marking the channel read', async () => {
+  it('clears unread badge fields when displayed reads reach the latest unread boundary', async () => {
+    const channel = makeChannel({
+      id: 'channel-read-boundary-clears',
+      lastMessage: makeMessage({ id: '103', channelId: 'channel-read-boundary-clears', incoming: true }),
+      lastDisplayedMessageId: '100',
+      unread: true,
+      newMessageCount: 3,
+      newMentionCount: 2,
+      markMessagesAsDisplayed: jest.fn(async () => ({
+        messageIds: ['101', '102', '103'],
+        user: makeUser({ id: 'current-user' }),
+        createdAt: new Date('2026-04-01T12:05:00.000Z')
+      }))
+    })
+    setChannelInMap(channel)
+
+    const dispatched = await runChannelSaga(
+      __channelSagaTestables.markMessagesRead,
+      markMessagesAsReadAC(channel.id, ['101', '102', '103'])
+    )
+
+    expect(dispatched).toContainEqual(
+      updateChannelDataAC(channel.id, {
+        lastDisplayedMessageId: '103',
+        unread: false,
+        newMessageCount: 0,
+        newMentionCount: 0
+      })
+    )
+    expect(getChannelFromMap(channel.id).lastDisplayedMessageId).toBe('103')
+    expect(getChannelFromMap(channel.id).newMessageCount).toBe(0)
+    expect(getChannelFromMap(channel.id).newMentionCount).toBe(0)
+    expect(getChannelFromMap(channel.id).unread).toBe(false)
+  })
+
+  it('uses the latest unread boundary when markChannelAsRead returns a stale displayed id', async () => {
     const channel = makeChannel({
       id: 'channel-read-all-boundary',
       lastMessage: makeMessage({ id: '205', channelId: 'channel-read-all-boundary', incoming: true }),
@@ -102,12 +141,56 @@ describe('channel saga read markers', () => {
       newMessageCount: 5,
       newMentionCount: 2
     })
-    ;(channel as any).markAsRead = jest.fn(async () => channel)
+    ;(channel as any).markAsRead = jest.fn(async () => ({ ...channel, lastDisplayedMessageId: '200' }))
     setChannelInMap(channel)
 
     const dispatched = await runChannelSaga(__channelSagaTestables.markChannelAsRead, markChannelAsReadAC(channel.id))
 
     expect((channel as any).markAsRead).toHaveBeenCalled()
+    expect(dispatched).toContainEqual(
+      updateChannelDataAC(channel.id, {
+        unread: false,
+        newMessageCount: 0,
+        newMentionCount: 0,
+        lastDisplayedMessageId: '205'
+      })
+    )
+    expect(getChannelFromMap(channel.id).lastDisplayedMessageId).toBe('205')
+  })
+
+  it('falls back to the latest cached incoming message when the read-all response does not advance the boundary', async () => {
+    const currentUser = makeUser({ id: 'current-user' })
+    const remoteUser = makeUser({ id: 'remote-user' })
+    const channel = makeChannel({
+      id: 'channel-read-all-cache-fallback',
+      lastMessage: makeMessage({
+        id: '206',
+        channelId: 'channel-read-all-cache-fallback',
+        body: 'own-latest',
+        incoming: false,
+        user: currentUser
+      }),
+      lastReceivedMsgId: '',
+      lastDisplayedMessageId: '200',
+      unread: true,
+      newMessageCount: 1,
+      newMentionCount: 1
+    })
+    const latestIncoming = makeMessage({
+      id: '205',
+      channelId: channel.id,
+      body: 'remote-latest',
+      incoming: true,
+      user: remoteUser
+    })
+    channel.lastReceivedMsgId = ''
+    ;(channel as any).markAsRead = jest.fn(async () => ({ ...channel, lastDisplayedMessageId: '200' }))
+    setChannelInMap(channel)
+    addMessageToMap(channel.id, latestIncoming)
+    addMessageToMap(channel.id, channel.lastMessage)
+
+    const dispatched = await runChannelSaga(__channelSagaTestables.markChannelAsRead, markChannelAsReadAC(channel.id))
+
     expect(dispatched).toContainEqual(
       updateChannelDataAC(channel.id, {
         unread: false,

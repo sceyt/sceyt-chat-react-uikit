@@ -101,7 +101,7 @@ import {
 } from '../../helpers/channelHalper'
 import { DEFAULT_CHANNEL_TYPE, LOADING_STATE, MESSAGE_DELIVERY_STATUS, USER_STATE } from '../../helpers/constants'
 import { MESSAGE_TYPE } from '../../types/enum'
-import { IAction, IChannel, IContact, IMember, IMessage } from '../../types'
+import { IAction, IChannel, IContact, IMember, IMessage, IMessageListMarker } from '../../types'
 import { getClient } from '../../common/client'
 import {
   clearMessagesAC,
@@ -114,7 +114,13 @@ import {
 } from '../message/actions'
 import watchForEvents from '../evetns/inedx'
 import { CHECK_USER_STATUS, CONNECTION_STATUS } from '../user/constants'
-import { removeAllMessages, removeMessagesFromMap, updateMessageOnMap } from '../../helpers/messagesHalper'
+import {
+  compareMessageIds,
+  getMessagesFromMap,
+  removeAllMessages,
+  removeMessagesFromMap,
+  updateMessageOnMap
+} from '../../helpers/messagesHalper'
 import { setActionIsRestrictedAC, updateMembersPresenceAC } from '../member/actions'
 import { updateUserStatusOnMapAC } from '../user/actions'
 import { isJSON, makeUsername } from '../../helpers/message'
@@ -124,6 +130,35 @@ import log from 'loglevel'
 import { queryDirection } from 'store/message/constants'
 import store from 'store'
 import { isResendableError } from 'helpers/error'
+
+const getUniqueMessageIds = (messageIds: string[] = []) => Array.from(new Set(messageIds.filter(Boolean)))
+
+const getNewestMessageId = (messageIds: string[]) =>
+  getUniqueMessageIds(messageIds).reduce(
+    (latestMessageId, messageId) => (compareMessageIds(messageId, latestMessageId) > 0 ? messageId : latestMessageId),
+    ''
+  )
+
+const getLatestIncomingConfirmedMessageId = (channel?: IChannel | null) => {
+  if (!channel?.id) {
+    return ''
+  }
+
+  let latestIncomingConfirmedMessageId =
+    channel.lastMessage?.incoming && channel.lastMessage?.id ? channel.lastMessage.id : ''
+  const cachedMessages = Object.values(getMessagesFromMap(channel.id) || {})
+
+  cachedMessages.forEach((message) => {
+    if (message?.incoming && message.id && compareMessageIds(message.id, latestIncomingConfirmedMessageId) > 0) {
+      latestIncomingConfirmedMessageId = message.id
+    }
+  })
+
+  return latestIncomingConfirmedMessageId
+}
+
+const getLatestUnreadBoundaryId = (channel?: IChannel | null) =>
+  channel?.lastReceivedMsgId || getLatestIncomingConfirmedMessageId(channel)
 
 function* createChannel(action: IAction): any {
   try {
@@ -1047,24 +1082,45 @@ function* markMessagesRead(action: IAction): any {
     }
     // const activeChannelId = yield call(getActiveChannelId)
     if (channel) {
-      const messageListMarker = yield call(channel.markMessagesAsDisplayed, messageIds)
-      // use updateChannelDataAC already changes unreadMessageCount no need in setChannelUnreadCount
-      // yield put(setChannelUnreadCount(0, channel.id));
-      yield put(
-        updateChannelDataAC(channel.id, {
-          lastDisplayedMessageId: channel.lastDisplayedMessageId
-        })
-      )
-      updateChannelOnAllChannels(channel.id, {
-        lastDisplayedMessageId: channel.lastDisplayedMessageId
-      })
-      for (const messageId of messageListMarker.messageIds) {
+      const previousLastDisplayedMessageId = channel.lastDisplayedMessageId || ''
+      const latestUnreadBoundaryId = getLatestUnreadBoundaryId(channel)
+      const messageListMarker = (yield call(channel.markMessagesAsDisplayed, messageIds)) as IMessageListMarker | void
+      const readMessageIds = getUniqueMessageIds(((messageListMarker as any)?.messageIds as string[]) || messageIds)
+      const nextLastDisplayedMessageId =
+        getNewestMessageId([previousLastDisplayedMessageId, ...readMessageIds]) || previousLastDisplayedMessageId
+      const newlyCoveredUnreadCount = readMessageIds.filter((messageId) => {
+        if (compareMessageIds(messageId, previousLastDisplayedMessageId) <= 0) {
+          return false
+        }
+
+        return !latestUnreadBoundaryId || compareMessageIds(messageId, latestUnreadBoundaryId) <= 0
+      }).length
+      const nextNewMessageCount = Math.max(0, (channel.newMessageCount || 0) - newlyCoveredUnreadCount)
+      const reachedLatestUnreadBoundary =
+        !!latestUnreadBoundaryId && compareMessageIds(nextLastDisplayedMessageId, latestUnreadBoundaryId) >= 0
+      const updateData =
+        reachedLatestUnreadBoundary || (readMessageIds.length > 0 && nextNewMessageCount === 0)
+          ? {
+              lastDisplayedMessageId: nextLastDisplayedMessageId,
+              unread: false,
+              newMessageCount: 0,
+              newMentionCount: 0
+            }
+          : {
+              lastDisplayedMessageId: nextLastDisplayedMessageId,
+              ...(newlyCoveredUnreadCount > 0 ? { newMessageCount: nextNewMessageCount } : {})
+            }
+
+      yield put(updateChannelDataAC(channel.id, updateData))
+      updateChannelOnAllChannels(channel.id, updateData)
+
+      for (const messageId of readMessageIds) {
         const updateParams = {
           deliveryStatus: MESSAGE_DELIVERY_STATUS.READ,
           userMarkers: [
             {
-              user: messageListMarker.user,
-              createdAt: messageListMarker.createdAt,
+              user: (messageListMarker as any)?.user || null,
+              createdAt: (messageListMarker as any)?.createdAt || new Date(),
               messageId,
               name: MESSAGE_DELIVERY_STATUS.READ
             }
@@ -1317,13 +1373,22 @@ function* markChannelAsRead(action: IAction): any {
     if (!channel) {
       channel = getChannelFromAllChannels(channelId)
     }
-    // const updatedChannel = yield call(channel.markAsRead)
     const updatedChannel = yield call(channel.markAsRead)
+    const latestUnreadBoundaryId = getLatestUnreadBoundaryId(channel)
+    const lastDisplayedCandidates = [
+      channel.lastDisplayedMessageId || '',
+      updatedChannel?.lastDisplayedMessageId || '',
+      latestUnreadBoundaryId
+    ].filter(Boolean)
+    const nextLastDisplayedMessageId =
+      getNewestMessageId(lastDisplayedCandidates) ||
+      updatedChannel?.lastDisplayedMessageId ||
+      channel.lastDisplayedMessageId
     const updateData = {
       unread: false,
       newMessageCount: 0,
       newMentionCount: 0,
-      lastDisplayedMessageId: updatedChannel?.lastDisplayedMessageId
+      lastDisplayedMessageId: nextLastDisplayedMessageId
     }
     updateChannelOnAllChannels(channel.id, updateData)
     yield put(updateChannelDataAC(channel.id, updateData))

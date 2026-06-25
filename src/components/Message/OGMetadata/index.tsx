@@ -122,7 +122,8 @@ const OGMetadata = ({
     [THEME_COLORS.INCOMING_MESSAGE_BACKGROUND_X]: incomingMessageBackgroundX,
     [THEME_COLORS.OUTGOING_MESSAGE_BACKGROUND_X]: outgoingMessageBackgroundX,
     [THEME_COLORS.TEXT_SECONDARY]: textSecondary,
-    [THEME_COLORS.TEXT_PRIMARY]: textPrimary
+    [THEME_COLORS.TEXT_PRIMARY]: textPrimary,
+    [THEME_COLORS.BACKGROUND]: background
   } = useColor()
   const attachment = useMemo(() => {
     return attachments.find((attachment) => attachment.type === attachmentTypes.link)
@@ -244,6 +245,7 @@ const OGMetadata = ({
                     onError={() => {
                       setImageLoadError(true)
                     }}
+                    bgColor={background}
                   />
                 </ImageContainer>
               )
@@ -487,12 +489,13 @@ const Url = styled.p<{ maxWidth: number; padding?: string }>`
   `}
 `
 
-const Img = styled.img`
+const Img = styled.img<{ bgColor: string }>`
   width: 100%;
   height: 100%;
   object-fit: cover;
   display: block;
   border-radius: inherit;
+  background: ${(props) => props.bgColor};
 `
 
 const OGRow = styled.div`

@@ -93,6 +93,13 @@ export interface IMarker {
   createdAt: Date
   user: IUser | null
 }
+
+export interface IMessageListMarker {
+  messageIds: string[]
+  user: IUser | null
+  name?: string
+  createdAt: Date
+}
 export interface IPollOption {
   id: string
   name: string
@@ -245,7 +252,7 @@ export interface IChannel {
   // eslint-disable-next-line no-unused-vars
   markMessagesAsReceived: (_messageIds: string[]) => Promise<void>
   // eslint-disable-next-line no-unused-vars
-  markMessagesAsDisplayed: (_messageIds: string[]) => Promise<void>
+  markMessagesAsDisplayed: (_messageIds: string[]) => Promise<IMessageListMarker | void>
   startTyping: () => void
   stopTyping: () => void
   // eslint-disable-next-line no-unused-vars

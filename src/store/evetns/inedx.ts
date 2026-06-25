@@ -325,6 +325,29 @@ export function* handleUnreadMessagesInfoEvent(args: { channel: IChannel }): any
   updateChannelOnAllChannels(channel.id, channelUpdateParams)
 }
 
+export function* handleChannelMarkedAsReadEvent(args: { channel: IChannel }): any {
+  const { channel } = args
+
+  if (!channel) {
+    return
+  }
+
+  const channelUpdateParams = {
+    unread: false,
+    newMessageCount: 0,
+    newMentionCount: 0,
+    muted: channel.muted,
+    mutedTill: channel.mutedTill,
+    ...(channel.lastReceivedMsgId ? { lastReceivedMsgId: channel.lastReceivedMsgId } : {}),
+    ...(channel.lastDisplayedMessageId ? { lastDisplayedMessageId: channel.lastDisplayedMessageId } : {})
+  }
+
+  yield put(updateChannelDataAC(channel.id, channelUpdateParams))
+  const groupName = getChannelGroupName(channel)
+  yield put(updateSearchedChannelDataAC(channel.id, channelUpdateParams, groupName))
+  updateChannelOnAllChannels(channel.id, channelUpdateParams)
+}
+
 export function* handleMessageMarkersReceivedEvent(
   args: { channelId: string; markerList: IMarker },
   SceytChatClient: any
@@ -444,6 +467,7 @@ export function* handleEditMessageEvent(args: { channel: IChannel; message: IMes
 
 export const __eventsTestables = {
   handleChannelMessageEvent,
+  handleChannelMarkedAsReadEvent,
   handleUnreadMessagesInfoEvent,
   handleMessageMarkersReceivedEvent,
   handleDeleteMessageEvent,
@@ -1586,18 +1610,7 @@ export default function* watchForEvents(): any {
           break
         }
         case CHANNEL_EVENT_TYPES.CHANNEL_MARKED_AS_READ: {
-          const { channel } = args
-          // log.info('channel CHANNEL_MARKED_AS_READ ... ', channel)
-          yield put(
-            updateChannelDataAC(channel.id, {
-              unread: channel.unread,
-              muted: channel.muted,
-              mutedTill: channel.mutedTill
-            })
-          )
-          const groupName = getChannelGroupName(channel)
-          yield put(updateSearchedChannelDataAC(channel.id, { unread: channel.unread }, groupName))
-          updateChannelOnAllChannels(channel.id, { unread: channel.unread })
+          yield call(handleChannelMarkedAsReadEvent, args)
           break
         }
         /*
