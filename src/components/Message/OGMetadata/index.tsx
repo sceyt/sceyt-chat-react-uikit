@@ -443,6 +443,10 @@ const Title = styled.p<{ maxWidth: number; padding?: string; color: string }>`
   padding: ${({ padding }) => padding ?? '0'};
   box-sizing: border-box;
   overflow-wrap: anywhere;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
   ${({ maxWidth }) =>
     maxWidth &&
     `
