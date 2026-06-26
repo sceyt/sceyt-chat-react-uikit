@@ -436,6 +436,7 @@ export function useChatController({
   const viewIsAtLatestRef = useRef(true)
   const jumpLockUntilRef = useRef<number>(0)
   const jumpLockModeRef = useRef<null | 'latest' | 'item'>(null)
+  const jumpLockHighWaterMarkRef = useRef<number>(0)
   const jumpUnlockTimeoutRef = useRef<NodeJS.Timeout | number | null>(null)
   const isJumping = useRef(false)
   const currentJumpIdRef = useRef(0)
@@ -666,6 +667,7 @@ export function useChatController({
   const clearJumpScrollingLock = useCallback(() => {
     jumpLockUntilRef.current = 0
     jumpLockModeRef.current = null
+    jumpLockHighWaterMarkRef.current = 0
     historyLoadArmedRef.current = true
     latestLoadArmedRef.current = true
 
@@ -689,6 +691,7 @@ export function useChatController({
       const lockDuration = smooth ? JUMP_SCROLL_LOCK_MS : 250
       jumpLockUntilRef.current = Date.now() + lockDuration
       jumpLockModeRef.current = mode
+      jumpLockHighWaterMarkRef.current = scrollRef.current?.scrollTop ?? 0
 
       if (jumpUnlockTimeoutRef.current !== null) {
         clearTimeout(jumpUnlockTimeoutRef.current)
@@ -1674,7 +1677,14 @@ export function useChatController({
       return
     }
 
-    if (currentScrollTop <= historyEdgeScrollTop + PRELOAD_TRIGGER_PX) {
+    const jumpLockActive = Date.now() < jumpLockUntilRef.current
+
+    // Skip the history-edge clamp while a jump-to-latest lock is active. The clamp
+    // would issue a direct scrollTop assignment (cancelling any in-progress smooth
+    // scroll animation) for events that fire at 1–5 px from the history edge, which
+    // is exactly where the smooth animation starts. The clamp is still applied once
+    // the lock expires so that normal edge-trigger behavior is preserved.
+    if (!jumpLockActive && currentScrollTop <= historyEdgeScrollTop + PRELOAD_TRIGGER_PX) {
       currentScrollTop = historyEdgeScrollTop
     }
 
@@ -1685,9 +1695,16 @@ export function useChatController({
     const distanceFromLatest = latestEdgeScrollTop - currentScrollTop
     lastMeasuredLatestEdgeRef.current = latestEdgeScrollTop
 
-    if (Date.now() < jumpLockUntilRef.current) {
+    if (jumpLockActive) {
+      // Always advance the high-water mark (including when already at the latest edge)
+      // so the regression check can detect user scroll-back after a completed jump.
+      jumpLockHighWaterMarkRef.current = Math.max(jumpLockHighWaterMarkRef.current, currentScrollTop)
       if (jumpLockModeRef.current === 'latest' && distanceFromLatest > PRELOAD_RESET_PX) {
-        clearJumpScrollingLock()
+        if (currentScrollTop < jumpLockHighWaterMarkRef.current - PRELOAD_RESET_PX) {
+          clearJumpScrollingLock()
+        } else {
+          return
+        }
       } else {
         return
       }

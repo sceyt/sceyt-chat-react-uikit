@@ -2042,6 +2042,214 @@ describe('useChatController', () => {
     )
   })
 
+  it('does not trigger a previous-page load when a scroll event fires at the history edge during a smooth jumpToLatest animation', () => {
+    const channelId = 'channel-jump-latest-from-top'
+    const channel = makeChannel({ id: channelId })
+    const messages = [
+      makeMessage({ id: '120', channelId, body: 'oldest-visible' }),
+      makeMessage({ id: '121', channelId, body: 'newest-visible' })
+    ]
+    const dispatch = jest.fn()
+
+    const { scrollable } = renderController({
+      channel,
+      messages,
+      hasPrevMessages: true,
+      hasNextMessages: false,
+      dispatch,
+      layoutSpec: {
+        containerRect: { top: 0, left: 0, width: 320, height: 240 },
+        scrollMetrics: {
+          scrollTop: getLatestEdgeScrollTop(800, 240),
+          scrollHeight: 800,
+          clientHeight: 240,
+          offsetTop: 0,
+          offsetHeight: 240
+        },
+        itemRects: {
+          '120': { top: 0, left: 0, width: 320, height: 32 },
+          '121': { top: 40, left: 0, width: 320, height: 32 }
+        }
+      }
+    })
+
+    // Scroll to the history edge (scrollTop = 0) to arm the previous-page load path
+    act(() => {
+      setScrollMetrics(scrollable, {
+        scrollTop: getHistoryEdgeScrollTop(800, 240),
+        scrollHeight: 800,
+        clientHeight: 240
+      })
+      fireEvent.scroll(scrollable)
+    })
+
+    // Clear the expected history-load dispatch from scrolling to the history edge
+    dispatch.mockClear()
+
+    // The user taps "scroll to bottom". jumpToLatest (fast path — !hasNext) sets the
+    // jump lock and calls scrollToLatestEdge with 'smooth'. In real browsers, smooth
+    // scroll is asynchronous: intermediate scroll events fire while scrollTop is still
+    // near 0. In jsdom, scrollTo() is synchronous, so we simulate this intermediate
+    // state by resetting scrollTop to 0 and firing a stale scroll event while the
+    // jump lock is still active.
+    fireEvent.click(screen.getByTestId('jump-to-latest'))
+
+    act(() => {
+      setScrollMetrics(scrollable, {
+        scrollTop: getHistoryEdgeScrollTop(800, 240),
+        scrollHeight: 800,
+        clientHeight: 240
+      })
+      fireEvent.scroll(scrollable)
+    })
+
+    // The jump lock should protect against spurious page loads during the animation.
+    // The bug: distanceFromLatest (560) > PRELOAD_RESET_PX (50) while jumpLockMode is
+    // 'latest' causes clearJumpScrollingLock() to fire, re-arming historyLoadArmedRef
+    // and dispatching a previous-page load for a scroll that belongs to the animation.
+    expect(dispatch).not.toHaveBeenCalledWith(
+      loadMoreMessagesAC(channelId, LOAD_MAX_MESSAGE_COUNT, MESSAGE_LOAD_DIRECTION.PREV, '120', true)
+    )
+  })
+
+  it('does not snap scrollTop to the history edge for an intermediate scroll event within PRELOAD_TRIGGER_PX during a smooth jumpToLatest animation', () => {
+    const channelId = 'channel-jump-no-snap-first'
+    const channel = makeChannel({ id: channelId })
+    const messages = [
+      makeMessage({ id: '120', channelId, body: 'oldest-visible' }),
+      makeMessage({ id: '121', channelId, body: 'newest-visible' })
+    ]
+
+    const { scrollable } = renderController({
+      channel,
+      messages,
+      hasPrevMessages: false,
+      hasNextMessages: false,
+      layoutSpec: {
+        containerRect: { top: 0, left: 0, width: 320, height: 240 },
+        scrollMetrics: {
+          scrollTop: getLatestEdgeScrollTop(800, 240),
+          scrollHeight: 800,
+          clientHeight: 240,
+          offsetTop: 0,
+          offsetHeight: 240
+        },
+        itemRects: {
+          '120': { top: 0, left: 0, width: 320, height: 32 },
+          '121': { top: 40, left: 0, width: 320, height: 32 }
+        }
+      }
+    })
+
+    // Move to the history edge so the jump starts from scrollTop = 0
+    act(() => {
+      setScrollMetrics(scrollable, {
+        scrollTop: getHistoryEdgeScrollTop(800, 240),
+        scrollHeight: 800,
+        clientHeight: 240
+      })
+      fireEvent.scroll(scrollable)
+    })
+
+    // Tap jump-to-latest; in jsdom, scrollTo is synchronous so scrollTop becomes 560.
+    fireEvent.click(screen.getByTestId('jump-to-latest'))
+
+    // In real browsers, the smooth animation fires scroll events while scrollTop is
+    // still within PRELOAD_TRIGGER_PX of the history edge. The scroll-clamping logic
+    // (currentScrollTop <= historyEdge + 5) would snap scrollTop back to 0 via a
+    // direct container.scrollTop assignment, cancelling the animation.
+    act(() => {
+      setScrollMetrics(scrollable, {
+        scrollTop: 2,
+        scrollHeight: 800,
+        clientHeight: 240
+      })
+      fireEvent.scroll(scrollable)
+    })
+
+    // The scroll position should not have been snapped back to the history edge.
+    expect(scrollable.scrollTop).not.toBe(getHistoryEdgeScrollTop(800, 240))
+  })
+
+  it('does not snap scrollTop to the history edge on a second jumpToLatest when the user scrolled back after the first completed', () => {
+    const channelId = 'channel-jump-no-snap-second'
+    const channel = makeChannel({ id: channelId })
+    const messages = [
+      makeMessage({ id: '120', channelId, body: 'oldest-visible' }),
+      makeMessage({ id: '121', channelId, body: 'newest-visible' })
+    ]
+
+    const { scrollable } = renderController({
+      channel,
+      messages,
+      hasPrevMessages: false,
+      hasNextMessages: false,
+      layoutSpec: {
+        containerRect: { top: 0, left: 0, width: 320, height: 240 },
+        scrollMetrics: {
+          scrollTop: getLatestEdgeScrollTop(800, 240),
+          scrollHeight: 800,
+          clientHeight: 240,
+          offsetTop: 0,
+          offsetHeight: 240
+        },
+        itemRects: {
+          '120': { top: 0, left: 0, width: 320, height: 32 },
+          '121': { top: 40, left: 0, width: 320, height: 32 }
+        }
+      }
+    })
+
+    // First tap: from history edge to latest edge
+    act(() => {
+      setScrollMetrics(scrollable, {
+        scrollTop: getHistoryEdgeScrollTop(800, 240),
+        scrollHeight: 800,
+        clientHeight: 240
+      })
+      fireEvent.scroll(scrollable)
+    })
+
+    fireEvent.click(screen.getByTestId('jump-to-latest'))
+
+    // Simulate the smooth animation reaching the latest edge so the high-water mark
+    // advances; this allows the regression check to detect user scroll-back.
+    act(() => {
+      setScrollMetrics(scrollable, {
+        scrollTop: getLatestEdgeScrollTop(800, 240),
+        scrollHeight: 800,
+        clientHeight: 240
+      })
+      fireEvent.scroll(scrollable)
+    })
+
+    // User scrolls back to the history edge (clears the jump lock via regression)
+    act(() => {
+      setScrollMetrics(scrollable, {
+        scrollTop: getHistoryEdgeScrollTop(800, 240),
+        scrollHeight: 800,
+        clientHeight: 240
+      })
+      fireEvent.scroll(scrollable)
+    })
+
+    // Second tap from history edge
+    fireEvent.click(screen.getByTestId('jump-to-latest'))
+
+    // Intermediate smooth-animation event within PRELOAD_TRIGGER_PX
+    act(() => {
+      setScrollMetrics(scrollable, {
+        scrollTop: 2,
+        scrollHeight: 800,
+        clientHeight: 240
+      })
+      fireEvent.scroll(scrollable)
+    })
+
+    // The scroll position should not have been snapped back to the history edge.
+    expect(scrollable.scrollTop).not.toBe(getHistoryEdgeScrollTop(800, 240))
+  })
+
   it('keeps jumpToItem position fixed after the target becomes visible while the item jump lock is still active', async () => {
     const channel = makeChannel({ id: 'channel-jump-item-visible-lock' })
     const currentMessages = Array.from({ length: 40 }, (_, index) =>
