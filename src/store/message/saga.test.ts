@@ -16,6 +16,7 @@ import {
 import {
   addChannelToAllChannels,
   destroyChannelsMap,
+  getAllChannels,
   getChannelFromAllChannels,
   getChannelFromMap,
   setActiveChannelId,
@@ -2551,6 +2552,8 @@ describe('message saga message-list flows', () => {
             lastMessage: expect.objectContaining({ id: '722', body: 'forward body' }),
             lastReactedMessage: null
           }),
+          true,
+          false,
           true
         )
       ])
@@ -2649,6 +2652,98 @@ describe('message saga message-list flows', () => {
     expect(getChannelFromMap(destinationChannel.id)?.lastMessage).toEqual(
       expect.objectContaining({ id: confirmedForward.id, body: 'cross channel forward body' })
     )
+  })
+
+  it('adds the destination channel to the channels list and moves it to the top when forwarding to a channel not in the list', async () => {
+    const currentUser = makeUser({ id: 'current-user' })
+    const sourceUser = makeUser({ id: 'source-user' })
+    const activeChannelId = 'active-channel-forward-source-unlisted'
+    const destinationChannel = makeChannel({
+      id: 'destination-channel-not-in-list',
+      lastMessage: makeMessage({
+        id: '741',
+        channelId: 'destination-channel-not-in-list',
+        body: 'destination-last-before-forward'
+      })
+    })
+    const otherChannel = makeChannel({
+      id: 'other-channel-in-list',
+      lastMessage: makeMessage({
+        id: '740',
+        channelId: 'other-channel-in-list',
+        body: 'other-channel-last'
+      })
+    })
+    const createdForward = makePendingMessage({
+      channelId: destinationChannel.id,
+      tid: 'unlisted-forward-tid',
+      body: 'unlisted channel forward body',
+      metadata: '{}',
+      user: currentUser,
+      forwardingDetails: {
+        messageId: 'origin-unlisted'
+      } as any
+    })
+    const confirmedForward = makeMessage({
+      id: '742',
+      tid: createdForward.tid,
+      channelId: destinationChannel.id,
+      body: 'unlisted channel forward body',
+      metadata: {} as any,
+      user: currentUser,
+      forwardingDetails: {
+        messageId: 'origin-unlisted'
+      } as any
+    })
+    const builder = {
+      setBody: jest.fn().mockReturnThis(),
+      setBodyAttributes: jest.fn().mockReturnThis(),
+      setAttachments: jest.fn().mockReturnThis(),
+      setMentionUserIds: jest.fn().mockReturnThis(),
+      setType: jest.fn().mockReturnThis(),
+      setDisableMentionsCount: jest.fn().mockReturnThis(),
+      setMetadata: jest.fn().mockReturnThis(),
+      setForwardingMessageId: jest.fn().mockReturnThis(),
+      setPollDetails: jest.fn().mockReturnThis(),
+      create: jest.fn(() => createdForward)
+    }
+
+    destinationChannel.createMessageBuilder = jest.fn(() => builder as any)
+    destinationChannel.sendMessage = jest.fn(() => resolveWithMockServerDelay(confirmedForward))
+
+    mockStoreState.UserReducer.connectionStatus = CONNECTION_STATUS.CONNECTED
+    setActiveChannelId(activeChannelId)
+    // destination channel is NOT added to channelsMap or allChannels — must be fetched via getChannel
+    addChannelToAllChannels(otherChannel)
+    setClient({
+      user: { id: 'current-user' },
+      Channel: { create: jest.fn() },
+      getChannel: jest.fn(() => resolveWithMockServerDelay(destinationChannel))
+    })
+
+    const sourceMessage = makeMessage({
+      id: 'origin-unlisted',
+      channelId: activeChannelId,
+      body: 'unlisted channel forward body',
+      metadata: {} as any,
+      user: sourceUser,
+      attachments: []
+    })
+
+    await runMessageSaga(
+      __messageSagaTestables.forwardMessage,
+      forwardMessageAC(sourceMessage, destinationChannel.id, CONNECTION_STATUS.CONNECTED, true)
+    )
+
+    // The destination channel should now appear in the channels list with the forwarded message as its lastMessage
+    expect(getChannelFromAllChannels(destinationChannel.id)).toEqual(
+      expect.objectContaining({
+        id: destinationChannel.id,
+        lastMessage: expect.objectContaining({ id: confirmedForward.id, body: 'unlisted channel forward body' })
+      })
+    )
+    // It should be at the top of the list (index 0), above the other channel
+    expect(getAllChannels()[0]?.id).toBe(destinationChannel.id)
   })
 
   it('edits the latest message and updates both the visible list state and channel last message', async () => {

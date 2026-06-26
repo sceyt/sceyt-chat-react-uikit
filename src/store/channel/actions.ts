@@ -203,8 +203,8 @@ export const updateChannelAC = (channelId: string, config: any) => ({
   payload: { channelId, config }
 })
 
-export const updateChannelDataAC = (channelId: string, config: any, moveUp?: boolean, sort?: boolean) =>
-  updateChannelData({ config, channelId, moveUp, sort })
+export const updateChannelDataAC = (channelId: string, config: any, moveUp?: boolean, sort?: boolean, add?: boolean) =>
+  updateChannelData({ config, channelId, moveUp, sort, add })
 
 export const updateChannelsMembersAC = (members: IUser[]) => updateChannelsMembers({ members })
 

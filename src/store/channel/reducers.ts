@@ -242,9 +242,10 @@ const channelSlice = createSlice({
         channelId: string
         moveUp?: boolean
         sort?: boolean
+        add?: boolean
       }>
     ) => {
-      const { config, channelId, moveUp, sort } = action.payload
+      const { config, channelId, moveUp, sort, add } = action.payload
 
       if (moveUp) {
         let updateChannel: any
@@ -254,8 +255,8 @@ const channelSlice = createSlice({
           }
           return chan.id !== channelId
         })
-        if (updateChannel) {
-          updateChannel = { ...updateChannel, ...config }
+        if (updateChannel || add) {
+          updateChannel = { ...(updateChannel || {}), ...config }
           state.channels = sortChannelByLastMessage([updateChannel, ...updatedChannels])
         }
       } else {

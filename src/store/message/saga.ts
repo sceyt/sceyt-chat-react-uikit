@@ -1456,8 +1456,13 @@ function* forwardMessage(action: IAction): any {
       if (!channel) {
         const SceytChatClient = getClient()
         channel = yield call(SceytChatClient.getChannel, channelId)
-      }
-      if (channel) {
+        if (channel) {
+          setChannelInMap(channel)
+          addChannelToAllChannels({ ...channel })
+          const parsedChannel = JSON.parse(JSON.stringify(channel));
+          yield put(addChannelAC(parsedChannel))
+        }
+      } else {
         setChannelInMap(channel)
       }
       if (!channel) {
@@ -1575,7 +1580,7 @@ function* forwardMessage(action: IAction): any {
             lastMessage: resolvedLastMessage,
             lastReactedMessage: null
           }
-          yield put(updateChannelDataAC(channel.id, channelUpdateParam, true))
+          yield put(updateChannelDataAC(channel.id, { ...channel, ...channelUpdateParam }, true, false, true))
           updateChannelOnAllChannels(channel.id, channelUpdateParam)
         }
       } else {
