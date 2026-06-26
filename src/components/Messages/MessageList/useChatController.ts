@@ -2537,16 +2537,6 @@ export function useChatController({
       (m) => m.sortKey === latestLocalRef || m.localRef === latestLocalRef
     )
     const shouldShow = !isLatestInView || (!isViewingLatest && (pendingNewestCount > 0 || !!scrollToMentionedMessage))
-    console.log('[scrollToNewMsg]', {
-      latestLocalRef,
-      isLatestInView: !!isLatestInView,
-      isViewingLatest,
-      pendingNewestCount,
-      scrollToMentionedMessage,
-      shouldShow,
-      showScrollToNewMessageButton,
-      latestVisibleMessages
-    })
     if (showScrollToNewMessageButton !== shouldShow) {
       dispatch(showScrollToNewMessageButtonAC(shouldShow))
     }
