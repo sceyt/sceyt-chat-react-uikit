@@ -1878,6 +1878,7 @@ describe('message saga message-list flows', () => {
       setPollDetails: jest.fn().mockReturnThis(),
       setParentMessageId: jest.fn().mockReturnThis(),
       setReplyInThread: jest.fn().mockReturnThis(),
+      setDisableMentionsCount: jest.fn().mockReturnThis(),
       create: jest.fn(() => createdMessage)
     }
 
@@ -1972,6 +1973,7 @@ describe('message saga message-list flows', () => {
       setPollDetails: jest.fn().mockReturnThis(),
       setParentMessageId: jest.fn().mockReturnThis(),
       setReplyInThread: jest.fn().mockReturnThis(),
+      setDisableMentionsCount: jest.fn().mockReturnThis(),
       create: jest.fn(() => createdMessage)
     }
 
@@ -2064,6 +2066,7 @@ describe('message saga message-list flows', () => {
       setPollDetails: jest.fn().mockReturnThis(),
       setParentMessageId: jest.fn().mockReturnThis(),
       setReplyInThread: jest.fn().mockReturnThis(),
+      setDisableMentionsCount: jest.fn().mockReturnThis(),
       create: jest.fn(() => createdMessages[createIndex++])
     }
 
@@ -2167,6 +2170,7 @@ describe('message saga message-list flows', () => {
       setParentMessageId: jest.fn().mockReturnThis(),
       setReplyInThread: jest.fn().mockReturnThis(),
       setViewOnce: jest.fn().mockReturnThis(),
+      setDisableMentionsCount: jest.fn().mockReturnThis(),
       create: jest.fn(() => createdMessage)
     }
 
@@ -2304,6 +2308,7 @@ describe('message saga message-list flows', () => {
       setParentMessageId: jest.fn().mockReturnThis(),
       setReplyInThread: jest.fn().mockReturnThis(),
       setViewOnce: jest.fn().mockReturnThis(),
+      setDisableMentionsCount: jest.fn().mockReturnThis(),
       create: jest.fn(() => createdMessage)
     }
 
@@ -3226,6 +3231,7 @@ describe('message saga message-list flows', () => {
       setPollDetails: jest.fn().mockReturnThis(),
       setParentMessageId: jest.fn().mockReturnThis(),
       setReplyInThread: jest.fn().mockReturnThis(),
+      setDisableMentionsCount: jest.fn().mockReturnThis(),
       create: jest.fn(() => failedMessage)
     }
 
@@ -3314,6 +3320,7 @@ describe('message saga message-list flows', () => {
       setParentMessageId: jest.fn().mockReturnThis(),
       setReplyInThread: jest.fn().mockReturnThis(),
       setViewOnce: jest.fn().mockReturnThis(),
+      setDisableMentionsCount: jest.fn().mockReturnThis(),
       create: jest.fn(() => failedMessage)
     }
 
@@ -3602,6 +3609,7 @@ describe('message saga message-list flows', () => {
       setPollDetails: jest.fn().mockReturnThis(),
       setParentMessageId: jest.fn().mockReturnThis(),
       setReplyInThread: jest.fn().mockReturnThis(),
+      setDisableMentionsCount: jest.fn().mockReturnThis(),
       create: jest.fn()
     }
 
@@ -3696,6 +3704,7 @@ describe('message saga message-list flows', () => {
       setPollDetails: jest.fn().mockReturnThis(),
       setParentMessageId: jest.fn().mockReturnThis(),
       setReplyInThread: jest.fn().mockReturnThis(),
+      setDisableMentionsCount: jest.fn().mockReturnThis(),
       create: jest.fn()
     }
 
