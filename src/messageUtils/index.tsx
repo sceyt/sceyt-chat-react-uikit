@@ -100,6 +100,30 @@ const MessageStatusIcon = ({
   }
 }
 
+// linkify-it balances parentheses and truncates complex URLs (e.g. Kibana rison fragments).
+// Use regex for protocol-based URLs; fall back to linkify-it only for bare-domain URLs.
+function extractUrlMatches(text: string): Array<{ text: string; url: string }> | null {
+  const results: Array<{ text: string; url: string; index: number }> = []
+
+  const protocolRegex = /https?:\/\/\S+/g
+  let m: RegExpExecArray | null
+  while ((m = protocolRegex.exec(text)) !== null) {
+    results.push({ text: m[0], url: m[0], index: m.index })
+  }
+
+  const linkifyResults = new LinkifyIt().match(text)
+  if (linkifyResults) {
+    for (const lm of linkifyResults) {
+      if (lm.schema === '') {
+        results.push({ text: lm.text, url: lm.url.replace(/^http:\/\//, 'https://'), index: lm.index })
+      }
+    }
+  }
+
+  results.sort((a, b) => a.index - b.index)
+  return results.length > 0 ? results.map(({ text, url }) => ({ text, url })) : null
+}
+
 const linkifyTextPart = (
   textPart: string,
   match: any,
@@ -194,7 +218,6 @@ const MessageTextFormat = ({
 }) => {
   try {
     let messageText: any = []
-    const linkify = new LinkifyIt()
     const messageBodyAttributes = message.bodyAttributes && JSON.parse(JSON.stringify(message.bodyAttributes))
     if (unsupportedMessage) {
       return 'This message is not supported. Update your app to view this message.'
@@ -210,13 +233,13 @@ const MessageTextFormat = ({
         try {
           let firstPart = `${textPart ? textPart?.substring(nextPartIndex || 0, attributeOffset) : ''}`
 
-          const firstPartMatch = firstPart ? linkify.match(firstPart) : ''
+          const firstPartMatch = firstPart ? extractUrlMatches(firstPart) : null
 
           if (!isLastMessage && !asSampleText && firstPartMatch) {
             firstPart = linkifyTextPart(firstPart, firstPartMatch, target, isInviteLink, onInviteLinkClick)
           }
           let secondPart = `${textPart ? textPart?.substring(attributeOffset + attribute.length) : ''}`
-          const secondPartMatch = secondPart ? linkify.match(secondPart) : ''
+          const secondPartMatch = secondPart ? extractUrlMatches(secondPart) : null
           if (!isLastMessage && !asSampleText && secondPartMatch) {
             secondPart = linkifyTextPart(secondPart, secondPartMatch, target, isInviteLink, onInviteLinkClick)
           }
@@ -310,7 +333,7 @@ const MessageTextFormat = ({
           } else {
             nextPartIndex = attributeOffset + attribute.length
             const textPart = `${text.slice(attributeOffset, attributeOffset + attribute.length)}`
-            const match = linkify.match(textPart)
+            const match = extractUrlMatches(textPart)
             let newTextPart = textPart
             if (!isLastMessage && !asSampleText && match) {
               newTextPart = linkifyTextPart(textPart, match, target, isInviteLink, onInviteLinkClick)
@@ -338,9 +361,8 @@ const MessageTextFormat = ({
         }
       })
     } else {
-      const match = linkify.match(text)
+      const match = extractUrlMatches(text)
       if (!isLastMessage && !asSampleText && match) {
-        // log.info('newMessageText ... . ', newMessageText)
         messageText = linkifyTextPart(text, match, target, isInviteLink, onInviteLinkClick)
       }
     }
@@ -351,4 +373,4 @@ const MessageTextFormat = ({
   }
 }
 
-export { MessageStatusIcon, MessageTextFormat }
+export { MessageStatusIcon, MessageTextFormat, extractUrlMatches }

@@ -491,12 +491,18 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
       const textContent = root.getTextContent()
 
       // Detect URLs in the text
-      const matches = linkify.match(textContent)
-      if (matches && matches.length > 0) {
-        // linkify defaults to http:// when no protocol is typed; upgrade to https://
-        const rawUrl = matches[0].url
-        const firstUrl = matches[0].schema === '' ? rawUrl.replace(/^http:\/\//, 'https://') : rawUrl
-
+      // Use regex first for protocol-based URLs (handles complex fragments like Kibana rison)
+      // linkify-it balances parentheses and truncates URLs containing !() or quotes
+      const protocolMatch = /https?:\/\/\S+/.exec(textContent)
+      const linkifyMatchResult = !protocolMatch ? linkify.match(textContent) : null
+      const firstUrl = protocolMatch
+        ? protocolMatch[0]
+        : linkifyMatchResult?.[0]
+          ? linkifyMatchResult[0].schema === ''
+            ? linkifyMatchResult[0].url.replace(/^http:\/\//, 'https://')
+            : linkifyMatchResult[0].url
+          : null
+      if (firstUrl) {
         // If URL changed, clear old preview with animation and set new URL
         if (firstUrl !== detectedUrl) {
           closePreviewWithAnimation(() => {
@@ -684,11 +690,16 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
         }
         let linkAttachment: any
         if (messageTexToSend) {
-          const linkify = new LinkifyIt()
-          const match = linkify.match(messageTexToSend)
-          if (match) {
-            const rawUrl = match[0].url
-            const url = match[0].schema === '' ? rawUrl.replace(/^http:\/\//, 'https://') : rawUrl
+          const protocolMatch = /https?:\/\/\S+/.exec(messageTexToSend)
+          const linkifyMatchResult = !protocolMatch ? new LinkifyIt().match(messageTexToSend)?.[0] : null
+          const url = protocolMatch
+            ? protocolMatch[0]
+            : linkifyMatchResult
+              ? linkifyMatchResult.schema === ''
+                ? linkifyMatchResult.url.replace(/^http:\/\//, 'https://')
+                : linkifyMatchResult.url
+              : null
+          if (url) {
             const urlMetadata = oGMetadata?.[url]
             const metadata: any = {}
 
@@ -811,11 +822,16 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
     if (messageTexToSend) {
       let linkAttachment: any
       if (messageTexToSend) {
-        const linkify = new LinkifyIt()
-        const match = linkify.match(messageTexToSend)
-        if (match) {
-          const rawUrl = match[0].url
-          const url = match[0].schema === '' ? rawUrl.replace(/^http:\/\//, 'https://') : rawUrl
+        const protocolMatch = /https?:\/\/\S+/.exec(messageTexToSend)
+        const linkifyMatchResult = !protocolMatch ? new LinkifyIt().match(messageTexToSend)?.[0] : null
+        const url = protocolMatch
+          ? protocolMatch[0]
+          : linkifyMatchResult
+            ? linkifyMatchResult.schema === ''
+              ? linkifyMatchResult.url.replace(/^http:\/\//, 'https://')
+              : linkifyMatchResult.url
+            : null
+        if (url) {
           const urlMetadata = oGMetadata?.[url]
           const metadata: any = {}
 
