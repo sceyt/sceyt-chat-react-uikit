@@ -877,6 +877,82 @@ describe('message saga message-list flows', () => {
     expect(getMessageFromMap(channelId, '2160')?.body).toBe('inserted-server-message')
   })
 
+  it('keeps a late refreshCacheAroundMessage response cache-only after jump-to-latest replaced the active window', async () => {
+    const channelId = 'channel-refresh-center-stale-after-latest-jump'
+    const initialUnreadWindow = Array.from({ length: 60 }, (_, index) =>
+      makeMessage({
+        id: String(3000 + index),
+        channelId,
+        body: `initial-${index}`
+      })
+    )
+    const latestWindow = Array.from({ length: 60 }, (_, index) =>
+      makeMessage({
+        id: String(4000 + index),
+        channelId,
+        body: `latest-${index}`
+      })
+    )
+    const previousSlice = initialUnreadWindow.slice(0, 30)
+    const nextSlice = [
+      ...initialUnreadWindow.slice(31),
+      makeMessage({
+        id: '3060',
+        channelId,
+        body: 'late-refresh-server-message'
+      })
+    ]
+    const deferredPrev = (() => {
+      let resolveDeferred!: (value: QueryResult) => void
+      const promise = new Promise<QueryResult>((resolve) => {
+        resolveDeferred = resolve
+      })
+      return { promise, resolve: resolveDeferred }
+    })()
+    const deferredNext = (() => {
+      let resolveDeferred!: (value: QueryResult) => void
+      const promise = new Promise<QueryResult>((resolve) => {
+        resolveDeferred = resolve
+      })
+      return { promise, resolve: resolveDeferred }
+    })()
+    const query = createMessageQuery({
+      loadPreviousMessageId: jest.fn(() => deferredPrev.promise),
+      loadNextMessageId: jest.fn(() => deferredNext.promise)
+    })
+
+    mockStoreState.UserReducer.connectionStatus = CONNECTION_STATUS.CONNECTED
+    mockStoreState.MessageReducer.activeChannelMessages = initialUnreadWindow
+    setActiveChannelId(channelId)
+    setClient(createClient(query))
+
+    const dispatched: any[] = []
+    const task = runSaga(
+      {
+        dispatch: (action) => {
+          dispatched.push(action)
+        },
+        getState: () => mockStoreState
+      },
+      __messageSagaTestables.refreshCacheAroundMessage,
+      refreshCacheAroundMessageAC(channelId, 'ignored-anchor')
+    )
+
+    await flushMockServerDelay()
+    await flushAsyncWork()
+
+    mockStoreState.MessageReducer.activeChannelMessages = latestWindow
+
+    deferredPrev.resolve({ messages: previousSlice, hasNext: false })
+    deferredNext.resolve({ messages: nextSlice, hasNext: false })
+
+    await task.toPromise()
+
+    expect(dispatched.some((action) => action.type === setMessagesAC([], channelId).type)).toBe(false)
+    expect(dispatched.some((action) => action.type === patchMessagesAC([]).type)).toBe(false)
+    expect(getMessageFromMap(channelId, '3060')?.body).toBe('late-refresh-server-message')
+  })
+
   it('loads the next page from the contiguous message map without hitting the network path', async () => {
     const channelId = 'channel-next-cache'
     const anchor = makeMessage({ id: '510', channelId, body: 'anchor' })

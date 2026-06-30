@@ -1073,6 +1073,9 @@ export function useChatController({
       restoreRef.current = null
       pendingNewestCountRef.current = 0
       setPendingNewestCount(0)
+      // Prevent the unread-divider effect from pulling the scroll back up after the user
+      // explicitly requested to jump to the latest edge.
+      unreadRestoreCompletedRef.current = true
       const container = scrollRef.current
       const currentChannelId = channelRef.current?.id
       const pendingLatestServerSync =
@@ -2149,6 +2152,7 @@ export function useChatController({
       restoreRef.current = null
       viewIsAtLatestRef.current = true
       setIsViewingLatest(true)
+      lockJumpScrolling(true, 'latest')
       scrollToLatestEdge(container, 'smooth')
       rememberLatestEdge()
       return
@@ -2226,7 +2230,8 @@ export function useChatController({
     unreadScrollTo,
     clearJumpBlur,
     hasNext,
-    isScrollInteractionActive
+    isScrollInteractionActive,
+    lockJumpScrolling
   ])
 
   useEffect(() => {

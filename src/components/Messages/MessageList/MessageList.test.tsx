@@ -2496,6 +2496,168 @@ describe('MessageList', () => {
     expect(getRenderedMessageBodies()).toEqual(['target-last-displayed', 'target-unread-one', 'target-unread-two'])
   })
 
+  it('scrolls fully to latest when the first opened channel has 50+ unread messages and the user taps scroll-to-bottom after waiting', async () => {
+    const targetChannelId = 'channel-first-open-50-plus-unread'
+    const lastDisplayed = makeMessage({
+      id: '2000',
+      channelId: targetChannelId,
+      body: 'target-last-displayed'
+    })
+    const unreadWindow = Array.from({ length: 20 }, (_, index) =>
+      makeMessage({
+        id: String(2001 + index),
+        channelId: targetChannelId,
+        body: `target-unread-${2001 + index}`,
+        incoming: true
+      })
+    )
+    const latestWindow = Array.from({ length: 40 }, (_, index) =>
+      makeMessage({
+        id: String(2021 + index),
+        channelId: targetChannelId,
+        body: `target-latest-${2021 + index}`,
+        incoming: true
+      })
+    )
+    const openedChannel = makeChannel({
+      id: targetChannelId,
+      newMessageCount: 55,
+      lastDisplayedMessageId: lastDisplayed.id,
+      lastMessage: latestWindow[latestWindow.length - 1]
+    })
+    const store = createMessageListStore({
+      ChannelReducer: {
+        activeChannel: {} as any
+      },
+      MessageReducer: {
+        activeChannelMessages: []
+      },
+      UserReducer: {
+        connectionStatus: CONNECTION_STATUS.CONNECTED
+      }
+    })
+
+    const rendered = renderMessageList(store)
+    const scrollable = rendered.container.querySelector('#scrollableDiv') as HTMLDivElement
+    const delayedDispatch = attachDelayedServerToMessageListStore(store, {
+      onLoadNearUnread: (action) => {
+        if (action.payload.channel.id !== targetChannelId) {
+          return { messages: [] }
+        }
+
+        return {
+          messages: [lastDisplayed, ...unreadWindow],
+          hasPrev: true,
+          hasNext: true,
+          unreadMessageId: lastDisplayed.id
+        }
+      },
+      onLoadAround: (action) => {
+        const requestChannelId = action.payload.channelId || action.payload.channel?.id
+        if (requestChannelId !== targetChannelId) {
+          return { messages: [] }
+        }
+
+        return {
+          messages: [lastDisplayed, ...unreadWindow],
+          hasPrev: true,
+          hasNext: true,
+          unreadMessageId: lastDisplayed.id
+        }
+      },
+      onLoadLatest: (action) => {
+        if (action.payload.channel.id !== targetChannelId) {
+          return { messages: [] }
+        }
+
+        return {
+          messages: latestWindow,
+          hasPrev: true,
+          hasNext: false,
+          unreadMessageId: lastDisplayed.id
+        }
+      }
+    })
+
+    delayedDispatch.mockClear()
+
+    await act(async () => {
+      store.dispatch(setActiveChannelAC(openedChannel))
+      await Promise.resolve()
+    })
+
+    await flushMockServerDelay()
+    await screen.findByText('target-unread-2001')
+
+    act(() => {
+      layoutRenderedMessageList(scrollable, {
+        scrollTop: toNativeScrollTop(560, 1280, 240),
+        scrollHeight: 1280,
+        itemTops: {
+          '2000': 0,
+          '2010': 400,
+          '2020': 800
+        }
+      })
+      fireEvent.scroll(scrollable)
+    })
+
+    act(() => {
+      flushAnimationFrames()
+    })
+
+    expect(delayedDispatch.mock.calls.map(([action]: [any]) => action.type)).toEqual(
+      expect.arrayContaining([loadNearUnreadAC(openedChannel).type])
+    )
+    expect(screen.getByTestId('scroll-to-bottom')).toHaveAttribute('data-show', '21')
+
+    await act(async () => {
+      await new Promise((resolve) => window.setTimeout(resolve, 2000))
+    })
+    await flushMockServerDelay()
+
+    expect(delayedDispatch.mock.calls.map(([action]: [any]) => action.type)).toEqual(
+      expect.arrayContaining([refreshCacheAroundMessageAC(targetChannelId, '').type])
+    )
+
+    delayedDispatch.mockClear()
+
+    fireEvent.click(screen.getByTestId('scroll-to-bottom'))
+
+    const loadLatestAction = delayedDispatch.mock.calls.find(
+      ([action]) => action.type === loadLatestMessagesAC(openedChannel).type
+    )?.[0]
+
+    expect(loadLatestAction?.payload).toEqual(
+      expect.objectContaining({
+        channel: expect.objectContaining({ id: targetChannelId }),
+        forceLatestWindow: true,
+        applyVisibleWindow: true
+      })
+    )
+
+    await flushMockServerDelay()
+    await screen.findByText('target-latest-2060')
+
+    act(() => {
+      layoutRenderedMessageList(scrollable, {
+        scrollTop: getLatestEdgeScrollTop(1680, 240),
+        scrollHeight: 1680,
+        itemTops: {
+          '2021': 0,
+          '2040': 760,
+          '2060': 1560
+        }
+      })
+      flushAnimationFrames()
+    })
+
+    expect(scrollable.scrollTop).toBe(getLatestEdgeScrollTop(1680, 240))
+    expect(screen.queryByText('target-unread-2001')).not.toBeInTheDocument()
+    expect(screen.getByText('target-latest-2021')).toBeInTheDocument()
+    expect(screen.getByText('target-latest-2060')).toBeInTheDocument()
+  })
+
   it('keeps the unread divider before remote unread messages when returning to a chat with an offline pending local tail', async () => {
     const channelId = 'channel-offline-pending-then-return'
     const lastDisplayed = makeMessage({

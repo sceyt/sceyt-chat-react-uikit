@@ -4194,6 +4194,12 @@ function* refreshCacheAroundMessage(action: IAction): any {
 
     yield call(loadOGMetadataForLinkMessages, loadedMessages, true)
 
+    const currentActiveMessages: IMessage[] = store.getState().MessageReducer.activeChannelMessages || []
+    const currentActiveConfirmedMessages = currentActiveMessages.filter((message) => !!message.id)
+    if (!sameConfirmedWindow(currentActiveConfirmedMessages, activeConfirmedMessages)) {
+      return
+    }
+
     if (sameConfirmedWindow(activeConfirmedMessages, loadedMessages)) {
       const activeById = new Map(activeConfirmedMessages.map((currentMessage) => [currentMessage.id, currentMessage]))
       const changed = loadedMessages.filter((loaded) => {

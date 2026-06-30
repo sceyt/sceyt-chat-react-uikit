@@ -6268,6 +6268,736 @@ describe('useChatController', () => {
     )
   })
 
+  describe('jumpToLatest with active unread state (50+ unread messages)', () => {
+    it('action-driven scrollToNewMessage reaches the latest edge after reopening a channel with 40+ unread messages', async () => {
+      const channelId = 'channel-scroll-action-reopen-unread'
+      const channel = makeChannel({
+        id: channelId,
+        newMessageCount: 45,
+        lastDisplayedMessageId: '1000',
+        lastMessage: makeMessage({ id: '1045', channelId, body: 'server-latest' })
+      })
+
+      const unreadWindow = Array.from({ length: 21 }, (_, index) =>
+        makeMessage({
+          id: String(991 + index),
+          channelId,
+          body: `unread-window-${991 + index}`
+        })
+      )
+      const latestWindow = Array.from({ length: 40 }, (_, index) =>
+        makeMessage({
+          id: String(1006 + index),
+          channelId,
+          body: `latest-window-${1006 + index}`
+        })
+      )
+      const dispatch = jest.fn()
+      const rendered = renderController({
+        channel,
+        messages: unreadWindow,
+        hasNextMessages: true,
+        connectionStatus: CONNECTION_STATUS.CONNECTED,
+        unreadScrollTo: true,
+        unreadMessageId: '1000',
+        dispatch
+      })
+
+      await flushEffects()
+      act(() => {
+        flushAnimationFrames()
+      })
+
+      dispatch.mockClear()
+      rendered.rerender(
+        <ControllerHarness
+          channel={channel}
+          messages={unreadWindow}
+          hasNextMessages={true}
+          connectionStatus={CONNECTION_STATUS.CONNECTED}
+          unreadScrollTo={true}
+          unreadMessageId={'1000'}
+          scrollToNewMessage={{
+            scrollToBottom: true,
+            updateMessageList: true,
+            isIncomingMessage: false
+          }}
+          dispatch={dispatch}
+        />
+      )
+
+      await flushEffects()
+
+      expect(dispatch).toHaveBeenCalledWith(loadLatestMessagesAC(channel, undefined, undefined, true, true))
+      expect(dispatch).toHaveBeenCalledWith(scrollToNewMessageAC(false, false, false))
+
+      rendered.rerender(
+        <ControllerHarness
+          channel={channel}
+          messages={unreadWindow}
+          hasNextMessages={true}
+          loadingNextMessages={LOADING_STATE.LOADING}
+          connectionStatus={CONNECTION_STATUS.CONNECTED}
+          unreadScrollTo={true}
+          unreadMessageId={'1000'}
+          dispatch={dispatch}
+        />
+      )
+      await flushEffects()
+
+      const latestScrollHeight = 40 * 40 + 80
+      rendered.rerender(
+        <ControllerHarness
+          channel={channel}
+          messages={latestWindow}
+          hasNextMessages={false}
+          loadingNextMessages={LOADING_STATE.LOADED}
+          connectionStatus={CONNECTION_STATUS.CONNECTED}
+          unreadScrollTo={true}
+          unreadMessageId={'1000'}
+          dispatch={dispatch}
+          layoutSpec={{
+            containerRect: { top: 0, left: 0, width: 320, height: 240 },
+            scrollMetrics: {
+              scrollTop: getLatestEdgeScrollTop(latestScrollHeight, 240),
+              scrollHeight: latestScrollHeight,
+              clientHeight: 240,
+              offsetTop: 0,
+              offsetHeight: 240
+            },
+            itemRects: {
+              '1006': { top: 0, left: 0, width: 320, height: 32 },
+              '1045': { top: latestScrollHeight - 80 - 32, left: 0, width: 320, height: 32 }
+            },
+            unreadDividerRect: { top: 0, left: 0, width: 320, height: 24 }
+          }}
+        />
+      )
+
+      await flushEffects()
+      act(() => {
+        flushAnimationFrames()
+      })
+
+      expect(rendered.scrollable.scrollTop).toBe(getLatestEdgeScrollTop(latestScrollHeight, 240))
+      expect(screen.getByTestId('is-viewing-latest')).toHaveTextContent('true')
+    })
+
+    it('re-opened channel with 40+ off-screen messages reaches the true latest edge after tapping scroll-to-bottom', async () => {
+      const channelAInitial = makeChannel({
+        id: 'channel-a-reopen-unread',
+        lastMessage: makeMessage({
+          id: '1000',
+          channelId: 'channel-a-reopen-unread',
+          body: 'a-initial-latest'
+        })
+      })
+      const channelB = makeChannel({
+        id: 'channel-b-active',
+        lastMessage: makeMessage({
+          id: '2001',
+          channelId: 'channel-b-active',
+          body: 'b-latest'
+        })
+      })
+      const channelAReturn = makeChannel({
+        id: 'channel-a-reopen-unread',
+        newMessageCount: 45,
+        lastDisplayedMessageId: '1000',
+        lastMessage: makeMessage({
+          id: '1045',
+          channelId: 'channel-a-reopen-unread',
+          body: 'a-return-latest'
+        })
+      })
+
+      const initialAMessages = [
+        makeMessage({ id: '999', channelId: channelAInitial.id, body: 'a-initial-older' }),
+        channelAInitial.lastMessage
+      ]
+      const channelBMessages = [
+        makeMessage({ id: '2000', channelId: channelB.id, body: 'b-older' }),
+        channelB.lastMessage
+      ]
+      const reopenedUnreadWindow = Array.from({ length: 21 }, (_, index) =>
+        makeMessage({
+          id: String(991 + index),
+          channelId: channelAReturn.id,
+          body: `a-unread-window-${991 + index}`
+        })
+      )
+      const latestWindow = Array.from({ length: 40 }, (_, index) =>
+        makeMessage({
+          id: String(1006 + index),
+          channelId: channelAReturn.id,
+          body: `a-latest-window-${1006 + index}`
+        })
+      )
+      const latestScrollHeight = 40 * 40 + 80
+
+      const dispatch = jest.fn()
+      const rendered = renderController({
+        channel: channelAInitial,
+        messages: initialAMessages,
+        connectionStatus: CONNECTION_STATUS.CONNECTED,
+        dispatch
+      })
+
+      rendered.rerender(
+        <ControllerHarness
+          channel={channelB}
+          messages={channelBMessages}
+          connectionStatus={CONNECTION_STATUS.CONNECTED}
+          dispatch={dispatch}
+        />
+      )
+      await flushEffects()
+
+      rendered.rerender(
+        <ControllerHarness
+          channel={channelAReturn}
+          messages={reopenedUnreadWindow}
+          hasNextMessages={true}
+          connectionStatus={CONNECTION_STATUS.CONNECTED}
+          unreadScrollTo={true}
+          unreadMessageId={''}
+          dispatch={dispatch}
+        />
+      )
+      await flushEffects()
+
+      rendered.rerender(
+        <ControllerHarness
+          channel={channelAReturn}
+          messages={reopenedUnreadWindow}
+          hasNextMessages={true}
+          connectionStatus={CONNECTION_STATUS.CONNECTED}
+          unreadScrollTo={true}
+          unreadMessageId={'1000'}
+          dispatch={dispatch}
+        />
+      )
+      await flushEffects()
+      act(() => {
+        flushAnimationFrames()
+      })
+
+      expect(screen.getByText('unread divider')).toBeInTheDocument()
+
+      dispatch.mockClear()
+      fireEvent.click(screen.getByTestId('jump-to-latest'))
+
+      expect(dispatch).toHaveBeenCalledWith(loadLatestMessagesAC(channelAReturn, undefined, undefined, true, true))
+
+      rendered.rerender(
+        <ControllerHarness
+          channel={channelAReturn}
+          messages={reopenedUnreadWindow}
+          hasNextMessages={true}
+          loadingNextMessages={LOADING_STATE.LOADING}
+          connectionStatus={CONNECTION_STATUS.CONNECTED}
+          unreadScrollTo={true}
+          unreadMessageId={'1000'}
+          dispatch={dispatch}
+        />
+      )
+      await flushEffects()
+
+      rendered.rerender(
+        <ControllerHarness
+          channel={channelAReturn}
+          messages={latestWindow}
+          hasNextMessages={false}
+          loadingNextMessages={LOADING_STATE.LOADED}
+          connectionStatus={CONNECTION_STATUS.CONNECTED}
+          unreadScrollTo={true}
+          unreadMessageId={'1000'}
+          dispatch={dispatch}
+          layoutSpec={{
+            containerRect: { top: 0, left: 0, width: 320, height: 240 },
+            scrollMetrics: {
+              scrollTop: getLatestEdgeScrollTop(latestScrollHeight, 240),
+              scrollHeight: latestScrollHeight,
+              clientHeight: 240,
+              offsetTop: 0,
+              offsetHeight: 240
+            },
+            itemRects: {
+              '1006': { top: 0, left: 0, width: 320, height: 32 },
+              '1045': { top: latestScrollHeight - 80 - 32, left: 0, width: 320, height: 32 }
+            },
+            unreadDividerRect: { top: 0, left: 0, width: 320, height: 24 }
+          }}
+        />
+      )
+
+      await flushEffects()
+      act(() => {
+        flushAnimationFrames()
+      })
+
+      expect(rendered.scrollable.scrollTop).toBe(getLatestEdgeScrollTop(latestScrollHeight, 240))
+      expect(screen.getByTestId('is-viewing-latest')).toHaveTextContent('true')
+    })
+
+    it('scrolls fully to the latest edge and marks isViewingLatest true after CONNECTED jump when unread separator was visible', async () => {
+      const channelId = 'channel-connected-unread-full-scroll'
+      const channel = makeChannel({
+        id: channelId,
+        newMessageCount: 55,
+        lastDisplayedMessageId: '550',
+        lastMessage: makeMessage({ id: '1000', channelId, body: 'server-latest' })
+      })
+
+      // Initial window: 21 messages centred around the unread anchor (msg-550 at index 10).
+      // getUnreadDividerIndex returns 11 → the unread-divider element is rendered in the DOM.
+      const initialMessages = Array.from({ length: 21 }, (_, i) =>
+        makeMessage({ id: String(540 + i), channelId, body: `initial-${540 + i}` })
+      )
+      // Latest window: 30 messages that span the newest content; anchor (550) falls before
+      // msg-971, so getUnreadDividerIndex returns 0 — the divider element is at the very start
+      // of the rendered list.  This is the critical case: when the latest-messages render
+      // produces a divider at index 0, effect-2232 can scroll back to it if
+      // unreadRestoreCompletedRef is still false.
+      const latestMessages = Array.from({ length: 30 }, (_, i) =>
+        makeMessage({ id: String(971 + i), channelId, body: `latest-${971 + i}` })
+      )
+
+      const dispatch = jest.fn()
+      const rendered = renderController({
+        channel,
+        messages: initialMessages,
+        hasNextMessages: true,
+        connectionStatus: CONNECTION_STATUS.CONNECTED,
+        unreadScrollTo: true,
+        unreadMessageId: '550',
+        dispatch
+      })
+
+      // After renderController, useLayoutEffect ran the reveal-unread-separator path
+      // (unreadRestoreCompletedRef.current = true) and the [channel.id] effect cleared
+      // unreadMessageId to ''.  unreadScrollTo stays true until the RAF from effect-2553
+      // fires (not yet flushed).
+
+      dispatch.mockClear()
+      fireEvent.click(screen.getByTestId('jump-to-latest'))
+
+      // CONNECTED path requires seeing LOADING_STATE.LOADING before the Promise resolves.
+      expect(dispatch).toHaveBeenCalledWith(loadLatestMessagesAC(channel, undefined, undefined, true, true))
+
+      rendered.rerender(
+        <ControllerHarness
+          channel={channel}
+          messages={initialMessages}
+          hasNextMessages={true}
+          loadingNextMessages={LOADING_STATE.LOADING}
+          connectionStatus={CONNECTION_STATUS.CONNECTED}
+          unreadScrollTo={true}
+          unreadMessageId={'550'}
+          dispatch={dispatch}
+        />
+      )
+      await flushEffects()
+
+      // Latest messages arrive.  The layoutSpec sets scrollTop to the latest edge so that
+      // useLayoutEffect's to-bottom-smooth path sees metrics consistent with a completed
+      // scroll (mirrors real behaviour where the render commit sets the container metrics).
+      rendered.rerender(
+        <ControllerHarness
+          channel={channel}
+          messages={latestMessages}
+          hasNextMessages={false}
+          loadingNextMessages={LOADING_STATE.LOADED}
+          connectionStatus={CONNECTION_STATUS.CONNECTED}
+          unreadScrollTo={true}
+          unreadMessageId={'550'}
+          dispatch={dispatch}
+          layoutSpec={{
+            containerRect: { top: 0, left: 0, width: 320, height: 240 },
+            scrollMetrics: {
+              scrollTop: getLatestEdgeScrollTop(1280, 240),
+              scrollHeight: 1280,
+              clientHeight: 240,
+              offsetTop: 0,
+              offsetHeight: 240
+            },
+            itemRects: {
+              '971': { top: 0, left: 0, width: 320, height: 32 },
+              '1000': { top: 1160, left: 0, width: 320, height: 32 }
+            }
+          }}
+        />
+      )
+
+      await flushEffects()
+      act(() => {
+        flushAnimationFrames()
+      })
+
+      // The scroll must reach the true latest edge — not stop partway through or be
+      // pulled back to the unread-divider position.
+      expect(rendered.scrollable.scrollTop).toBe(getLatestEdgeScrollTop(1280, 240))
+      expect(screen.getByTestId('is-viewing-latest')).toHaveTextContent('true')
+    })
+
+    it('re-arms the latest jump lock when the post-load smooth scroll starts so intermediate scroll events do not trigger idle refresh', async () => {
+      const channelId = 'channel-connected-unread-force-latest-after-load'
+      const channel = makeChannel({
+        id: channelId,
+        newMessageCount: 55,
+        lastDisplayedMessageId: '550',
+        lastMessage: makeMessage({ id: '1000', channelId, body: 'server-latest' })
+      })
+
+      const initialMessages = Array.from({ length: 21 }, (_, i) =>
+        makeMessage({ id: String(540 + i), channelId, body: `initial-${540 + i}` })
+      )
+      const latestMessages = Array.from({ length: 30 }, (_, i) =>
+        makeMessage({ id: String(971 + i), channelId, body: `latest-${971 + i}` })
+      )
+
+      const dispatch = jest.fn()
+      const rendered = renderController({
+        channel,
+        messages: initialMessages,
+        hasNextMessages: true,
+        connectionStatus: CONNECTION_STATUS.CONNECTED,
+        unreadScrollTo: true,
+        unreadMessageId: '550',
+        dispatch
+      })
+
+      await flushEffects()
+      act(() => {
+        flushAnimationFrames()
+      })
+
+      Object.defineProperty(rendered.scrollable, 'scrollTo', {
+        configurable: true,
+        value: function scrollTo(this: HTMLDivElement, optionsOrX?: ScrollToOptions | number, y?: number) {
+          if (typeof optionsOrX === 'number') {
+            this.scrollTop = y ?? 0
+            return
+          }
+
+          if (typeof optionsOrX?.top !== 'number') {
+            return
+          }
+
+          if (optionsOrX.behavior === 'smooth') {
+            return
+          }
+
+          this.scrollTop = optionsOrX.top
+        }
+      })
+
+      act(() => {
+        setScrollMetrics(rendered.scrollable, {
+          scrollTop: 300,
+          scrollHeight: 800,
+          clientHeight: 240,
+          offsetTop: 0,
+          offsetHeight: 240
+        })
+      })
+
+      dispatch.mockClear()
+      fireEvent.click(screen.getByTestId('jump-to-latest'))
+
+      expect(dispatch).toHaveBeenCalledWith(loadLatestMessagesAC(channel, undefined, undefined, true, true))
+
+      rendered.rerender(
+        <ControllerHarness
+          channel={channel}
+          messages={initialMessages}
+          hasNextMessages={true}
+          loadingNextMessages={LOADING_STATE.LOADING}
+          connectionStatus={CONNECTION_STATUS.CONNECTED}
+          unreadScrollTo={true}
+          unreadMessageId={'550'}
+          dispatch={dispatch}
+        />
+      )
+      await flushEffects()
+
+      rendered.rerender(
+        <ControllerHarness
+          channel={channel}
+          messages={latestMessages}
+          hasNextMessages={false}
+          loadingNextMessages={LOADING_STATE.LOADED}
+          connectionStatus={CONNECTION_STATUS.CONNECTED}
+          unreadScrollTo={true}
+          unreadMessageId={'550'}
+          dispatch={dispatch}
+          layoutSpec={{
+            containerRect: { top: 0, left: 0, width: 320, height: 240 },
+            scrollMetrics: {
+              scrollTop: 300,
+              scrollHeight: 1280,
+              clientHeight: 240,
+              offsetTop: 0,
+              offsetHeight: 240
+            },
+            itemRects: {
+              '971': { top: 0, left: 0, width: 320, height: 32 },
+              '1000': { top: 1160, left: 0, width: 320, height: 32 }
+            }
+          }}
+        />
+      )
+
+      await flushEffects()
+      dispatch.mockClear()
+
+      act(() => {
+        fireEvent.scroll(rendered.scrollable)
+      })
+
+      await act(async () => {
+        await new Promise((resolve) => window.setTimeout(resolve, 900))
+      })
+
+      expect(screen.getByTestId('is-viewing-latest')).toHaveTextContent('true')
+      expect(dispatch.mock.calls.some(([action]) => action.type === refreshCacheAroundMessageAC(channelId, '').type)).toBe(
+        false
+      )
+    })
+
+    it('scrolls fully to the latest edge when the unread anchor was never visible in the initial window (unreadRestoreCompleted starts false)', async () => {
+      // Scenario: the component boots with unreadMessageId='' so the initial useLayoutEffect
+      // takes the to-bottom path (not reveal-unread-separator), leaving
+      // unreadRestoreCompletedRef.current = false.  The store then sets unreadMessageId='990'
+      // (simulated by a prop rerender that changes the value), causing effect-2232 to be
+      // armed.  When the user taps "go to bottom" and the latest messages arrive, the
+      // divider appears at index 0 (anchor 990 predates all latest messages).  With
+      // unreadRestoreCompleted still false, effect-2232 fires, sets isViewingLatest=false,
+      // and scrolls back toward the divider — the test verifies this must NOT happen.
+      const channelId = 'channel-connected-unread-anchor-outside-window'
+      const channel = makeChannel({
+        id: channelId,
+        newMessageCount: 55,
+        lastDisplayedMessageId: '990',
+        lastMessage: makeMessage({ id: '1045', channelId, body: 'server-latest' })
+      })
+
+      // Initial window does not contain anchor (990 ≥ last message 989) → no divider element
+      // → reveal-unread-separator path in useLayoutEffect returns early without setting
+      // unreadRestoreCompletedRef.current = true.
+      const initialMessages = Array.from({ length: 20 }, (_, i) =>
+        makeMessage({ id: String(970 + i), channelId, body: `initial-${970 + i}` })
+      )
+      // Latest messages: 1001-1045.  Anchor 990 is before 1001, so getUnreadDividerIndex
+      // returns 0 → divider element rendered at position 0 in the timeline.  If
+      // unreadRestoreCompleted is false when these messages arrive, effect-2232 fires and
+      // scrolls back to the divider at top:0 instead of staying at the latest edge.
+      const latestMessages = Array.from({ length: 45 }, (_, i) =>
+        makeMessage({ id: String(1001 + i), channelId, body: `latest-${1001 + i}` })
+      )
+      const latestScrollHeight = 45 * 40 + 80 // 1880
+
+      const dispatch = jest.fn()
+      // Boot with unreadMessageId='' so useLayoutEffect uses to-bottom (not
+      // reveal-unread-separator) and unreadRestoreCompletedRef stays false.
+      const rendered = renderController({
+        channel,
+        messages: initialMessages,
+        hasNextMessages: true,
+        connectionStatus: CONNECTION_STATUS.CONNECTED,
+        unreadScrollTo: true,
+        unreadMessageId: '',
+        dispatch
+      })
+      await flushEffects()
+
+      // Simulate the store pushing unreadMessageId='990' after boot (the prop value change
+      // triggers ControllerHarness's second useEffect, updating controllerState.unreadMessageId).
+      // The [channel.id] effect already fired and will not fire again for the same channel,
+      // so unreadRestoreCompletedRef stays false.
+      rendered.rerender(
+        <ControllerHarness
+          channel={channel}
+          messages={initialMessages}
+          hasNextMessages={true}
+          connectionStatus={CONNECTION_STATUS.CONNECTED}
+          unreadScrollTo={true}
+          unreadMessageId={'990'}
+          dispatch={dispatch}
+        />
+      )
+      await flushEffects()
+      // Effect-2232 now fires (unreadMessageId dep changed) but finds no divider in the
+      // initial window (anchor is after the last message) → returns early, no harm yet.
+
+      dispatch.mockClear()
+      fireEvent.click(screen.getByTestId('jump-to-latest'))
+
+      expect(dispatch).toHaveBeenCalledWith(loadLatestMessagesAC(channel, undefined, undefined, true, true))
+
+      rendered.rerender(
+        <ControllerHarness
+          channel={channel}
+          messages={initialMessages}
+          hasNextMessages={true}
+          loadingNextMessages={LOADING_STATE.LOADING}
+          connectionStatus={CONNECTION_STATUS.CONNECTED}
+          unreadScrollTo={true}
+          unreadMessageId={'990'}
+          dispatch={dispatch}
+        />
+      )
+      await flushEffects()
+
+      rendered.rerender(
+        <ControllerHarness
+          channel={channel}
+          messages={latestMessages}
+          hasNextMessages={false}
+          loadingNextMessages={LOADING_STATE.LOADED}
+          connectionStatus={CONNECTION_STATUS.CONNECTED}
+          unreadScrollTo={true}
+          unreadMessageId={'990'}
+          dispatch={dispatch}
+          layoutSpec={{
+            containerRect: { top: 0, left: 0, width: 320, height: 240 },
+            scrollMetrics: {
+              scrollTop: getLatestEdgeScrollTop(latestScrollHeight, 240),
+              scrollHeight: latestScrollHeight,
+              clientHeight: 240,
+              offsetTop: 0,
+              offsetHeight: 240
+            },
+            itemRects: {
+              '1001': { top: 0, left: 0, width: 320, height: 32 },
+              '1045': { top: latestScrollHeight - 80 - 32, left: 0, width: 320, height: 32 }
+            },
+            // Divider at visual top of the container (position 0 in the latest window).
+            // effect-2232 finds this element and tries to scroll to it; with the bug
+            // scrollTop becomes latestEdge - (clientHeight - dividerHeight)/2 = 1640-108 = 1532.
+            unreadDividerRect: { top: 0, left: 0, width: 320, height: 24 }
+          }}
+        />
+      )
+
+      await flushEffects()
+      act(() => {
+        flushAnimationFrames()
+      })
+
+      // Must be at the true latest edge, not pulled back to the divider position.
+      expect(rendered.scrollable.scrollTop).toBe(getLatestEdgeScrollTop(latestScrollHeight, 240))
+      expect(screen.getByTestId('is-viewing-latest')).toHaveTextContent('true')
+    })
+
+    it('fast-path jump: unread state pushed after the tap must not pull the scroll back to the divider', async () => {
+      // Scenario: second visit to a channel.  The component opens with all messages already
+      // loaded (hasNextMessages=false) but without unread state (unreadScrollTo=false,
+      // unreadMessageId='').  The [channel.id] useEffect has reset unreadRestoreCompletedRef
+      // to false.  The user taps go-to-bottom (fast path — no async load), which sets
+      // viewIsAtLatestRef=true and scrolls to the latest edge.
+      //
+      // Shortly afterwards the store pushes unreadScrollTo=true + unreadMessageId='550'
+      // (the re-arm that happens when newMessageCount > 0 and the user is not at latest yet).
+      // effect-2232 fires with unreadRestoreCompletedRef=false, finds the divider at index 0,
+      // and without the fix would clobber viewIsAtLatestRef=false and scroll back toward the
+      // separator.  The subsequent RAF (effect-2553) dispatches setUnreadScrollToAC(false),
+      // but the useLayoutEffect it triggers sees viewIsAtLatestRef=false and skips the
+      // scrollToLatestEdge correction — leaving the user short of the bottom.
+      //
+      // With the fix (unreadRestoreCompletedRef=true set at the top of jumpToLatest),
+      // effect-2232 early-returns and the scroll stays at the latest edge.
+      const channelId = 'channel-fast-path-unread-push-after-tap'
+      const channel = makeChannel({
+        id: channelId,
+        newMessageCount: 55,
+        lastDisplayedMessageId: '550',
+        lastMessage: makeMessage({ id: '1000', channelId, body: 'server-latest' })
+      })
+      // 30 messages already represent the latest window — no hasNextMessages.
+      const messages = Array.from({ length: 30 }, (_, i) =>
+        makeMessage({ id: String(971 + i), channelId, body: `msg-${971 + i}` })
+      )
+      const scrollHeight = 1200
+      const clientHeight = 240
+      const latestEdge = getLatestEdgeScrollTop(scrollHeight, clientHeight) // 960
+
+      const dispatch = jest.fn()
+      const rendered = renderController({
+        channel,
+        messages,
+        hasNextMessages: false,
+        connectionStatus: CONNECTION_STATUS.CONNECTED,
+        // Channel opens without unread state — effect-2232 skips (unreadMessageId='')
+        unreadScrollTo: false,
+        unreadMessageId: '',
+        dispatch,
+        layoutSpec: {
+          containerRect: { top: 0, left: 0, width: 320, height: clientHeight },
+          scrollMetrics: {
+            scrollTop: latestEdge,
+            scrollHeight,
+            clientHeight,
+            offsetTop: 0,
+            offsetHeight: clientHeight
+          },
+          itemRects: {
+            '971': { top: 0, left: 0, width: 320, height: 40 },
+            '1000': { top: scrollHeight - clientHeight - 40, left: 0, width: 320, height: 40 }
+          }
+        }
+      })
+      await flushEffects()
+
+      // User taps go-to-bottom.  hasNextMessages=false → fast path (no await, no microtask).
+      // This sets viewIsAtLatestRef=true and scrolls to the latest edge synchronously.
+      dispatch.mockClear()
+      fireEvent.click(screen.getByTestId('jump-to-latest'))
+
+      // Store now pushes unread state (simulates the re-arm from the newMessageCount effect).
+      // The anchor (550) is before all loaded messages → getUnreadDividerIndex returns 0 →
+      // the divider element is rendered at the top of the list.
+      rendered.rerender(
+        <ControllerHarness
+          channel={channel}
+          messages={messages}
+          hasNextMessages={false}
+          connectionStatus={CONNECTION_STATUS.CONNECTED}
+          unreadScrollTo={true}
+          unreadMessageId={'550'}
+          dispatch={dispatch}
+          layoutSpec={{
+            containerRect: { top: 0, left: 0, width: 320, height: clientHeight },
+            scrollMetrics: {
+              scrollTop: latestEdge,
+              scrollHeight,
+              clientHeight,
+              offsetTop: 0,
+              offsetHeight: clientHeight
+            },
+            itemRects: {
+              '971': { top: 0, left: 0, width: 320, height: 40 },
+              '1000': { top: scrollHeight - clientHeight - 40, left: 0, width: 320, height: 40 }
+            },
+            // Divider rendered at the very top of the list (anchor 550 < first message 971).
+            unreadDividerRect: { top: 0, left: 0, width: 320, height: 24 }
+          }}
+        />
+      )
+
+      // effect-2232 fires here: without the fix it sees unreadRestoreCompletedRef=false,
+      // finds the divider, sets viewIsAtLatestRef=false and scrolls to ~852.
+      await flushEffects()
+      act(() => {
+        flushAnimationFrames()
+      })
+
+      // Must remain at the latest edge — the unread re-arm must NOT pull the view back.
+      expect(rendered.scrollable.scrollTop).toBe(latestEdge)
+      expect(screen.getByTestId('is-viewing-latest')).toHaveTextContent('true')
+    })
+  })
+
   describe('jumpToLatest while user is scrolling', () => {
     it('scrolls to the latest edge even when a pointerdown is active', async () => {
       const channel = makeChannel({
