@@ -21,7 +21,7 @@ export const isSafari = (): boolean => {
 /**
  * Initializes FFmpeg instance (lazy loading)
  */
-const initFFmpeg = async (): Promise<FFmpeg> => {
+export const initFFmpeg = async (): Promise<FFmpeg> => {
   if (ffmpegInstance) {
     return ffmpegInstance
   }

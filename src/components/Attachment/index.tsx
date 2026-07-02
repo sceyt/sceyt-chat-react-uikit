@@ -51,6 +51,7 @@ import log from 'loglevel'
 import { isJSON } from 'helpers/message'
 import { updateMessageAsOpenedAC } from 'store/channel/actions'
 import { compressAndCacheImage, getVideoFirstFrame } from 'helpers/getVideoFrame'
+import { ensurePlayableVideoBlob } from 'helpers/videoConversion'
 
 interface AttachmentPops {
   attachment: IAttachment
@@ -366,7 +367,11 @@ const Attachment = ({
       )
       setDownloadFilePromise(attachment.id!, urlPromise)
       const result = await urlPromise
-      const url = URL.createObjectURL(result.Body)
+      // In Firefox, QuickTime .mov blobs must be remuxed to standard MP4 before
+      // they can be played or have frames extracted; other browsers (and
+      // non-QuickTime files) get the blob back unchanged.
+      const body = attachment.type === attachmentTypes.video ? await ensurePlayableVideoBlob(result.Body) : result.Body
+      const url = URL.createObjectURL(body)
       setSizeProgress(undefined)
       let downloadingUrl = url
       if (attachment.type === attachmentTypes.image) {
@@ -383,9 +388,16 @@ const Attachment = ({
         dispatch(setUpdateMessageAttachmentAC(attachment.url + '_original_image_url', url))
       } else {
         if (attachment.type === attachmentTypes.video) {
-          const result = await getVideoFirstFrame(url, renderWidth, renderHeight, 0.8)
-          if (result) {
-            const { frameBlobUrl, blob } = result
+          // Pass the raw Blob (result.Body), not the object URL string.
+          // getVideoFirstFrame needs the actual Blob so it can inspect and
+          // correct a bad/unsupported MIME type (e.g. "video/quicktime;
+          // charset=utf-8" from S3) before creating its own internal object
+          // URL. Once an object URL string is created from a mistyped blob,
+          // Firefox has already locked in the bad type and there's no way
+          // to fix it from the string alone.
+          const frameResult = await getVideoFirstFrame(body, renderWidth, renderHeight, 0.8)
+          if (frameResult) {
+            const { frameBlobUrl, blob } = frameResult
             const response = new Response(blob, {
               headers: { 'Content-Type': 'image/jpeg' }
             })
@@ -393,12 +405,10 @@ const Attachment = ({
             await setAttachmentToCache(key, response)
             dispatch(setUpdateMessageAttachmentAC(key, frameBlobUrl))
           }
-        }
-        if (attachment.type === attachmentTypes.video) {
           setAttachmentToCache(
             attachment.url + `_original_video_url`,
-            new Response(result.Body, {
-              headers: { 'Content-Type': attachment.type || 'application/octet-stream' }
+            new Response(body, {
+              headers: { 'Content-Type': body.type || 'application/octet-stream' }
             })
           )
           dispatch(setUpdateMessageAttachmentAC(attachment.url + `_original_video_url`, url))
@@ -426,10 +436,14 @@ const Attachment = ({
       } else {
         fetch(attachment.url)
           .then(async (response) => {
-            const blob = await response.blob()
+            const rawBlob = await response.blob()
+            // Remux QuickTime blobs for Firefox (no-op elsewhere) — see above.
+            const blob = attachment.type === attachmentTypes.video ? await ensurePlayableVideoBlob(rawBlob) : rawBlob
             const blobUrl = URL.createObjectURL(blob)
             if (attachment.type === attachmentTypes.video) {
-              const frameResult = await getVideoFirstFrame(blobUrl, renderWidth, renderHeight, 0.8)
+              // Same fix here: pass the raw blob, not blobUrl, so
+              // getVideoFirstFrame can correct the MIME type if needed.
+              const frameResult = await getVideoFirstFrame(blob, renderWidth, renderHeight, 0.8)
               if (frameResult) {
                 const { frameBlobUrl, blob: frameBlob } = frameResult
                 await setAttachmentToCache(

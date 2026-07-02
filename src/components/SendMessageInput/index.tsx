@@ -88,6 +88,7 @@ import { attachmentTypes, DEFAULT_CHANNEL_TYPE, MESSAGE_DELIVERY_STATUS, USER_ST
 import { hideUserPresence } from '../../helpers/userHelper'
 import { getShowOnlyContactUsers } from '../../helpers/contacts'
 import { getFrame, getVideoFirstFrame } from '../../helpers/getVideoFrame'
+import { remuxVideoFileForUpload } from '../../helpers/videoConversion'
 import { CAN_USE_DOM } from '../../helpers/canUseDOM'
 
 // Hooks
@@ -1169,6 +1170,12 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
 
   const handleAddAttachment = async (file: File, isMediaAttachment: boolean) => {
     const customUploader = getCustomUploader()
+    if (file.type.split('/')[0] === 'video') {
+      // QuickTime .mov containers are unplayable in Firefox even when the codec
+      // is H.264 — remux to standard MP4 (stream copy, no re-encoding) before
+      // upload so every recipient can play the file and render thumbnails.
+      file = await remuxVideoFileForUpload(file)
+    }
     const fileType = file.type.split('/')[0]
     const tid = uuidv4()
     const reader = new FileReader()
@@ -1182,8 +1189,10 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
         attachment.metadata.szh || 400,
         attachment.metadata.szh || 400
       )
-      const url = URL.createObjectURL(attachment.data)
-      const result = await getVideoFirstFrame(url, newWidth, newHeight, 0.8)
+      // Pass the raw File/Blob so getVideoFirstFrame can sniff and correct the
+      // MIME type — an object URL string locks in the original (possibly
+      // Firefox-unsupported) type like video/quicktime.
+      const result = await getVideoFirstFrame(attachment.data, newWidth, newHeight, 0.8)
       if (result) {
         const { frameBlobUrl } = result
         dispatch(setUpdateMessageAttachmentAC(attachment?.metadata?.tmb || '', frameBlobUrl))
@@ -1213,7 +1222,9 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
             setAttachments((prevState: any[]) => [...prevState, attachment])
           })
         } else if (fileType === 'video') {
-          const { thumb, width, height, duration } = await getFrame(URL.createObjectURL(file as any), 0)
+          // Pass the File itself, not an object URL — lets getFrame correct a
+          // Firefox-unsupported MIME type (e.g. video/quicktime) via byte sniffing.
+          const { thumb, width, height, duration } = await getFrame(file, 0)
           const attachment = {
             data: file,
             upload: false,
@@ -1302,7 +1313,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
             ])
           }
         } else if (fileType === 'video') {
-          const { thumb, width, height, duration } = await getFrame(URL.createObjectURL(file as any), 0)
+          const { thumb, width, height, duration } = await getFrame(file, 0)
           const metas = JSON.stringify({ tmb: thumb, width, height, dur: duration })
           const attachment = {
             data: file,
