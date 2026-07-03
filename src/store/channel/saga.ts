@@ -47,6 +47,7 @@ import {
   MARK_CHANNEL_AS_UNREAD,
   MARK_MESSAGES_AS_DELIVERED,
   MARK_MESSAGES_AS_READ,
+  RESEND_PENDING_CHANNEL_READS,
   PIN_CHANNEL,
   UNPIN_CHANNEL,
   REMOVE_CHANNEL_CACHES,
@@ -97,8 +98,13 @@ import {
   setPendingDeleteChannel,
   getPendingDeleteChannels,
   removePendingDeleteChannel,
-  updateChannelMemberInAllChannels
+  updateChannelMemberInAllChannels,
+  getPendingChannelRead,
+  getPendingChannelReads,
+  removePendingChannelRead,
+  setPendingChannelRead
 } from '../../helpers/channelHalper'
+import type { PendingChannelRead } from '../../helpers/channelHalper'
 import { DEFAULT_CHANNEL_TYPE, LOADING_STATE, MESSAGE_DELIVERY_STATUS, USER_STATE } from '../../helpers/constants'
 import { MESSAGE_TYPE } from '../../types/enum'
 import { IAction, IChannel, IContact, IMember, IMessage, IMessageListMarker } from '../../types'
@@ -159,6 +165,126 @@ const getLatestIncomingConfirmedMessageId = (channel?: IChannel | null) => {
 
 const getLatestUnreadBoundaryId = (channel?: IChannel | null) =>
   channel?.lastReceivedMsgId || getLatestIncomingConfirmedMessageId(channel)
+
+const READ_MARKER_RETRY_DELAYS_MS = [500, 1500]
+
+let waitForReadMarkerRetry = (retryDelayMs: number) => new Promise((resolve) => setTimeout(resolve, retryDelayMs))
+
+type ChannelReadProgressUpdate = {
+  lastDisplayedMessageId: string
+  unread?: boolean
+  newMessageCount?: number
+  newMentionCount?: number
+}
+
+const getStoredChannel = (channelId: string): IChannel | undefined => {
+  let channel: IChannel | undefined = getChannelFromMap(channelId)
+  if (!channel) {
+    channel = getChannelFromAllChannels(channelId)
+    if (channel) {
+      setChannelInMap(channel)
+    }
+  }
+
+  return channel
+}
+
+const deriveChannelReadProgressUpdate = ({
+  channel,
+  messageIds = [],
+  readAll = false,
+  fallbackBoundaryId
+}: {
+  channel: IChannel
+  messageIds?: string[]
+  readAll?: boolean
+  fallbackBoundaryId?: string
+}): ChannelReadProgressUpdate => {
+  const previousLastDisplayedMessageId = channel.lastDisplayedMessageId || ''
+  const latestUnreadBoundaryId = fallbackBoundaryId || getLatestUnreadBoundaryId(channel)
+
+  if (readAll) {
+    const nextLastDisplayedMessageId =
+      getNewestMessageId([previousLastDisplayedMessageId, latestUnreadBoundaryId].filter(Boolean)) ||
+      latestUnreadBoundaryId ||
+      previousLastDisplayedMessageId
+
+    return {
+      unread: false,
+      newMessageCount: 0,
+      newMentionCount: 0,
+      lastDisplayedMessageId: nextLastDisplayedMessageId
+    }
+  }
+
+  const readMessageIds = getUniqueMessageIds(messageIds)
+  const nextLastDisplayedMessageId =
+    getNewestMessageId([previousLastDisplayedMessageId, ...readMessageIds]) || previousLastDisplayedMessageId
+  const newlyCoveredUnreadCount = readMessageIds.filter((messageId) => {
+    if (compareMessageIds(messageId, previousLastDisplayedMessageId) <= 0) {
+      return false
+    }
+
+    return !latestUnreadBoundaryId || compareMessageIds(messageId, latestUnreadBoundaryId) <= 0
+  }).length
+  const nextNewMessageCount = Math.max(0, (channel.newMessageCount || 0) - newlyCoveredUnreadCount)
+  const reachedLatestUnreadBoundary =
+    !!latestUnreadBoundaryId && compareMessageIds(nextLastDisplayedMessageId, latestUnreadBoundaryId) >= 0
+
+  if (reachedLatestUnreadBoundary || (readMessageIds.length > 0 && nextNewMessageCount === 0)) {
+    return {
+      lastDisplayedMessageId: nextLastDisplayedMessageId,
+      unread: false,
+      newMessageCount: 0,
+      newMentionCount: 0
+    }
+  }
+
+  return {
+    lastDisplayedMessageId: nextLastDisplayedMessageId,
+    ...(newlyCoveredUnreadCount > 0 ? { newMessageCount: nextNewMessageCount } : {})
+  }
+}
+
+function* applyChannelReadProgress(channelId: string, updateData: ChannelReadProgressUpdate) {
+  updateChannelOnAllChannels(channelId, updateData)
+  yield put(updateChannelDataAC(channelId, updateData))
+}
+
+const shouldKeepQueuedPendingRead = (error: any) => isResendableError(error?.type)
+
+function* confirmDisplayedRead(channel: IChannel, pendingRead: PendingChannelRead): any {
+  const messageIds = getUniqueMessageIds(pendingRead.messageIds)
+
+  for (let attempt = 0; attempt <= READ_MARKER_RETRY_DELAYS_MS.length; attempt++) {
+    const connectionStatus = store.getState().UserReducer.connectionStatus
+    if (connectionStatus !== CONNECTION_STATUS.CONNECTED) {
+      return { status: 'queued' as const }
+    }
+
+    try {
+      if (pendingRead.readAll) {
+        yield call(channel.markAsRead)
+        return { status: 'success' as const }
+      }
+
+      const messageListMarker = (yield call(channel.markMessagesAsDisplayed, messageIds)) as IMessageListMarker | void
+      return { status: 'success' as const, messageListMarker }
+    } catch (error) {
+      if (!shouldKeepQueuedPendingRead(error)) {
+        return { status: 'drop' as const, error }
+      }
+
+      if (attempt === READ_MARKER_RETRY_DELAYS_MS.length) {
+        return { status: 'queued' as const, error }
+      }
+
+      yield call(waitForReadMarkerRetry, READ_MARKER_RETRY_DELAYS_MS[attempt])
+    }
+  }
+
+  return { status: 'queued' as const }
+}
 
 function* createChannel(action: IAction): any {
   try {
@@ -1068,63 +1194,44 @@ function* channelsForForwardLoadMore(action: IAction): any {
 function* markMessagesRead(action: IAction): any {
   const { payload } = action
   const { channelId, messageIds } = payload
-  log.info(`[READ_MESSAGE] saga ch=${channelId} ids=[${messageIds.join(',')}]`)
-  const connectionStatus = store.getState().UserReducer.connectionStatus
-  if (connectionStatus !== CONNECTION_STATUS.CONNECTED) {
-    log.warn(`[READ_MESSAGE] saga skip — not connected (${connectionStatus})`)
+  const requestedMessageIds = getUniqueMessageIds(messageIds)
+  if (!requestedMessageIds.length) {
     return
   }
-  let channel = yield call(getChannelFromMap, channelId)
   try {
-    if (!channel) {
-      channel = getChannelFromAllChannels(channelId)
-      if (channel) {
-        setChannelInMap(channel)
-      }
-    }
-    // const activeChannelId = yield call(getActiveChannelId)
+    const channel = yield call(getStoredChannel, channelId)
     if (channel) {
-      const previousLastDisplayedMessageId = channel.lastDisplayedMessageId || ''
-      const latestUnreadBoundaryId = getLatestUnreadBoundaryId(channel)
-      log.info(`[READ_MESSAGE] calling markMessagesAsDisplayed ch=${channelId}`)
-      const messageListMarker = (yield call(channel.markMessagesAsDisplayed, messageIds)) as IMessageListMarker | void
-      const readMessageIds = getUniqueMessageIds(((messageListMarker as any)?.messageIds as string[]) || messageIds)
-      const nextLastDisplayedMessageId =
-        getNewestMessageId([previousLastDisplayedMessageId, ...readMessageIds]) || previousLastDisplayedMessageId
-      const newlyCoveredUnreadCount = readMessageIds.filter((messageId) => {
-        if (compareMessageIds(messageId, previousLastDisplayedMessageId) <= 0) {
-          return false
+      const optimisticUpdate = deriveChannelReadProgressUpdate({
+        channel,
+        messageIds: requestedMessageIds
+      })
+      yield call(applyChannelReadProgress, channel.id, optimisticUpdate)
+
+      const pendingRead = setPendingChannelRead({ channelId: channel.id, messageIds: requestedMessageIds })
+      const confirmation = yield call(confirmDisplayedRead, channel, pendingRead!)
+
+      if (confirmation.status === 'success') {
+        const queuedPendingRead = getPendingChannelRead(channel.id)
+        if (queuedPendingRead?.queuedAt === pendingRead?.queuedAt) {
+          removePendingChannelRead(channel.id)
         }
+      } else if (confirmation.status === 'drop') {
+        removePendingChannelRead(channel.id)
+        return
+      } else {
+        return
+      }
 
-        return !latestUnreadBoundaryId || compareMessageIds(messageId, latestUnreadBoundaryId) <= 0
-      }).length
-      const nextNewMessageCount = Math.max(0, (channel.newMessageCount || 0) - newlyCoveredUnreadCount)
-      const reachedLatestUnreadBoundary =
-        !!latestUnreadBoundaryId && compareMessageIds(nextLastDisplayedMessageId, latestUnreadBoundaryId) >= 0
-      const updateData =
-        reachedLatestUnreadBoundary || (readMessageIds.length > 0 && nextNewMessageCount === 0)
-          ? {
-              lastDisplayedMessageId: nextLastDisplayedMessageId,
-              unread: false,
-              newMessageCount: 0,
-              newMentionCount: 0
-            }
-          : {
-              lastDisplayedMessageId: nextLastDisplayedMessageId,
-              ...(newlyCoveredUnreadCount > 0 ? { newMessageCount: nextNewMessageCount } : {})
-            }
-
-      log.info(`[READ_MESSAGE] marked ${readMessageIds.length} msgs, newCount=${nextNewMessageCount}`)
-      yield put(updateChannelDataAC(channel.id, updateData))
-      updateChannelOnAllChannels(channel.id, updateData)
-
+      const readMessageIds = getUniqueMessageIds(
+        ((confirmation.messageListMarker as any)?.messageIds as string[]) || requestedMessageIds
+      )
       for (const messageId of readMessageIds) {
         const updateParams = {
           deliveryStatus: MESSAGE_DELIVERY_STATUS.READ,
           userMarkers: [
             {
-              user: (messageListMarker as any)?.user || null,
-              createdAt: (messageListMarker as any)?.createdAt || new Date(),
+              user: (confirmation.messageListMarker as any)?.user || null,
+              createdAt: (confirmation.messageListMarker as any)?.createdAt || new Date(),
               messageId,
               name: MESSAGE_DELIVERY_STATUS.READ
             }
@@ -1133,8 +1240,6 @@ function* markMessagesRead(action: IAction): any {
         yield put(updateMessageAC(messageId, updateParams))
         updateMessageOnMap(channel.id, { messageId, params: updateParams })
       }
-    } else {
-      log.warn(`[READ_MESSAGE] saga skip — channel not found ch=${channelId}`)
     }
   } catch (e) {
     log.error(e, '[READ_MESSAGE] Error on mark messages read')
@@ -1375,32 +1480,102 @@ function* notificationsTurnOn(): any {
 function* markChannelAsRead(action: IAction): any {
   try {
     const { channelId } = action.payload
-    let channel = yield call(getChannelFromMap, channelId)
+    const channel = yield call(getStoredChannel, channelId)
     if (!channel) {
-      channel = getChannelFromAllChannels(channelId)
+      return
     }
-    const updatedChannel = yield call(channel.markAsRead)
-    const latestUnreadBoundaryId = getLatestUnreadBoundaryId(channel)
-    const lastDisplayedCandidates = [
-      channel.lastDisplayedMessageId || '',
-      updatedChannel?.lastDisplayedMessageId || '',
-      latestUnreadBoundaryId
-    ].filter(Boolean)
-    const nextLastDisplayedMessageId =
-      getNewestMessageId(lastDisplayedCandidates) ||
-      updatedChannel?.lastDisplayedMessageId ||
-      channel.lastDisplayedMessageId
-    const updateData = {
-      unread: false,
-      newMessageCount: 0,
-      newMentionCount: 0,
-      lastDisplayedMessageId: nextLastDisplayedMessageId
+
+    const optimisticUpdate = deriveChannelReadProgressUpdate({
+      channel,
+      readAll: true
+    })
+    yield call(applyChannelReadProgress, channel.id, optimisticUpdate)
+
+    const pendingRead = setPendingChannelRead({ channelId: channel.id, readAll: true })
+    const confirmation = yield call(confirmDisplayedRead, channel, pendingRead!)
+
+    if (confirmation.status === 'success') {
+      const queuedPendingRead = getPendingChannelRead(channel.id)
+      if (queuedPendingRead?.queuedAt === pendingRead?.queuedAt) {
+        removePendingChannelRead(channel.id)
+      }
+      return
     }
-    updateChannelOnAllChannels(channel.id, updateData)
-    yield put(updateChannelDataAC(channel.id, updateData))
+
+    if (confirmation.status === 'drop') {
+      removePendingChannelRead(channel.id)
+    }
+
+    log.error(confirmation.error, 'Error in set channel unread')
   } catch (error) {
     log.error(error, 'Error in set channel unread')
     // yield put(setErrorNotification(error.message));
+  }
+}
+
+function* resendPendingChannelReads(action: IAction): any {
+  try {
+    const { connectionState } = action.payload
+    if (connectionState !== CONNECTION_STATUS.CONNECTED) {
+      return
+    }
+
+    const pendingReads = getPendingChannelReads().sort((left, right) => left.queuedAt - right.queuedAt)
+
+    for (const pendingRead of pendingReads) {
+      if (store.getState().UserReducer.connectionStatus !== CONNECTION_STATUS.CONNECTED) {
+        return
+      }
+
+      const currentPendingRead = getPendingChannelRead(pendingRead.channelId)
+      if (!currentPendingRead || currentPendingRead.queuedAt !== pendingRead.queuedAt) {
+        continue
+      }
+
+      if (!pendingRead.readAll && !pendingRead.messageIds.length) {
+        removePendingChannelRead(pendingRead.channelId)
+        continue
+      }
+
+      const channel = yield call(getStoredChannel, pendingRead.channelId)
+      if (!channel) {
+        removePendingChannelRead(pendingRead.channelId)
+        continue
+      }
+
+      const confirmation = yield call(confirmDisplayedRead, channel, pendingRead)
+      const latestPendingRead = getPendingChannelRead(pendingRead.channelId)
+      if (!latestPendingRead || latestPendingRead.queuedAt !== pendingRead.queuedAt) {
+        continue
+      }
+
+      if (confirmation.status === 'success' || confirmation.status === 'drop') {
+        removePendingChannelRead(pendingRead.channelId)
+      }
+
+      if (confirmation.status === 'success' && !pendingRead.readAll) {
+        const readMessageIds = getUniqueMessageIds(
+          ((confirmation.messageListMarker as any)?.messageIds as string[]) || pendingRead.messageIds
+        )
+        for (const messageId of readMessageIds) {
+          const updateParams = {
+            deliveryStatus: MESSAGE_DELIVERY_STATUS.READ,
+            userMarkers: [
+              {
+                user: (confirmation.messageListMarker as any)?.user || null,
+                createdAt: (confirmation.messageListMarker as any)?.createdAt || new Date(),
+                messageId,
+                name: MESSAGE_DELIVERY_STATUS.READ
+              }
+            ]
+          }
+          yield put(updateMessageAC(messageId, updateParams))
+          updateMessageOnMap(channel.id, { messageId, params: updateParams })
+        }
+      }
+    }
+  } catch (error) {
+    log.error(error, '[READ_MESSAGE] Error on resend pending channel reads')
   }
 }
 
@@ -2091,6 +2266,7 @@ export default function* ChannelsSaga() {
   yield takeLatest(TURN_OFF_NOTIFICATION, notificationsTurnOff)
   yield takeLatest(TURN_ON_NOTIFICATION, notificationsTurnOn)
   yield takeLatest(MARK_CHANNEL_AS_READ, markChannelAsRead)
+  yield takeLatest(RESEND_PENDING_CHANNEL_READS, resendPendingChannelReads)
   yield takeLatest(MARK_CHANNEL_AS_UNREAD, markChannelAsUnRead)
   yield takeLatest(CHECK_USER_STATUS, checkUsersStatus)
   yield takeLatest(SEND_TYPING, sendTyping)
@@ -2118,5 +2294,12 @@ export default function* ChannelsSaga() {
 export const __channelSagaTestables = {
   markMessagesRead,
   markChannelAsRead,
-  getChannels
+  resendPendingChannelReads,
+  getChannels,
+  setWaitForReadMarkerRetry: (waitFn: typeof waitForReadMarkerRetry) => {
+    waitForReadMarkerRetry = waitFn
+  },
+  resetWaitForReadMarkerRetry: () => {
+    waitForReadMarkerRetry = (retryDelayMs: number) => new Promise((resolve) => setTimeout(resolve, retryDelayMs))
+  }
 }

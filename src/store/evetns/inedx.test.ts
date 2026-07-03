@@ -28,11 +28,15 @@ import {
 import { MESSAGE_DELIVERY_STATUS, MESSAGE_STATUS } from '../../helpers/constants'
 import {
   markMessagesAsDeliveredAC,
+  resendPendingChannelReadsAC,
   updateChannelDataAC,
   updateChannelLastMessageAC,
   updateChannelLastMessageStatusAC
 } from '../channel/actions'
-import { addMessagesAC, updateMessagesMarkersAC, updateMessagesStatusAC } from '../message/actions'
+import { addMessagesAC, resendPendingMessageMutationsAC, updateMessagesMarkersAC, updateMessagesStatusAC } from '../message/actions'
+import { getRolesAC } from '../member/actions'
+import { setConnectionStatusAC } from '../user/actions'
+import { CONNECTION_STATUS } from '../user/constants'
 import { navigateToLatest } from '../../helpers/messageListNavigator'
 import { __eventsTestables } from './inedx'
 
@@ -100,6 +104,26 @@ describe('event message last-message handling', () => {
     defaultStoreState.MessageReducer.visibleMessagesMap = {}
     destroyChannelsMap()
     setActiveChannelId('')
+  })
+
+  it('dispatches pending read and message resend hooks when connection becomes connected', async () => {
+    const dispatched: any[] = []
+
+    await runSaga(
+      {
+        getState: getSagaState,
+        dispatch: (action) => {
+          dispatched.push(action)
+        }
+      },
+      __eventsTestables.handleConnectionStatusChangedEvent,
+      CONNECTION_STATUS.CONNECTED
+    ).toPromise()
+
+    expect(dispatched).toContainEqual(setConnectionStatusAC(CONNECTION_STATUS.CONNECTED))
+    expect(dispatched).toContainEqual(getRolesAC())
+    expect(dispatched).toContainEqual(resendPendingMessageMutationsAC(CONNECTION_STATUS.CONNECTED))
+    expect(dispatched).toContainEqual(resendPendingChannelReadsAC(CONNECTION_STATUS.CONNECTED))
   })
 
   it('handles current-user message markers as userMarkers across active action, cache, and last message', async () => {

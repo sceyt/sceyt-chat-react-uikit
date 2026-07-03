@@ -243,6 +243,7 @@ export interface IChannel {
   deleteAllMessages: (forEveryone?: boolean) => Promise<void>
   hide: () => Promise<boolean>
   unhide: () => Promise<boolean>
+  markAsRead: () => Promise<IChannel>
   markAsUnRead: () => Promise<IChannel>
   pin: () => Promise<IChannel>
   unpin: () => Promise<IChannel>

@@ -60,6 +60,7 @@ import {
   MARK_MESSAGES_AS_DELIVERED,
   MARK_MESSAGES_AS_READ,
   MARK_VOICE_MESSAGE_AS_PLAYED,
+  RESEND_PENDING_CHANNEL_READS,
   PIN_CHANNEL,
   UNPIN_CHANNEL,
   REMOVE_CHANNEL_CACHES,
@@ -282,6 +283,11 @@ export const turnOnNotificationsAC = () => ({
 export const markChannelAsReadAC = (channelId: string) => ({
   type: MARK_CHANNEL_AS_READ,
   payload: { channelId }
+})
+
+export const resendPendingChannelReadsAC = (connectionState: string) => ({
+  type: RESEND_PENDING_CHANNEL_READS,
+  payload: { connectionState }
 })
 
 export const markChannelAsUnReadAC = (channelId: string) => ({

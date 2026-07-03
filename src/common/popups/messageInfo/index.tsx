@@ -769,6 +769,7 @@ const RowInfo = styled.div`
   align-items: center;
   justify-content: space-between;
   width: 100%;
+  gap: 12px;
 `
 
 const RowTitle = styled.div<{ color: string }>`

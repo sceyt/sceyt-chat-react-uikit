@@ -520,18 +520,11 @@ const Message = ({
       channel.newMessageCount > 0 &&
       connectionStatus === CONNECTION_STATUS.CONNECTED
     ) {
-      console.log(`[READ_MESSAGE] queuing msgId=${message.id} ch=${channel.id}`)
       if (queueReadMarker) {
         queueReadMarker(channel.id, message.id)
       } else {
         dispatch(markMessagesAsReadAC(channel.id, [message.id]))
       }
-    } else if (isVisible && message.incoming && !alreadyRead) {
-      console.log(
-        `[READ_MESSAGE] skip msgId=${message.id}`,
-        `disabledTracking=${disableAutoReadTracking} tabActive=${isTabActive}`,
-        `newMsgCount=${channel.newMessageCount} conn=${connectionStatus}`
-      )
     }
   }, [
     dispatch,

@@ -15,11 +15,19 @@ type defaultRolesByChannelTypesMap = {
   [key: string]: string
 }
 
+export type PendingChannelRead = {
+  channelId: string
+  messageIds: string[]
+  readAll: boolean
+  queuedAt: number
+}
+
 let autoSelectFitsChannel = false
 let allChannels: IChannel[] = []
 let channelsMap: channelMap = {}
 const allChannelsMap: channelMap = {}
 const pendingDeleteChannelMap: { [key: string]: IChannel } = {}
+const pendingChannelReadMap: { [key: string]: PendingChannelRead } = {}
 
 let channelTypesMemberDisplayTextMap: channelTypesMemberDisplayTextMap
 let defaultRolesByChannelTypesMap: defaultRolesByChannelTypesMap
@@ -112,6 +120,7 @@ export type MemberSummary = {
   id: string
   role: string
 }
+
 export type JoinGroupPopupRenderParams = {
   onClose: () => void
   onJoin: () => void
@@ -285,6 +294,7 @@ export function getLastChannelFromMap(deletePending: boolean = false) {
 export function removeChannelFromMap(channelId: string) {
   delete channelsMap[channelId]
   delete allChannelsMap[channelId]
+  delete pendingChannelReadMap[channelId]
 }
 
 export function checkChannelExists(channelId: string) {
@@ -308,6 +318,8 @@ export function destroyChannelsMap() {
   defaultRolesByChannelTypesMap = {}
   channelTypesMemberDisplayTextMap = {}
   memberCount = 0
+  Object.keys(pendingDeleteChannelMap).forEach((channelId) => delete pendingDeleteChannelMap[channelId])
+  Object.keys(pendingChannelReadMap).forEach((channelId) => delete pendingChannelReadMap[channelId])
 }
 
 export const query: any = {
@@ -564,6 +576,43 @@ export const sortChannelByLastMessage = (channels: IChannel[]) => {
 
 export const setPendingDeleteChannel = (channel: IChannel) => {
   pendingDeleteChannelMap[channel?.id] = channel
+}
+
+export const setPendingChannelRead = ({
+  channelId,
+  messageIds = [],
+  readAll = false
+}: {
+  channelId: string
+  messageIds?: string[]
+  readAll?: boolean
+}): PendingChannelRead | null => {
+  if (!channelId) {
+    return null
+  }
+
+  const current = pendingChannelReadMap[channelId]
+  const nextReadAll = readAll || current?.readAll || false
+  const nextMessageIds = nextReadAll
+    ? []
+    : Array.from(new Set([...(current?.messageIds || []), ...messageIds.filter(Boolean)]))
+  const nextPendingRead = {
+    channelId,
+    messageIds: nextMessageIds,
+    readAll: nextReadAll,
+    queuedAt: Date.now()
+  }
+
+  pendingChannelReadMap[channelId] = nextPendingRead
+  return nextPendingRead
+}
+
+export const getPendingChannelRead = (channelId: string) => pendingChannelReadMap[channelId]
+
+export const getPendingChannelReads = () => Object.values(pendingChannelReadMap)
+
+export const removePendingChannelRead = (channelId: string) => {
+  delete pendingChannelReadMap[channelId]
 }
 
 export const getPendingDeleteChannel = (channelId: string) => {

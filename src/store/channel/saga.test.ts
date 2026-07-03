@@ -1,11 +1,23 @@
 import { runSaga } from 'redux-saga'
-import { destroyChannelsMap, getChannelFromMap, setChannelInMap } from '../../helpers/channelHalper'
+import {
+  destroyChannelsMap,
+  getChannelFromMap,
+  getPendingChannelRead,
+  setChannelInMap,
+  setPendingChannelRead
+} from '../../helpers/channelHalper'
 import { addMessageToMap } from '../../helpers/messagesHalper'
 import { MESSAGE_DELIVERY_STATUS } from '../../helpers/constants'
 import { makeChannel, makeMessage, makePendingMessage, makeUser } from '../../testUtils/messageFixtures'
 import { updateMessageAC } from '../message/actions'
 import { CONNECTION_STATUS } from '../user/constants'
-import { markChannelAsReadAC, markMessagesAsReadAC, setChannelsAC, updateChannelDataAC } from './actions'
+import {
+  markChannelAsReadAC,
+  markMessagesAsReadAC,
+  resendPendingChannelReadsAC,
+  setChannelsAC,
+  updateChannelDataAC
+} from './actions'
 import { __channelSagaTestables } from './saga'
 import { setClient } from '../../common/client'
 
@@ -55,6 +67,11 @@ describe('channel saga read markers', () => {
     mockStore.getState.mockReturnValue(mockStoreState)
     destroyChannelsMap()
     mockStoreState.UserReducer.connectionStatus = CONNECTION_STATUS.CONNECTED
+    __channelSagaTestables.setWaitForReadMarkerRetry(() => Promise.resolve())
+  })
+
+  afterEach(() => {
+    __channelSagaTestables.resetWaitForReadMarkerRetry()
   })
 
   it('advances lastDisplayedMessageId when displayed messages are read', async () => {
@@ -132,6 +149,122 @@ describe('channel saga read markers', () => {
     expect(getChannelFromMap(channel.id).unread).toBe(false)
   })
 
+  it('applies the optimistic unread badge clear before markMessagesAsDisplayed resolves', async () => {
+    const channel = makeChannel({
+      id: 'channel-read-optimistic-clear',
+      lastMessage: makeMessage({ id: '303', channelId: 'channel-read-optimistic-clear', incoming: true }),
+      lastDisplayedMessageId: '300',
+      unread: true,
+      newMessageCount: 3,
+      newMentionCount: 1,
+      markMessagesAsDisplayed: jest.fn(async () => {
+        expect(getChannelFromMap('channel-read-optimistic-clear')).toEqual(
+          expect.objectContaining({
+            unread: false,
+            newMessageCount: 0,
+            newMentionCount: 0,
+            lastDisplayedMessageId: '303'
+          })
+        )
+
+        return {
+          messageIds: ['301', '302', '303'],
+          user: makeUser({ id: 'current-user' }),
+          createdAt: new Date('2026-07-02T08:00:00.000Z')
+        }
+      })
+    })
+    setChannelInMap(channel)
+
+    const dispatched = await runChannelSaga(
+      __channelSagaTestables.markMessagesRead,
+      markMessagesAsReadAC(channel.id, ['301', '302', '303'])
+    )
+
+    expect(dispatched).toContainEqual(
+      updateChannelDataAC(channel.id, {
+        unread: false,
+        newMessageCount: 0,
+        newMentionCount: 0,
+        lastDisplayedMessageId: '303'
+      })
+    )
+    expect(getPendingChannelRead(channel.id)).toBeUndefined()
+  })
+
+  it('retries resendable displayed-read timeouts without a second controller dispatch', async () => {
+    const markMessagesAsDisplayed = jest
+      .fn()
+      .mockRejectedValueOnce({ type: 'InternalError', message: 'first timeout' })
+      .mockRejectedValueOnce({ type: 'InternalError', message: 'second timeout' })
+      .mockResolvedValue({
+        messageIds: ['401', '402'],
+        user: makeUser({ id: 'current-user' }),
+        createdAt: new Date('2026-07-02T09:00:00.000Z')
+      })
+    const channel = makeChannel({
+      id: 'channel-read-retry',
+      lastMessage: makeMessage({ id: '402', channelId: 'channel-read-retry', incoming: true }),
+      lastDisplayedMessageId: '400',
+      unread: true,
+      newMessageCount: 2,
+      markMessagesAsDisplayed
+    })
+    setChannelInMap(channel)
+
+    const dispatched = await runChannelSaga(
+      __channelSagaTestables.markMessagesRead,
+      markMessagesAsReadAC(channel.id, ['401', '402'])
+    )
+
+    expect(markMessagesAsDisplayed).toHaveBeenCalledTimes(3)
+    expect(
+      dispatched.filter((action) => action.type === updateChannelDataAC(channel.id, { lastDisplayedMessageId: '402' }).type)
+    ).toHaveLength(1)
+    expect(getPendingChannelRead(channel.id)).toBeUndefined()
+  })
+
+  it('keeps exhausted resendable displayed reads queued and replays them after reconnect', async () => {
+    const channel = makeChannel({
+      id: 'channel-read-replay',
+      lastMessage: makeMessage({ id: '502', channelId: 'channel-read-replay', incoming: true }),
+      lastDisplayedMessageId: '500',
+      unread: true,
+      newMessageCount: 2,
+      markMessagesAsDisplayed: jest.fn().mockRejectedValue({ type: 'InternalError', message: 'timeout' })
+    })
+    setChannelInMap(channel)
+
+    await runChannelSaga(__channelSagaTestables.markMessagesRead, markMessagesAsReadAC(channel.id, ['501', '502']))
+
+    expect(channel.markMessagesAsDisplayed).toHaveBeenCalledTimes(3)
+    expect(getPendingChannelRead(channel.id)).toEqual(
+      expect.objectContaining({ channelId: channel.id, messageIds: ['501', '502'], readAll: false })
+    )
+
+    ;(getChannelFromMap(channel.id) as any).markMessagesAsDisplayed = jest.fn().mockResolvedValue({
+      messageIds: ['501', '502'],
+      user: makeUser({ id: 'current-user' }),
+      createdAt: new Date('2026-07-02T09:05:00.000Z')
+    })
+
+    const replayDispatched = await runChannelSaga(
+      __channelSagaTestables.resendPendingChannelReads,
+      resendPendingChannelReadsAC(CONNECTION_STATUS.CONNECTED)
+    )
+
+    expect((getChannelFromMap(channel.id) as any).markMessagesAsDisplayed).toHaveBeenCalledTimes(1)
+    expect(getPendingChannelRead(channel.id)).toBeUndefined()
+    expect(replayDispatched).toContainEqual(
+      updateMessageAC(
+        '502',
+        expect.objectContaining({
+          deliveryStatus: MESSAGE_DELIVERY_STATUS.READ
+        })
+      )
+    )
+  })
+
   it('uses the latest unread boundary when markChannelAsRead returns a stale displayed id', async () => {
     const channel = makeChannel({
       id: 'channel-read-all-boundary',
@@ -156,6 +289,34 @@ describe('channel saga read markers', () => {
       })
     )
     expect(getChannelFromMap(channel.id).lastDisplayedMessageId).toBe('205')
+  })
+
+  it('upgrades queued per-message reads to a read-all retry when markChannelAsRead runs', async () => {
+    const channel = makeChannel({
+      id: 'channel-read-all-upgrade',
+      lastMessage: makeMessage({ id: '605', channelId: 'channel-read-all-upgrade', incoming: true }),
+      lastDisplayedMessageId: '600',
+      unread: true,
+      newMessageCount: 5,
+      newMentionCount: 2
+    })
+    ;(channel as any).markAsRead = jest.fn(async () => {
+      expect(getPendingChannelRead(channel.id)).toEqual(
+        expect.objectContaining({
+          channelId: channel.id,
+          readAll: true,
+          messageIds: []
+        })
+      )
+      return { ...channel, lastDisplayedMessageId: '605' }
+    })
+    setChannelInMap(channel)
+    setPendingChannelRead({ channelId: channel.id, messageIds: ['601', '602'] })
+
+    await runChannelSaga(__channelSagaTestables.markChannelAsRead, markChannelAsReadAC(channel.id))
+
+    expect((channel as any).markAsRead).toHaveBeenCalledTimes(1)
+    expect(getPendingChannelRead(channel.id)).toBeUndefined()
   })
 
   it('falls back to the latest cached incoming message when the read-all response does not advance the boundary', async () => {

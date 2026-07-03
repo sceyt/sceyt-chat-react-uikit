@@ -28,6 +28,7 @@ import {
   markMessagesAsDeliveredAC,
   removeChannelAC,
   removeChannelCachesAC,
+  resendPendingChannelReadsAC,
   setActiveChannelAC,
   setAddedToChannelAC,
   setChannelToAddAC,
@@ -117,6 +118,16 @@ const lastMessageNeedsUpdate = (
     currentLastMessage.state === nextLastMessage.state &&
     currentLastMessage.deliveryStatus === nextLastMessage.deliveryStatus
   )
+}
+
+function* handleConnectionStatusChangedEvent(status: string) {
+  log.info('connection status changed . . . . . ', status)
+  yield put(setConnectionStatusAC(status))
+  if (status === CONNECTION_STATUS.CONNECTED) {
+    yield put(getRolesAC())
+    yield put(resendPendingMessageMutationsAC(status))
+    yield put(resendPendingChannelReadsAC(status))
+  }
 }
 
 const getResolvedChannelLastMessage = (
@@ -354,8 +365,6 @@ export function* handleMessageMarkersReceivedEvent(
 ): any {
   const { channelId, markerList } = args
   const channel = getStoredChannel(channelId)
-  log.info('channel MESSAGE_MARKERS_RECEIVED ... channel: ', channel, 'markers list: ', markerList)
-
   if (!channel) {
     return
   }
@@ -471,7 +480,8 @@ export const __eventsTestables = {
   handleUnreadMessagesInfoEvent,
   handleMessageMarkersReceivedEvent,
   handleDeleteMessageEvent,
-  handleEditMessageEvent
+  handleEditMessageEvent,
+  handleConnectionStatusChangedEvent
 }
 
 export default function* watchForEvents(): any {
@@ -1717,7 +1727,6 @@ export default function* watchForEvents(): any {
         case CHANNEL_EVENT_TYPES.CHANNEL_EVENT: {
           const { channelId, from, name } = args
           // const { user, channelId, name } = args
-          log.info('channel event received >>>... . . . . . ', args)
           if (from.id === SceytChatClient.user.id) {
             break
           }
@@ -1758,12 +1767,7 @@ export default function* watchForEvents(): any {
         }
         case CONNECTION_EVENT_TYPES.CONNECTION_STATUS_CHANGED: {
           const { status } = args
-          log.info('connection status changed . . . . . ', status)
-          yield put(setConnectionStatusAC(status))
-          if (status === CONNECTION_STATUS.CONNECTED) {
-            yield put(getRolesAC())
-            yield put(resendPendingMessageMutationsAC(status))
-          }
+          yield call(handleConnectionStatusChangedEvent, status)
           break
         }
         default:
