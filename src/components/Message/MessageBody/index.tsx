@@ -140,6 +140,7 @@ interface IMessageBodyProps {
   messageTextFontSize?: string
   messageTextLineHeight?: string
   messageActionsShow?: boolean
+  messageActionsBelow?: boolean
   setMessageActionsShow: (state: boolean) => void
   handleRetractVote: () => void
   handleEndVote: () => void
@@ -299,6 +300,7 @@ const MessageBody = ({
   handleToggleForwardMessagePopup,
   handleToggleInfoMessagePopupOpen,
   messageActionsShow,
+  messageActionsBelow,
   handleRetractVote,
   handleEndVote,
   closeMessageActions,
@@ -690,6 +692,7 @@ const MessageBody = ({
             message={message}
             channel={channel}
             isThreadMessage={isThreadMessage}
+            openBelow={messageActionsBelow}
             rtlDirection={ownMessageOnRightSide && !message.incoming}
             handleSetMessageForEdit={toggleEditMode}
             handleOpenDeleteMessage={handleToggleDeleteMessagePopup}
@@ -727,6 +730,7 @@ const MessageBody = ({
             handleOpenEmojis={handleOpenEmojis}
             selfMessage={message.user && messageUserID === getComparableUserId(user)}
             isThreadMessage={isThreadMessage}
+            openBelow={messageActionsBelow}
             rtlDirection={ownMessageOnRightSide && !message.incoming}
             showMessageReaction={messageReaction}
             showEditMessage={
@@ -1179,6 +1183,7 @@ export default React.memo(MessageBody, (prevProps, nextProps) => {
     prevProps.messageTextFontSize === nextProps.messageTextFontSize &&
     prevProps.messageTextLineHeight === nextProps.messageTextLineHeight &&
     prevProps.messageActionsShow === nextProps.messageActionsShow &&
+    prevProps.messageActionsBelow === nextProps.messageActionsBelow &&
     prevProps.emojisPopupOpen === nextProps.emojisPopupOpen &&
     prevProps.emojisPopupPosition === nextProps.emojisPopupPosition &&
     prevProps.frequentlyEmojisOpen === nextProps.frequentlyEmojisOpen &&

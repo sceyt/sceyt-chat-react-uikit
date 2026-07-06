@@ -30,6 +30,7 @@ interface EditMessageContainerProps {
   isThreadMessage?: boolean
   rtlDirection?: boolean
   backgroundColor?: string
+  openBelow?: boolean
 }
 
 export default function MessageActions({
@@ -52,6 +53,7 @@ export default function MessageActions({
   handleOpenInfoMessage,
   isThreadMessage,
   rtlDirection,
+  openBelow,
   showMessageReaction,
   showEditMessage,
   showCopyMessage,
@@ -152,7 +154,7 @@ export default function MessageActions({
   }, []) */
 
   return (
-    <MessageActionsWrapper isThreadMessage={isThreadMessage} rtlDirection={rtlDirection}>
+    <MessageActionsWrapper isThreadMessage={isThreadMessage} rtlDirection={rtlDirection} openBelow={openBelow}>
       <EditMessageContainer backgroundColor={backgroundSections} className='message_actions_cont '>
         {showMessageReaction &&
           messageStatus !== MESSAGE_DELIVERY_STATUS.PENDING &&
@@ -385,8 +387,11 @@ const MessageActionsWrapper = styled.div<EditMessageContainerProps>`
   left: ${({ isThreadMessage, rtlDirection }) => !rtlDirection && (isThreadMessage ? '8px' : '0')};
   right: ${({ rtlDirection }) => rtlDirection && '0'};
   direction: ${(props) => (props.rtlDirection ? 'initial' : '')};
-  top: -46px;
-  padding: 0 0 8px;
+  /* Opens above the bubble by default; below it when there is no room above
+     (e.g. the first message sitting under the chat header). The padding keeps
+     the hover area contiguous with the bubble on the facing side. */
+  top: ${({ openBelow }) => (openBelow ? '100%' : '-46px')};
+  padding: ${({ openBelow }) => (openBelow ? '8px 0 0' : '0 0 8px')};
   z-index: 90;
 `
 const EditMessageContainer = styled.div<EditMessageContainerProps>`

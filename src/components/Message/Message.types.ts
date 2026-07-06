@@ -28,6 +28,8 @@ export interface IMessageActions {
   handleReplyMessage?: () => void
   isThreadMessage?: boolean
   rtlDirection?: boolean
+  // Render the actions bar under the bubble (set when there is no room above)
+  openBelow?: boolean
 }
 
 export interface IMessageStyles {
@@ -50,6 +52,7 @@ interface ICustomMessageItem {
   unreadMessageId: string
   isUnreadMessage: boolean
   messageActionsShow: boolean
+  messageActionsBelow?: boolean
   selectionIsActive?: boolean
   emojisPopupOpen: boolean
   frequentlyEmojisOpen: boolean

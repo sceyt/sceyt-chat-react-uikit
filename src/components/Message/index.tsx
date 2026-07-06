@@ -1,5 +1,5 @@
 import styled from 'styled-components'
-import React, { useCallback, useEffect, useMemo, useRef } from 'react'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { shallowEqual } from 'react-redux'
 import { useSelector, useDispatch } from 'store/hooks'
 import moment from 'moment'
@@ -59,6 +59,10 @@ import { useMessageState } from './hooks/useMessageState'
 
 // Constants
 const MESSAGE_ACTIONS_HOVER_DELAY = 450
+// The actions bar renders ~46px above the bubble; when the message top is
+// closer than this to the viewport top (chat header area) the bar would be
+// clipped, so it opens below the bubble instead.
+const MESSAGE_ACTIONS_FLIP_THRESHOLD = 110
 const MAX_SELECTED_MESSAGES = 30
 const EMOJI_POPUP_THRESHOLD = 300
 
@@ -256,6 +260,8 @@ const Message = ({
   const scrollToNewMessage = useSelector(scrollToNewMessageSelector, shallowEqual)
   const messageItemRef = useRef<HTMLDivElement>(null)
   const isVisible = useOnScreen(messageItemRef)
+  // Whether the actions bar should open under the bubble (no room above).
+  const [messageActionsBelow, setMessageActionsBelow] = useState(false)
   const reactionsCount = useMemo(() => {
     return message.reactionTotals
       ? message.reactionTotals.reduce((prevValue, currentValue) => prevValue + currentValue.count, 0)
@@ -448,7 +454,7 @@ const Message = ({
     if (message.state !== MESSAGE_STATUS.DELETE && !selectionIsActive && !infoPopupOpen) {
       messageActionsTimeout.current = setTimeout(() => {
         const msgTop = messageItemRef.current?.getBoundingClientRect().top ?? 0
-        if (msgTop < 110) return
+        setMessageActionsBelow(msgTop < MESSAGE_ACTIONS_FLIP_THRESHOLD)
         setMessageActionsShow(true)
         dispatch(setMessageMenuOpenedAC(message.id || message.tid!))
       }, MESSAGE_ACTIONS_HOVER_DELAY)
@@ -790,6 +796,7 @@ const Message = ({
             unreadMessageId={unreadMessageId}
             isUnreadMessage={isUnreadMessage}
             messageActionsShow={messageActionsShow}
+            messageActionsBelow={messageActionsBelow}
             selectionIsActive={selectionIsActive}
             emojisPopupOpen={emojisPopupOpen}
             frequentlyEmojisOpen={frequentlyEmojisOpen}
@@ -829,6 +836,7 @@ const Message = ({
             message={message}
             channel={channel}
             MessageActionsMenu={MessageActionsMenu}
+            messageActionsBelow={messageActionsBelow}
             handleScrollToRepliedMessage={handleScrollToRepliedMessage}
             handleMediaItemClick={handleMediaItemClick}
             isPendingMessage={isPendingMessage}
