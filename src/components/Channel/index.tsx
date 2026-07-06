@@ -372,7 +372,7 @@ const Channel: React.FC<IChannelProps> = ({
     if (messageTimeAndStatusRef.current) {
       setStatusWidth(messageTimeAndStatusRef.current.offsetWidth)
     }
-  }, [messageTimeAndStatusRef, lastMessage, channelListWidth])
+  }, [messageTimeAndStatusRef, lastMessage, channelListWidth, draftMessageText])
   useEffect(() => {
     if (activeChannel.id !== channel.id) {
       const channelDraftMessage = getDraftMessageFromMap(channel.id)
@@ -756,7 +756,9 @@ const Channel: React.FC<IChannelProps> = ({
           </ChannelInfo>
 
           <ChannelStatus color={iconInactive} ref={messageTimeAndStatusRef}>
-            {lastMessage && lastMessage.state !== MESSAGE_STATUS.DELETE && (
+            {/* While a draft is previewed, the last message's delivery status is
+                not what the row describes — show the draft alone. */}
+            {lastMessage && lastMessage.state !== MESSAGE_STATUS.DELETE && !draftMessageText && (
               <DeliveryIconCont>
                 {lastMessage &&
                   lastMessage.user &&

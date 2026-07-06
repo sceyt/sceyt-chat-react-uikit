@@ -14,6 +14,7 @@ import {
   renderWithSceytProvider,
   resetMessageListFixtureIds
 } from '../../testUtils/messageListHarness'
+import { removeDraftMessageFromMap, setDraftMessageToMap } from '../../helpers/messagesHalper'
 
 jest.mock('../../hooks', () => ({
   useColor: () => {
@@ -47,7 +48,7 @@ jest.mock('../Avatar', () => ({
 }))
 
 jest.mock('../../messageUtils', () => ({
-  MessageStatusIcon: () => null,
+  MessageStatusIcon: () => <span data-testid='message-status-icon' />,
   MessageTextFormat: ({ text }: { text?: string }) => text || null
 }))
 
@@ -113,5 +114,61 @@ describe('Channel unread badge', () => {
     })
 
     expect(screen.queryByText('99+')).not.toBeInTheDocument()
+  })
+})
+
+describe('Channel draft preview', () => {
+  const channelId = 'channel-row-draft'
+
+  beforeEach(() => {
+    resetMessageListFixtureIds()
+    setClient({
+      user: makeUser({ id: 'current-user', firstName: 'Current' })
+    })
+  })
+
+  afterEach(() => {
+    removeDraftMessageFromMap(channelId)
+  })
+
+  const renderOwnLastMessageChannel = () => {
+    const currentUser = makeUser({ id: 'current-user', firstName: 'Current' })
+    const lastMessage = makeMessage({
+      id: '1801',
+      channelId,
+      body: 'my sent message',
+      incoming: false,
+      user: currentUser
+    })
+    const channel = makeChannel({
+      id: channelId,
+      type: DEFAULT_CHANNEL_TYPE.DIRECT,
+      lastMessage,
+      lastReceivedMsgId: lastMessage.id,
+      lastDisplayedMessageId: lastMessage.id
+    })
+    const store = createMessageListStore({
+      ChannelReducer: {
+        channels: [channel]
+      }
+    })
+    return renderWithSceytProvider(<ConnectedChannel channelId={channelId} />, { store })
+  }
+
+  it('shows the delivery status of an own last message when there is no draft', () => {
+    renderOwnLastMessageChannel()
+
+    expect(screen.getByTestId('message-status-icon')).toBeInTheDocument()
+    expect(screen.queryByText('Draft')).not.toBeInTheDocument()
+  })
+
+  it('hides the last message delivery status while a draft is previewed', () => {
+    setDraftMessageToMap(channelId, { text: 'unsent draft text', mentionedUsers: [] })
+
+    renderOwnLastMessageChannel()
+
+    expect(screen.getByText('Draft')).toBeInTheDocument()
+    expect(screen.getByText('unsent draft text')).toBeInTheDocument()
+    expect(screen.queryByTestId('message-status-icon')).not.toBeInTheDocument()
   })
 })
