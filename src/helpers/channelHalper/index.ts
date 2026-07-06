@@ -318,6 +318,7 @@ export function destroyChannelsMap() {
   defaultRolesByChannelTypesMap = {}
   channelTypesMemberDisplayTextMap = {}
   memberCount = 0
+  Object.keys(allChannelsMap).forEach((channelId) => delete allChannelsMap[channelId])
   Object.keys(pendingDeleteChannelMap).forEach((channelId) => delete pendingDeleteChannelMap[channelId])
   Object.keys(pendingChannelReadMap).forEach((channelId) => delete pendingChannelReadMap[channelId])
 }

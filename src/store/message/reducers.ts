@@ -18,6 +18,8 @@ import { handleVoteDetails } from '../../helpers/message'
 import store from 'store'
 import { getPollVotesAC } from './actions'
 
+export const OG_METADATA_MAX = 200
+
 export type PendingMessageMutation =
   | {
       type: 'EDIT_MESSAGE'
@@ -462,6 +464,13 @@ const messageSlice = createSlice({
       state.attachmentUpdatedMap[url] = attachmentUrl
     },
 
+    // Keys arrive already versioned (registry keys) — see helpers/attachmentBlobUrls.
+    removeAttachmentUpdatedEntries: (state, action: PayloadAction<{ keys: string[] }>) => {
+      for (const key of action.payload.keys) {
+        delete state.attachmentUpdatedMap[key]
+      }
+    },
+
     addReactionToMessage: (
       state,
       action: PayloadAction<{
@@ -666,6 +675,10 @@ const messageSlice = createSlice({
       state.attachmentsUploadingState[attachmentId] = attachmentUploadingState
     },
 
+    removeAttachmentUploadingState: (state, action: PayloadAction<{ attachmentId: string }>) => {
+      delete state.attachmentsUploadingState[action.payload.attachmentId]
+    },
+
     setReactionsList: (
       state,
       action: PayloadAction<{
@@ -739,6 +752,13 @@ const messageSlice = createSlice({
       const { url, metadata } = action.payload
       if (!state.oGMetadata) {
         state.oGMetadata = {}
+      }
+      if (!(url in state.oGMetadata)) {
+        const keys = Object.keys(state.oGMetadata)
+        // FIFO cap so link previews typed/seen over a long session stay bounded
+        for (let i = 0; i <= keys.length - OG_METADATA_MAX; i++) {
+          delete state.oGMetadata[keys[i]]
+        }
       }
       state.oGMetadata[url] = metadata
     },
@@ -816,6 +836,10 @@ const messageSlice = createSlice({
 
     setMessagesMarkersLoadingState: (state, action: PayloadAction<{ state: number }>) => {
       state.messagesMarkersLoadingState = action.payload.state
+    },
+
+    removeChannelMarkers: (state, action: PayloadAction<{ channelId: string }>) => {
+      delete state.messageMarkers[action.payload.channelId]
     },
 
     setPollVotesList: (
@@ -980,6 +1004,7 @@ export const {
   updateMessage,
   patchMessages,
   updateMessageAttachment,
+  removeAttachmentUpdatedEntries,
   addReactionToMessage,
   deleteReactionFromMessage,
   setHasPrevMessages,
@@ -1006,6 +1031,7 @@ export const {
   setSendMessageInputHeight,
   setMessageForReply,
   uploadAttachmentCompilation,
+  removeAttachmentUploadingState,
   setReactionsList,
   addReactionsToList,
   addReactionToList,
@@ -1020,6 +1046,7 @@ export const {
   updateOGMetadata,
   setMessageMarkers,
   setMessagesMarkersLoadingState,
+  removeChannelMarkers,
   updateMessagesMarkers,
   setPollVotesList,
   addPollVotesToList,

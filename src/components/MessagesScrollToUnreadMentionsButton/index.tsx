@@ -101,8 +101,10 @@ const MessagesScrollToUnreadMentionsButton: React.FC<MessagesScrollToUnreadMenti
       if (repliedMessage) {
         const scrollRef = document.getElementById('scrollableDiv') as HTMLElement
         if (scrollRef) {
+          let safetyTimer: NodeJS.Timeout
           // Function to handle scroll completion
           const handleScrollEnd = () => {
+            clearTimeout(safetyTimer)
             dispatch(setScrollToMentionedMessageAC(false))
           }
 
@@ -128,6 +130,15 @@ const MessagesScrollToUnreadMentionsButton: React.FC<MessagesScrollToUnreadMenti
           } else {
             ;(scrollRef as Element).addEventListener('scroll', handleScrollEvent)
           }
+          // Safety net: if the target is already in view no scroll (and no
+          // scrollend) ever fires — don't leave listeners dangling on the
+          // long-lived scroll container.
+          safetyTimer = setTimeout(() => {
+            scrollRef.removeEventListener('scrollend', handleScrollEndEvent)
+            scrollRef.removeEventListener('scroll', handleScrollEvent)
+            clearTimeout(scrollTimeout)
+            dispatch(setScrollToMentionedMessageAC(false))
+          }, 3000)
           dispatch(setScrollToMentionedMessageAC(true))
           scrollMessageInList(repliedMessage, {
             container: scrollRef,

@@ -6,6 +6,47 @@ let ffmpegInstance: FFmpeg | null = null
 let isFFmpegLoading = false
 let ffmpegLoadPromise: Promise<void> | null = null
 
+// The wasm heap only grows and is reclaimed exclusively by terminate() —
+// keep the instance warm between operations, but tear it down after an idle
+// period so a single large remux/conversion doesn't pin hundreds of MB for
+// the rest of the session. The core reloads from the (HTTP-cached) CDN on
+// next use.
+const FFMPEG_IDLE_TERMINATE_MS = 60000
+let activeFFmpegOps = 0
+let ffmpegIdleTimer: ReturnType<typeof setTimeout> | null = null
+
+const terminateFFmpegIfIdle = () => {
+  ffmpegIdleTimer = null
+  if (activeFFmpegOps > 0 || !ffmpegInstance || isFFmpegLoading) {
+    return
+  }
+  try {
+    ffmpegInstance.terminate()
+  } catch (e) {
+    log.info('Error terminating idle FFmpeg instance', e)
+  }
+  ffmpegInstance = null
+  ffmpegLoadPromise = null
+}
+
+export const beginFFmpegOp = () => {
+  activeFFmpegOps++
+  if (ffmpegIdleTimer) {
+    clearTimeout(ffmpegIdleTimer)
+    ffmpegIdleTimer = null
+  }
+}
+
+export const endFFmpegOp = () => {
+  activeFFmpegOps = Math.max(0, activeFFmpegOps - 1)
+  if (activeFFmpegOps === 0) {
+    if (ffmpegIdleTimer) {
+      clearTimeout(ffmpegIdleTimer)
+    }
+    ffmpegIdleTimer = setTimeout(terminateFFmpegIfIdle, FFMPEG_IDLE_TERMINATE_MS)
+  }
+}
+
 /**
  * Detects if the current browser is Safari
  * Uses the accurate detection method that excludes Chrome (which also includes "Safari" in user agent)
@@ -91,6 +132,7 @@ const getExtensionForType = (mimeType: string): string => {
 }
 
 export const convertToAac = async (file: File, messageId: string): Promise<File> => {
+  beginFFmpegOp()
   try {
     // Validate file size (limit to 50MB to avoid memory issues)
     const maxSize = 50 * 1024 * 1024 // 50MB
@@ -171,6 +213,8 @@ export const convertToAac = async (file: File, messageId: string): Promise<File>
   } catch (error) {
     log.error('Failed to convert audio to AAC:', error)
     throw error
+  } finally {
+    endFFmpegOp()
   }
 }
 

@@ -1,4 +1,18 @@
-import MessageReducer, { addMessage, addMessages, setMessages, updateMessage, updateMessagesStatus } from './reducers'
+import MessageReducer, {
+  addMessage,
+  addMessages,
+  setMessages,
+  updateMessage,
+  updateMessagesStatus,
+  updateMessageAttachment,
+  removeAttachmentUpdatedEntries,
+  uploadAttachmentCompilation,
+  removeAttachmentUploadingState,
+  setMessageMarkers,
+  removeChannelMarkers,
+  setOGMetadata,
+  OG_METADATA_MAX
+} from './reducers'
 import {
   addMessageToMap,
   clearMessagesMap,
@@ -636,5 +650,76 @@ describe('message marker status updates', () => {
       { name: MESSAGE_DELIVERY_STATUS.READ, count: 1 }
     ])
     expect(getMessagesFromMap(channelId)[cachedRemoteMessage.id].userMarkers).toEqual([])
+  })
+})
+
+describe('memory-bounded maps', () => {
+  const initialState = MessageReducer(undefined, { type: '@@INIT' })
+
+  it('removeAttachmentUpdatedEntries deletes only the given (already versioned) keys', () => {
+    let state = MessageReducer(initialState, updateMessageAttachment({ url: 'url-a_v1', attachmentUrl: 'blob:a' }))
+    state = MessageReducer(state, updateMessageAttachment({ url: 'url-b_v1', attachmentUrl: 'blob:b' }))
+    state = MessageReducer(state, removeAttachmentUpdatedEntries({ keys: ['url-a_v1', 'missing-key'] }))
+    expect(state.attachmentUpdatedMap).toEqual({ 'url-b_v1': 'blob:b' })
+  })
+
+  it('removeAttachmentUploadingState deletes a single upload state entry', () => {
+    let state = MessageReducer(
+      initialState,
+      uploadAttachmentCompilation({ attachmentUploadingState: 'success', attachmentId: 'tid-1' })
+    )
+    state = MessageReducer(
+      state,
+      uploadAttachmentCompilation({ attachmentUploadingState: 'fail', attachmentId: 'tid-2' })
+    )
+    state = MessageReducer(state, removeAttachmentUploadingState({ attachmentId: 'tid-1' }))
+    expect(state.attachmentsUploadingState).toEqual({ 'tid-2': 'fail' })
+  })
+
+  it('removeChannelMarkers drops all markers of one channel', () => {
+    let state = MessageReducer(
+      initialState,
+      setMessageMarkers({
+        channelId: 'channel-1',
+        messageId: 'message-1',
+        messageMarkers: { displayed: [] },
+        deliveryStatuses: ['displayed']
+      })
+    )
+    state = MessageReducer(
+      state,
+      setMessageMarkers({
+        channelId: 'channel-2',
+        messageId: 'message-2',
+        messageMarkers: { displayed: [] },
+        deliveryStatuses: ['displayed']
+      })
+    )
+    state = MessageReducer(state, removeChannelMarkers({ channelId: 'channel-1' }))
+    expect(state.messageMarkers['channel-1']).toBeUndefined()
+    expect(state.messageMarkers['channel-2']).toBeDefined()
+  })
+
+  it('setOGMetadata caps the map with FIFO eviction', () => {
+    let state = initialState
+    for (let i = 0; i < OG_METADATA_MAX; i++) {
+      state = MessageReducer(state, setOGMetadata({ url: `https://example.com/${i}`, metadata: null }))
+    }
+    expect(Object.keys(state.oGMetadata || {})).toHaveLength(OG_METADATA_MAX)
+    state = MessageReducer(state, setOGMetadata({ url: 'https://example.com/overflow', metadata: null }))
+    const keys = Object.keys(state.oGMetadata || {})
+    expect(keys).toHaveLength(OG_METADATA_MAX)
+    expect(keys).not.toContain('https://example.com/0')
+    expect(keys).toContain('https://example.com/overflow')
+  })
+
+  it('updating an existing oGMetadata key does not evict others', () => {
+    let state = initialState
+    for (let i = 0; i < OG_METADATA_MAX; i++) {
+      state = MessageReducer(state, setOGMetadata({ url: `https://example.com/${i}`, metadata: null }))
+    }
+    state = MessageReducer(state, setOGMetadata({ url: 'https://example.com/0', metadata: null }))
+    expect(Object.keys(state.oGMetadata || {})).toHaveLength(OG_METADATA_MAX)
+    expect(Object.keys(state.oGMetadata || {})).toContain('https://example.com/1')
   })
 })

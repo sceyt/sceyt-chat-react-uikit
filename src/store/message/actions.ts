@@ -90,10 +90,13 @@ import {
   removeSelectedMessage,
   clearSelectedMessages,
   updateMessageAttachment,
+  removeAttachmentUpdatedEntries,
+  removeAttachmentUploadingState,
   setOGMetadata,
   updateOGMetadata,
   setMessageMarkers,
   setMessagesMarkersLoadingState,
+  removeChannelMarkers,
   updateMessagesMarkers,
   setPollVotesList,
   addPollVotesToList,
@@ -111,6 +114,7 @@ import {
 } from './reducers'
 import { PendingPollAction } from 'helpers/messagesHalper'
 import { ATTACHMENT_VERSION } from 'helpers/attachmentsCache'
+import { registerBlobUrl } from 'helpers/attachmentBlobUrls'
 
 export function sendMessageAC(
   message: any,
@@ -493,7 +497,26 @@ export function updateOGMetadataAC(url: string, metadata: IOGMetadata | null) {
 }
 
 export function setUpdateMessageAttachmentAC(url: string, attachmentUrl: string) {
-  return updateMessageAttachment({ url: url + ATTACHMENT_VERSION, attachmentUrl })
+  const versionedKey = url + ATTACHMENT_VERSION
+  // Every blob URL shared through attachmentUpdatedMap is tracked by the
+  // registry so it gets revoked on eviction instead of leaking for the session.
+  if (attachmentUrl && attachmentUrl.startsWith('blob:')) {
+    registerBlobUrl(versionedKey, attachmentUrl)
+  }
+  return updateMessageAttachment({ url: versionedKey, attachmentUrl })
+}
+
+// Keys must already carry ATTACHMENT_VERSION (they come from the blob-URL registry).
+export function removeAttachmentUpdatedEntriesAC(keys: string[]) {
+  return removeAttachmentUpdatedEntries({ keys })
+}
+
+export function removeAttachmentUploadingStateAC(attachmentId: string) {
+  return removeAttachmentUploadingState({ attachmentId })
+}
+
+export function removeChannelMarkersAC(channelId: string) {
+  return removeChannelMarkers({ channelId })
 }
 
 export function updateMessageAC(

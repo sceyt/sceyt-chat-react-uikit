@@ -51,6 +51,7 @@ import {
   deletePollVotesFromListAC,
   deleteReactionFromMessageAC,
   loadOGMetadataForLinkAC,
+  removeChannelMarkersAC,
   removePendingMessageMutationAC,
   resendPendingMessageMutationsAC,
   updateMessageAC,
@@ -1495,6 +1496,7 @@ export default function* watchForEvents(): any {
             removeAllMessages()
           }
           removeMessagesFromMap(channel.id)
+          yield put(removeChannelMarkersAC(channel.id))
           if (channelExist) {
             yield put(
               updateChannelDataAC(channel.id, {
@@ -1744,6 +1746,10 @@ export default function* watchForEvents(): any {
           } else if (name === 'stop_typing') {
             if (usersTimeout.typingTimeout[channelId] && usersTimeout.typingTimeout[channelId][from.id]) {
               clearTimeout(usersTimeout.typingTimeout[channelId][from.id])
+              delete usersTimeout.typingTimeout[channelId][from.id]
+              if (!Object.keys(usersTimeout.typingTimeout[channelId]).length) {
+                delete usersTimeout.typingTimeout[channelId]
+              }
             }
             yield put(switchTypingIndicatorAC(false, channelId, from))
           } else if (name === 'start_recording') {
@@ -1760,6 +1766,10 @@ export default function* watchForEvents(): any {
           } else if (name === 'stop_recording') {
             if (usersTimeout.recordingTimeout[channelId] && usersTimeout.recordingTimeout[channelId][from.id]) {
               clearTimeout(usersTimeout.recordingTimeout[channelId][from.id])
+              delete usersTimeout.recordingTimeout[channelId][from.id]
+              if (!Object.keys(usersTimeout.recordingTimeout[channelId]).length) {
+                delete usersTimeout.recordingTimeout[channelId]
+              }
             }
             yield put(switchRecordingIndicatorAC(false, channelId, from))
           }

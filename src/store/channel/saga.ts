@@ -112,6 +112,8 @@ import { getClient } from '../../common/client'
 import {
   clearMessagesAC,
   clearSelectedMessagesAC,
+  clearTabAttachmentsCacheAC,
+  removeChannelMarkersAC,
   sendTextMessageAC,
   setMessagesHasPrevAC,
   setUnreadScrollToAC,
@@ -122,9 +124,11 @@ import watchForEvents from '../evetns/inedx'
 import { CHECK_USER_STATUS, CONNECTION_STATUS } from '../user/constants'
 import {
   compareMessageIds,
+  evictLruChannels,
   getMessagesFromMap,
   removeAllMessages,
   removeMessagesFromMap,
+  trackChannelVisit,
   updateMessageOnMap
 } from '../../helpers/messagesHalper'
 import { setActionIsRestrictedAC, updateMembersPresenceAC } from '../member/actions'
@@ -1417,8 +1421,13 @@ function* switchChannel(action: IAction): any {
       const currentActiveChannel = getChannelFromMap(getActiveChannelId())
       yield put(setUnreadScrollToAC(true))
       removeAllMessages()
+      yield put(clearTabAttachmentsCacheAC())
       yield put(setMessagesHasPrevAC(true))
       yield call(setActiveChannelId, channel && channel.id)
+      if (channel && channel.id) {
+        trackChannelVisit(channel.id)
+        evictLruChannels(channel.id)
+      }
       if (channel.isLinkedChannel) {
         channelToSwitch.linkedFrom = currentActiveChannel
       }
@@ -1634,6 +1643,7 @@ function* removeChannelCaches(action: IAction): any {
   const activeChannelId = yield call(getActiveChannelId)
   removeChannelFromMap(channelId)
   removeMessagesFromMap(channelId)
+  yield put(removeChannelMarkersAC(channelId))
   if (activeChannelId === channelId) {
     const activeChannel = yield call(getLastChannelFromMap)
     if (activeChannel) {
@@ -1720,6 +1730,7 @@ function* deleteChannel(action: IAction): any {
         yield call(channel.hide)
         yield put(clearMessagesAC())
         removeMessagesFromMap(channelId)
+        yield put(removeChannelMarkersAC(channelId))
         removeAllMessages()
         yield put(clearSelectedMessagesAC())
         yield put(setChannelToHideAC(channel))
@@ -1919,6 +1930,7 @@ function* clearHistory(action: IAction): any {
       yield call(channel.deleteAllMessages)
       yield put(clearMessagesAC())
       removeMessagesFromMap(channelId)
+      yield put(removeChannelMarkersAC(channelId))
       if (channelId === activeChannelId) {
         removeAllMessages()
       }
@@ -1953,6 +1965,7 @@ function* deleteAllMessages(action: IAction): any {
     if (channel) {
       yield call(channel.deleteAllMessages, true)
       removeMessagesFromMap(channelId)
+      yield put(removeChannelMarkersAC(channelId))
       if (channelId === activeChannelId) {
         yield put(clearMessagesAC())
         removeAllMessages()

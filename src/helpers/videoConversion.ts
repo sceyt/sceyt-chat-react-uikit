@@ -30,12 +30,17 @@ export const remuxToMp4 = async (blob: Blob): Promise<Blob | null> => {
   const inputName = `remux_${id}_in.mov`
   const outputName = `remux_${id}_out.mp4`
   let ffmpeg: FFmpeg | null = null
+  let endFFmpegOpRef: (() => void) | null = null
   try {
-    dbg('remux: starting ffmpeg -c copy remux, size =', blob.size)
     // Lazy-load ffmpeg only when a remux is actually needed — the UMD bundle
     // cannot be evaluated outside a real browser (e.g. jsdom tests) and is
     // heavy to parse at startup.
-    const [{ initFFmpeg }, { fetchFile }] = await Promise.all([import('./audioConversion'), import('@ffmpeg/util')])
+    const [{ initFFmpeg, beginFFmpegOp, endFFmpegOp }, { fetchFile }] = await Promise.all([
+      import('./audioConversion'),
+      import('@ffmpeg/util')
+    ])
+    beginFFmpegOp()
+    endFFmpegOpRef = endFFmpegOp
     ffmpeg = await initFFmpeg()
 
     await ffmpeg.writeFile(inputName, await fetchFile(blob))
@@ -60,7 +65,6 @@ export const remuxToMp4 = async (blob: Blob): Promise<Blob | null> => {
       return null
     }
     const arrayBuffer = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer
-    dbg('remux: done, output size =', bytes.length)
     return new Blob([arrayBuffer], { type: 'video/mp4' })
   } catch (error) {
     dbg('remux: FAILED', error)
@@ -79,6 +83,9 @@ export const remuxToMp4 = async (blob: Blob): Promise<Blob | null> => {
         // File doesn't exist, that's fine
       }
     }
+    if (endFFmpegOpRef) {
+      endFFmpegOpRef()
+    }
   }
 }
 
@@ -95,7 +102,6 @@ export const remuxVideoFileForUpload = async (file: File): Promise<File> => {
     if (!isQuickTimeContainer(info)) {
       return file
     }
-    dbg('upload: QuickTime file picked, remuxing before upload:', file.name)
     const remuxed = await remuxToMp4(file)
     if (!remuxed) {
       log.warn('remuxVideoFileForUpload: remux failed, uploading original file')
@@ -124,7 +130,6 @@ export const ensurePlayableVideoBlob = async (blob: Blob): Promise<Blob> => {
     if (!isQuickTimeContainer(info)) {
       return blob
     }
-    dbg('download: QuickTime blob in Firefox, remuxing for playback')
     const remuxed = await remuxToMp4(blob)
     return remuxed || blob
   } catch (error) {

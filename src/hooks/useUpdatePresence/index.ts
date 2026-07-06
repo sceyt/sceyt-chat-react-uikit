@@ -10,7 +10,29 @@ import { DEFAULT_CHANNEL_TYPE } from '../../helpers/constants'
 import { getClient } from '../../common/client'
 import { deleteUserFromMap, setUserToMap, updateUserOnMap, usersMap } from '../../helpers/userHelper'
 // import { checkUserStatusAC } from '../../store/user/actions'
+// One shared polling interval for all hook instances; stopped when the last
+// instance unmounts, presence tracking empties, or the connection drops.
 let updateInterval: any
+let presenceHookInstances = 0
+
+const stopPresenceInterval = () => {
+  if (updateInterval) {
+    clearInterval(updateInterval)
+    updateInterval = undefined
+  }
+}
+
+const syncPresenceInterval = (dispatch: any, connected: boolean) => {
+  const shouldRun = presenceHookInstances > 0 && Object.keys(usersMap).length > 0 && connected
+  if (shouldRun && !updateInterval) {
+    updateInterval = setInterval(() => {
+      dispatch(checkUserStatusAC())
+    }, 4000)
+  } else if (!shouldRun) {
+    stopPresenceInterval()
+  }
+}
+
 export default function useUpdatePresence(channel: IChannel, isVisible: boolean) {
   const dispatch = useDispatch()
   const connectionStatus = useSelector(connectionStatusSelector)
@@ -23,15 +45,15 @@ export default function useUpdatePresence(channel: IChannel, isVisible: boolean)
     deleteUserFromMap(userId)
   }
 
-  if (Object.keys(usersMap).length && connectionStatus === CONNECTION_STATUS.CONNECTED) {
-    clearInterval(updateInterval)
-    updateInterval = setInterval(() => {
-      dispatch(checkUserStatusAC())
-    }, 4000)
-  } else if (!Object.keys(usersMap).length && updateInterval) {
-    clearInterval(updateInterval)
-    updateInterval = undefined
-  }
+  useEffect(() => {
+    presenceHookInstances++
+    return () => {
+      presenceHookInstances--
+      if (presenceHookInstances <= 0) {
+        stopPresenceInterval()
+      }
+    }
+  }, [])
 
   useEffect(() => {
     if (userId && isVisible && directChannelUser) {
@@ -44,15 +66,11 @@ export default function useUpdatePresence(channel: IChannel, isVisible: boolean)
     }
   })
 
+  // Runs after every render so changes to the module-level usersMap (which
+  // never changes identity) are still picked up.
   useEffect(() => {
-    clearInterval(updateInterval)
-  }, [usersMap])
-
-  useEffect(() => {
-    if (connectionStatus !== CONNECTION_STATUS.CONNECTED) {
-      clearInterval(updateInterval)
-    }
-  }, [connectionStatus])
+    syncPresenceInterval(dispatch, connectionStatus === CONNECTION_STATUS.CONNECTED)
+  })
 
   useEffect(() => {
     if (

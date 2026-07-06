@@ -61,6 +61,10 @@ import { IChatClientProps } from '../ChatContainer'
 import { defaultTheme, THEME_COLORS } from '../../UIHelper/constants'
 import { setHideUserPresence } from '../../helpers/userHelper'
 import { clearMessagesMap } from '../../helpers/messagesHalper'
+import { releaseAllBlobUrls, setBlobUrlEvictListener } from '../../helpers/attachmentBlobUrls'
+import { removeAttachmentUpdatedEntriesAC } from '../../store/message/actions'
+import { initMessagesIdbForUser } from '../../helpers/messagesIdb'
+import { clearUsersMap } from '../../helpers/userHelper'
 import { setTheme, setThemeAC } from '../../store/theme/actions'
 import { SceytChatUIKitTheme, ThemeMode } from '../../components'
 import log from 'loglevel'
@@ -159,6 +163,11 @@ const SceytChat = ({
     if (client) {
       // Clean up old attachment cache if version changed
       cleanupOldAttachmentCache()
+      // Scope the IndexedDB message spill to the connected user (wipes it on
+      // account switch) and prune stale entries.
+      if (client.user && client.user.id) {
+        initMessagesIdbForUser(client.user.id)
+      }
 
       setClient(client)
       setSceytChatClient(client)
@@ -172,6 +181,8 @@ const SceytChat = ({
       clearMessagesMap()
       setActiveChannelId('')
       destroyChannelsMap()
+      clearUsersMap()
+      releaseAllBlobUrls()
       dispatch(destroySession())
     }
   }, [client])
@@ -241,24 +252,33 @@ const SceytChat = ({
     if (channelTypeFilter) {
       setChannelTypesFilter(channelTypeFilter)
     }
+    // Evicted blob URLs must also leave the Redux map so consumers fall back
+    // to the attachments cache instead of rendering a revoked URL.
+    setBlobUrlEvictListener((keys) => dispatch(removeAttachmentUpdatedEntriesAC(keys)))
+
+    const handleWindowFocus = () => handleFocusChange(true)
+    const handleWindowBlur = () => handleFocusChange(false)
     if (showNotifications) {
       // Initialize notifications with cross-browser support
       initializeNotifications()
       window.sceytTabNotifications = null
       window.sceytTabUrl = window.location.href
 
-      window.addEventListener('focus', () => handleFocusChange(true))
-      window.addEventListener('blur', () => handleFocusChange(false))
+      window.addEventListener('focus', handleWindowFocus)
+      window.addEventListener('blur', handleWindowBlur)
     }
 
     document.addEventListener(visibilityChange, handleVisibilityChange, false)
     return () => {
-      window.removeEventListener('focus', () => handleFocusChange(true))
-      window.removeEventListener('blur', () => handleFocusChange(false))
+      window.removeEventListener('focus', handleWindowFocus)
+      window.removeEventListener('blur', handleWindowBlur)
       document.removeEventListener(visibilityChange, handleVisibilityChange)
       clearMessagesMap()
       setActiveChannelId('')
       destroyChannelsMap()
+      clearUsersMap()
+      releaseAllBlobUrls()
+      setBlobUrlEvictListener(null)
       dispatch(destroySession())
     }
   }, [])

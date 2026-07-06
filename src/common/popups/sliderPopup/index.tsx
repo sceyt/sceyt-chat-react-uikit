@@ -50,6 +50,7 @@ import {
   getAttachmentURLWithVersion,
   setAttachmentToCache
 } from '../../../helpers/attachmentsCache'
+import { releaseAllOriginalBlobUrls } from '../../../helpers/attachmentBlobUrls'
 import VideoPlayer from '../../../components/VideoPlayer'
 import { CircularProgressbar } from 'react-circular-progressbar'
 import ForwardMessagePopup from '../forwardMessage'
@@ -134,6 +135,15 @@ const SliderPopup: React.FC<IProps> = ({
   const handleClosePopup = () => {
     setIsSliderOpen(false)
   }
+
+  useEffect(() => {
+    return () => {
+      // The slider is the only consumer of full-size originals — drop them on
+      // close so the biggest blobs don't stay pinned; they re-mint from the
+      // attachments cache on next open.
+      releaseAllOriginalBlobUrls()
+    }
+  }, [])
 
   const downloadImage = (src: string, setToDownloadedFiles?: boolean, type?: string) => {
     if (setToDownloadedFiles && currentFile) {

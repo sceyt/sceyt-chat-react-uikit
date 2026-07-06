@@ -111,6 +111,9 @@ const AudioRecord: React.FC<AudioPlayerProps> = ({
   }
 
   const handleStopRecording = () => {
+    // Stops the waveform rAF loop (and lets it close its AudioContext) even
+    // when the component unmounts mid-recording.
+    shouldDraw = false
     dispatch(sendRecordingAC(false, currentChannelId))
     if (sendingInterval) {
       clearInterval(sendingInterval)
@@ -240,6 +243,11 @@ const AudioRecord: React.FC<AudioPlayerProps> = ({
                 obj.x = 0
                 // @ts-ignore
                 obj.ctx.clearRect(0, 0, obj.canvas.width, obj.canvas.height)
+                // Every stop path funnels through here — release the audio
+                // graph (browsers cap live AudioContexts at ~6).
+                if (obj.audioContext && obj.audioContext.state !== 'closed') {
+                  obj.audioContext.close().catch(() => undefined)
+                }
                 return
               }
               obj.ctx.clearRect(0, 0, obj.canvas.width, obj.canvas.height)
@@ -288,6 +296,7 @@ const AudioRecord: React.FC<AudioPlayerProps> = ({
               // @ts-ignore
               const AudioContext = window.AudioContext || window.webkitAudioContext
               const audioContent = new AudioContext()
+              obj.audioContext = audioContent
               const streamSource = audioContent.createMediaStreamSource(stream)
 
               obj.analyser = audioContent.createAnalyser()
@@ -315,6 +324,9 @@ const AudioRecord: React.FC<AudioPlayerProps> = ({
     handleStopRecording()
     if (currentRecordedFile) {
       dispatch(setChannelDraftMessageIsRemovedAC(currentChannelId))
+      if (currentRecordedFile.objectUrl && currentRecordedFile.objectUrl.startsWith('blob:')) {
+        URL.revokeObjectURL(currentRecordedFile.objectUrl)
+      }
       setRecordedFile(null)
       setPlayAudio(false)
       cleanupAudioElement(currentChannelId)
@@ -349,10 +361,16 @@ const AudioRecord: React.FC<AudioPlayerProps> = ({
           const reader = new FileReader()
 
           reader.onload = (event: any) => {
+            const closeDecodeContext = () => {
+              if (audioContext.state !== 'closed') {
+                audioContext.close().catch(() => undefined)
+              }
+            }
             audioContext.decodeAudioData(
               // @ts-ignore
               event.target.result,
               (audioBuffer: any) => {
+                closeDecodeContext()
                 const numberOfSegments = 50
                 const segmentSize = Math.floor(audioBuffer.length / numberOfSegments)
                 const waveform = []
@@ -398,6 +416,7 @@ const AudioRecord: React.FC<AudioPlayerProps> = ({
                 }
               },
               (e: any) => {
+                closeDecodeContext()
                 log.info('Error decoding audio data: ' + e.err)
               }
             )

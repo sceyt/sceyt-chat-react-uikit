@@ -2,9 +2,11 @@ import { IAttachment, IMarker, IMessage, IPollVote, IReaction } from '../../type
 import { checkArraysEqual } from '../index'
 import { MESSAGE_DELIVERY_STATUS, MESSAGE_STATUS } from '../constants'
 import { cancelUpload, getCustomUploader } from '../customUploader'
+import { releaseBlobUrls } from '../attachmentBlobUrls'
 import { handleVoteDetails } from '../message'
 import store from 'store'
-import { removePendingPollActionAC, setPendingPollActionsMapAC } from 'store/message/actions'
+import { removeChannelMarkersAC, removePendingPollActionAC, setPendingPollActionsMapAC } from 'store/message/actions'
+import { persistChannelMessages, restoreChannelMessages } from '../messagesIdb'
 export const MESSAGES_MAX_PAGE_COUNT = 60
 export const MESSAGES_MAX_LENGTH = 40
 export const LOAD_MAX_MESSAGE_COUNT = 20
@@ -995,7 +997,87 @@ export function getMessageFromMap(channelId: string, messageId: string) {
 export function removeMessagesFromMap(channelId: string) {
   delete messagesMap[channelId]
   delete loadedSegmentsMap[channelId]
+  channelVisitOrder = channelVisitOrder.filter((id) => id !== channelId)
 }
+
+// ---- In-memory channel-cache LRU with IndexedDB spill ----------------------
+// messagesMap keeps every visited channel's messages; without a bound it grows
+// for the whole session. The active channel plus the most recently visited
+// MESSAGES_CACHE_MAX_CHANNELS channels stay in memory; older channels are
+// persisted to IndexedDB (sans Files/blob URLs) and restored on revisit.
+
+export const MESSAGES_CACHE_MAX_CHANNELS = 8
+
+let channelVisitOrder: string[] = []
+
+export const trackChannelVisit = (channelId: string) => {
+  if (!channelId) {
+    return
+  }
+  channelVisitOrder = channelVisitOrder.filter((id) => id !== channelId)
+  channelVisitOrder.push(channelId)
+}
+
+export const evictLruChannels = (activeChannelId: string) => {
+  // Drop ids whose caches are already gone (leave/delete flows).
+  channelVisitOrder = channelVisitOrder.filter((id) => messagesMap[id])
+  const candidates = channelVisitOrder.filter((id) => id !== activeChannelId)
+  let overflow = candidates.length - MESSAGES_CACHE_MAX_CHANNELS
+  if (overflow <= 0) {
+    return []
+  }
+  const evictedIds: string[] = []
+  for (const channelId of candidates) {
+    if (overflow <= 0) {
+      break
+    }
+    // Unsent messages only live in memory — never spill them.
+    if (getPendingMessagesFromMap(channelId).length) {
+      continue
+    }
+    persistChannelMessages(channelId, Object.values(messagesMap[channelId] || {}), [
+      ...(loadedSegmentsMap[channelId] || [])
+    ])
+    removeMessagesFromMap(channelId)
+    store.dispatch(removeChannelMarkersAC(channelId))
+    evictedIds.push(channelId)
+    overflow--
+  }
+  return evictedIds
+}
+
+// Repopulates messagesMap/loadedSegmentsMap from the IndexedDB spill before
+// the cache-first load paths run, so a previously evicted channel still opens
+// instantly. No-op when the channel is already in memory or nothing is stored.
+export const ensureChannelCacheLoaded = async (channelId: string) => {
+  if (!channelId || messagesMap[channelId]) {
+    return false
+  }
+  const persisted = await restoreChannelMessages(channelId)
+  if (!persisted || !persisted.messages || !persisted.messages.length) {
+    return false
+  }
+  // A live load may have raced the restore — in-memory data wins.
+  if (messagesMap[channelId]) {
+    return true
+  }
+  messagesMap[channelId] = {}
+  persisted.messages.forEach((message: IMessage) => {
+    const key = message.id || message.tid
+    if (key) {
+      messagesMap[channelId][key] = message
+    }
+  })
+  if (persisted.segments) {
+    persisted.segments.forEach((segment) => {
+      if (segment && segment.startId && segment.endId) {
+        upsertSegment(channelId, segment.startId, segment.endId)
+      }
+    })
+  }
+  return true
+}
+// ----------------------------------------------------------------------------
 
 export function removeMessageFromMap(channelId: string, messageId: string) {
   if (messagesMap[channelId] && messagesMap[channelId][messageId]) {
@@ -1019,6 +1101,7 @@ export function removeMessageFromMap(channelId: string, messageId: string) {
 export function clearMessagesMap() {
   messagesMap = {}
   loadedSegmentsMap = {}
+  channelVisitOrder = []
   clearActiveSegment()
 }
 
@@ -1028,6 +1111,9 @@ export function checkChannelExistsOnMessagesMap(channelId: string) {
 
 export function destroyChannelsMap() {
   messagesMap = {}
+  loadedSegmentsMap = {}
+  channelVisitOrder = []
+  clearActiveSegment()
 }
 
 export const messagesDiff = (message: IMessage, updatedMessage: IMessage) =>
@@ -1068,6 +1154,7 @@ export const deletePendingMessage = (channelId: string, message: IMessage) => {
         cancelUpload(att.tid!)
         deletePendingAttachment(att.tid!)
       }
+      releaseBlobUrls([`compose_${att.tid}`])
     })
   }
   removeMessageFromMap(channelId, message.id || message.tid!)
@@ -1123,6 +1210,10 @@ export const removeDraftMessageFromMap = (channelId: string) => {
   delete draftMessagesMap[channelId]
 }
 
+// Note: the recording's objectUrl is intentionally NOT revoked here — on send
+// it becomes the pending voice message's attachmentUrl (see sendRecordedFile),
+// which registers it as compose_<tid> and releases it on confirmation.
+// Discarded recordings are revoked by AudioRecord's cancel flow.
 export const removeAudioRecordingFromMap = (channelId: string) => {
   delete audioRecordingMap[channelId]
 }

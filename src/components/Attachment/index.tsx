@@ -39,6 +39,7 @@ import {
   getAttachmentURLWithVersion,
   setAttachmentToCache
 } from '../../helpers/attachmentsCache'
+import { registerBlobUrl } from '../../helpers/attachmentBlobUrls'
 import { base64ToDataURL } from '../../helpers/resizeImage'
 import { getPendingAttachment, updateMessageOnMap } from '../../helpers/messagesHalper'
 import { CONNECTION_STATUS } from '../../store/user/constants'
@@ -377,6 +378,7 @@ const Attachment = ({
       if (attachment.type === attachmentTypes.image) {
         const compressedUrl = await compressAndCacheImage(url, attachment.url, renderWidth, renderHeight)
         if (compressedUrl) {
+          registerBlobUrl(getAttachmentURLWithVersion(attachment.url), compressedUrl)
           downloadingUrl = compressedUrl
         }
         setAttachmentToCache(
@@ -430,6 +432,7 @@ const Attachment = ({
       if (attachment.type === attachmentTypes.image) {
         const compressedUrl = await compressAndCacheImage(attachment.url, attachment.url, renderWidth, renderHeight)
         if (compressedUrl) {
+          registerBlobUrl(getAttachmentURLWithVersion(attachment.url), compressedUrl)
           downloadingUrl = compressedUrl
         }
         setIsCached(true)
@@ -450,7 +453,7 @@ const Attachment = ({
                   attachment.url,
                   new Response(frameBlob, { headers: { 'Content-Type': 'image/jpeg' } })
                 )
-                dispatch(setUpdateMessageAttachmentAC(getAttachmentURLWithVersion(attachment.url), frameBlobUrl))
+                dispatch(setUpdateMessageAttachmentAC(attachment.url, frameBlobUrl))
               }
               setAttachmentToCache(
                 attachment.url + '_original_video_url',
@@ -462,6 +465,7 @@ const Attachment = ({
                 attachment.url,
                 new Response(blob, { headers: { 'Content-Type': blob.type || 'application/octet-stream' } })
               )
+              registerBlobUrl(getAttachmentURLWithVersion(attachment.url), blobUrl)
             }
             setAttachmentUrl(blobUrl)
             setIsCached(true)
@@ -582,6 +586,7 @@ const Attachment = ({
               if (attachment.type === attachmentTypes.image) {
                 const compressedUrl = await compressAndCacheImage(url, attachment.url, renderWidth, renderHeight)
                 if (compressedUrl) {
+                  registerBlobUrl(getAttachmentURLWithVersion(attachment.url), compressedUrl)
                   downloadingUrl = compressedUrl
                 }
               } else {

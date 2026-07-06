@@ -84,6 +84,7 @@ import {
   setPendingAttachment,
   setSendMessageHandler
 } from '../../helpers/messagesHalper'
+import { registerBlobUrl, releaseBlobUrls } from '../../helpers/attachmentBlobUrls'
 import { attachmentTypes, DEFAULT_CHANNEL_TYPE, MESSAGE_DELIVERY_STATUS, USER_STATE } from '../../helpers/constants'
 import { hideUserPresence } from '../../helpers/userHelper'
 import { getShowOnlyContactUsers } from '../../helpers/contacts'
@@ -904,9 +905,11 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
     if (attachmentId) {
       const updatedAttachments = attachmentsUpdate.filter((item: any) => item.tid !== attachmentId)
       deleteVideoThumb(attachmentId)
+      releaseBlobUrls([`compose_${attachmentId}`])
       setAttachments(updatedAttachments)
       attachmentsUpdate = updatedAttachments
     } else {
+      releaseBlobUrls(attachmentsUpdate.map((item: any) => `compose_${item.tid}`))
       setAttachments([])
       attachmentsUpdate = []
     }
@@ -1168,6 +1171,15 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
     setMentionedUsers((prevState: any[]) => [...prevState, mentionMember])
   }
 
+  // Compose preview URLs are tracked in the blob-URL registry under a
+  // compose_<tid> key; they're released when the attachment is removed from
+  // the compose bar, the pending message is deleted, or the send is confirmed.
+  const createComposePreviewUrl = (attachmentTid: string, blob: Blob | File) => {
+    const url = URL.createObjectURL(blob)
+    registerBlobUrl(`compose_${attachmentTid}`, url)
+    return url
+  }
+
   const handleAddAttachment = async (file: File, isMediaAttachment: boolean) => {
     const customUploader = getCustomUploader()
     if (file.type.split('/')[0] === 'video') {
@@ -1209,7 +1221,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
               data: file,
               upload: false,
               type: isMediaAttachment ? fileType : 'file',
-              attachmentUrl: URL.createObjectURL(resizedFile.blob as any),
+              attachmentUrl: createComposePreviewUrl(tid, resizedFile.blob as any),
               tid,
               size: isMediaAttachment ? (resizedFile?.blob ? resizedFile?.blob?.size : file.size) : file.size,
               metadata: {
@@ -1229,7 +1241,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
             data: file,
             upload: false,
             type: isMediaAttachment ? fileType : 'file',
-            attachmentUrl: URL.createObjectURL(file),
+            attachmentUrl: createComposePreviewUrl(tid, file),
             tid,
             size: file.size,
             metadata: {
@@ -1264,7 +1276,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
                 {
                   data: file,
                   upload: true,
-                  attachmentUrl: URL.createObjectURL(file),
+                  attachmentUrl: createComposePreviewUrl(tid, file),
                   tid,
                   type: fileType,
                   size: file.size,
@@ -1281,7 +1293,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
                 const attachment = {
                   data: resizedFile,
                   upload: true,
-                  attachmentUrl: URL.createObjectURL(resizedFile),
+                  attachmentUrl: createComposePreviewUrl(tid, resizedFile),
                   tid,
                   type: fileType,
                   size: resizedFile.size,
@@ -1303,7 +1315,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
                 data: file,
                 type: 'file',
                 upload: true,
-                attachmentUrl: URL.createObjectURL(file as any),
+                attachmentUrl: createComposePreviewUrl(tid, file),
                 tid,
                 size: file.size,
                 metadata: JSON.stringify({
@@ -1320,7 +1332,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
             type: 'video',
             upload: true,
             size: file.size,
-            attachmentUrl: URL.createObjectURL(file as any),
+            attachmentUrl: createComposePreviewUrl(tid, file),
             tid,
             metadata: metas
           }
@@ -1432,6 +1444,9 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
       reader.onload = async () => {
         // @ts-ignore
         setPendingAttachment(tid, { file: recordedFile })
+        if (recordedFile.objectUrl && recordedFile.objectUrl.startsWith('blob:')) {
+          registerBlobUrl(`compose_${tid}`, recordedFile.objectUrl)
+        }
         const messageToSend = {
           metadata: '',
           body: '',

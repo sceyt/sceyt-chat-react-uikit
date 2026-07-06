@@ -66,6 +66,7 @@ import {
   deleteReactionFromListAC,
   deleteReactionFromMessageAC,
   removeAttachmentProgressAC,
+  removeAttachmentUploadingStateAC,
   scrollToNewMessageAC,
   setAttachmentsAC,
   setAttachmentsCompleteAC,
@@ -163,7 +164,8 @@ import {
   removeMessageFromMap,
   checkIsItSentAlready,
   getMessageLocalRef,
-  deletePendingMessage as deletePendingMessageLocally
+  deletePendingMessage as deletePendingMessageLocally,
+  ensureChannelCacheLoaded
 } from '../../helpers/messagesHalper'
 import { navigateToLatest } from '../../helpers/messageListNavigator'
 import { CONNECTION_STATUS } from '../user/constants'
@@ -176,6 +178,7 @@ import {
 } from '../../helpers/customUploader'
 import { resizeImageWithPica } from '../../helpers/resizeImage'
 import { setAttachmentToCache } from '../../helpers/attachmentsCache'
+import { releaseBlobUrls } from '../../helpers/attachmentBlobUrls'
 import store from '../index'
 import { IProgress } from '../../components/ChatContainer'
 import { canBeViewOnce, isJSON } from '../../helpers/message'
@@ -437,7 +440,6 @@ export const handleUploadAttachments = async (attachments: IAttachment[], messag
         blobLocal = blob
         if (blobLocal) {
           fileSize = blobLocal.size
-          filePath = URL.createObjectURL(blobLocal)
         } else {
           log.warn('Upload returned null blob for attachment:', attachment.name)
         }
@@ -1039,6 +1041,7 @@ function* sendMessage(action: IAction): any {
 
                 store.dispatch(removeAttachmentProgressAC(attachment.tid))
                 deletePendingAttachment(attachment.tid)
+                releaseBlobUrls([`compose_${attachment.tid}`])
                 store.dispatch(updateAttachmentUploadingStateAC(UPLOAD_STATE.SUCCESS, attachment.tid))
               }
             }
@@ -1206,7 +1209,11 @@ function* sendMessage(action: IAction): any {
                   tid: messageAttachment[k].tid as string
                 }
                 yield put(removeAttachmentProgressAC(messageAttachment[k].tid))
+                yield put(removeAttachmentUploadingStateAC(messageAttachment[k].tid as string))
                 deletePendingAttachment(messageAttachment[k].tid!)
+                // The compose preview URL is superseded by the upload-time
+                // display URL once the message is confirmed.
+                releaseBlobUrls([`compose_${messageAttachment[k].tid}`])
               }
             }
             let attachmentsToUpdate = []
@@ -2547,6 +2554,9 @@ function* loadNearUnread(action: IAction): any {
     const connectionState = store.getState().UserReducer.connectionStatus
 
     if (channel?.id && !channel?.isMockChannel) {
+      // Restore the channel's cache from the IndexedDB spill (if it was
+      // LRU-evicted) before the cache-first checks below.
+      yield call(ensureChannelCacheLoaded, channel.id)
       const cachedNearWindow = getCachedNearMessages(channel.id, channel.lastDisplayedMessageId, MESSAGES_MAX_LENGTH)
       const cacheWasShown = cachedNearWindow.hasEnoughCache && cachedNearWindow.messages.length > 0
       const cachedLastConfirmedMessageId = getLastConfirmedMessageId(cachedNearWindow.messages)
@@ -2669,6 +2679,9 @@ function* loadDefaultMessages(action: IAction): any {
     const connectionState = store.getState().UserReducer.connectionStatus
 
     if (channel?.id && !channel?.isMockChannel) {
+      // Restore the channel's cache from the IndexedDB spill (if it was
+      // LRU-evicted) before the cache-first checks below.
+      yield call(ensureChannelCacheLoaded, channel.id)
       const SceytChatClient = getClient()
       const messageQueryBuilder = new (SceytChatClient.MessageListQueryBuilder as any)(channel.id)
       messageQueryBuilder.limit(MESSAGES_MAX_LENGTH)
