@@ -261,7 +261,11 @@ export default function ChatHeader({
       </ChannelInfo>
       {CustomActions && <CustomActionsWrapper order={customActionsOrder}>{CustomActions}</CustomActionsWrapper>}
       {!channelListHidden && showChannelDetails && (
-        <ChanelInfo onClick={() => channelDetailsOnOpen()} infoIconColor={accentColor} order={infoIconOrder}>
+        <ChanelInfo
+          onClick={() => channelDetailsOnOpen()}
+          infoIconColor={channelDetailsIsOpen ? accentColor : iconPrimary}
+          order={infoIconOrder}
+        >
           {infoIcon || <DefaultInfoIcon color={iconPrimary} />}
         </ChanelInfo>
       )}
