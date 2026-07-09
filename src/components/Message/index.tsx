@@ -40,7 +40,7 @@ import { compareMessagesForList } from 'helpers/messagesHalper'
 import { getOpenChatOnUserInteraction } from 'helpers/channelHalper'
 import { DEFAULT_CHANNEL_TYPE, MESSAGE_DELIVERY_STATUS, MESSAGE_STATUS } from 'helpers/constants'
 import { THEME_COLORS } from 'UIHelper/constants'
-import { IReaction, IUser } from 'types'
+import { IAttachment, IReaction, IUser } from 'types'
 // Components
 import Avatar from '../Avatar'
 import { IMessageProps } from './Message.types'
@@ -478,6 +478,23 @@ const Message = ({
     setMessageActionsShow(false)
   }, [])
 
+  // Opening the media slider must also dismiss the actions bar: without this
+  // the hover-delay timer fires after the click (the pointer never "leaves"
+  // the message once the overlay covers it) and the bar opens behind the
+  // slider, staying there when it closes.
+  const handleMediaItemClickWithActionsClose = useCallback(
+    (attachment: IAttachment) => {
+      if (messageActionsTimeout.current) {
+        clearTimeout(messageActionsTimeout.current)
+      }
+      setMessageActionsShow(false)
+      if (handleMediaItemClick) {
+        handleMediaItemClick(attachment)
+      }
+    },
+    [handleMediaItemClick]
+  )
+
   const handleReactionAddDelete = useCallback(
     (selectedEmoji: string) => {
       if (message.userReactions && message.userReactions.some((item: IReaction) => item.key === selectedEmoji)) {
@@ -666,6 +683,27 @@ const Message = ({
     }
   }, [openedMessageMenuId])
 
+  // The reactions details popup is anchored to fixed coordinates captured at
+  // open time — close it when the chat scrolls so it doesn't hang detached
+  // from its message. (Scroll events don't bubble, so scrolling inside the
+  // popup's own list doesn't trigger this.)
+  useEffect(() => {
+    if (!reactionsPopupOpen) {
+      return undefined
+    }
+    const scrollContainer = document.getElementById('scrollableDiv')
+    if (!scrollContainer) {
+      return undefined
+    }
+    const handleChatScroll = () => {
+      setReactionsPopupOpen(false)
+    }
+    scrollContainer.addEventListener('scroll', handleChatScroll, { passive: true })
+    return () => {
+      scrollContainer.removeEventListener('scroll', handleChatScroll)
+    }
+  }, [reactionsPopupOpen])
+
   useEffect(() => {
     document.addEventListener('mousedown', handleClick)
     return () => {
@@ -821,7 +859,7 @@ const Message = ({
             handleCreateChat={handleCreateChat}
             handleReactionAddDelete={handleReactionAddDelete}
             handleScrollToRepliedMessage={handleScrollToRepliedMessage}
-            handleMediaItemClick={handleMediaItemClick}
+            handleMediaItemClick={handleMediaItemClickWithActionsClose}
             isThreadMessage={isThreadMessage}
             handleOpenUserProfile={handleOpenUserProfile}
             unsupportedMessage={unsupportedMessage}
@@ -838,7 +876,7 @@ const Message = ({
             MessageActionsMenu={MessageActionsMenu}
             messageActionsBelow={messageActionsBelow}
             handleScrollToRepliedMessage={handleScrollToRepliedMessage}
-            handleMediaItemClick={handleMediaItemClick}
+            handleMediaItemClick={handleMediaItemClickWithActionsClose}
             isPendingMessage={isPendingMessage}
             prevMessage={prevMessage}
             nextMessage={nextMessage}
