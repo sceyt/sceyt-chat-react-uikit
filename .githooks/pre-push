@@ -1,0 +1,21 @@
+#!/bin/sh
+# Runs the full test suite before every push; a failing run aborts the push.
+#
+# One-time setup per clone (points git at this versioned hooks dir):
+#   git config core.hooksPath .githooks
+#
+# Bypass in an emergency: git push --no-verify
+
+echo "→ pre-push: running yarn test:all ..."
+yarn test:all
+status=$?
+
+if [ $status -ne 0 ]; then
+  echo ""
+  echo "✖ Push aborted: tests failed (exit $status)."
+  echo "  Fix the failures, or bypass once with: git push --no-verify"
+  exit $status
+fi
+
+echo "✓ All tests passed — pushing."
+exit 0
