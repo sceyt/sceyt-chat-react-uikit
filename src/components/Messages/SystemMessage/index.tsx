@@ -2,20 +2,17 @@ import styled from 'styled-components'
 import React, { useEffect, useMemo, useRef } from 'react'
 import { useDispatch, useSelector } from 'store/hooks'
 // Store
-import { markMessagesAsReadAC } from '../../../store/channel/actions'
-import { CONNECTION_STATUS } from '../../../store/user/constants'
 // Hooks
-import { useColor, useDidUpdate, useOnScreen } from '../../../hooks'
+import { useColor, useOnScreen } from '../../../hooks'
 // Helpers
 import { isJSON, makeUsername } from '../../../helpers/message'
 import { systemMessageUserName, formatDisappearingMessageTime } from '../../../helpers'
 import { IChannel, IMessage } from '../../../types'
 import { getShowOnlyContactUsers } from '../../../helpers/contacts'
-import { LOADING_STATE, MESSAGE_DELIVERY_STATUS } from '../../../helpers/constants'
 import { THEME_COLORS } from '../../../UIHelper/constants'
 import { getClient } from '../../../common/client'
-import { removeMessageFromVisibleMessagesMap, setMessageToVisibleMessagesMap } from 'helpers/messagesHalper'
-import { scrollToNewMessageAC, setMessagesLoadingStateAC } from 'store/message/actions'
+import { compareMessagesForList } from 'helpers/messagesHalper'
+import { removeVisibleMessageAC, scrollToNewMessageAC, setVisibleMessageAC } from 'store/message/actions'
 import { scrollToNewMessageSelector, unreadScrollToSelector } from 'store/message/selector'
 import { MESSAGE_TYPE } from 'types/enum'
 
@@ -23,7 +20,6 @@ interface ISystemMessageProps {
   channel: IChannel
   message: IMessage
   nextMessage: IMessage
-  connectionStatus: string
   contactsMap: { [key: string]: any }
   differentUserMessageSpacing?: string
   fontSize?: string
@@ -31,16 +27,13 @@ interface ISystemMessageProps {
   border?: string
   backgroundColor?: string
   borderRadius?: string
-  tabIsActive?: boolean
-  setLastVisibleMessageId?: (messageId: string) => void
+  setLastVisibleMessageId?: (message: IMessage) => void
 }
 
 const Message = ({
   message,
   nextMessage,
-  connectionStatus,
   channel,
-  tabIsActive,
   differentUserMessageSpacing,
   fontSize,
   textColor,
@@ -65,56 +58,38 @@ const Message = ({
     return isJSON(message.metadata) ? JSON.parse(message.metadata) : message.metadata
   }, [message.metadata])
 
-  const handleSendReadMarker = () => {
-    if (
-      isVisible &&
-      message.incoming &&
-      !(
-        message.userMarkers &&
-        message.userMarkers.length &&
-        message.userMarkers.find((marker) => marker.name === MESSAGE_DELIVERY_STATUS.READ)
-      ) &&
-      channel.newMessageCount &&
-      channel.newMessageCount > 0 &&
-      connectionStatus === CONNECTION_STATUS.CONNECTED &&
-      !unreadScrollTo
-    ) {
-      dispatch(markMessagesAsReadAC(channel.id, [message.id]))
-    }
-  }
-
   useEffect(() => {
     if (isVisible && !unreadScrollTo) {
       if (setLastVisibleMessageId) {
-        setLastVisibleMessageId(message.id)
+        setLastVisibleMessageId(message)
       }
-      handleSendReadMarker()
-      if (!channel.isLinkedChannel) {
-        setMessageToVisibleMessagesMap(message)
-      }
+      dispatch(setVisibleMessageAC(message))
 
-      if (scrollToNewMessage.scrollToBottom && (message?.id === channel.lastMessage?.id || !message?.id)) {
+      if (
+        scrollToNewMessage.scrollToBottom &&
+        channel.lastMessage &&
+        compareMessagesForList(message, channel.lastMessage) >= 0
+      ) {
         dispatch(scrollToNewMessageAC(false, false, false))
-        dispatch(setMessagesLoadingStateAC(LOADING_STATE.LOADED))
       }
     } else {
-      if (!channel.isLinkedChannel) {
-        removeMessageFromVisibleMessagesMap(message)
-      }
+      dispatch(removeVisibleMessageAC(message))
     }
-  }, [isVisible, unreadScrollTo])
+  }, [
+    channel.lastMessage,
+    dispatch,
+    isVisible,
+    message,
+    scrollToNewMessage.scrollToBottom,
+    unreadScrollTo,
+    setLastVisibleMessageId
+  ])
 
-  useDidUpdate(() => {
-    if (tabIsActive) {
-      handleSendReadMarker()
+  useEffect(() => {
+    return () => {
+      dispatch(removeVisibleMessageAC(message))
     }
-  }, [tabIsActive])
-
-  useDidUpdate(() => {
-    if (connectionStatus === CONNECTION_STATUS.CONNECTED) {
-      handleSendReadMarker()
-    }
-  }, [connectionStatus])
+  }, [dispatch, message])
 
   return (
     <Container
@@ -190,9 +165,7 @@ export default React.memo(Message, (prevProps, nextProps) => {
     prevProps.message.deliveryStatus === nextProps.message.deliveryStatus &&
     prevProps.message.state === nextProps.message.state &&
     prevProps.message.userMarkers === nextProps.message.userMarkers &&
-    prevProps.nextMessage === nextProps.nextMessage &&
-    prevProps.connectionStatus === nextProps.connectionStatus &&
-    prevProps.tabIsActive === nextProps.tabIsActive
+    prevProps.nextMessage === nextProps.nextMessage
   )
 })
 
@@ -215,7 +188,6 @@ export const Container = styled.div<{
   text-align: center;
   z-index: 10;
   background: transparent;
-  transition: all 0.2s ease-in-out;
   span {
     display: inline-block;
     max-width: 380px;

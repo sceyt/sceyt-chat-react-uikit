@@ -10,7 +10,7 @@ import {
   MessageInfoTab,
   OGMetadataProps
 } from '../../types'
-import { FC } from 'react'
+import { FC, MutableRefObject } from 'react'
 
 export interface IMessageActions {
   message: IMessage
@@ -28,6 +28,8 @@ export interface IMessageActions {
   handleReplyMessage?: () => void
   isThreadMessage?: boolean
   rtlDirection?: boolean
+  // Render the actions bar under the bubble (set when there is no room above)
+  openBelow?: boolean
 }
 
 export interface IMessageStyles {
@@ -50,6 +52,7 @@ interface ICustomMessageItem {
   unreadMessageId: string
   isUnreadMessage: boolean
   messageActionsShow: boolean
+  messageActionsBelow?: boolean
   selectionIsActive?: boolean
   emojisPopupOpen: boolean
   frequentlyEmojisOpen: boolean
@@ -79,6 +82,7 @@ interface ICustomMessageItem {
   handleOpenUserProfile: (user: IUser) => void
   unsupportedMessage: boolean
   onInviteLinkClick?: (key: string) => void
+  ifLatestAndHasNotPreview: boolean
 }
 
 export interface IMessageProps {
@@ -90,11 +94,15 @@ export interface IMessageProps {
   prevMessage?: IMessage
   nextMessage: IMessage
   stopScrolling: (stop: boolean) => void
-  setLastVisibleMessageId?: (msgId: string) => void
+  setLastVisibleMessageId?: (message: IMessage) => void
+  queueReadMarker?: (channelId: string, messageId?: string) => void
+  queueDeliveredMarker?: (channelId: string, messageId?: string) => void
+  disableAutoReadTracking?: boolean
   handleScrollToRepliedMessage: (msgId: string) => void
   handleMediaItemClick?: (attachment: IAttachment) => void
   unreadMessageId: string
   isUnreadMessage: boolean
+  nextMessageStartsUnreadSection?: boolean
   isThreadMessage: boolean
   fontFamily?: string
   ownMessageOnRightSide?: boolean
@@ -209,6 +217,7 @@ export interface IMessageProps {
   contactsMap: { [key: string]: any }
   openedMessageMenuId?: string
   tabIsActive?: boolean
+  tabIsActiveRef?: MutableRefObject<boolean>
   connectionStatus: string
   messageTextFontSize?: string
   messageTextLineHeight?: string
@@ -229,5 +238,7 @@ export interface IMessageProps {
     tabsStyles?: ITabsStyles
     listItemStyles?: IListItemStyles
   }
-  collapsedCharacterLimit?: number
+  collapsedLinesLimit?: number
+  createChatOnAvatarTap?: boolean
+  ifLatestAndHasNotPreview: boolean
 }

@@ -157,6 +157,7 @@ const MessageStatusAndTimeContainer = styled.span<{
   hide?: boolean
   isSelfMessage?: boolean
   marginBottom?: string
+  marginTop?: string
   leftMargin?: boolean
   rtlDirection?: boolean
   bottomOfMessage?: boolean
@@ -177,12 +178,11 @@ const MessageStatusAndTimeContainer = styled.span<{
   margin-right: ${(props) => props.rtlDirection && 'auto'};
   margin-left: ${(props) => props.leftMargin && '12px'};
   margin-bottom: ${(props) => props.marginBottom && '8px'};
+  margin-top: ${(props) => props.marginTop && '4px'};
   direction: ${(props) => (props.isSelfMessage ? 'initial' : '')};
-  transform: translate(0px, 4px);
   white-space: nowrap;
   width: ${(props) => props.bottomOfMessage && '100%'};
   justify-content: ${(props) => props.bottomOfMessage && props.rtlDirection && 'flex-end'};
-  z-index: 10;
 
   & > svg {
     margin-left: 4px;

@@ -16,9 +16,10 @@ interface IVideoPlayerProps {
   videoFileId?: string
   activeFileId?: string
   onMouseDown?: (e: React.MouseEvent) => void
+  readyToPlay: boolean
 }
 
-const VideoPlayer = ({ src, videoFileId, activeFileId, onMouseDown }: IVideoPlayerProps) => {
+const VideoPlayer = ({ src, videoFileId, activeFileId, onMouseDown, readyToPlay }: IVideoPlayerProps) => {
   const { [THEME_COLORS.TEXT_ON_PRIMARY]: textOnPrimary } = useColor()
   const containerRef = useRef<HTMLDivElement>(null)
   const videoRef = useRef<HTMLVideoElement>(null)
@@ -85,26 +86,27 @@ const VideoPlayer = ({ src, videoFileId, activeFileId, onMouseDown }: IVideoPlay
     }
   }
   const handleOpenFullScreen = () => {
-    if (containerRef.current) {
-      if (isFullScreen) {
-        document
-          .exitFullscreen()
-          .then(() => {
-            setIsFullScreen(false)
-          })
-          .catch((error) => {
-            console.error('Error exiting fullscreen:', error)
-          })
-      } else {
-        containerRef.current
-          .requestFullscreen()
-          .then(() => {
-            setIsFullScreen(true)
-          })
-          .catch((error) => {
-            console.error('Error entering fullscreen:', error)
-          })
-      }
+    if (isFullScreen) {
+      document
+        .exitFullscreen()
+        .then(() => {
+          setIsFullScreen(false)
+        })
+        .catch((error) => {
+          console.error('Error exiting fullscreen:', error)
+        })
+    } else {
+      // Request fullscreen on the <video> element directly to avoid rendering
+      // artifacts (e.g. upside-down video) caused by CSS transforms on ancestor
+      // elements (such as the Carousel track's translateX).
+      videoRef.current
+        ?.requestFullscreen()
+        .then(() => {
+          setIsFullScreen(true)
+        })
+        .catch((error) => {
+          console.error('Error entering fullscreen:', error)
+        })
     }
   }
   const handleVideoProgress = (e: React.SyntheticEvent<HTMLVideoElement>) => {
@@ -183,6 +185,28 @@ const VideoPlayer = ({ src, videoFileId, activeFileId, onMouseDown }: IVideoPlay
       }
     }
   }, [activeFileId, videoFileId])
+
+  // Autoplay when the video finishes loading (after a 1-second delay)
+  useEffect(() => {
+    if (!isLoaded) return
+    if (!videoRef.current) return
+    if (!readyToPlay) return
+    if (activeFileId !== videoFileId) return
+    videoRef.current
+      .play()
+      .then(() => setPlaying(true))
+      .catch(() => {
+        // Browser blocked unmuted autoplay — retry muted
+        if (videoRef.current) {
+          videoRef.current.muted = true
+          setIsMuted(true)
+          videoRef.current
+            .play()
+            .then(() => setPlaying(true))
+            .catch(() => {})
+        }
+      })
+  }, [isLoaded, readyToPlay])
 
   // Handle fullscreen changes (e.g., user presses ESC)
   useEffect(() => {
@@ -266,6 +290,7 @@ const VideoPlayer = ({ src, videoFileId, activeFileId, onMouseDown }: IVideoPlay
         onError={handleVideoError}
         playsInline
         preload='metadata'
+        controls={isFullScreen}
       />
 
       {isLoaded && (

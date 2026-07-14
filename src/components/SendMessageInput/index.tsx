@@ -25,14 +25,16 @@ import log from 'loglevel'
 import {
   clearSelectedMessagesAC,
   deleteMessageAC,
-  deleteMessageFromListAC,
   editMessageAC,
   forwardMessageAC,
   sendMessageAC,
   sendTextMessageAC,
   setMessageForReplyAC,
   setMessageToEditAC,
-  setSendMessageInputHeightAC
+  setSendMessageInputHeightAC,
+  loadOGMetadataForLinkAC,
+  updateOGMetadataAC,
+  setUpdateMessageAttachmentAC
 } from '../../store/message/actions'
 import {
   joinChannelAC,
@@ -68,12 +70,11 @@ import {
 import { DropdownOptionLi, DropdownOptionsUl, TextInOneLine, UploadFile, ViewOnceToggleCont } from '../../UIHelper'
 import { THEME_COLORS } from '../../UIHelper/constants'
 import { createImageThumbnail, resizeImage } from '../../helpers/resizeImage'
-import { detectBrowser, detectOS, hashString } from '../../helpers'
-import { IMember, IMessage } from '../../types'
+import { calculateRenderedImageWidth, detectBrowser, detectOS } from '../../helpers'
+import { IMember, IMessage, IUser } from '../../types'
 import { getCustomUploader, getSendAttachmentsAsSeparateMessages } from '../../helpers/customUploader'
 import {
   checkDraftMessagesIsEmpty,
-  deletePendingMessage,
   deleteVideoThumb,
   draftMessagesMap,
   getAudioRecordingFromMap,
@@ -83,17 +84,12 @@ import {
   setPendingAttachment,
   setSendMessageHandler
 } from '../../helpers/messagesHalper'
-import {
-  attachmentTypes,
-  DEFAULT_CHANNEL_TYPE,
-  DB_NAMES,
-  DB_STORE_NAMES,
-  MESSAGE_DELIVERY_STATUS,
-  USER_STATE
-} from '../../helpers/constants'
+import { registerBlobUrl, releaseBlobUrls } from '../../helpers/attachmentBlobUrls'
+import { attachmentTypes, DEFAULT_CHANNEL_TYPE, MESSAGE_DELIVERY_STATUS, USER_STATE } from '../../helpers/constants'
 import { hideUserPresence } from '../../helpers/userHelper'
 import { getShowOnlyContactUsers } from '../../helpers/contacts'
-import { getFrame } from '../../helpers/getVideoFrame'
+import { getFrame, getVideoFirstFrame } from '../../helpers/getVideoFrame'
+import { remuxVideoFileForUpload } from '../../helpers/videoConversion'
 import { CAN_USE_DOM } from '../../helpers/canUseDOM'
 
 // Hooks
@@ -117,6 +113,8 @@ import { ReactComponent as CloseIcon } from '../../assets/svg/close.svg'
 import { ReactComponent as DeleteIcon } from '../../assets/svg/deleteIcon.svg'
 import { ReactComponent as ForwardIcon } from '../../assets/svg/forward.svg'
 import { ReactComponent as ViewOnceIconOpen } from '../../assets/svg/view_once_last_message.svg'
+import { isDescriptionOnlySymbol } from '../Message/OGMetadata'
+import { ReactComponent as LinkIcon } from '../../assets/svg/linkIcon.svg'
 
 // Components
 import Attachment, { AttachmentFile, AttachmentImg } from '../Attachment'
@@ -126,7 +124,6 @@ import ForwardMessagePopup from '../../common/popups/forwardMessage'
 import AudioRecord from '../AudioRecord'
 
 import { getClient } from '../../common/client'
-import { getDataFromDB } from '../../services/indexedDB'
 import { HistoryPlugin } from '@lexical/react/LexicalHistoryPlugin'
 import { MessageTextFormat } from '../../messageUtils'
 import RecordingAnimation from './RecordingAnimation'
@@ -201,7 +198,7 @@ function onError(error: any) {
 let prevActiveChannelId: any
 let attachmentsUpdate: any = []
 
-interface SendMessageProps {
+export interface SendMessageProps {
   draggedAttachments?: boolean
   // eslint-disable-next-line no-unused-vars
   handleAttachmentSelected?: (state: boolean) => void
@@ -264,6 +261,11 @@ interface SendMessageProps {
   replyEditMessageContainerBottomPosition?: string
   replyEditMessageContainerLeftPosition?: string
   replyEditMessageContainerPadding?: string
+  customReplyMessageTypes?: string[]
+  CustomReplyMessageContainer?: FC<{
+    messageForReply: IMessage
+    onClose: () => void
+  }>
   editMessageIcon?: JSX.Element
   editMessageBackgroundColor?: string
   editMessageTextColor?: string
@@ -342,6 +344,8 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
   replyEditMessageContainerBottomPosition,
   replyEditMessageContainerPadding,
   replyEditMessageContainerLeftPosition,
+  customReplyMessageTypes,
+  CustomReplyMessageContainer,
   sendAttachmentSeparately,
   allowMentionUser = true,
   allowTextEdit = true,
@@ -366,7 +370,8 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
     [THEME_COLORS.TEXT_FOOTNOTE]: textFootnote,
     [THEME_COLORS.HIGHLIGHTED_BACKGROUND]: highlightedBackground,
     [THEME_COLORS.TEXT_ON_PRIMARY]: textOnPrimary,
-    [THEME_COLORS.TOOLTIP_BACKGROUND]: tooltipBackground
+    [THEME_COLORS.TOOLTIP_BACKGROUND]: tooltipBackground,
+    [THEME_COLORS.BORDER]: borderColor
   } = useColor()
 
   const dispatch = useDispatch()
@@ -451,16 +456,127 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
   const messageInputRef = useRef<any>(null)
   const emojiBtnRef = useRef<any>(null)
   const addAttachmentsBtnRef = useRef<any>(null)
+  const metadataDebounceRef = useRef<NodeJS.Timeout | null>(null)
+  const sendMessageWrapperRef = useRef<HTMLDivElement | null>(null)
 
   const [realEditorState, setRealEditorState] = useState()
   const [floatingAnchorElem, setFloatingAnchorElem] = useState<HTMLDivElement | null>(null)
   const [isSmallWidthViewport, setIsSmallWidthViewport] = useState<boolean>(false)
   const [isScrolling, setIsScrolling] = useState<boolean>(false)
-
+  const [linkPreview, setLinkPreview] = useState<{ url: string; metadata: any } | null>(null)
+  const [detectedUrl, setDetectedUrl] = useState<string | null>(null)
+  const [dismissedUrls, setDismissedUrls] = useState<Set<string>>(new Set())
+  const [isClosingPreview, setIsClosingPreview] = useState(false)
   const addAttachmentByMenu = showChooseFileAttachment && showChooseMediaAttachment
+  const linkify = new LinkifyIt()
+  const oGMetadata = useSelector((state: any) => state.MessageReducer.oGMetadata)
+
+  const closePreviewWithAnimation = (callback?: () => void) => {
+    if (linkPreview) {
+      setIsClosingPreview(true)
+      setTimeout(() => {
+        setLinkPreview(null)
+        setIsClosingPreview(false)
+        callback?.()
+      }, 300)
+    } else {
+      callback?.()
+    }
+  }
 
   function onChange(editorState: any) {
     setRealEditorState(editorState)
+
+    // Extract text content from editor state
+    editorState.read(() => {
+      const root = $getRoot()
+      const textContent = root.getTextContent()
+
+      // Detect URLs in the text
+      // Use regex first for protocol-based URLs (handles complex fragments like Kibana rison)
+      // linkify-it balances parentheses and truncates URLs containing !() or quotes
+      const protocolMatch = /https?:\/\/\S+/.exec(textContent)
+      const linkifyMatchResult = !protocolMatch ? linkify.match(textContent) : null
+      const firstUrl = protocolMatch
+        ? protocolMatch[0]
+        : linkifyMatchResult?.[0]
+          ? linkifyMatchResult[0].schema === ''
+            ? linkifyMatchResult[0].url.replace(/^http:\/\//, 'https://')
+            : linkifyMatchResult[0].url
+          : null
+      if (firstUrl) {
+        // If URL changed, clear old preview with animation and set new URL
+        if (firstUrl !== detectedUrl) {
+          closePreviewWithAnimation(() => {
+            // Only fetch metadata if new URL is not dismissed
+            if (!dismissedUrls.has(firstUrl)) {
+              setDetectedUrl(firstUrl)
+
+              // Clear any existing debounce timeout
+              if (metadataDebounceRef.current) {
+                clearTimeout(metadataDebounceRef.current)
+              }
+
+              // Debounce the metadata fetch request
+              metadataDebounceRef.current = setTimeout(() => {
+                dispatch(
+                  loadOGMetadataForLinkAC([
+                    {
+                      attachments: [{ type: attachmentTypes.link, url: firstUrl }]
+                    } as IMessage
+                  ])
+                )
+              }, 500)
+            } else {
+              setDetectedUrl(firstUrl)
+            }
+          })
+        }
+      } else {
+        // Clear preview and dismissed URLs if no URL detected
+        if (detectedUrl) {
+          // Clear any pending metadata request
+          if (metadataDebounceRef.current) {
+            clearTimeout(metadataDebounceRef.current)
+          }
+
+          closePreviewWithAnimation(() => {
+            setDetectedUrl(null)
+            setDismissedUrls(new Set())
+          })
+        }
+      }
+    })
+  }
+
+  // Monitor metadata changes and update link preview
+  useEffect(() => {
+    if (detectedUrl && oGMetadata?.[detectedUrl] && !dismissedUrls.has(detectedUrl)) {
+      setLinkPreview({ url: detectedUrl, metadata: oGMetadata[detectedUrl] })
+    }
+  }, [detectedUrl, oGMetadata, dismissedUrls])
+
+  // Hide link preview when attachments are added, restore when removed
+  useEffect(() => {
+    if (attachments.length > 0 && linkPreview) {
+      closePreviewWithAnimation()
+    } else if (
+      attachments.length === 0 &&
+      detectedUrl &&
+      oGMetadata?.[detectedUrl] &&
+      !dismissedUrls.has(detectedUrl)
+    ) {
+      setLinkPreview({ url: detectedUrl, metadata: oGMetadata[detectedUrl] })
+    }
+  }, [attachments.length])
+
+  const handleRemoveLinkPreview = () => {
+    closePreviewWithAnimation(() => {
+      if (detectedUrl) {
+        setDismissedUrls((prev) => new Set(prev).add(detectedUrl))
+      }
+      setDetectedUrl(null)
+    })
   }
 
   const onRef = (_floatingAnchorElem: HTMLDivElement) => {
@@ -559,7 +675,13 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
         if (messageBodyAttributes && messageBodyAttributes.length) {
           messageBodyAttributes.forEach((att: any) => {
             if (att.type === 'mention') {
-              mentionUsersToSend.push({ id: att.metadata })
+              let mentionsToFind = [...mentionedUsers]
+              const draftMessage = getDraftMessageFromMap(activeChannel.id)
+              if (draftMessage) {
+                mentionsToFind = [...draftMessage.mentionedUsers, ...mentionedUsers]
+              }
+              const mentionToAdd = mentionsToFind.find((mention: IUser) => mention.id === att.metadata)
+              mentionUsersToSend.push(mentionToAdd || { id: att.metadata })
             }
           })
         }
@@ -570,13 +692,37 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
         }
         let linkAttachment: any
         if (messageTexToSend) {
-          const linkify = new LinkifyIt()
-          const match = linkify.match(messageTexToSend)
-          if (match) {
+          const protocolMatch = /https?:\/\/\S+/.exec(messageTexToSend)
+          const linkifyMatchResult = !protocolMatch ? new LinkifyIt().match(messageTexToSend)?.[0] : null
+          const url = protocolMatch
+            ? protocolMatch[0]
+            : linkifyMatchResult
+              ? linkifyMatchResult.schema === ''
+                ? linkifyMatchResult.url.replace(/^http:\/\//, 'https://')
+                : linkifyMatchResult.url
+              : null
+          if (url) {
+            const urlMetadata = oGMetadata?.[url]
+            const metadata: any = {}
+
+            if (urlMetadata) {
+              if (urlMetadata.imageWidth) metadata.szw = urlMetadata.imageWidth
+              if (urlMetadata.imageHeight) metadata.szh = urlMetadata.imageHeight
+              if (urlMetadata.og?.favicon?.url) metadata.tur = urlMetadata.og.favicon.url
+              if (urlMetadata.og?.description) metadata.dsc = urlMetadata.og.description?.slice(0, 200)
+              if (urlMetadata.og?.image?.[0]?.url) metadata.iur = urlMetadata.og.image[0].url
+              if (urlMetadata.og?.title) metadata.ttl = urlMetadata.og.title?.slice(0, 100)
+            }
+
+            if (dismissedUrls.has(url)) {
+              metadata.hld = true
+            }
+
             linkAttachment = {
               type: attachmentTypes.link,
-              data: match[0].url,
-              upload: false
+              data: url,
+              upload: false,
+              ...(Object.keys(metadata).length > 0 ? { metadata, name: metadata.ttl } : { metadata: { hld: true } })
             }
           }
         }
@@ -640,6 +786,10 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
       setShouldClearEditor({ clear: true })
       setMentionedUsers([])
       setMessageBodyAttributes([])
+      closePreviewWithAnimation(() => {
+        setDetectedUrl(null)
+        setDismissedUrls(new Set())
+      })
       dispatch(setCloseSearchChannelsAC(true))
     } else {
       if (typingTimout) {
@@ -661,16 +811,50 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
 
   const handleEditMessage = () => {
     const messageTexToSend = editMessageText.trim()
+    const hasTextChanged = messageTexToSend !== messageToEdit.body
+    const normalizeAttrs = (attrs: any) => (!attrs || attrs.length === 0 ? [] : attrs)
+    const hasAttributesChanged = !compareMessageBodyAttributes(
+      normalizeAttrs(messageBodyAttributes),
+      normalizeAttrs(messageToEdit.bodyAttributes)
+    )
+    if (!hasTextChanged && !hasAttributesChanged) {
+      handleCloseEditMode()
+      return
+    }
     if (messageTexToSend) {
       let linkAttachment: any
       if (messageTexToSend) {
-        const linkify = new LinkifyIt()
-        const match = linkify.match(messageTexToSend)
-        if (match) {
+        const protocolMatch = /https?:\/\/\S+/.exec(messageTexToSend)
+        const linkifyMatchResult = !protocolMatch ? new LinkifyIt().match(messageTexToSend)?.[0] : null
+        const url = protocolMatch
+          ? protocolMatch[0]
+          : linkifyMatchResult
+            ? linkifyMatchResult.schema === ''
+              ? linkifyMatchResult.url.replace(/^http:\/\//, 'https://')
+              : linkifyMatchResult.url
+            : null
+        if (url) {
+          const urlMetadata = oGMetadata?.[url]
+          const metadata: any = {}
+
+          if (urlMetadata) {
+            if (urlMetadata.imageWidth) metadata.szw = urlMetadata.imageWidth
+            if (urlMetadata.imageHeight) metadata.szh = urlMetadata.imageHeight
+            if (urlMetadata.og?.favicon?.url) metadata.tur = urlMetadata.og.favicon.url
+            if (urlMetadata.og?.description) metadata.dsc = urlMetadata.og.description?.slice(0, 200)
+            if (urlMetadata.og?.image?.[0]?.url) metadata.iur = urlMetadata.og.image[0].url
+            if (urlMetadata.og?.title) metadata.ttl = urlMetadata.og.title?.slice(0, 100)
+          }
+
+          if (dismissedUrls.has(url)) {
+            metadata.hld = true
+          }
+
           linkAttachment = {
             type: attachmentTypes.link,
-            data: match[0].url,
-            upload: false
+            data: url,
+            upload: false,
+            ...(Object.keys(metadata).length > 0 ? { metadata, name: metadata.ttl } : { metadata: { hld: true } })
           }
         }
       }
@@ -685,15 +869,21 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
               if (draftMessage) {
                 mentionsToFind = [...draftMessage.mentionedUsers, ...mentionedUsers]
               }
-              const mentionToAdd = mentionsToFind.find((mention: any) => mention.id === att.metadata)
+              const mentionToAdd = mentionsToFind.find((mention: IUser) => mention.id === att.metadata)
               mentionUsersToSend.push(mentionToAdd)
             }
           })
         }
       }
+      const existingMediaAttachments = (messageToEdit.attachments || []).filter(
+        (att: any) => att.type !== attachmentTypes.link
+      )
+      const updatedAttachments = linkAttachment
+        ? [...existingMediaAttachments, linkAttachment]
+        : existingMediaAttachments
       const messageToSend = {
         ...messageToEdit,
-        ...(linkAttachment ? { attachments: [linkAttachment] } : {}),
+        attachments: updatedAttachments,
         metadata: mentionedUsersPositions,
         bodyAttributes: messageBodyAttributes,
         mentionedUsers: mentionUsersToSend,
@@ -715,9 +905,11 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
     if (attachmentId) {
       const updatedAttachments = attachmentsUpdate.filter((item: any) => item.tid !== attachmentId)
       deleteVideoThumb(attachmentId)
+      releaseBlobUrls([`compose_${attachmentId}`])
       setAttachments(updatedAttachments)
       attachmentsUpdate = updatedAttachments
     } else {
+      releaseBlobUrls(attachmentsUpdate.map((item: any) => `compose_${item.tid}`))
       setAttachments([])
       attachmentsUpdate = []
     }
@@ -787,7 +979,9 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
 
     if (skippedCount > 0) {
       showFileUploadError(
-        `Only ${filesToProcess.length} file${filesToProcess.length !== 1 ? 's' : ''} can be added. ${skippedCount} file${skippedCount !== 1 ? 's' : ''} will be skipped.`
+        `Only ${filesToProcess.length} file${
+          filesToProcess.length !== 1 ? 's' : ''
+        } can be added. ${skippedCount} file${skippedCount !== 1 ? 's' : ''} will be skipped.`
       )
     }
 
@@ -856,7 +1050,9 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
 
         if (skippedCount > 0) {
           showFileUploadError(
-            `Only ${filesToProcess.length} file${filesToProcess.length !== 1 ? 's' : ''} can be added. ${skippedCount} file${skippedCount !== 1 ? 's' : ''} will be skipped.`
+            `Only ${filesToProcess.length} file${
+              filesToProcess.length !== 1 ? 's' : ''
+            } can be added. ${skippedCount} file${skippedCount !== 1 ? 's' : ''} will be skipped.`
           )
         }
 
@@ -939,8 +1135,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
   }
 
   const handleDeletePendingMessage = (message: IMessage) => {
-    deletePendingMessage(activeChannel.id, message)
-    dispatch(deleteMessageFromListAC(message.id || message.tid!))
+    dispatch(deleteMessageAC(activeChannel.id, message.id || message.tid!, 'forEveryone'))
   }
 
   const handleToggleDeleteMessagePopup = () => {
@@ -976,227 +1171,181 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
     setMentionedUsers((prevState: any[]) => [...prevState, mentionMember])
   }
 
+  // Compose preview URLs are tracked in the blob-URL registry under a
+  // compose_<tid> key; they're released when the attachment is removed from
+  // the compose bar, the pending message is deleted, or the send is confirmed.
+  const createComposePreviewUrl = (attachmentTid: string, blob: Blob | File) => {
+    const url = URL.createObjectURL(blob)
+    registerBlobUrl(`compose_${attachmentTid}`, url)
+    return url
+  }
+
   const handleAddAttachment = async (file: File, isMediaAttachment: boolean) => {
     const customUploader = getCustomUploader()
+    if (file.type.split('/')[0] === 'video') {
+      // QuickTime .mov containers are unplayable in Firefox even when the codec
+      // is H.264 — remux to standard MP4 (stream copy, no re-encoding) before
+      // upload so every recipient can play the file and render thumbnails.
+      file = await remuxVideoFileForUpload(file)
+    }
     const fileType = file.type.split('/')[0]
     const tid = uuidv4()
-    let cachedUrl: any
     const reader = new FileReader()
+
+    const handleAttachmentImageForCache = async (attachment: any) => {
+      const url = URL.createObjectURL(attachment.data)
+      dispatch(setUpdateMessageAttachmentAC(attachment?.metadata?.tmb || '', url))
+    }
+    const handleAttachmentVideoForCache = async (attachment: any) => {
+      const [newWidth, newHeight] = calculateRenderedImageWidth(
+        attachment.metadata.szh || 400,
+        attachment.metadata.szh || 400
+      )
+      // Pass the raw File/Blob so getVideoFirstFrame can sniff and correct the
+      // MIME type — an object URL string locks in the original (possibly
+      // Firefox-unsupported) type like video/quicktime.
+      const result = await getVideoFirstFrame(attachment.data, newWidth, newHeight, 0.8)
+      if (result) {
+        const { frameBlobUrl } = result
+        dispatch(setUpdateMessageAttachmentAC(attachment?.metadata?.tmb || '', frameBlobUrl))
+      }
+    }
     reader.onload = async () => {
       // @ts-ignore
-      const length = reader.result && reader.result.length
-      let fileChecksum
-      if (length > 3000) {
-        const firstPart = reader.result && reader.result.slice(0, 1000)
-        const middlePart = reader.result && reader.result.slice(length / 2 - 500, length / 2 + 500)
-        const lastPart = reader.result && reader.result.slice(length - 1000, length)
-        fileChecksum = `${firstPart}${middlePart}${lastPart}`
-      } else {
-        fileChecksum = `${reader.result}`
-      }
-      const checksumHash = await hashString(fileChecksum || '')
-      let dataFromDb: any
-      try {
-        dataFromDb = await getDataFromDB(DB_NAMES.FILES_STORAGE, DB_STORE_NAMES.ATTACHMENTS, checksumHash, 'checksum')
-      } catch (e) {
-        log.error('error in get data from db . . . . ', e)
-      }
-      if (dataFromDb) {
-        cachedUrl = dataFromDb.url
-        setPendingAttachment(tid, { file: cachedUrl })
-      } else {
-        setPendingAttachment(tid, { file, checksum: checksumHash })
-      }
+      setPendingAttachment(tid, { file })
       if (customUploader) {
         if (fileType === 'image') {
           resizeImage(file).then(async (resizedFile: any) => {
             const { thumbnail, imageWidth, imageHeight } = await createImageThumbnail(file)
-            setAttachments((prevState: any[]) => [
-              ...prevState,
-              {
-                data: file,
-                cachedUrl,
-                upload: false,
-                type: isMediaAttachment ? fileType : 'file',
-                attachmentUrl: URL.createObjectURL(resizedFile.blob as any),
-                tid,
-                size: isMediaAttachment ? (resizedFile?.blob ? resizedFile?.blob?.size : file.size) : file.size,
-                metadata: {
-                  ...(dataFromDb && dataFromDb.metadata),
-                  szw: imageWidth,
-                  szh: imageHeight,
-                  tmb: thumbnail
-                }
-              }
-            ])
-          })
-        } else if (fileType === 'video') {
-          const { thumb, width, height } = await getFrame(URL.createObjectURL(file as any), 0)
-          setAttachments((prevState: any[]) => [
-            ...prevState,
-            {
+            const attachment = {
               data: file,
-              cachedUrl,
               upload: false,
               type: isMediaAttachment ? fileType : 'file',
-              attachmentUrl: URL.createObjectURL(file),
+              attachmentUrl: createComposePreviewUrl(tid, resizedFile.blob as any),
               tid,
-              size: dataFromDb ? dataFromDb.size : file.size,
+              size: isMediaAttachment ? (resizedFile?.blob ? resizedFile?.blob?.size : file.size) : file.size,
               metadata: {
-                ...(dataFromDb && dataFromDb.metadata),
-                szw: width,
-                szh: height,
-                tmb: thumb
+                szw: imageWidth,
+                szh: imageHeight,
+                tmb: thumbnail
               }
             }
-          ])
+            handleAttachmentImageForCache(attachment)
+            setAttachments((prevState: any[]) => [...prevState, attachment])
+          })
+        } else if (fileType === 'video') {
+          // Pass the File itself, not an object URL — lets getFrame correct a
+          // Firefox-unsupported MIME type (e.g. video/quicktime) via byte sniffing.
+          const { thumb, width, height, duration } = await getFrame(file, 0)
+          const attachment = {
+            data: file,
+            upload: false,
+            type: isMediaAttachment ? fileType : 'file',
+            attachmentUrl: createComposePreviewUrl(tid, file),
+            tid,
+            size: file.size,
+            metadata: {
+              szw: width,
+              szh: height,
+              tmb: thumb,
+              dur: duration
+            }
+          }
+          handleAttachmentVideoForCache(attachment)
+          setAttachments((prevState: any[]) => [...prevState, attachment])
         } else {
           setAttachments((prevState: any[]) => [
             ...prevState,
             {
               data: file,
-              cachedUrl,
               upload: false,
               type: 'file',
               tid,
-              size: dataFromDb ? dataFromDb.size : file.size,
-              metadata: dataFromDb && dataFromDb.metadata
+              size: file.size
             }
           ])
         }
       } else {
         if (fileType === 'image') {
           if (isMediaAttachment) {
-            let metas: any = {}
-            if (dataFromDb) {
-              metas = dataFromDb.metadata
-            } else {
-              const { thumbnail, imageWidth, imageHeight } = await createImageThumbnail(file)
-              metas.imageHeight = imageHeight
-              metas.imageWidth = imageWidth
-              metas.thumbnail = thumbnail
-            }
+            const { thumbnail, imageWidth, imageHeight } = await createImageThumbnail(file)
+            const metas = { thumbnail, imageWidth, imageHeight }
             if (file.type === 'image/gif') {
               setAttachments((prevState: any[]) => [
                 ...prevState,
                 {
                   data: file,
-                  cachedUrl,
-                  upload: !cachedUrl,
-                  attachmentUrl: URL.createObjectURL(file),
+                  upload: true,
+                  attachmentUrl: createComposePreviewUrl(tid, file),
                   tid,
                   type: fileType,
-                  size: dataFromDb ? dataFromDb.size : file.size,
-                  metadata: dataFromDb
-                    ? metas
-                    : JSON.stringify({
-                        tmb: metas.thumbnail,
-                        szw: metas.imageWidth,
-                        szh: metas.imageHeight
-                      })
+                  size: file.size,
+                  metadata: JSON.stringify({
+                    tmb: metas.thumbnail,
+                    szw: metas.imageWidth,
+                    szh: metas.imageHeight
+                  })
                 }
               ])
             } else {
-              if (dataFromDb) {
-                setAttachments((prevState: any[]) => [
-                  ...prevState,
-                  {
-                    data: file,
-                    cachedUrl,
-                    upload: false,
-                    attachmentUrl: URL.createObjectURL(file),
-                    tid,
-                    type: fileType,
-                    size: dataFromDb.size,
-                    metadata: metas
-                  }
-                ])
-              } else {
-                resizeImage(file).then(async (resizedFileData: any) => {
-                  // resizedFiles.forEach((file: any, index: number) => {
-                  const resizedFile = new File([resizedFileData.blob], resizedFileData.file.name)
-                  setAttachments((prevState: any[]) => [
-                    ...prevState,
-                    {
-                      data: resizedFile,
-                      upload: true,
-                      attachmentUrl: URL.createObjectURL(resizedFile),
-                      tid,
-                      type: fileType,
-                      size: resizedFile.size,
-                      metadata: JSON.stringify({
-                        tmb: metas.thumbnail,
-                        szw: resizedFileData.newWidth,
-                        szh: resizedFileData.newHeight
-                      })
-                    }
-                  ])
-                  // })
-                })
-              }
+              resizeImage(file).then(async (resizedFileData: any) => {
+                const resizedFile = new File([resizedFileData.blob], resizedFileData.file.name)
+                const attachment = {
+                  data: resizedFile,
+                  upload: true,
+                  attachmentUrl: createComposePreviewUrl(tid, resizedFile),
+                  tid,
+                  type: fileType,
+                  size: resizedFile.size,
+                  metadata: JSON.stringify({
+                    tmb: metas.thumbnail,
+                    szw: resizedFileData.newWidth,
+                    szh: resizedFileData.newHeight
+                  })
+                }
+                handleAttachmentImageForCache(attachment)
+                setAttachments((prevState: any[]) => [...prevState, attachment])
+              })
             }
           } else {
-            let metas: any = {}
-            if (dataFromDb) {
-              metas = dataFromDb.metadata
-            } else {
-              const { thumbnail } = await createImageThumbnail(file, undefined, 50, 50)
-              metas.thumbnail = thumbnail
-            }
+            const { thumbnail } = await createImageThumbnail(file, undefined, 50, 50)
             setAttachments((prevState: any[]) => [
               ...prevState,
               {
                 data: file,
-                // type: file.type.split('/')[0],
                 type: 'file',
-                cachedUrl,
-                upload: !cachedUrl,
-                attachmentUrl: URL.createObjectURL(file as any),
+                upload: true,
+                attachmentUrl: createComposePreviewUrl(tid, file),
                 tid,
-                size: dataFromDb ? dataFromDb.size : file.size,
-                metadata: dataFromDb
-                  ? metas
-                  : JSON.stringify({
-                      tmb: metas.thumbnail
-                    })
+                size: file.size,
+                metadata: JSON.stringify({
+                  tmb: thumbnail
+                })
               }
             ])
           }
         } else if (fileType === 'video') {
-          let metas: any = {}
-          if (dataFromDb) {
-            metas = dataFromDb.metadata
-          } else {
-            const { thumb, width, height } = await getFrame(URL.createObjectURL(file as any), 0)
-            metas.tmb = thumb
-            metas.width = width
-            metas.height = height
-            metas = JSON.stringify(metas)
+          const { thumb, width, height, duration } = await getFrame(file, 0)
+          const metas = JSON.stringify({ tmb: thumb, width, height, dur: duration })
+          const attachment = {
+            data: file,
+            type: 'video',
+            upload: true,
+            size: file.size,
+            attachmentUrl: createComposePreviewUrl(tid, file),
+            tid,
+            metadata: metas
           }
-          setAttachments((prevState: any[]) => [
-            ...prevState,
-            {
-              data: file,
-              // type: file.type.split('/')[0],
-              type: 'video',
-              cachedUrl,
-              upload: !cachedUrl,
-              size: dataFromDb ? dataFromDb.size : file.size,
-              attachmentUrl: URL.createObjectURL(file as any),
-              tid,
-              metadata: metas
-            }
-          ])
+          handleAttachmentVideoForCache(attachment)
+          setAttachments((prevState: any[]) => [...prevState, attachment])
         } else {
           setAttachments((prevState: any[]) => [
             ...prevState,
             {
               data: file,
-              cachedUrl,
-              upload: !cachedUrl,
+              upload: true,
               type: 'file',
-              size: dataFromDb ? dataFromDb.size : file.size,
-              metadata: dataFromDb && dataFromDb.metadata,
+              size: file.size,
               tid
             }
           ])
@@ -1248,7 +1397,9 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
 
       if (skippedCount > 0) {
         showFileUploadError(
-          `Only ${filesToProcess.length} file${filesToProcess.length !== 1 ? 's' : ''} can be added. ${skippedCount} file${skippedCount !== 1 ? 's' : ''} will be skipped.`
+          `Only ${filesToProcess.length} file${
+            filesToProcess.length !== 1 ? 's' : ''
+          } can be added. ${skippedCount} file${skippedCount !== 1 ? 's' : ''} will be skipped.`
         )
       }
 
@@ -1292,19 +1443,10 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
       const reader = new FileReader()
       reader.onload = async () => {
         // @ts-ignore
-        const length = reader.result && reader.result.length
-        let fileChecksum
-        if (length > 3000) {
-          const firstPart = reader.result && reader.result.slice(0, 1000)
-          const middlePart = reader.result && reader.result.slice(length / 2 - 500, length / 2 + 500)
-          const lastPart = reader.result && reader.result.slice(length - 1000, length)
-          fileChecksum = `${firstPart}${middlePart}${lastPart}`
-        } else {
-          fileChecksum = `${reader.result}`
+        setPendingAttachment(tid, { file: recordedFile })
+        if (recordedFile.objectUrl && recordedFile.objectUrl.startsWith('blob:')) {
+          registerBlobUrl(`compose_${tid}`, recordedFile.objectUrl)
         }
-        const checksumHash = await hashString(fileChecksum || '')
-
-        setPendingAttachment(tid, { file: recordedFile, checksum: checksumHash })
         const messageToSend = {
           metadata: '',
           body: '',
@@ -1327,15 +1469,15 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
         }
         const sendAttachmentsAsSeparateMessage = getSendAttachmentsAsSeparateMessages()
         dispatch(sendMessageAC(messageToSend, id, connectionStatus, connectionStatus, sendAttachmentsAsSeparateMessage))
-        // Reset viewOnce after sending
-        setViewOnce(false)
-        setAttachments([])
-        handleCloseReply()
       }
 
       reader.onerror = (e: any) => {
         log.info(' error on read file onError', e)
       }
+      setViewOnce(false)
+      setAttachments([])
+      attachmentsUpdate = []
+      handleCloseReply()
       reader.readAsBinaryString(recordedFile.file)
     }
   }
@@ -1412,15 +1554,8 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
         setSendMessageIsActive(true)
       }
     } else {
-      if (editMessageText) {
-        if (
-          editMessageText.trim() !== messageToEdit.body ||
-          !compareMessageBodyAttributes(messageBodyAttributes, messageToEdit.bodyAttributes)
-        ) {
-          setSendMessageIsActive(true)
-        } else {
-          setSendMessageIsActive(false)
-        }
+      if (messageToEdit) {
+        setSendMessageIsActive(true)
       } else {
         setSendMessageIsActive(false)
       }
@@ -1636,8 +1771,28 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
     return selectedMessagesMap?.values()?.some((message: IMessage) => message.type === MESSAGE_TYPE.POLL)
   }, [selectedMessagesMap])
 
+  const showLinkPreview = useMemo(
+    () =>
+      linkPreview &&
+      linkPreview.metadata &&
+      !isDescriptionOnlySymbol(linkPreview.metadata.og?.description) &&
+      (linkPreview.metadata.og?.title ||
+        linkPreview.metadata.og?.description ||
+        linkPreview.metadata.og?.image?.[0]?.url ||
+        linkPreview.metadata.og?.favicon?.url),
+    [linkPreview]
+  )
+
+  useEffect(() => {
+    if (messageContRef && messageContRef.current) {
+      setTimeout(() => {
+        dispatch(setSendMessageInputHeightAC(messageContRef.current.getBoundingClientRect().height))
+      }, 301)
+    }
+  }, [showLinkPreview])
+
   return (
-    <SendMessageWrapper backgroundColor={backgroundColor || background}>
+    <SendMessageWrapper ref={sendMessageWrapperRef} backgroundColor={backgroundColor || background}>
       <Container
         margin={margin}
         padding={padding}
@@ -1780,6 +1935,8 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
                     padding={replyEditMessageContainerPadding}
                     color={editMessageTextColor || textPrimary}
                     backgroundColor={editMessageBackgroundColor || surface1Background}
+                    borderBottom={linkPreview && linkPreview.metadata}
+                    borderColor={borderColor}
                   >
                     <CloseEditMode color={textSecondary} onClick={handleCloseEditMode}>
                       <CloseIcon />
@@ -1810,105 +1967,164 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
                     padding={replyEditMessageContainerPadding}
                     color={replyMessageTextColor || textPrimary}
                     backgroundColor={replyMessageBackgroundColor || surface1Background}
+                    borderBottom={linkPreview && linkPreview.metadata}
+                    borderColor={borderColor}
                   >
                     <CloseEditMode color={textSecondary} onClick={handleCloseReply}>
                       <CloseIcon />
                     </CloseEditMode>
-                    <ReplyMessageCont>
-                      {!!(messageForReply.attachments && messageForReply.attachments.length) &&
-                        !messageForReply.viewOnce &&
-                        (messageForReply.attachments[0].type === attachmentTypes.image ||
-                        messageForReply.attachments[0].type === attachmentTypes.video ? (
-                          <Attachment
-                            attachment={messageForReply.attachments[0]}
-                            backgroundColor={selectedFileAttachmentsBoxBackground || ''}
-                            isRepliedMessage
-                          />
-                        ) : (
-                          messageForReply.attachments[0].type === attachmentTypes.file && (
-                            <ReplyIconWrapper backgroundColor={accentColor} iconColor={textOnPrimary}>
-                              <ChooseFileIcon />
-                            </ReplyIconWrapper>
-                          )
-                        ))}
-                      <ReplyMessageBody linkColor={accentColor}>
-                        <EditReplyMessageHeader color={accentColor}>
-                          {replyMessageIcon || <ReplyIcon />} Reply to
-                          <UserName>
-                            {user.id === messageForReply.user.id
-                              ? user.firstName
-                                ? `${user.firstName} ${user.lastName}`
-                                : user.id
-                              : makeUsername(
-                                  contactsMap[messageForReply.user.id],
-                                  messageForReply.user,
-                                  getFromContacts
-                                )}
-                          </UserName>
-                        </EditReplyMessageHeader>
-                        {messageForReply.attachments && messageForReply.attachments.length ? (
-                          messageForReply.attachments[0].type === attachmentTypes.voice ? (
-                            <TextInOneLine>
-                              {messageForReply?.viewOnce && <ViewOnceIconOpen style={{ margin: '0 4px -3px 0' }} />}
-                              {messageForReply.body && !messageForReply.viewOnce ? messageForReply.body : 'Voice'}
-                            </TextInOneLine>
-                          ) : !messageForReply.viewOnce &&
-                            messageForReply.body &&
-                            messageForReply.bodyAttributes &&
-                            messageForReply.bodyAttributes.length > 0 ? (
+                    {CustomReplyMessageContainer && customReplyMessageTypes?.includes(messageForReply.type) ? (
+                      <CustomReplyMessageContainer messageForReply={messageForReply} onClose={handleCloseReply} />
+                    ) : (
+                      <ReplyMessageCont>
+                        {!!(messageForReply.attachments && messageForReply.attachments.length) &&
+                          !messageForReply.viewOnce &&
+                          (messageForReply.attachments[0].type === attachmentTypes.image ||
+                          messageForReply.attachments[0].type === attachmentTypes.video ? (
+                            <Attachment
+                              attachment={messageForReply.attachments[0]}
+                              backgroundColor={selectedFileAttachmentsBoxBackground || ''}
+                              isRepliedMessage
+                            />
+                          ) : (
+                            messageForReply.attachments[0].type === attachmentTypes.file && (
+                              <ReplyIconWrapper backgroundColor={accentColor} iconColor={textOnPrimary}>
+                                <ChooseFileIcon />
+                              </ReplyIconWrapper>
+                            )
+                          ))}
+                        <ReplyMessageBody linkColor={accentColor}>
+                          <EditReplyMessageHeader color={accentColor}>
+                            {replyMessageIcon || <ReplyIcon />} Reply to
+                            <UserName>
+                              {user.id === messageForReply.user.id
+                                ? user.firstName
+                                  ? `${user.firstName} ${user.lastName}`
+                                  : user.id
+                                : makeUsername(
+                                    contactsMap[messageForReply.user.id],
+                                    messageForReply.user,
+                                    getFromContacts
+                                  )}
+                            </UserName>
+                          </EditReplyMessageHeader>
+                          {messageForReply.attachments && messageForReply.attachments.length ? (
+                            messageForReply.attachments[0].type === attachmentTypes.voice ? (
+                              <TextInOneLine>
+                                {messageForReply?.viewOnce && <ViewOnceIconOpen style={{ margin: '0 4px -3px 0' }} />}
+                                {messageForReply.body && !messageForReply.viewOnce ? messageForReply.body : 'Voice'}
+                              </TextInOneLine>
+                            ) : !messageForReply.viewOnce &&
+                              messageForReply.body &&
+                              messageForReply.bodyAttributes &&
+                              messageForReply.bodyAttributes.length > 0 ? (
+                              MessageTextFormat({
+                                text: messageForReply.body,
+                                message: {
+                                  ...messageForReply,
+                                  mentionedUsers:
+                                    messageForReply.mentionedUsers && messageForReply.mentionedUsers.length > 0
+                                      ? messageForReply.mentionedUsers
+                                      : activeChannelMembers &&
+                                          messageForReply.bodyAttributes &&
+                                          messageForReply.bodyAttributes.length > 0
+                                        ? messageForReply.bodyAttributes
+                                            .filter((attr: any) => attr.type.includes('mention'))
+                                            .map((attr: any) => {
+                                              const member = activeChannelMembers.find(
+                                                (m: any) => m.id === attr.metadata
+                                              )
+                                              return member || null
+                                            })
+                                            .filter((m: IMember | null): m is IMember => m !== null)
+                                        : messageForReply.mentionedUsers || [],
+                                  channel: activeChannelMembers ? { members: activeChannelMembers } : undefined
+                                },
+                                contactsMap,
+                                getFromContacts,
+                                accentColor,
+                                textSecondary
+                              })
+                            ) : messageForReply.attachments[0].type === attachmentTypes.image ? (
+                              <TextInOneLine>
+                                {messageForReply?.viewOnce && <ViewOnceIconOpen style={{ margin: '0 4px -2px 0' }} />}
+                                {messageForReply.body && !messageForReply.viewOnce ? messageForReply.body : 'Photo'}
+                              </TextInOneLine>
+                            ) : messageForReply.attachments[0].type === attachmentTypes.video ? (
+                              <TextInOneLine>
+                                {messageForReply?.viewOnce && <ViewOnceIconOpen style={{ margin: '0 4px -2px 0' }} />}
+                                {messageForReply.body && !messageForReply.viewOnce ? messageForReply.body : 'Video'}
+                              </TextInOneLine>
+                            ) : (
+                              <TextInOneLine>
+                                {messageForReply.body && !messageForReply.viewOnce ? messageForReply.body : 'File'}
+                              </TextInOneLine>
+                            )
+                          ) : (
                             MessageTextFormat({
                               text: messageForReply.body,
-                              message: {
-                                ...messageForReply,
-                                mentionedUsers:
-                                  messageForReply.mentionedUsers && messageForReply.mentionedUsers.length > 0
-                                    ? messageForReply.mentionedUsers
-                                    : activeChannelMembers &&
-                                        messageForReply.bodyAttributes &&
-                                        messageForReply.bodyAttributes.length > 0
-                                      ? messageForReply.bodyAttributes
-                                          .filter((attr: any) => attr.type.includes('mention'))
-                                          .map((attr: any) => {
-                                            const member = activeChannelMembers.find((m: any) => m.id === attr.metadata)
-                                            return member || null
-                                          })
-                                          .filter((m: IMember | null): m is IMember => m !== null)
-                                      : messageForReply.mentionedUsers || [],
-                                channel: activeChannelMembers ? { members: activeChannelMembers } : undefined
-                              },
+                              message: messageForReply,
                               contactsMap,
                               getFromContacts,
                               accentColor,
                               textSecondary
                             })
-                          ) : messageForReply.attachments[0].type === attachmentTypes.image ? (
-                            <TextInOneLine>
-                              {messageForReply?.viewOnce && <ViewOnceIconOpen style={{ margin: '0 4px -2px 0' }} />}
-                              {messageForReply.body && !messageForReply.viewOnce ? messageForReply.body : 'Photo'}
-                            </TextInOneLine>
-                          ) : messageForReply.attachments[0].type === attachmentTypes.video ? (
-                            <TextInOneLine>
-                              {messageForReply?.viewOnce && <ViewOnceIconOpen style={{ margin: '0 4px -2px 0' }} />}
-                              {messageForReply.body && !messageForReply.viewOnce ? messageForReply.body : 'Video'}
-                            </TextInOneLine>
-                          ) : (
-                            <TextInOneLine>
-                              {messageForReply.body && !messageForReply.viewOnce ? messageForReply.body : 'File'}
-                            </TextInOneLine>
-                          )
-                        ) : (
-                          MessageTextFormat({
-                            text: messageForReply.body,
-                            message: messageForReply,
-                            contactsMap,
-                            getFromContacts,
-                            accentColor,
-                            textSecondary
-                          })
-                        )}
-                      </ReplyMessageBody>
-                    </ReplyMessageCont>
+                          )}
+                        </ReplyMessageBody>
+                      </ReplyMessageCont>
+                    )}
                   </EditReplyMessageCont>
+                )}
+                {showLinkPreview && linkPreview && (
+                  <LinkPreviewContainer
+                    backgroundColor={surface1Background}
+                    borderColor={borderColor}
+                    isClosing={isClosingPreview}
+                    width={replyEditMessageContainerWidth}
+                    borderRadius={messageForReply || messageToEdit ? '0px' : replyEditMessageContainerBorderRadius}
+                    left={replyEditMessageContainerLeftPosition}
+                    bottom={replyEditMessageContainerBottomPosition}
+                    padding={replyEditMessageContainerPadding}
+                  >
+                    <CloseEditMode color={textSecondary} onClick={handleRemoveLinkPreview}>
+                      <CloseIcon />
+                    </CloseEditMode>
+                    <LinkPreviewContent>
+                      {linkPreview.metadata.og?.image?.[0]?.url ? (
+                        <LinkPreviewImage
+                          onLoad={(e: any) => {
+                            if (e.target?.naturalHeight && e.target?.naturalWidth) {
+                              dispatch(
+                                updateOGMetadataAC(linkPreview.url, {
+                                  ...linkPreview.metadata,
+                                  imageHeight: e.target.naturalHeight,
+                                  imageWidth: e.target.naturalWidth
+                                })
+                              )
+                            }
+                          }}
+                          src={linkPreview.metadata.og.image[0].url}
+                          alt='Link preview'
+                        />
+                      ) : linkPreview.metadata.og?.favicon?.url ? (
+                        <LinkPreviewImage src={linkPreview.metadata.og.favicon.url} alt='Favicon' />
+                      ) : (
+                        <LinkPreviewIcon color={accentColor} bg={background} />
+                      )}
+                      <LinkPreviewTextContent
+                        hasImage={!!linkPreview.metadata.og?.image?.[0]?.url || !!linkPreview.metadata.og?.favicon?.url}
+                      >
+                        {linkPreview.metadata.og?.title && (
+                          <LinkPreviewTitle color={accentColor}>{linkPreview.metadata.og.title}</LinkPreviewTitle>
+                        )}
+                        {linkPreview.metadata.og?.description && (
+                          <LinkPreviewDescription color={textPrimary}>
+                            {linkPreview.metadata.og.description}
+                          </LinkPreviewDescription>
+                        )}
+                      </LinkPreviewTextContent>
+                    </LinkPreviewContent>
+                  </LinkPreviewContainer>
                 )}
 
                 {!!attachments.length && !sendAttachmentSeparately && (
@@ -1932,6 +2148,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
                     ))}
                   </ChosenAttachments>
                 )}
+
                 <SendMessageInputContainer iconColor={accentColor} minHeight={minHeight}>
                   {uploadErrorMessage && (
                     <ViewOnceWarningTooltip backgroundColor={tooltipBackground}>
@@ -1948,7 +2165,9 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
                     <MessageInputWrapper
                       className='message_input_wrapper'
                       borderRadius={
-                        messageForReply || messageToEdit ? borderRadiusOnOpenedEditReplyMessage : borderRadius
+                        messageForReply || messageToEdit || (showLinkPreview && linkPreview)
+                          ? borderRadiusOnOpenedEditReplyMessage
+                          : borderRadius
                       }
                       ref={inputWrapperRef}
                       backgroundColor={inputBackgroundColor || surface1Background}
@@ -2151,6 +2370,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
                   )}
 
                   {sendMessageIsActive ||
+                  attachments.length > 0 ||
                   (!voiceMessage && !getAudioRecordingFromMap(activeChannel?.id)?.file) ||
                   messageToEdit ? (
                     <SendMessageButton
@@ -2202,7 +2422,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
 const SendMessageWrapper = styled.div<{ backgroundColor: string }>`
   background-color: ${(props) => props.backgroundColor};
   position: relative;
-  z-index: 100;
+  z-index: 10;
 `
 const Container = styled.div<{
   margin?: string
@@ -2221,7 +2441,7 @@ const Container = styled.div<{
   border-radius: ${(props) => props.borderRadius || '4px'};
   position: relative;
   padding: ${(props) => props.padding || '0 calc(4% + 32px)'};
-  z-index: 100;
+  z-index: 10;
 
   & span.rdw-suggestion-dropdown {
     position: absolute;
@@ -2265,6 +2485,8 @@ const EditReplyMessageCont = styled.div<{
   left?: string
   bottom?: string
   padding?: string
+  borderBottom?: boolean
+  borderColor: string
 }>`
   position: relative;
   left: ${(props) => props.left || '0'};
@@ -2280,6 +2502,7 @@ const EditReplyMessageCont = styled.div<{
   background-color: ${(props) => props.backgroundColor};
   z-index: 19;
   box-sizing: content-box;
+  ${(props) => (props.borderBottom ? `border-bottom: 1px solid ${props.borderColor};` : '')}
 `
 
 const EditMessageText = styled.p<any>`
@@ -2469,6 +2692,13 @@ const LexicalWrapper = styled.div<{
     order: ${(props) => (props.order === 0 || props.order ? props.order : 1)};
     overflow-y: auto;
     overflow-x: hidden;
+    scrollbar-width: none;
+    scrollbar-color: transparent transparent;
+    overscroll-behavior: none;
+
+    @supports (overflow: overlay) {
+      overflow-y: overlay;
+    }
 
     &::-webkit-scrollbar {
       width: 8px;
@@ -2484,6 +2714,11 @@ const LexicalWrapper = styled.div<{
     }
     &.show-scrollbar::-webkit-scrollbar-track {
       background: transparent;
+    }
+
+    &.show-scrollbar {
+      scrollbar-width: thin;
+      scrollbar-color: ${(props) => props.thumbColor} transparent;
     }
 
     & p {
@@ -2849,4 +3084,117 @@ const CloseIconWrapper = styled.span<{ color: string }>`
   color: ${(props) => props.color};
 `
 
+const linkPreviewSlideIn = keyframes`
+  from {
+    max-height: 0;
+    opacity: 0;
+    padding-top: 0;
+    padding-bottom: 0;
+  }
+  to {
+    max-height: 200px;
+    opacity: 1;
+    padding-top: 6px;
+    padding-bottom: 6px;
+  }
+`
+
+const linkPreviewSlideOut = keyframes`
+  from {
+    max-height: 200px;
+    opacity: 1;
+    padding-top: 6px;
+    padding-bottom: 6px;
+  }
+  to {
+    max-height: 0;
+    opacity: 0;
+    padding-top: 0;
+    padding-bottom: 0;
+  }
+`
+
+const LinkPreviewContainer = styled.div<{
+  backgroundColor: string
+  borderColor: string
+  isClosing: boolean
+  width?: string
+  borderRadius?: string
+  left?: string
+  bottom?: string
+  padding?: string
+}>`
+  position: relative;
+  left: ${(props) => props.left || '0'};
+  bottom: ${(props) => props.bottom || '0'};
+  width: ${(props) => props.width || 'calc(100% - 82px)'};
+  border-radius: ${(props) => props.borderRadius || '18px 18px 0 0'};
+  padding: ${(props) => props.padding || '8px 16px 12px'};
+  display: flex;
+  align-items: flex-start;
+  box-sizing: content-box;
+  gap: 12px;
+  background-color: ${(props) => props.backgroundColor};
+  z-index: 19;
+  animation: ${(props) => (props.isClosing ? linkPreviewSlideOut : linkPreviewSlideIn)} 0.3s ease-in-out forwards;
+  overflow: hidden;
+`
+
+const LinkPreviewContent = styled.div`
+  display: flex;
+  gap: 12px;
+  flex: 1;
+  overflow: hidden;
+`
+
+const LinkPreviewImage = styled.img`
+  width: 40px;
+  height: 40px;
+  object-fit: cover;
+  border-radius: 8px;
+  flex-shrink: 0;
+`
+
+const LinkPreviewIcon = styled(LinkIcon)<{ color: string; bg: string }>`
+  color: ${(props) => props.color};
+  rect {
+    fill: ${(props) => props.bg};
+    fill-opacity: 1;
+  }
+`
+
+const LinkPreviewTextContent = styled.div<{ hasImage: boolean }>`
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  overflow: hidden;
+  flex: 1;
+  justify-content: center;
+  ${(props) => (props.hasImage ? '' : 'padding-left: 0;')}
+`
+
+const LinkPreviewTitle = styled.div<{ color: string }>`
+  color: ${(props) => props.color};
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: Inter;
+  font-weight: 500;
+  font-size: 13px;
+  line-height: 16px;
+  letter-spacing: 0px;
+`
+
+const LinkPreviewDescription = styled.div<{ color: string }>`
+  color: ${(props) => props.color};
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 1;
+  -webkit-box-orient: vertical;
+  font-weight: 400;
+  font-size: 15px;
+  line-height: 20px;
+  letter-spacing: -0.2px;
+`
 export default SendMessageInput

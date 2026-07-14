@@ -39,6 +39,7 @@ export interface IChannelState {
   hiddenChannel: IChannel | null
   visibleChannel: IChannel | null
   channelInfoIsOpen: boolean
+  messageSearchIsOpen: boolean
   channelEditMode: boolean
   channelListWidth: number
   isDragging: boolean
@@ -84,6 +85,7 @@ const initialState: IChannelState = {
   hiddenChannel: null,
   visibleChannel: null,
   channelInfoIsOpen: false,
+  messageSearchIsOpen: false,
   channelEditMode: false,
   channelListWidth: 0,
   isDragging: false,
@@ -113,6 +115,14 @@ const channelSlice = createSlice({
 
     setChannels: (state, action: PayloadAction<{ channels: IChannel[] }>) => {
       state.channels = sortChannelByLastMessage([...action.payload.channels])
+      if (state.activeChannel) {
+        const channel = state.channels.find(
+          (channel: IChannel) => channel.id === (state?.activeChannel as IChannel)?.id
+        ) as IChannel
+        if (channel) {
+          state.activeChannel = channel
+        }
+      }
     },
 
     setSearchedChannels: (
@@ -156,7 +166,11 @@ const channelSlice = createSlice({
     },
 
     addChannels: (state, action: PayloadAction<{ channels: IChannel[] }>) => {
-      state.channels.push(...action.payload.channels)
+      const existingIds = new Set(state.channels.map((c) => c.id))
+      const newChannels = action.payload.channels.filter((c) => !existingIds.has(c.id))
+      if (newChannels.length) {
+        state.channels.push(...newChannels)
+      }
     },
 
     addChannelsForForward: (state, action: PayloadAction<{ channels: IChannel[] }>) => {
@@ -208,6 +222,7 @@ const channelSlice = createSlice({
 
     setActiveChannel: (state, action: PayloadAction<{ channel: IChannel | {} }>) => {
       state.activeChannel = action.payload.channel || {}
+      state.messageSearchIsOpen = false
       if ((action.payload.channel as IChannel).type === DEFAULT_CHANNEL_TYPE.DIRECT) {
         const ChatClient = getClient()
         const { user } = ChatClient
@@ -227,9 +242,10 @@ const channelSlice = createSlice({
         channelId: string
         moveUp?: boolean
         sort?: boolean
+        add?: boolean
       }>
     ) => {
-      const { config, channelId, moveUp, sort } = action.payload
+      const { config, channelId, moveUp, sort, add } = action.payload
 
       if (moveUp) {
         let updateChannel: any
@@ -239,8 +255,8 @@ const channelSlice = createSlice({
           }
           return chan.id !== channelId
         })
-        if (updateChannel) {
-          updateChannel = { ...updateChannel, ...config }
+        if (updateChannel || add) {
+          updateChannel = { ...(updateChannel || {}), ...config }
           state.channels = sortChannelByLastMessage([updateChannel, ...updatedChannels])
         }
       } else {
@@ -386,6 +402,9 @@ const channelSlice = createSlice({
           state.channels = sortChannelByLastMessage([updateChannel, ...updatedChannels])
         }
       }
+      if (updateChannel?.id && updateChannel?.id === (state.activeChannel as any)?.id) {
+        state.activeChannel = updateChannel
+      }
     },
 
     updateChannelLastMessageStatus: (state, action: PayloadAction<{ message: IMessage; channel: IChannel }>) => {
@@ -398,6 +417,7 @@ const channelSlice = createSlice({
               ...channel.lastMessage,
               deliveryStatus: message.deliveryStatus,
               userMarkers: message.userMarkers,
+              markerTotals: message.markerTotals,
               state: message.state
             }
           }
@@ -409,6 +429,10 @@ const channelSlice = createSlice({
 
     setChannelInfoOpenClose: (state, action: PayloadAction<{ open: boolean }>) => {
       state.channelInfoIsOpen = action.payload.open
+    },
+
+    setMessageSearchOpenClose: (state, action: PayloadAction<{ open: boolean }>) => {
+      state.messageSearchIsOpen = action.payload.open
     },
 
     toggleEditChannel: (state, action: PayloadAction<{ state: boolean }>) => {
@@ -573,6 +597,7 @@ export const {
   updateChannelLastMessage,
   updateChannelLastMessageStatus,
   setChannelInfoOpenClose,
+  setMessageSearchOpenClose,
   toggleEditChannel,
   switchTypingIndicator,
   switchRecordingIndicator,

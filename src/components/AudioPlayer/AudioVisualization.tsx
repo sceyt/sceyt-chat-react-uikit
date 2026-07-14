@@ -10,6 +10,7 @@ interface AudioVisualizationProps {
   height?: number
   barWidth?: number
   barRadius?: number
+  containerWidth?: number
 }
 
 const AudioVisualization: React.FC<AudioVisualizationProps> = ({
@@ -20,7 +21,8 @@ const AudioVisualization: React.FC<AudioVisualizationProps> = ({
   progressColor,
   height = 20,
   barWidth = 1,
-  barRadius = 1.5
+  barRadius = 1.5,
+  containerWidth = 148
 }) => {
   const normalizedBars = useMemo(() => {
     if (!tmb || tmb.length === 0) return []
@@ -36,8 +38,6 @@ const AudioVisualization: React.FC<AudioVisualizationProps> = ({
       return Math.max(2, normalized)
     })
   }, [tmb, height])
-
-  const containerWidth = 148
 
   // Calculate spacing for space-between distribution
   // First bar at 0, last bar at (containerWidth - barWidth)

@@ -53,9 +53,7 @@ const AllVotesPopup = ({ onClose, poll, messageId, optionId, optionName }: AllVo
   const [isScrolling, setIsScrolling] = useState<boolean>(false)
 
   useEffect(() => {
-    if (allVotes.length === 0 && totalVotes > 0 && !isLoading) {
-      dispatch(getPollVotesAC(messageId, poll.id, optionId, POLL_VOTES_LIMIT))
-    }
+    dispatch(getPollVotesAC(messageId, poll.id, optionId, POLL_VOTES_LIMIT))
   }, [])
 
   useEffect(() => {
@@ -174,6 +172,13 @@ const VotesList = styled.div<{ thumbColor: string }>`
   overflow-y: auto;
   overflow-x: hidden;
   padding-right: 14px;
+  scrollbar-width: none;
+  scrollbar-color: transparent transparent;
+  overscroll-behavior: none;
+
+  @supports (overflow: overlay) {
+    overflow-y: overlay;
+  }
 
   &::-webkit-scrollbar {
     width: 8px;
@@ -189,6 +194,11 @@ const VotesList = styled.div<{ thumbColor: string }>`
   }
   &.show-scrollbar::-webkit-scrollbar-track {
     background: transparent;
+  }
+
+  &.show-scrollbar {
+    scrollbar-width: thin;
+    scrollbar-color: ${(props) => props.thumbColor} transparent;
   }
 `
 

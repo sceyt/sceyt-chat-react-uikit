@@ -40,6 +40,29 @@ interface IRepliedMessageProps {
   contactsMap: { [key: string]: any }
 }
 
+const parentMessagePreviewEqual = (prevMessage: IMessage, nextMessage: IMessage) => {
+  const prevParent = prevMessage.parentMessage
+  const nextParent = nextMessage.parentMessage
+
+  if (prevParent === nextParent) {
+    return true
+  }
+
+  if (!prevParent || !nextParent) {
+    return false
+  }
+
+  return (
+    prevParent.id === nextParent.id &&
+    prevParent.tid === nextParent.tid &&
+    prevParent.body === nextParent.body &&
+    prevParent.state === nextParent.state &&
+    prevParent.attachments === nextParent.attachments &&
+    prevParent.updatedAt === nextParent.updatedAt &&
+    prevParent.user?.id === nextParent.user?.id
+  )
+}
+
 const RepliedMessage = ({
   message,
   handleScrollToRepliedMessage,
@@ -198,7 +221,6 @@ const RepliedMessage = ({
 }
 
 export default React.memo(RepliedMessage, (prevProps, nextProps) => {
-  // Custom comparison function to check if only 'messages' prop has changed
   return (
     prevProps.message.deliveryStatus === nextProps.message.deliveryStatus &&
     prevProps.message.state === nextProps.message.state &&
@@ -207,6 +229,7 @@ export default React.memo(RepliedMessage, (prevProps, nextProps) => {
     prevProps.message.reactionTotals === nextProps.message.reactionTotals &&
     prevProps.message.attachments === nextProps.message.attachments &&
     prevProps.message.userMarkers === nextProps.message.userMarkers &&
+    parentMessagePreviewEqual(prevProps.message, nextProps.message) &&
     prevProps.selectedMessagesMap === nextProps.selectedMessagesMap &&
     prevProps.selectionIsActive === nextProps.selectionIsActive &&
     prevProps.contactsMap === nextProps.contactsMap

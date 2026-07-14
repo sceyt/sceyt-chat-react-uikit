@@ -20,3 +20,7 @@ export const setUserToMap = (user: IUser) => {
 export const deleteUserFromMap = (userId: string) => {
   delete usersMap[userId]
 }
+
+export const clearUsersMap = () => {
+  Object.keys(usersMap).forEach((userId) => delete usersMap[userId])
+}

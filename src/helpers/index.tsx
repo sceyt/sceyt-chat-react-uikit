@@ -124,14 +124,24 @@ export const calculateRenderedImageWidth = (width: number, height: number, maxWi
   const maxWdt = maxWidth || 420
   const maxHg = maxHeight || 400
   const minWidth = 165
+  const minHeight = 165
   const aspectRatio = width / height
   if (aspectRatio >= maxWdt / maxHg) {
-    return [Math.max(minWidth, Math.min(maxWdt, width)), Math.min(maxHg, height, maxWdt / aspectRatio) + 2]
+    return [
+      Math.floor(Math.max(minWidth, Math.min(maxWdt, width))),
+      Math.floor(Math.max(minHeight, Math.min(maxHg, height, maxWdt / aspectRatio))) + 2
+    ]
   } else {
     if (maxHg <= height) {
-      return [Math.min(maxWdt, maxHg * aspectRatio), Math.min(maxHg, height)]
+      return [
+        Math.floor(Math.min(maxWdt, maxHg * aspectRatio)),
+        Math.floor(Math.max(minHeight, Math.min(maxHg, height)))
+      ]
     } else {
-      return [Math.min(maxWdt, height * aspectRatio), Math.min(maxHg, height)]
+      return [
+        Math.floor(Math.min(maxWdt, height * aspectRatio)),
+        Math.floor(Math.max(minHeight, Math.min(maxHg, height)))
+      ]
     }
   }
 }
@@ -201,39 +211,6 @@ export const checkArraysEqual = (arr1: any[], arr2: any[]) => {
     }
   }
   return true
-}
-
-export const getMetadataFromUrl = (url: string): Promise<any> => {
-  return fetch(url)
-    .then((response) => response.text())
-    .then((data) => {
-      // Extract metadata from the HTML
-      const parser = new DOMParser()
-      const doc = parser.parseFromString(data, 'text/html')
-      // @ts-ignore
-      const title = doc.querySelector('title').innerText
-
-      // Extract the description
-      // @ts-ignore
-      const description = (
-        doc.querySelector("meta[name='twitter:description']") ||
-        doc.querySelector("meta[property='og:description']") ||
-        doc.querySelector("meta[name='description']")
-      ).getAttribute('content')
-      let image
-      // Extract the image
-      // @ts-ignore
-      const imageSrc = (
-        doc.querySelector("meta[name='twitter:image']") || doc.querySelector("meta[property='og:image']")
-      ).getAttribute('content')
-      if (!(imageSrc && imageSrc.startsWith('http'))) {
-        image = `${url.slice(0, -1)}${imageSrc}`
-      } else {
-        image = imageSrc
-      }
-      return { title, description, image }
-    })
-    .catch((error) => log.error(error))
 }
 
 export const formatAudioVideoTime = (currentTime: number) => {

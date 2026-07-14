@@ -5,10 +5,17 @@ import {
   EDIT_MESSAGE,
   FORWARD_MESSAGE,
   GET_MESSAGE,
-  GET_MESSAGES,
+  LOAD_LATEST_MESSAGES,
+  LOAD_AROUND_MESSAGE,
+  REFRESH_CACHE_AROUND_MESSAGE,
+  LOAD_NEAR_UNREAD,
+  LOAD_DEFAULT_MESSAGES,
+  RELOAD_ACTIVE_CHANNEL_AFTER_RECONNECT,
   GET_MESSAGES_ATTACHMENTS,
   GET_REACTIONS,
   LOAD_MORE_MESSAGES,
+  PREFETCH_MESSAGES,
+  CANCEL_CHANNEL_MESSAGE_PROCESSES,
   LOAD_MORE_MESSAGES_ATTACHMENTS,
   LOAD_MORE_REACTIONS,
   PAUSE_ATTACHMENT_UPLOADING,
@@ -24,27 +31,36 @@ import {
   GET_POLL_VOTES,
   LOAD_MORE_POLL_VOTES,
   RESEND_PENDING_POLL_ACTIONS,
-  queryDirection
+  RESEND_PENDING_MESSAGE_MUTATIONS,
+  LOAD_OG_METADATA_FOR_LINK,
+  queryDirection,
+  FETCH_OG_METADATA,
+  CANCEL_WINDOW_LOAD
 } from './constants'
 import { IAttachment, IChannel, IMarker, IMessage, IOGMetadata, IPollVote, IReaction } from '../../types'
 import {
   addMessage,
   deleteMessageFromList,
-  setScrollToMessage,
   setScrollToMentionedMessage,
   setScrollToNewMessage,
   setShowScrollToNewMessageButton,
+  setVisibleMessage,
+  removeVisibleMessage,
+  clearVisibleMessagesMap,
   setUnreadScrollTo,
   setMessages,
   addMessages,
   updateMessagesStatus,
   updateMessage,
+  patchMessages,
   addReactionToMessage,
   deleteReactionFromMessage,
   setHasPrevMessages,
   setMessagesHasNext,
   clearMessages,
   emptyChannelAttachments,
+  setCachedTabAttachments,
+  clearTabAttachmentsCache,
   setAttachments,
   removeAttachment,
   setAttachmentsForPopup,
@@ -55,7 +71,10 @@ import {
   updateUploadProgress,
   removeUploadProgress,
   setMessageToEdit,
-  setMessagesLoadingState,
+  setLoadingPrevMessagesState,
+  setLoadingNextMessagesState,
+  setActivePaginationIntent,
+  clearActivePaginationIntent,
   setAttachmentsLoadingState,
   setSendMessageInputHeight,
   setMessageForReply,
@@ -71,10 +90,13 @@ import {
   removeSelectedMessage,
   clearSelectedMessages,
   updateMessageAttachment,
+  removeAttachmentUpdatedEntries,
+  removeAttachmentUploadingState,
   setOGMetadata,
   updateOGMetadata,
   setMessageMarkers,
   setMessagesMarkersLoadingState,
+  removeChannelMarkers,
   updateMessagesMarkers,
   setPollVotesList,
   addPollVotesToList,
@@ -83,15 +105,16 @@ import {
   setPollVotesInitialCount,
   removePendingPollAction,
   setPendingPollActionsMap,
-  setPendingMessage,
-  removePendingMessage,
-  updatePendingMessage,
-  clearPendingMessagesMap,
   updatePendingPollAction,
-  setUnreadMessageId
+  setPendingMessageMutation,
+  removePendingMessageMutation,
+  setUnreadMessageId,
+  setStableUnreadAnchor,
+  PendingMessageMutation
 } from './reducers'
 import { PendingPollAction } from 'helpers/messagesHalper'
 import { ATTACHMENT_VERSION } from 'helpers/attachmentsCache'
+import { registerBlobUrl } from 'helpers/attachmentBlobUrls'
 
 export function sendMessageAC(
   message: any,
@@ -155,27 +178,73 @@ export function setMessageToEditAC(message: IMessage | null) {
   return setMessageToEdit({ message })
 }
 
-export function getMessagesAC(
+export function loadLatestMessagesAC(
   channel: IChannel,
-  loadWithLastMessage?: boolean,
   messageId?: string,
-  limit?: number,
-  highlight = true,
-  behavior?: 'smooth' | 'instant' | 'auto',
-  scrollToMessage: boolean = true,
-  networkChanged: boolean = false
+  networkChanged?: boolean,
+  applyVisibleWindow: boolean = true,
+  forceLatestWindow: boolean = false
 ) {
   return {
-    type: GET_MESSAGES,
+    type: LOAD_LATEST_MESSAGES,
+    payload: { channel, messageId, networkChanged, applyVisibleWindow, forceLatestWindow }
+  }
+}
+
+export interface RestoreWindowPayload {
+  startId: string
+  endId: string
+  anchorId: string
+  prevCount: number
+  nextCount: number
+  preferCache: boolean
+}
+
+export function loadAroundMessageAC(
+  channel: IChannel,
+  messageId: string,
+  networkChanged?: boolean,
+  restoreWindow?: RestoreWindowPayload
+) {
+  return {
+    type: LOAD_AROUND_MESSAGE,
+    payload: { channel, messageId, networkChanged, restoreWindow }
+  }
+}
+
+export function cancelWindowLoadAC() {
+  return { type: CANCEL_WINDOW_LOAD }
+}
+
+export function loadNearUnreadAC(channel: IChannel) {
+  return {
+    type: LOAD_NEAR_UNREAD,
+    payload: { channel }
+  }
+}
+
+export function loadDefaultMessagesAC(channel: IChannel) {
+  return {
+    type: LOAD_DEFAULT_MESSAGES,
+    payload: { channel }
+  }
+}
+
+export function reloadActiveChannelAfterReconnectAC(
+  channel: IChannel,
+  visibleAnchorId?: string,
+  wasViewingLatest?: boolean,
+  applyVisibleWindow: boolean = true,
+  isAtHistoryTop: boolean = false
+) {
+  return {
+    type: RELOAD_ACTIVE_CHANNEL_AFTER_RECONNECT,
     payload: {
       channel,
-      loadWithLastMessage,
-      messageId,
-      limit,
-      highlight,
-      behavior,
-      scrollToMessage,
-      networkChanged
+      visibleAnchorId: visibleAnchorId || '',
+      wasViewingLatest: !!wasViewingLatest,
+      applyVisibleWindow,
+      isAtHistoryTop
     }
   }
 }
@@ -187,20 +256,15 @@ export function getMessageAC(channelId: string, messageId?: string, limit?: numb
   }
 }
 
-export function setScrollToMessagesAC(
-  messageId: string | null,
-  highlight = true,
-  behavior?: 'smooth' | 'instant' | 'auto'
-) {
-  return setScrollToMessage({ messageId: messageId || '', highlight, behavior })
-}
-
 export function setScrollToMentionedMessageAC(isScrollToMentionedMessage: boolean | null) {
   return setScrollToMentionedMessage({ isScrollToMentionedMessage: !!isScrollToMentionedMessage })
 }
 
-export function setMessagesLoadingStateAC(state: number) {
-  return setMessagesLoadingState({ state })
+export function setLoadingPrevMessagesStateAC(state: number | null) {
+  return setLoadingPrevMessagesState({ state })
+}
+export function setLoadingNextMessagesStateAC(state: number | null) {
+  return setLoadingNextMessagesState({ state })
 }
 export function setAttachmentsLoadingStateAC(state: number, forPopup?: boolean) {
   return setAttachmentsLoadingState({ state, forPopup: forPopup || false })
@@ -209,8 +273,8 @@ export function addMessagesAC(messages: any, direction: string) {
   return addMessages({ messages, direction })
 }
 
-export function setMessagesAC(messages: any) {
-  return setMessages({ messages })
+export function setMessagesAC(messages: any, channelId?: string) {
+  return setMessages({ messages, channelId })
 }
 
 export function addReactionAC(
@@ -303,6 +367,14 @@ export function emptyChannelAttachmentsAC() {
   return emptyChannelAttachments()
 }
 
+export function setCachedTabAttachmentsAC(key: string, attachments: any[]) {
+  return setCachedTabAttachments({ key, attachments })
+}
+
+export function clearTabAttachmentsCacheAC() {
+  return clearTabAttachmentsCache()
+}
+
 export function addMessageAC(message: IMessage) {
   return addMessage({ message })
 }
@@ -323,6 +395,18 @@ export function showScrollToNewMessageButtonAC(state: boolean) {
   return setShowScrollToNewMessageButton({ state })
 }
 
+export function setVisibleMessageAC(message: IMessage) {
+  return setVisibleMessage({ message })
+}
+
+export function removeVisibleMessageAC(message: IMessage) {
+  return removeVisibleMessage({ message })
+}
+
+export function clearVisibleMessagesMapAC() {
+  return clearVisibleMessagesMap()
+}
+
 export function setUnreadScrollToAC(state: boolean) {
   return setUnreadScrollTo({ state })
 }
@@ -332,11 +416,67 @@ export function loadMoreMessagesAC(
   limit: number,
   direction: string,
   messageId: string,
-  hasNext: boolean
+  hasNext: boolean,
+  requestId?: string
 ) {
-  return {
+  const payload: {
+    limit: number
+    direction: string
+    channelId: string
+    messageId: string
+    hasNext: boolean
+    requestId?: string
+  } = { limit, direction, channelId, messageId, hasNext }
+
+  if (requestId) {
+    Object.defineProperty(payload, 'requestId', {
+      value: requestId,
+      enumerable: false,
+      configurable: true
+    })
+  }
+
+  const action = {
     type: LOAD_MORE_MESSAGES,
-    payload: { limit, direction, channelId, messageId, hasNext }
+    payload
+  }
+
+  return action
+}
+
+export function prefetchMessagesAC(channelId: string, fromMessageId: string, direction: string, pages: number) {
+  return {
+    type: PREFETCH_MESSAGES,
+    payload: {
+      channelId,
+      fromMessageId,
+      direction,
+      pages
+    }
+  }
+}
+
+export function cancelChannelMessageProcessesAC(channelId: string) {
+  return {
+    type: CANCEL_CHANNEL_MESSAGE_PROCESSES,
+    payload: {
+      channelId
+    }
+  }
+}
+
+export function setActivePaginationIntentAC(
+  channelId: string,
+  direction: 'prev' | 'next',
+  requestId: string,
+  anchorId: string
+) {
+  return setActivePaginationIntent({ channelId, direction, requestId, anchorId })
+}
+
+export function clearActivePaginationIntentAC(requestId?: string) {
+  return {
+    ...clearActivePaginationIntent({ requestId })
   }
 }
 
@@ -357,7 +497,26 @@ export function updateOGMetadataAC(url: string, metadata: IOGMetadata | null) {
 }
 
 export function setUpdateMessageAttachmentAC(url: string, attachmentUrl: string) {
-  return updateMessageAttachment({ url: url + ATTACHMENT_VERSION, attachmentUrl })
+  const versionedKey = url + ATTACHMENT_VERSION
+  // Every blob URL shared through attachmentUpdatedMap is tracked by the
+  // registry so it gets revoked on eviction instead of leaking for the session.
+  if (attachmentUrl && attachmentUrl.startsWith('blob:')) {
+    registerBlobUrl(versionedKey, attachmentUrl)
+  }
+  return updateMessageAttachment({ url: versionedKey, attachmentUrl })
+}
+
+// Keys must already carry ATTACHMENT_VERSION (they come from the blob-URL registry).
+export function removeAttachmentUpdatedEntriesAC(keys: string[]) {
+  return removeAttachmentUpdatedEntries({ keys })
+}
+
+export function removeAttachmentUploadingStateAC(attachmentId: string) {
+  return removeAttachmentUploadingState({ attachmentId })
+}
+
+export function removeChannelMarkersAC(channelId: string) {
+  return removeChannelMarkers({ channelId })
 }
 
 export function updateMessageAC(
@@ -372,8 +531,13 @@ export function updateMessageAC(
   return updateMessage({ messageId, params, addIfNotExists, voteDetails })
 }
 
-export function updateMessagesStatusAC(name: string, markersMap: { [key: string]: IMarker }, isOwnMarker?: boolean) {
-  return updateMessagesStatus({ name, markersMap, isOwnMarker })
+export function updateMessagesStatusAC(
+  name: string,
+  markersMap: { [key: string]: IMarker },
+  isOwnMarker?: boolean,
+  marker?: IMarker
+) {
+  return updateMessagesStatus({ name, markersMap, isOwnMarker, marker })
 }
 
 export function clearMessagesAC() {
@@ -599,22 +763,50 @@ export function updatePendingPollActionAC(messageId: string, message: IMessage) 
   return updatePendingPollAction({ messageId, message })
 }
 
-export function setPendingMessageAC(channelId: string, message: IMessage) {
-  return setPendingMessage({ channelId, message })
+export function setPendingMessageMutationAC(mutation: PendingMessageMutation) {
+  return setPendingMessageMutation({ mutation })
 }
 
-export function removePendingMessageAC(channelId: string, messageId: string) {
-  return removePendingMessage({ channelId, messageId })
+export function removePendingMessageMutationAC(messageId: string) {
+  return removePendingMessageMutation({ messageId })
 }
 
-export function updatePendingMessageAC(channelId: string, messageId: string, updatedMessage: Partial<IMessage>) {
-  return updatePendingMessage({ channelId, messageId, updatedMessage })
-}
-
-export function clearPendingMessagesMapAC() {
-  return clearPendingMessagesMap()
+export function resendPendingMessageMutationsAC(connectionState: string) {
+  return {
+    type: RESEND_PENDING_MESSAGE_MUTATIONS,
+    payload: { connectionState }
+  }
 }
 
 export function setUnreadMessageIdAC(messageId: string) {
   return setUnreadMessageId({ messageId })
+}
+
+export function setStableUnreadAnchorAC(channelId: string, messageId: string) {
+  return setStableUnreadAnchor({ channelId, messageId })
+}
+
+export function loadOGMetadataForLinkAC(messages: IMessage[]) {
+  return {
+    type: LOAD_OG_METADATA_FOR_LINK,
+    payload: { messages }
+  }
+}
+
+export function patchMessagesAC(messages: IMessage[]) {
+  return patchMessages({ messages })
+}
+
+export function refreshCacheAroundMessageAC(channelId: string, messageId: string, applyVisibleWindow = true) {
+  return {
+    type: REFRESH_CACHE_AROUND_MESSAGE,
+    payload: { channelId, messageId, applyVisibleWindow }
+  }
+}
+
+export function fetchOGMetadataForLinkAC(url: string) {
+  return {
+    type: FETCH_OG_METADATA,
+    payload: { url }
+  }
 }

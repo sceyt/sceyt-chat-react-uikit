@@ -72,7 +72,7 @@ function* getMembers(action: IAction): any {
     const { members, hasNext } = getMembers ? yield call(getMembers, channel) : yield call(membersQuery.loadNextPage)
     yield put(setMembersToListAC(members, channelId))
     yield put(setMembersHasNextAC(hasNext, channelId))
-    const updateChannelData = yield call(updateActiveChannelMembersAdd, members) || {}
+    const updateChannelData = yield call(updateActiveChannelMembersAdd, members, channelId) || {}
     yield put(updateChannelDataAC(channelId, updateChannelData))
   } catch (e) {
     log.error('ERROR in get members - ', e.message)
@@ -111,7 +111,7 @@ function* loadMoreMembers(action: IAction): any {
       : yield call(membersQuery.loadNextPage)
     yield put(addMembersToListAC(members, channelId))
     yield put(setMembersHasNextAC(hasNext, channelId))
-    const updateChannelData = yield call(updateActiveChannelMembersAdd, members) || {}
+    const updateChannelData = yield call(updateActiveChannelMembersAdd, members, channelId) || {}
     yield put(updateChannelDataAC(channelId, updateChannelData))
   } catch (e) {
     if (e.code !== 10008) {
@@ -176,7 +176,7 @@ function* addMembers(action: IAction): any {
 
       const updateChannelData = addMembersEvent
         ? { members: membersList }
-        : yield call(updateActiveChannelMembersAdd, addedMembers) || {}
+        : yield call(updateActiveChannelMembersAdd, addedMembers, channelId) || {}
       yield put(
         updateChannelDataAC(channel.id, {
           memberCount: channel.memberCount + addedMembers.length,
@@ -215,7 +215,7 @@ function* kickMemberFromChannel(action: IAction): any {
     yield put(removeMemberFromListAC(removedMembers, channelId))
     updateChannelOnAllChannels(channel.id, { memberCount: channel.memberCount - removedMembers.length })
 
-    const updateChannelData = yield call(updateActiveChannelMembersRemove, removedMembers) || {}
+    const updateChannelData = yield call(updateActiveChannelMembersRemove, removedMembers, channelId) || {}
     yield put(
       updateChannelDataAC(channel.id, {
         memberCount: channel.memberCount - removedMembers.length,
@@ -237,7 +237,7 @@ function* blockMember(action: IAction): any {
     yield put(removeMemberFromListAC(removedMembers, channelId))
     updateChannelOnAllChannels(channel.id, { memberCount: channel.memberCount - removedMembers.length })
 
-    const updateChannelData = yield call(updateActiveChannelMembersRemove, removedMembers) || {}
+    const updateChannelData = yield call(updateActiveChannelMembersRemove, removedMembers, channelId) || {}
     yield put(
       updateChannelDataAC(channel.id, {
         memberCount: channel.memberCount - removedMembers.length,

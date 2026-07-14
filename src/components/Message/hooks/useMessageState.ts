@@ -12,6 +12,8 @@ export interface MessageState {
   reactionsPopupPosition: number
   emojisPopupPosition: string
   reactionsPopupHorizontalPosition: { left: number; right: number }
+  reactionsAnchorTop: number
+  reactionsAnchorBottom: number
 }
 
 export interface MessageStateSetters {
@@ -26,6 +28,8 @@ export interface MessageStateSetters {
   setReactionsPopupPosition: (value: number) => void
   setEmojisPopupPosition: (value: string) => void
   setReactionsPopupHorizontalPosition: (value: { left: number; right: number }) => void
+  setReactionsAnchorTop: (value: number) => void
+  setReactionsAnchorBottom: (value: number) => void
   setReportPopupOpen: (value: boolean | ((prev: boolean) => boolean)) => void
 }
 
@@ -43,6 +47,8 @@ export const useMessageState = () => {
   const [reactionsPopupPosition, setReactionsPopupPosition] = useState(0)
   const [emojisPopupPosition, setEmojisPopupPosition] = useState('')
   const [reactionsPopupHorizontalPosition, setReactionsPopupHorizontalPosition] = useState({ left: 0, right: 0 })
+  const [reactionsAnchorTop, setReactionsAnchorTop] = useState(0)
+  const [reactionsAnchorBottom, setReactionsAnchorBottom] = useState(0)
   const messageActionsTimeout = useRef<NodeJS.Timeout | null>(null)
 
   const state: MessageState = {
@@ -56,7 +62,9 @@ export const useMessageState = () => {
     reactionsPopupOpen,
     reactionsPopupPosition,
     emojisPopupPosition,
-    reactionsPopupHorizontalPosition
+    reactionsPopupHorizontalPosition,
+    reactionsAnchorTop,
+    reactionsAnchorBottom
   }
 
   const setters: MessageStateSetters = {
@@ -71,6 +79,8 @@ export const useMessageState = () => {
     setReactionsPopupPosition,
     setEmojisPopupPosition,
     setReactionsPopupHorizontalPosition,
+    setReactionsAnchorTop,
+    setReactionsAnchorBottom,
     setReportPopupOpen
   }
 

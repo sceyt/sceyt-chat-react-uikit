@@ -35,8 +35,14 @@ export const customUpload = (
       const uploadTask: IUploadTask = {
         updateLocalFileLocation: getUpdatedFilePath,
         progress,
-        failure: (e: Error) => reject(e),
-        success: ({ uri, blob }: { uri: string; blob: Blob }) => resolve({ uri, blob }),
+        failure: (e: Error) => {
+          delete pendingUploaders[attachment.tid!]
+          reject(e)
+        },
+        success: ({ uri, blob }: { uri: string; blob: Blob }) => {
+          delete pendingUploaders[attachment.tid!]
+          resolve({ uri, blob })
+        },
         cancel: () => {},
         stop: () => {},
         resume: () => {}
@@ -82,7 +88,9 @@ export const resumeUpload = (attachmentId: string) => {
 }
 
 export const cancelUpload = (attachmentId: string) => {
-  if (pendingUploaders[attachmentId]) {
-    return pendingUploaders[attachmentId].cancel()
+  const task = pendingUploaders[attachmentId]
+  if (task) {
+    delete pendingUploaders[attachmentId]
+    return task.cancel()
   }
 }

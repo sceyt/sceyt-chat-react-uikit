@@ -3,11 +3,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { useSelector, useDispatch } from 'store/hooks'
 import { CircularProgressbar } from 'react-circular-progressbar'
 // Store
-import {
-  attachmentCompilationStateSelector,
-  attachmentsUploadProgressSelector,
-  attachmentUpdatedMapSelector
-} from '../../store/message/selector'
+import { attachmentCompilationStateSelector, attachmentsUploadProgressSelector } from '../../store/message/selector'
 import { connectionStatusSelector } from '../../store/user/selector'
 import { themeSelector } from '../../store/theme/selector'
 import {
@@ -43,8 +39,9 @@ import {
   getAttachmentURLWithVersion,
   setAttachmentToCache
 } from '../../helpers/attachmentsCache'
+import { registerBlobUrl } from '../../helpers/attachmentBlobUrls'
 import { base64ToDataURL } from '../../helpers/resizeImage'
-import { getPendingAttachment, updateMessageOnAllMessages, updateMessageOnMap } from '../../helpers/messagesHalper'
+import { getPendingAttachment, updateMessageOnMap } from '../../helpers/messagesHalper'
 import { CONNECTION_STATUS } from '../../store/user/constants'
 import { IAttachment } from '../../types'
 import ViewOnceVoiceModal from '../../common/popups/viewOnceMedia/ViewOnceVoiceModal'
@@ -55,6 +52,7 @@ import log from 'loglevel'
 import { isJSON } from 'helpers/message'
 import { updateMessageAsOpenedAC } from 'store/channel/actions'
 import { compressAndCacheImage, getVideoFirstFrame } from 'helpers/getVideoFrame'
+import { ensurePlayableVideoBlob } from 'helpers/videoConversion'
 
 interface AttachmentPops {
   attachment: IAttachment
@@ -86,6 +84,7 @@ interface AttachmentPops {
   channelId?: string
   incoming?: boolean
   viewOnce?: boolean
+  onlyVideoImage?: boolean
 }
 
 const Attachment = ({
@@ -113,7 +112,8 @@ const Attachment = ({
   messagePlayed,
   channelId,
   incoming,
-  viewOnce
+  viewOnce,
+  onlyVideoImage
 }: AttachmentPops) => {
   const {
     [THEME_COLORS.ACCENT]: accentColor,
@@ -137,11 +137,14 @@ const Attachment = ({
   const theme = useSelector(themeSelector)
   // const attachmentUploadProgress = useSelector(attachmentUploadProgressSelector) || {}
   const imageContRef = useRef<HTMLDivElement>(null)
-  const attachmentUpdatedMap = useSelector(attachmentUpdatedMapSelector) || {}
-  const attachmentUrlFromMap = useMemo(
-    () => attachmentUpdatedMap[getAttachmentURLWithVersion(attachment.url)],
-    [attachmentUpdatedMap, attachment.url]
-  )
+  const attachmentUrlFromMap = useSelector((store: any) => {
+    const map = store.MessageReducer.attachmentUpdatedMap
+    return (
+      map[getAttachmentURLWithVersion(attachment?.metadata?.tmb || '')] ||
+      map[getAttachmentURLWithVersion(attachment.url)] ||
+      undefined
+    )
+  })
   const [viewOnceVoiceModalOpen, setViewOnceVoiceModalOpen] = useState(false)
   const [downloadingFile, setDownloadingFile] = useState(false)
   const [attachmentUrl, setAttachmentUrl] = useState(attachmentUrlFromMap)
@@ -167,6 +170,14 @@ const Attachment = ({
     return isJSON(attachment.metadata) ? JSON.parse(attachment.metadata) : attachment.metadata
   }, [attachment.metadata])
 
+  const hasRequiredMediaMetadata = useMemo(() => {
+    if (!(attachment.type === attachmentTypes.image || attachment.type === attachmentTypes.video)) {
+      return true
+    }
+
+    return Boolean(attachmentMetadata?.szw && attachmentMetadata?.szh)
+  }, [attachment.type, attachmentMetadata])
+
   const [renderWidth, renderHeight] = useMemo(() => {
     let attachmentData = null
     attachmentData = attachmentMetadata
@@ -187,7 +198,7 @@ const Attachment = ({
       attachmentCompilationState[attachment.tid!] === UPLOAD_STATE.PAUSED)
   // const attachmentThumb = attachmentMetadata && attachmentMetadata.tmb
 
-  let attachmentThumb: string | undefined
+  let attachmentThumb: string | undefined = ''
   let withPrefix = true
   if (
     attachment.type !== attachmentTypes.voice &&
@@ -357,12 +368,17 @@ const Attachment = ({
       )
       setDownloadFilePromise(attachment.id!, urlPromise)
       const result = await urlPromise
-      const url = URL.createObjectURL(result.Body)
+      // In Firefox, QuickTime .mov blobs must be remuxed to standard MP4 before
+      // they can be played or have frames extracted; other browsers (and
+      // non-QuickTime files) get the blob back unchanged.
+      const body = attachment.type === attachmentTypes.video ? await ensurePlayableVideoBlob(result.Body) : result.Body
+      const url = URL.createObjectURL(body)
       setSizeProgress(undefined)
       let downloadingUrl = url
       if (attachment.type === attachmentTypes.image) {
         const compressedUrl = await compressAndCacheImage(url, attachment.url, renderWidth, renderHeight)
         if (compressedUrl) {
+          registerBlobUrl(getAttachmentURLWithVersion(attachment.url), compressedUrl)
           downloadingUrl = compressedUrl
         }
         setAttachmentToCache(
@@ -374,9 +390,16 @@ const Attachment = ({
         dispatch(setUpdateMessageAttachmentAC(attachment.url + '_original_image_url', url))
       } else {
         if (attachment.type === attachmentTypes.video) {
-          const result = await getVideoFirstFrame(url, renderWidth, renderHeight, 0.8)
-          if (result) {
-            const { frameBlobUrl, blob } = result
+          // Pass the raw Blob (result.Body), not the object URL string.
+          // getVideoFirstFrame needs the actual Blob so it can inspect and
+          // correct a bad/unsupported MIME type (e.g. "video/quicktime;
+          // charset=utf-8" from S3) before creating its own internal object
+          // URL. Once an object URL string is created from a mistyped blob,
+          // Firefox has already locked in the bad type and there's no way
+          // to fix it from the string alone.
+          const frameResult = await getVideoFirstFrame(body, renderWidth, renderHeight, 0.8)
+          if (frameResult) {
+            const { frameBlobUrl, blob } = frameResult
             const response = new Response(blob, {
               headers: { 'Content-Type': 'image/jpeg' }
             })
@@ -384,12 +407,10 @@ const Attachment = ({
             await setAttachmentToCache(key, response)
             dispatch(setUpdateMessageAttachmentAC(key, frameBlobUrl))
           }
-        }
-        if (attachment.type === attachmentTypes.video) {
           setAttachmentToCache(
             attachment.url + `_original_video_url`,
-            new Response(result.Body, {
-              headers: { 'Content-Type': attachment.type || 'application/octet-stream' }
+            new Response(body, {
+              headers: { 'Content-Type': body.type || 'application/octet-stream' }
             })
           )
           dispatch(setUpdateMessageAttachmentAC(attachment.url + `_original_video_url`, url))
@@ -411,14 +432,48 @@ const Attachment = ({
       if (attachment.type === attachmentTypes.image) {
         const compressedUrl = await compressAndCacheImage(attachment.url, attachment.url, renderWidth, renderHeight)
         if (compressedUrl) {
+          registerBlobUrl(getAttachmentURLWithVersion(attachment.url), compressedUrl)
           downloadingUrl = compressedUrl
         }
         setIsCached(true)
       } else {
-        fetch(attachment.url).then(async (response) => {
-          setAttachmentToCache(attachment.url, response)
-          setIsCached(true)
-        })
+        fetch(attachment.url)
+          .then(async (response) => {
+            const rawBlob = await response.blob()
+            // Remux QuickTime blobs for Firefox (no-op elsewhere) — see above.
+            const blob = attachment.type === attachmentTypes.video ? await ensurePlayableVideoBlob(rawBlob) : rawBlob
+            const blobUrl = URL.createObjectURL(blob)
+            if (attachment.type === attachmentTypes.video) {
+              // Same fix here: pass the raw blob, not blobUrl, so
+              // getVideoFirstFrame can correct the MIME type if needed.
+              const frameResult = await getVideoFirstFrame(blob, renderWidth, renderHeight, 0.8)
+              if (frameResult) {
+                const { frameBlobUrl, blob: frameBlob } = frameResult
+                await setAttachmentToCache(
+                  attachment.url,
+                  new Response(frameBlob, { headers: { 'Content-Type': 'image/jpeg' } })
+                )
+                dispatch(setUpdateMessageAttachmentAC(attachment.url, frameBlobUrl))
+              }
+              setAttachmentToCache(
+                attachment.url + '_original_video_url',
+                new Response(blob, { headers: { 'Content-Type': blob.type || 'video/mp4' } })
+              )
+              dispatch(setUpdateMessageAttachmentAC(attachment.url + '_original_video_url', blobUrl))
+            } else {
+              setAttachmentToCache(
+                attachment.url,
+                new Response(blob, { headers: { 'Content-Type': blob.type || 'application/octet-stream' } })
+              )
+              registerBlobUrl(getAttachmentURLWithVersion(attachment.url), blobUrl)
+            }
+            setAttachmentUrl(blobUrl)
+            setIsCached(true)
+          })
+          .catch((error) => {
+            log.error('Error fetching attachment:', error)
+          })
+        return
       }
       setAttachmentUrl(downloadingUrl)
     }
@@ -531,6 +586,7 @@ const Attachment = ({
               if (attachment.type === attachmentTypes.image) {
                 const compressedUrl = await compressAndCacheImage(url, attachment.url, renderWidth, renderHeight)
                 if (compressedUrl) {
+                  registerBlobUrl(getAttachmentURLWithVersion(attachment.url), compressedUrl)
                   downloadingUrl = compressedUrl
                 }
               } else {
@@ -560,7 +616,6 @@ const Attachment = ({
               messageId: pendingAttachment.messageTid,
               params: { state: MESSAGE_STATUS.FAILED }
             })
-            updateMessageOnAllMessages(pendingAttachment.messageTid, { state: MESSAGE_STATUS.FAILED })
             dispatch(updateMessageAC(pendingAttachment.messageTid, { state: MESSAGE_STATUS.FAILED }))
           }
           // }
@@ -589,6 +644,10 @@ const Attachment = ({
       }
     }
   }, [attachmentsUploadProgress])
+
+  if (!hasRequiredMediaMetadata) {
+    return <React.Fragment></React.Fragment>
+  }
 
   return (
     <React.Fragment>
@@ -637,7 +696,11 @@ const Attachment = ({
             isPreview={isPreview}
             isRepliedMessage={isRepliedMessage}
             withBorder={!isPreview && !isDetailsView}
-            src={attachment.attachmentUrl || attachmentUrlFromMap || attachmentUrl || attachmentThumb}
+            src={
+              attachmentUrlFromMap ||
+              attachmentUrl ||
+              (withPrefix && attachmentThumb ? `data:image/jpeg;base64,${attachmentThumb}` : attachmentThumb)
+            }
             fitTheContainer
             imageMaxHeight={
               `${renderHeight || 400}px`
@@ -651,12 +714,12 @@ const Attachment = ({
             $shouldAnimate={shouldAnimateImage}
             $isLoaded={imageLoaded}
             onLoad={() => {
-              const currentSrc = attachment.attachmentUrl || attachmentUrlFromMap || attachmentUrl || attachmentThumb
+              const currentSrc = attachmentUrlFromMap || attachment.attachmentUrl || attachmentUrl || attachmentThumb
               const wasThumbnail = previousImageSrcRef.current === attachmentThumb
               const isNowFullImage =
                 currentSrc &&
                 currentSrc !== attachmentThumb &&
-                (attachment.attachmentUrl || attachmentUrlFromMap || attachmentUrl)
+                (attachmentUrlFromMap || attachment.attachmentUrl || attachmentUrl)
 
               if (wasThumbnail && isNowFullImage) {
                 setShouldAnimateImage(true)
@@ -670,11 +733,12 @@ const Attachment = ({
           (isInUploadingState ||
             !(attachmentUrlFromMap || attachment.attachmentUrl || attachmentUrl || attachmentThumb)) ? (
             <UploadProgress
-              backgroundImage={attachmentThumb}
+              backgroundImage={!attachmentUrlFromMap ? attachmentThumb : ''}
               isRepliedMessage={isRepliedMessage}
               width={renderWidth}
               height={renderHeight}
               withBorder={!isPreview && !isDetailsView}
+              borderRadius={borderRadius}
               backgroundColor={backgroundColor && backgroundColor !== 'inherit' ? backgroundColor : overlayBackground2}
               isDetailsView={isDetailsView}
               imageMinWidth={imageMinWidth}
@@ -786,9 +850,13 @@ const Attachment = ({
                   isDetailsView={isDetailsView}
                   isRepliedMessage={isRepliedMessage}
                   withPrefix={withPrefix}
-                  backgroundImage={attachmentThumb || ''}
+                  backgroundImage={!attachmentUrlFromMap ? attachmentThumb : ''}
                   zIndex={9}
                   borderColor={borderColor}
+                  withBorder={!isPreview && !isDetailsView}
+                  borderRadius={borderRadius}
+                  width={renderWidth}
+                  height={renderHeight}
                 >
                   <UploadPercent
                     isRepliedMessage={isRepliedMessage}
@@ -845,6 +913,7 @@ const Attachment = ({
                 </UploadProgress>
               ) : null}
               <VideoPreview
+                onlyVideoImage={onlyVideoImage}
                 width={
                   isRepliedMessage
                     ? '40px'
@@ -859,8 +928,9 @@ const Attachment = ({
                       ? '100%'
                       : `${renderHeight || videoAttachmentMaxHeight || 240}px`
                 }
+                downloading={downloadingFile}
                 file={attachment}
-                src={attachment.attachmentUrl || attachmentUrl}
+                src={attachmentUrlFromMap || attachment.attachmentUrl || attachmentUrl}
                 isCachedFile={isCached}
                 uploading={
                   attachmentCompilationState[attachment.tid!] &&
@@ -879,8 +949,10 @@ const Attachment = ({
             <AttachmentImgCont isPreview={isPreview} backgroundColor={overlayBackground2}>
               {/* <PlayIcon /> */}
               <VideoPreview
+                onlyVideoImage={onlyVideoImage}
                 width='48px'
                 height='48px'
+                downloading={downloadingFile}
                 file={attachment}
                 src={attachment.attachmentUrl || attachmentUrl}
                 borderRadius={borderRadius}
@@ -917,17 +989,6 @@ const Attachment = ({
           }
         />
       ) : attachment.type === attachmentTypes.link ? null : (
-        /* <LinkAttachmentCont href={attachment.url} target='_blank' rel='noreferrer'>
-          {linkTitle ? (
-            <React.Fragment>
-              <LinkTitle>{linkTitle}</LinkTitle>
-              <LinkDescription>{linkDescription}</LinkDescription>
-              <LinkImage src={linkImage} />
-            </React.Fragment>
-          ) : (
-            <div />
-          )}
-        </LinkAttachmentCont> */
         <AttachmentFile
           draggable={false}
           isPreview={isPreview}
@@ -954,6 +1015,8 @@ const Attachment = ({
             <AttachmentIconCont backgroundColor={accentColor} className='icon-warpper'>
               {previewFileType && previewFileType === attachmentTypes.video ? (
                 <VideoPreview
+                  onlyVideoImage={onlyVideoImage}
+                  downloading={downloadingFile}
                   file={attachment}
                   backgroundColor={
                     backgroundColor && backgroundColor !== 'inherit' ? backgroundColor : overlayBackground2
@@ -1068,12 +1131,14 @@ const Attachment = ({
 }
 
 export default React.memo(Attachment, (prevProps, nextProps) => {
-  // Custom comparison function to check if only 'messages' prop has changed
-  return (
-    prevProps.attachment.url === nextProps.attachment.url &&
-    prevProps.handleMediaItemClick === nextProps.handleMediaItemClick &&
-    prevProps.attachment.attachmentUrl === nextProps.attachment.attachmentUrl
-  )
+  if (prevProps.attachment.url !== nextProps.attachment.url) return false
+  if (prevProps.attachment.attachmentUrl !== nextProps.attachment.attachmentUrl) return false
+  if (prevProps.handleMediaItemClick !== nextProps.handleMediaItemClick) return false
+  if (prevProps.borderRadius !== nextProps.borderRadius) return false
+  if (prevProps.isRepliedMessage !== nextProps.isRepliedMessage) return false
+  if (prevProps.messagePlayed !== nextProps.messagePlayed) return false
+  if (prevProps.attachment.metadata !== nextProps.attachment.metadata) return false
+  return true
 })
 
 const DownloadImage = styled.div<any>`
@@ -1113,7 +1178,7 @@ const AttachmentImgCont = styled.div<{
   align-items: center;
   justify-content: flex-end;
   margin-right: ${(props) => (props.isPreview ? '16px' : props.isRepliedMessage ? '8px' : '')};
-  min-width: ${(props) => !props.isRepliedMessage && !props.fitTheContainer && '165px'};
+  min-width: ${(props) => !props.isRepliedMessage && !props.fitTheContainer && '100%'};
   height: ${(props) => props.fitTheContainer && '100%'};
   width: ${(props) =>
     props.fitTheContainer ? '100%' : props.isRepliedMessage ? '40px' : props.width && `${props.width}px`};
@@ -1176,7 +1241,7 @@ const DownloadFile = styled.span<{ backgroundColor: string; widthThumb?: boolean
   max-width: 40px;
   height: 40px;
   position: ${(props) => props.widthThumb && 'absolute'};
-  border-radius: ${(props) => (props.widthThumb ? '8px' : '50%')};
+  border-radius: ${(props) => (props.widthThumb ? '7.3px' : '50%')};
 
   & > svg {
     width: 20px;
@@ -1224,7 +1289,6 @@ export const AttachmentFile = styled.div<{
   padding: ${(props) => !props.isRepliedMessage && '8px 12px;'};
   //width: ${(props) => !props.isRepliedMessage && (props.width ? `${props.width}px` : '350px')};
   min-width: ${(props) => !props.isRepliedMessage && (props.width || (props.isUploading ? '260px' : '205px'))};
-  transition: all 0.1s;
   //height: 70px;
   background: ${(props) => props.backgroundColor};
   border: ${(props) => props.border || `1px solid  ${props.borderColor}`};
@@ -1323,24 +1387,10 @@ export const AttachmentImg = styled.img<{
   border-radius: ${(props) => (props.isRepliedMessage ? '4px' : props.borderRadius || '6px')};
   padding: ${(props) => (props.isRepliedMessage ? '0.5px' : props.withBorder && `2px`)};
   box-sizing: border-box;
-  max-width: 100%;
-  max-height: ${(props) => (props.imageMaxHeight && !props.isDetailsView ? '400px' : '100%')};
   width: ${(props) =>
     props.isRepliedMessage ? '40px' : props.isPreview ? '48px' : props.fitTheContainer ? '100%' : ''};
   height: ${(props) =>
     props.isRepliedMessage ? '40px' : props.isPreview ? '48px' : props.fitTheContainer ? '100%' : ''};
-  min-height: ${(props) =>
-    !props.isRepliedMessage && !props.isPreview && !props.fitTheContainer && !props.isDetailsView
-      ? '165px'
-      : props.isRepliedMessage
-        ? '40px'
-        : ''};
-  min-width: ${(props) =>
-    !props.isRepliedMessage && !props.isPreview && !props.fitTheContainer && !props.isDetailsView
-      ? props.imageMinWidth || '165px'
-      : props.isRepliedMessage
-        ? '40px'
-        : ''};
   object-fit: cover;
   visibility: ${(props) => props.hidden && 'hidden'};
   z-index: 2;

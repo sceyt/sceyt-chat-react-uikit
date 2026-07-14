@@ -100,6 +100,30 @@ const MessageStatusIcon = ({
   }
 }
 
+// linkify-it balances parentheses and truncates complex URLs (e.g. Kibana rison fragments).
+// Use regex for protocol-based URLs; fall back to linkify-it only for bare-domain URLs.
+function extractUrlMatches(text: string): Array<{ text: string; url: string }> | null {
+  const results: Array<{ text: string; url: string; index: number }> = []
+
+  const protocolRegex = /https?:\/\/\S+/g
+  let m: RegExpExecArray | null
+  while ((m = protocolRegex.exec(text)) !== null) {
+    results.push({ text: m[0], url: m[0], index: m.index })
+  }
+
+  const linkifyResults = new LinkifyIt().match(text)
+  if (linkifyResults) {
+    for (const lm of linkifyResults) {
+      if (lm.schema === '') {
+        results.push({ text: lm.text, url: lm.url.replace(/^http:\/\//, 'https://'), index: lm.index })
+      }
+    }
+  }
+
+  results.sort((a, b) => a.index - b.index)
+  return results.length > 0 ? results.map(({ text, url }) => ({ text, url })) : null
+}
+
 const linkifyTextPart = (
   textPart: string,
   match: any,
@@ -128,7 +152,10 @@ const linkifyTextPart = (
             ? {
                 onClick: () => {
                   const splitedKey = matchItem.url.split('/')
-                  const key = splitedKey[splitedKey.length - 1]
+                  let key = splitedKey[splitedKey.length - 1]
+                  if (!key) {
+                    key = splitedKey[splitedKey.length - 2]
+                  }
                   if (key) {
                     onInviteLinkClick?.(key)
                   }
@@ -191,7 +218,6 @@ const MessageTextFormat = ({
 }) => {
   try {
     let messageText: any = []
-    const linkify = new LinkifyIt()
     const messageBodyAttributes = message.bodyAttributes && JSON.parse(JSON.stringify(message.bodyAttributes))
     if (unsupportedMessage) {
       return 'This message is not supported. Update your app to view this message.'
@@ -207,13 +233,13 @@ const MessageTextFormat = ({
         try {
           let firstPart = `${textPart ? textPart?.substring(nextPartIndex || 0, attributeOffset) : ''}`
 
-          const firstPartMatch = firstPart ? linkify.match(firstPart) : ''
+          const firstPartMatch = firstPart ? extractUrlMatches(firstPart) : null
 
           if (!isLastMessage && !asSampleText && firstPartMatch) {
             firstPart = linkifyTextPart(firstPart, firstPartMatch, target, isInviteLink, onInviteLinkClick)
           }
           let secondPart = `${textPart ? textPart?.substring(attributeOffset + attribute.length) : ''}`
-          const secondPartMatch = secondPart ? linkify.match(secondPart) : ''
+          const secondPartMatch = secondPart ? extractUrlMatches(secondPart) : null
           if (!isLastMessage && !asSampleText && secondPartMatch) {
             secondPart = linkifyTextPart(secondPart, secondPartMatch, target, isInviteLink, onInviteLinkClick)
           }
@@ -263,6 +289,7 @@ const MessageTextFormat = ({
                       isLastMessage={isLastMessage}
                       color={isLastMessage ? textSecondary : accentColor}
                       key={attributeOffset + index}
+                      data-mention={attribute.metadata}
                       onClick={() => {
                         if (onMentionNameClick && shouldOpenUserProfileForMention) {
                           onMentionNameClick(mentionDisplay)
@@ -289,6 +316,7 @@ const MessageTextFormat = ({
                     isLastMessage={isLastMessage}
                     color={isLastMessage ? textSecondary : accentColor}
                     key={attributeOffset}
+                    data-mention={attribute.metadata}
                     onClick={() => {
                       if (onMentionNameClick && shouldOpenUserProfileForMention) {
                         onMentionNameClick(mentionDisplay)
@@ -305,7 +333,7 @@ const MessageTextFormat = ({
           } else {
             nextPartIndex = attributeOffset + attribute.length
             const textPart = `${text.slice(attributeOffset, attributeOffset + attribute.length)}`
-            const match = linkify.match(textPart)
+            const match = extractUrlMatches(textPart)
             let newTextPart = textPart
             if (!isLastMessage && !asSampleText && match) {
               newTextPart = linkifyTextPart(textPart, match, target, isInviteLink, onInviteLinkClick)
@@ -333,9 +361,8 @@ const MessageTextFormat = ({
         }
       })
     } else {
-      const match = linkify.match(text)
+      const match = extractUrlMatches(text)
       if (!isLastMessage && !asSampleText && match) {
-        // log.info('newMessageText ... . ', newMessageText)
         messageText = linkifyTextPart(text, match, target, isInviteLink, onInviteLinkClick)
       }
     }
@@ -346,118 +373,4 @@ const MessageTextFormat = ({
   }
 }
 
-const getNodeTextLength = (node: any): number => {
-  if (!node) return 0
-  if (typeof node === 'string') return node.length
-  if (typeof node === 'number') return String(node).length
-  if (Array.isArray(node)) {
-    return node.reduce((sum, child) => sum + getNodeTextLength(child), 0)
-  }
-  if (node.props && node.props.children) {
-    return getNodeTextLength(node.props.children)
-  }
-  return 0
-}
-
-const truncateNodeText = (node: any, maxLength: number): { node: any; usedLength: number } => {
-  if (!node) return { node, usedLength: 0 }
-
-  if (typeof node === 'string') {
-    if (node.length > maxLength) {
-      return { node: node.slice(0, maxLength), usedLength: maxLength }
-    }
-    return { node, usedLength: node.length }
-  }
-
-  if (typeof node === 'number') {
-    const str = String(node)
-    if (str.length > maxLength) {
-      return { node: str.slice(0, maxLength), usedLength: maxLength }
-    }
-    return { node, usedLength: str.length }
-  }
-
-  if (Array.isArray(node)) {
-    const result: any[] = []
-    let remaining = maxLength
-    for (const child of node) {
-      if (remaining <= 0) break
-      const { node: truncatedChild, usedLength } = truncateNodeText(child, remaining)
-      result.push(truncatedChild)
-      remaining -= usedLength
-    }
-    return { node: result, usedLength: maxLength - remaining }
-  }
-
-  if (node.props && node.props.children !== undefined) {
-    const { node: truncatedChildren, usedLength } = truncateNodeText(node.props.children, maxLength)
-    return {
-      node: {
-        ...node,
-        props: {
-          ...node.props,
-          children: truncatedChildren
-        }
-      },
-      usedLength
-    }
-  }
-
-  return { node, usedLength: 0 }
-}
-
-const trimReactMessage = (parts: any[] | string, limit: number | undefined) => {
-  if (typeof limit !== 'number' || limit < 0) {
-    return { result: parts, truncated: false }
-  }
-  if (typeof parts === 'string') {
-    if (parts.length > limit) {
-      return { result: parts.slice(0, limit) + '...', truncated: true }
-    }
-    return { result: parts, truncated: false }
-  }
-  let remaining = limit
-  let truncated = false
-  const result = []
-
-  for (const part of parts) {
-    if (typeof part === 'string') {
-      if (remaining <= 0) {
-        truncated = true
-        break
-      }
-
-      if (part.length > remaining) {
-        result.push(part.slice(0, remaining))
-        remaining = 0
-        truncated = true
-        break
-      } else {
-        result.push(part)
-        remaining -= part.length
-      }
-    } else if (part && typeof part === 'object') {
-      if (remaining <= 0) {
-        truncated = true
-        break
-      }
-
-      const nodeTextLength = getNodeTextLength(part)
-
-      if (nodeTextLength > remaining) {
-        const { node: truncatedNode } = truncateNodeText(part, remaining)
-        result.push(truncatedNode)
-        remaining = 0
-        truncated = true
-        break
-      } else {
-        result.push(part)
-        remaining -= nodeTextLength
-      }
-    }
-  }
-
-  return { result, truncated }
-}
-
-export { MessageStatusIcon, MessageTextFormat, trimReactMessage }
+export { MessageStatusIcon, MessageTextFormat, extractUrlMatches }

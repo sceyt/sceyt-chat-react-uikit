@@ -1,5 +1,5 @@
 import styled from 'styled-components'
-import React, { FC, useMemo, useState, useEffect, useRef } from 'react'
+import React, { FC, useMemo, useState } from 'react'
 import moment from 'moment'
 // Hooks
 import { useColor } from 'hooks'
@@ -25,7 +25,7 @@ import MessageHeader from '../MessageHeader'
 import Attachment from 'components/Attachment'
 import EmojisPopup from 'components/Emojis'
 import FrequentlyEmojis from 'components/Emojis/frequentlyEmojis'
-import { MessageTextFormat, trimReactMessage } from 'messageUtils'
+import { MessageTextFormat } from 'messageUtils'
 import { IMessageActions, IMessageStyles } from '../Message.types'
 import MessageStatusAndTime from '../MessageStatusAndTime'
 import PollMessage from '../PollMessage'
@@ -140,6 +140,7 @@ interface IMessageBodyProps {
   messageTextFontSize?: string
   messageTextLineHeight?: string
   messageActionsShow?: boolean
+  messageActionsBelow?: boolean
   setMessageActionsShow: (state: boolean) => void
   handleRetractVote: () => void
   handleEndVote: () => void
@@ -169,7 +170,31 @@ interface IMessageBodyProps {
   ogMetadataProps?: OGMetadataProps
   unsupportedMessage: boolean
   onInviteLinkClick?: (key: string) => void
-  collapsedCharacterLimit?: number
+  ifLatestAndHasNotPreview: boolean
+  collapsedLinesLimit?: number
+}
+
+const parentMessagePreviewEqual = (prevMessage: IMessage, nextMessage: IMessage) => {
+  const prevParent = prevMessage.parentMessage
+  const nextParent = nextMessage.parentMessage
+
+  if (prevParent === nextParent) {
+    return true
+  }
+
+  if (!prevParent || !nextParent) {
+    return false
+  }
+
+  return (
+    prevParent.id === nextParent.id &&
+    prevParent.tid === nextParent.tid &&
+    prevParent.body === nextParent.body &&
+    prevParent.state === nextParent.state &&
+    prevParent.attachments === nextParent.attachments &&
+    prevParent.updatedAt === nextParent.updatedAt &&
+    prevParent.user?.id === nextParent.user?.id
+  )
 }
 
 const MessageBody = ({
@@ -181,7 +206,6 @@ const MessageBody = ({
   isPendingMessage,
   prevMessage,
   nextMessage,
-  isUnreadMessage,
   unreadMessageId,
   isThreadMessage,
   fontFamily,
@@ -276,6 +300,7 @@ const MessageBody = ({
   handleToggleForwardMessagePopup,
   handleToggleInfoMessagePopupOpen,
   messageActionsShow,
+  messageActionsBelow,
   handleRetractVote,
   handleEndVote,
   closeMessageActions,
@@ -302,7 +327,8 @@ const MessageBody = ({
   ogMetadataProps,
   unsupportedMessage,
   onInviteLinkClick,
-  collapsedCharacterLimit
+  collapsedLinesLimit,
+  ifLatestAndHasNotPreview
 }: IMessageBodyProps) => {
   const {
     [THEME_COLORS.ACCENT]: accentColor,
@@ -322,10 +348,9 @@ const MessageBody = ({
   const ChatClient = getClient()
   const { user } = ChatClient
   const getFromContacts = getShowOnlyContactUsers()
-  const messageUserID = message.user ? message.user.id : 'deleted'
+  const getComparableUserId = (messageUser?: IUser | null) => (messageUser?.id ? String(messageUser.id) : 'deleted')
+  const messageUserID = getComparableUserId(message.user)
   const [isExpanded, setIsExpanded] = useState(false)
-  const textContainerRef = useRef<HTMLDivElement>(null)
-  const [textHeight, setTextHeight] = useState<number | 'auto'>('auto')
 
   const messageText = useMemo(() => {
     return MessageTextFormat({
@@ -383,49 +408,26 @@ const MessageBody = ({
     }
   }
 
-  const messageTextTrimmed = useMemo(() => {
-    if (!message.body) return { result: messageText, truncated: false }
-    if (isExpanded) return { result: messageText, truncated: false }
-    return trimReactMessage(messageText, collapsedCharacterLimit)
-  }, [message.body, messageText, isExpanded, collapsedCharacterLimit])
+  const isTruncated = useMemo(() => {
+    if (!message.body || isExpanded) return false
+    const limit = collapsedLinesLimit || 10
+    const lines = message.body.split('\n')
+    const estimatedLines = lines.reduce((total: number, line: string) => {
+      return total + Math.max(1, Math.ceil(line.length / 50))
+    }, 0)
+    return estimatedLines > limit
+  }, [message.body, isExpanded, collapsedLinesLimit])
 
-  useEffect(() => {
-    if (textContainerRef.current && typeof collapsedCharacterLimit === 'number' && collapsedCharacterLimit >= 0) {
-      if (messageTextTrimmed.truncated && !isExpanded) {
-        requestAnimationFrame(() => {
-          if (textContainerRef.current) {
-            const height = textContainerRef.current.scrollHeight
-            setTextHeight(height)
-          }
-        })
-      } else if (isExpanded) {
-        requestAnimationFrame(() => {
-          if (textContainerRef.current) {
-            const fullHeight = textContainerRef.current.scrollHeight
-            setTextHeight(fullHeight)
-          }
-        })
-      } else if (!messageTextTrimmed.truncated && textHeight !== 'auto') {
-        setTextHeight('auto')
-      }
-    }
-  }, [isExpanded, messageTextTrimmed.truncated, textHeight, collapsedCharacterLimit])
-
-  const prevMessageUserID = useMemo(
-    () => (prevMessage ? (prevMessage.user ? prevMessage.user.id : 'deleted') : null),
-    [prevMessage]
-  )
-  const nextMessageUserID = useMemo(
-    () => (nextMessage ? (nextMessage.user ? nextMessage.user.id : 'deleted') : null),
-    [nextMessage]
-  )
+  const prevMessageUserID = useMemo(() => (prevMessage ? getComparableUserId(prevMessage.user) : null), [prevMessage])
+  const nextMessageUserID = useMemo(() => (nextMessage ? getComparableUserId(nextMessage.user) : null), [nextMessage])
   const current = useMemo(() => moment(message.createdAt).startOf('day'), [message.createdAt])
   const firstMessageInInterval = useMemo(
     () =>
+      ifLatestAndHasNotPreview ||
       !(prevMessage && current.diff(moment(prevMessage.createdAt).startOf('day'), 'days') === 0) ||
       prevMessage?.type === MESSAGE_TYPE.SYSTEM ||
       unreadMessageId === prevMessage.id,
-    [prevMessage, current, unreadMessageId]
+    [prevMessage, current, unreadMessageId, ifLatestAndHasNotPreview]
   )
   const lastMessageInInterval = useMemo(
     () =>
@@ -464,7 +466,11 @@ const MessageBody = ({
   )
   const ogContainerOrder = (ogMetadataProps && ogMetadataProps.ogLayoutOrder) || 'og-first'
   const ogContainerFirst = useMemo(() => ogContainerOrder === 'og-first', [ogContainerOrder])
-  const messageOwnerIsNotCurrentUser = !!(message.user && message.user.id !== user.id && message.user.id)
+  const messageOwnerIsNotCurrentUser = !!(
+    message.user &&
+    getComparableUserId(message.user) !== getComparableUserId(user) &&
+    message.user.id
+  )
   const mediaAttachment = useMemo(
     () =>
       withAttachments &&
@@ -493,6 +499,18 @@ const MessageBody = ({
     )
   }, [message.attachments, viewOnce, isViewOnceAndVoiceMessage])
 
+  const showOGMetadata = useMemo(() => {
+    if (!(linkAttachment && !mediaAttachment && !withMediaAttachment && !fileAttachment)) {
+      return false
+    }
+    const attachment = message.attachments[0]
+    const attachmentMetadata = isJSON(attachment?.metadata) ? JSON.parse(attachment.metadata) : attachment.metadata
+    if (!attachmentMetadata || attachmentMetadata?.hld) {
+      return false
+    }
+    return true
+  }, [linkAttachment, mediaAttachment, withMediaAttachment, fileAttachment])
+
   const borderRadius = useMemo(
     () =>
       message.incoming && incomingMessageStyles?.background === 'inherit'
@@ -500,12 +518,14 @@ const MessageBody = ({
         : !message.incoming && outgoingMessageStyles?.background === 'inherit'
           ? '0px'
           : !message.incoming && ownMessageOnRightSide
-            ? prevMessageUserID !== messageUserID || firstMessageInInterval
+            ? (!!prevMessageUserID || ifLatestAndHasNotPreview) &&
+              (prevMessageUserID !== messageUserID || firstMessageInInterval)
               ? '16px 16px 4px 16px'
               : nextMessageUserID !== messageUserID || lastMessageInInterval
                 ? '16px 4px 16px 16px'
                 : '16px 4px 4px 16px'
-            : prevMessageUserID !== messageUserID || firstMessageInInterval
+            : (!!prevMessageUserID || ifLatestAndHasNotPreview) &&
+                (prevMessageUserID !== messageUserID || firstMessageInInterval)
               ? '16px 16px 16px 4px'
               : nextMessageUserID !== messageUserID || lastMessageInInterval
                 ? '4px 16px 16px 16px'
@@ -519,16 +539,17 @@ const MessageBody = ({
       firstMessageInInterval,
       nextMessageUserID,
       lastMessageInInterval,
-      ownMessageOnRightSide
+      ownMessageOnRightSide,
+      ifLatestAndHasNotPreview
     ]
   )
   const showMessageSenderName = useMemo(
     () =>
-      (isUnreadMessage || prevMessageUserID !== messageUserID || firstMessageInInterval) &&
+      (!!prevMessageUserID || ifLatestAndHasNotPreview) &&
+      (prevMessageUserID !== messageUserID || firstMessageInInterval) &&
       (channel.type === DEFAULT_CHANNEL_TYPE.DIRECT ? showSenderNameOnDirectChannel : showSenderNameOnGroupChannel) &&
       (message.incoming || showSenderNameOnOwnMessages),
     [
-      isUnreadMessage,
       prevMessageUserID,
       messageUserID,
       firstMessageInInterval,
@@ -536,7 +557,8 @@ const MessageBody = ({
       showSenderNameOnDirectChannel,
       showSenderNameOnGroupChannel,
       message.incoming,
-      showSenderNameOnOwnMessages
+      showSenderNameOnOwnMessages,
+      ifLatestAndHasNotPreview
     ]
   )
   const selectionIsActive = useMemo(() => selectedMessagesMap && selectedMessagesMap.size > 0, [selectedMessagesMap])
@@ -579,7 +601,7 @@ const MessageBody = ({
       return 336
     }
     if (hasDescription) {
-      return 356
+      return 336
     }
     return ogMetadataProps?.maxWidth || 400
   }, [
@@ -670,6 +692,7 @@ const MessageBody = ({
             message={message}
             channel={channel}
             isThreadMessage={isThreadMessage}
+            openBelow={messageActionsBelow}
             rtlDirection={ownMessageOnRightSide && !message.incoming}
             handleSetMessageForEdit={toggleEditMode}
             handleOpenDeleteMessage={handleToggleDeleteMessagePopup}
@@ -705,8 +728,9 @@ const MessageBody = ({
             handleRetractVote={handleRetractVote}
             handleEndVote={handleEndVote}
             handleOpenEmojis={handleOpenEmojis}
-            selfMessage={message.user && messageUserID === user.id}
+            selfMessage={message.user && messageUserID === getComparableUserId(user)}
             isThreadMessage={isThreadMessage}
+            openBelow={messageActionsBelow}
             rtlDirection={ownMessageOnRightSide && !message.incoming}
             showMessageReaction={messageReaction}
             showEditMessage={
@@ -837,7 +861,7 @@ const MessageBody = ({
         unsupportedMessage={unsupportedMessage}
         unsupportedMessageColor={textSecondary}
       >
-        {ogContainerFirst && linkAttachment && !mediaAttachment && !withMediaAttachment && !fileAttachment && (
+        {ogContainerFirst && showOGMetadata && linkAttachment && (
           <OGMetadata
             maxWidth={ogMetadataContainerWidth}
             maxHeight={ogMetadataProps?.maxHeight}
@@ -857,9 +881,9 @@ const MessageBody = ({
             infoPadding={ogMetadataProps?.infoPadding}
           />
         )}
-        {message.type !== MESSAGE_TYPE.POLL && (
-          <TextContentContainer ref={textContainerRef} textHeight={textHeight}>
-            {viewOnce && message.attachments?.length === 1 && message.attachments[0].type !== attachmentTypes.voice ? (
+        {message.type !== MESSAGE_TYPE.POLL &&
+          (viewOnce && message.attachments?.length === 1 && message.attachments[0].type !== attachmentTypes.voice ? (
+            <TextContentContainer>
               <ViewOnceMessageWrapper color={hasOpened ? iconInactive : accentColor}>
                 {hasOpened ? (
                   <ViewOnceIconOpen style={{ marginRight: '8px' }} />
@@ -870,27 +894,28 @@ const MessageBody = ({
                 )}
                 <ViewOnceInfoText color={textSecondary}>{getViewOnceMessage()}</ViewOnceInfoText>
               </ViewOnceMessageWrapper>
-            ) : (
-              <React.Fragment>
-                <span ref={messageTextRef}>
-                  {messageTextTrimmed?.result}
-                  {messageTextTrimmed?.truncated && !isExpanded ? '...' : ''}
-                </span>
-                {messageTextTrimmed.truncated && !isExpanded && (
-                  <ReadMoreLink onClick={() => setIsExpanded(true)} accentColor={accentColor}>
-                    Read more
-                  </ReadMoreLink>
-                )}
-              </React.Fragment>
-            )}
-          </TextContentContainer>
-        )}
+            </TextContentContainer>
+          ) : (
+            <React.Fragment>
+              <TextContentContainer
+                isExpanded={isExpanded}
+                linesLimit={isTruncated ? collapsedLinesLimit || 10 : undefined}
+              >
+                <span ref={messageTextRef}>{messageText}</span>
+              </TextContentContainer>
+              {isTruncated && !isExpanded && (
+                <ReadMoreLink onClick={() => setIsExpanded(true)} accentColor={accentColor}>
+                  Read more
+                </ReadMoreLink>
+              )}
+            </React.Fragment>
+          ))}
         {!withAttachments && message.state === MESSAGE_STATUS.DELETE ? (
           <MessageStatusDeleted color={textSecondary}> Message was deleted. </MessageStatusDeleted>
         ) : (
           ''
         )}
-        {!ogContainerFirst && linkAttachment && !mediaAttachment && !withMediaAttachment && !fileAttachment && (
+        {!ogContainerFirst && showOGMetadata && linkAttachment && (
           <OGMetadata
             maxWidth={ogMetadataContainerWidth}
             maxHeight={ogMetadataProps?.maxHeight}
@@ -1067,6 +1092,7 @@ export default React.memo(MessageBody, (prevProps, nextProps) => {
     prevProps.message.reactionTotals === nextProps.message.reactionTotals &&
     prevProps.message.attachments === nextProps.message.attachments &&
     prevProps.message.userMarkers === nextProps.message.userMarkers &&
+    parentMessagePreviewEqual(prevProps.message, nextProps.message) &&
     prevProps.prevMessage === nextProps.prevMessage &&
     prevProps.nextMessage === nextProps.nextMessage &&
     prevProps.selectedMessagesMap === nextProps.selectedMessagesMap &&
@@ -1077,6 +1103,8 @@ export default React.memo(MessageBody, (prevProps, nextProps) => {
     prevProps.showSenderNameOnDirectChannel === nextProps.showSenderNameOnDirectChannel &&
     prevProps.showSenderNameOnGroupChannel === nextProps.showSenderNameOnGroupChannel &&
     prevProps.showSenderNameOnOwnMessages === nextProps.showSenderNameOnOwnMessages &&
+    prevProps.isUnreadMessage === nextProps.isUnreadMessage &&
+    prevProps.unreadMessageId === nextProps.unreadMessageId &&
     prevProps.messageStatusAndTimePosition === nextProps.messageStatusAndTimePosition &&
     prevProps.messageStatusDisplayingType === nextProps.messageStatusDisplayingType &&
     prevProps.outgoingMessageStyles === nextProps.outgoingMessageStyles &&
@@ -1155,6 +1183,7 @@ export default React.memo(MessageBody, (prevProps, nextProps) => {
     prevProps.messageTextFontSize === nextProps.messageTextFontSize &&
     prevProps.messageTextLineHeight === nextProps.messageTextLineHeight &&
     prevProps.messageActionsShow === nextProps.messageActionsShow &&
+    prevProps.messageActionsBelow === nextProps.messageActionsBelow &&
     prevProps.emojisPopupOpen === nextProps.emojisPopupOpen &&
     prevProps.emojisPopupPosition === nextProps.emojisPopupPosition &&
     prevProps.frequentlyEmojisOpen === nextProps.frequentlyEmojisOpen &&
@@ -1165,7 +1194,7 @@ export default React.memo(MessageBody, (prevProps, nextProps) => {
     prevProps.ogMetadataProps?.ogShowDescription === nextProps.ogMetadataProps?.ogShowDescription &&
     prevProps.ogMetadataProps?.ogShowFavicon === nextProps.ogMetadataProps?.ogShowFavicon &&
     prevProps.ogMetadataProps?.order === nextProps.ogMetadataProps?.order &&
-    prevProps.collapsedCharacterLimit === nextProps.collapsedCharacterLimit
+    prevProps.collapsedLinesLimit === nextProps.collapsedLinesLimit
   )
 })
 
@@ -1326,10 +1355,8 @@ const MessageBodyContainer = styled.div<{
           : props.incomingMessageStyles?.background === 'inherit'
             ? ' 0'
             : '8px 12px'};
-  //direction: ${(props) => (props.isSelfMessage ? 'initial' : '')};
-  //overflow: ${(props) => props.noBody && 'hidden'};
-  transition: all 0.3s;
   transform-origin: right;
+  box-sizing: border-box;
 `
 
 const EmojiContainer = styled.div<any>`
@@ -1350,10 +1377,16 @@ const FrequentlyEmojisContainer = styled.div<{ rtlDirection?: boolean }>`
   z-index: 99;
 `
 
-const TextContentContainer = styled.div<{ textHeight: number | 'auto' }>`
+const TextContentContainer = styled.div<{ isExpanded?: boolean; linesLimit?: number }>`
   overflow: hidden;
-  height: ${(props) => (props.textHeight !== 'auto' ? `${props.textHeight}px` : 'auto')};
-  transition: height 0.3s ease-out;
+  ${(props) =>
+    !props.isExpanded &&
+    props.linesLimit &&
+    `
+    display: -webkit-box;
+    -webkit-line-clamp: ${props.linesLimit};
+    -webkit-box-orient: vertical;
+  `}
 `
 
 const ReadMoreLink = styled.span<{ accentColor: string }>`

@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState, useCallback } from 'react'
+import { createPortal } from 'react-dom'
 import { shallowEqual } from 'react-redux'
 import { useSelector, useDispatch } from 'store/hooks'
 import styled from 'styled-components'
@@ -28,7 +29,8 @@ import {
   getAttachmentsAC,
   loadMoreAttachmentsAC,
   removeAttachmentAC,
-  setUpdateMessageAttachmentAC
+  setUpdateMessageAttachmentAC,
+  setAttachmentsForPopupAC
 } from '../../../store/message/actions'
 import {
   DEFAULT_CHANNEL_TYPE,
@@ -48,10 +50,11 @@ import {
   getAttachmentURLWithVersion,
   setAttachmentToCache
 } from '../../../helpers/attachmentsCache'
+import { releaseAllOriginalBlobUrls } from '../../../helpers/attachmentBlobUrls'
 import VideoPlayer from '../../../components/VideoPlayer'
 import { CircularProgressbar } from 'react-circular-progressbar'
 import ForwardMessagePopup from '../forwardMessage'
-import { deletePendingMessage, getAllMessages } from '../../../helpers/messagesHalper'
+import { getMessagesFromMap } from '../../../helpers/messagesHalper'
 import { getChannelFromMap } from '../../../helpers/channelHalper'
 import ConfirmPopup from '../delete'
 import { IAttachmentProperties } from '../../../components/Message/Message.types'
@@ -67,14 +70,14 @@ interface IProps {
   messageType?: string | null | undefined
 }
 
-const SliderPopup = ({
+const SliderPopup: React.FC<IProps> = ({
   channel,
   setIsSliderOpen,
   currentMediaFile,
   allowEditDeleteIncomingMessage,
   attachmentsPreview,
   messageType
-}: IProps) => {
+}) => {
   const { [THEME_COLORS.TEXT_ON_PRIMARY]: textOnPrimary, [THEME_COLORS.OVERLAY_BACKGROUND_2]: overlayBackground2 } =
     useColor()
 
@@ -86,16 +89,27 @@ const SliderPopup = ({
   const { user } = ChatClient
   const [currentFile, setCurrentFile] = useState<IMedia>({ ...currentMediaFile })
   const [downloadingFilesMap, setDownloadingFilesMap] = useState<{ [key: string]: { uploadPercent: number } }>({})
-  const [itemsLoadedMap, setItemsLoadedMap] = useState<{ [key: string]: boolean }>({})
   const [playedVideo, setPlayedVideo] = useState<string | undefined>()
   const [nextButtonDisabled, setNextButtonDisabled] = useState(true)
   const [prevButtonDisabled, setPrevButtonDisabled] = useState(true)
   const [forwardPopupOpen, setForwardPopupOpen] = useState(false)
+  const [readyToPlay, setReadyToPlay] = useState(true)
   const [messageToDelete, setMessageToDelete] = useState<IMessage | undefined>()
   const attachmentLoadingStateForPopup = useSelector(attachmentForPopupLoadingStateSelector)
   const attachmentsForPopupHasPrev = useSelector(attachmentsForPopupHasPrevSelector)
   const attachmentsForPopupHasNext = useSelector(attachmentsForPopupHasNextSelector)
   const attachmentUpdatedMap = useSelector(attachmentUpdatedMapSelector) || {}
+
+  const [itemsLoadedMap, setItemsLoadedMap] = useState<{ [key: string]: boolean }>(() => {
+    if (currentMediaFile.id && currentMediaFile.type === 'image') {
+      const imageKey = getAttachmentURLWithVersion(currentMediaFile.url + '_original_image_url')
+      if (attachmentUpdatedMap[imageKey]) {
+        return { [currentMediaFile.id]: true }
+      }
+    }
+    return {}
+  })
+
   const prefixUrl = useMemo(() => {
     return currentFile?.type === 'image'
       ? '_original_image_url'
@@ -121,6 +135,15 @@ const SliderPopup = ({
   const handleClosePopup = () => {
     setIsSliderOpen(false)
   }
+
+  useEffect(() => {
+    return () => {
+      // The slider is the only consumer of full-size originals — drop them on
+      // close so the biggest blobs don't stay pinned; they re-mint from the
+      // attachments cache on next open.
+      releaseAllOriginalBlobUrls()
+    }
+  }, [])
 
   const downloadImage = (src: string, setToDownloadedFiles?: boolean, type?: string) => {
     if (setToDownloadedFiles && currentFile) {
@@ -164,7 +187,9 @@ const SliderPopup = ({
   const handleForwardMessage = useCallback(
     async (channelIds: string[]) => {
       try {
-        let message = getAllMessages().find((message) => message.id === currentFile.messageId)
+        let message = Object.values(getMessagesFromMap(channel.id) || {}).find(
+          (message) => message.id === currentFile.messageId
+        )
         if (!message) {
           let channelInstance = getChannelFromMap(channel.id)
           if (!channelInstance) {
@@ -197,7 +222,9 @@ const SliderPopup = ({
   const handleToggleDeleteMessagePopup = useCallback(async () => {
     if (!messageToDelete) {
       try {
-        let message = getAllMessages().find((message) => message.id === currentFile.messageId)
+        let message = Object.values(getMessagesFromMap(channel.id) || {}).find(
+          (message) => message.id === currentFile.messageId
+        )
         if (!message) {
           let channelInstance = getChannelFromMap(channel.id)
           if (!channelInstance) {
@@ -211,7 +238,11 @@ const SliderPopup = ({
           message = messages[0]
         }
         if (!message.deliveryStatus || message.deliveryStatus === MESSAGE_DELIVERY_STATUS.PENDING) {
-          deletePendingMessage(channel.id, message)
+          dispatch(deleteMessageAC(channel.id, message.id || message.tid!, 'forEveryone'))
+          if (currentFile.id) {
+            dispatch(removeAttachmentAC(currentFile.id))
+          }
+          setIsSliderOpen(false)
         } else {
           setMessageToDelete(message)
         }
@@ -221,7 +252,7 @@ const SliderPopup = ({
     } else {
       setMessageToDelete(undefined)
     }
-  }, [messageToDelete, currentFile.messageId, channel.id])
+  }, [messageToDelete, currentFile.id, currentFile.messageId, channel.id, dispatch, setIsSliderOpen])
 
   const handleDeleteMessage = (deleteOption: 'forMe' | 'forEveryone') => {
     dispatch(deleteMessageAC(channel.id, currentFile.messageId, deleteOption))
@@ -359,11 +390,10 @@ const SliderPopup = ({
           log.error('Error getting initial attachment from cache:', error)
         })
     }
-    if (currentMediaFile && !attachmentsList.find((item: IMedia) => item.id === currentMediaFile.id)) {
-      dispatch(
-        getAttachmentsAC(channel.id, channelDetailsTabs.media, 34, queryDirection.NEAR, currentMediaFile.id, true)
-      )
+    if (!attachmentsList.find((item: IMedia) => item.id === currentMediaFile.id)) {
+      dispatch(setAttachmentsForPopupAC([currentMediaFile]))
     }
+    dispatch(getAttachmentsAC(channel.id, channelDetailsTabs.media, 34, queryDirection.NEAR, currentMediaFile.id, true))
   }, [])
 
   const activeFileIndex = useMemo(() => {
@@ -453,14 +483,7 @@ const SliderPopup = ({
   }, [activeFileIndex, attachmentLoadingStateForPopup, attachmentsForPopupHasPrev, attachmentsList, dispatch])
 
   // Check if carousel is loading (attachments list is being fetched)
-  const isCarouselLoading = useMemo(() => {
-    return (
-      attachmentLoadingStateForPopup !== LOADING_STATE.LOADED ||
-      activeFileIndex < 0 ||
-      !attachmentsList ||
-      !attachmentsList.length
-    )
-  }, [attachmentLoadingStateForPopup, activeFileIndex, attachmentsList])
+  const isCarouselLoading = !attachmentsList.length || activeFileIndex < 0
 
   // Helper function to check if a specific item is loading
   const isItemLoading = useCallback(
@@ -471,7 +494,7 @@ const SliderPopup = ({
     [itemsLoadedMap]
   )
 
-  return (
+  return createPortal(
     <Container draggable={false}>
       <SliderHeader>
         <FileInfo>
@@ -549,7 +572,6 @@ const SliderPopup = ({
           return true
         }}
       >
-        {/* Carousel-level loading - shows when carousel/attachments list is loading */}
         {isCarouselLoading && (
           <UploadCont className='upload_cont'>
             <UploadingIcon color={textOnPrimary} />
@@ -562,14 +584,18 @@ const SliderPopup = ({
             initialActiveIndex={activeFileIndex >= 0 ? activeFileIndex : 0}
             skipTransition={skipTransition}
             onNextStart={() => {
-              // Loading state will be set when currentFile changes in useDidUpdate
+              setReadyToPlay(false)
               loadNextMoreAttachments()
             }}
             onPrevStart={() => {
-              // Loading state will be set when currentFile changes in useDidUpdate
+              setReadyToPlay(false)
               loadPrevMoreAttachments()
             }}
             onChange={(pageIndex: number) => {
+              const timeout = setTimeout(() => {
+                setReadyToPlay(true)
+                clearTimeout(timeout)
+              }, 400)
               if (pageIndex >= 0 && pageIndex < attachmentsList.length) {
                 setCurrentFile(attachmentsList[pageIndex])
                 setNextButtonDisabled(!attachmentsList[pageIndex + 1])
@@ -612,7 +638,6 @@ const SliderPopup = ({
                   e.stopPropagation()
                 }}
               >
-                {/* Per-item loading indicator - shows when this specific item is loading */}
                 {isItemLoading(file.id) && file.type === 'image' && (
                   <ItemLoadingCont>
                     <UploadingIcon color={textOnPrimary} />
@@ -620,39 +645,39 @@ const SliderPopup = ({
                 )}
                 {file.type === 'image' ? (
                   <React.Fragment>
-                    {attachmentLoadingStateForPopup === LOADING_STATE.LOADED &&
-                      attachmentUpdatedMap[getAttachmentURLWithVersion(file.url + '_original_image_url')] && (
-                        <img
-                          loading='lazy'
-                          decoding='async'
-                          draggable={false}
-                          src={attachmentUpdatedMap[getAttachmentURLWithVersion(file.url + '_original_image_url')]}
-                          alt={file.name || 'Attachment'}
-                          onMouseDown={(e) => {
-                            if (e.button === 2) {
-                              e.stopPropagation()
-                            }
-                          }}
-                          style={{ position: 'relative', zIndex: 2, opacity: isItemLoading(file.id) ? 0 : 1 }}
-                          onLoad={() => {
-                            const fileId = file.id
-                            if (fileId) {
-                              setItemsLoadedMap((prev) => ({ ...prev, [fileId]: true }))
-                            }
-                          }}
-                          onError={() => {
-                            const fileId = file.id
-                            if (fileId) {
-                              setItemsLoadedMap((prev) => ({ ...prev, [fileId]: false }))
-                            }
-                          }}
-                        />
-                      )}
+                    {attachmentUpdatedMap[getAttachmentURLWithVersion(file.url + '_original_image_url')] && (
+                      <img
+                        loading='lazy'
+                        decoding='async'
+                        draggable={false}
+                        src={attachmentUpdatedMap[getAttachmentURLWithVersion(file.url + '_original_image_url')]}
+                        alt={file.name || 'Attachment'}
+                        onMouseDown={(e) => {
+                          if (e.button === 2) {
+                            e.stopPropagation()
+                          }
+                        }}
+                        style={{ position: 'relative', zIndex: 2, opacity: isItemLoading(file.id) ? 0 : 1 }}
+                        onLoad={() => {
+                          const fileId = file.id
+                          if (fileId) {
+                            setItemsLoadedMap((prev) => ({ ...prev, [fileId]: true }))
+                          }
+                        }}
+                        onError={() => {
+                          const fileId = file.id
+                          if (fileId) {
+                            setItemsLoadedMap((prev) => ({ ...prev, [fileId]: false }))
+                          }
+                        }}
+                      />
+                    )}
                   </React.Fragment>
                 ) : (
                   <React.Fragment>
                     {attachmentUpdatedMap[getAttachmentURLWithVersion(file.url + '_original_video_url')] && (
                       <VideoPlayer
+                        readyToPlay={readyToPlay}
                         activeFileId={currentFile?.id || ''}
                         videoFileId={file.id || ''}
                         src={attachmentUpdatedMap[getAttachmentURLWithVersion(file.url + '_original_video_url')]}
@@ -692,8 +717,9 @@ const SliderPopup = ({
           title='Delete message'
         />
       )}
-    </Container>
-  )
+    </Container>,
+    document.body
+  ) as unknown as React.ReactElement
 }
 
 export default SliderPopup
@@ -705,7 +731,7 @@ const Container = styled.div`
   right: 0;
   bottom: 0;
   height: 100vh;
-  z-index: 999;
+  z-index: 199;
 `
 const ProgressWrapper = styled.span`
   display: inline-block;

@@ -16,6 +16,7 @@ interface MessagePopupsProps {
   allowEditDeleteIncomingMessage?: boolean
   showInfoMessageProps?: any
   contactsMap: { [key: string]: any }
+  anchorRef: React.RefObject<HTMLElement>
   onDeleteMessage: (deleteOption: 'forMe' | 'forEveryone') => void
   onToggleDeletePopup: () => void
   onForwardMessage: (channelIds: string[]) => void
@@ -36,6 +37,7 @@ const MessagePopups: React.FC<MessagePopupsProps> = ({
   allowEditDeleteIncomingMessage,
   showInfoMessageProps = {},
   contactsMap,
+  anchorRef,
   onDeleteMessage,
   onToggleDeletePopup,
   onForwardMessage,
@@ -77,6 +79,7 @@ const MessagePopups: React.FC<MessagePopupsProps> = ({
           contacts={contactsMap}
           handleOpenUserProfile={onOpenUserProfile}
           isP2PChannel={channel.type === DEFAULT_CHANNEL_TYPE.DIRECT}
+          anchorRef={anchorRef}
         />
       )}
       {showEndVoteConfirmPopup && (

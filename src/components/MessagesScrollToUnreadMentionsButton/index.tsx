@@ -3,7 +3,7 @@ import { useSelector, useDispatch } from 'store/hooks'
 import React, { useCallback, useEffect } from 'react'
 // Store
 import { activeChannelSelector } from '../../store/channel/selector'
-import { getMessagesAC } from '../../store/message/actions'
+import { loadAroundMessageAC } from '../../store/message/actions'
 import { getChannelMentionsAC, markMessagesAsReadAC, updateChannelDataAC } from '../../store/channel/actions'
 import {
   sendMessageInputHeightSelector,
@@ -19,6 +19,7 @@ import { UnreadCountProps } from '../Channel'
 import { useColor } from '../../hooks'
 import { MESSAGE_DELIVERY_STATUS } from 'helpers/constants'
 import { setScrollToMentionedMessageAC } from 'store/message/actions'
+import { scrollMessageInList } from '../../helpers/messageListScroll'
 
 interface MessagesScrollToUnreadMentionsButtonProps {
   buttonIcon?: JSX.Element
@@ -100,8 +101,10 @@ const MessagesScrollToUnreadMentionsButton: React.FC<MessagesScrollToUnreadMenti
       if (repliedMessage) {
         const scrollRef = document.getElementById('scrollableDiv') as HTMLElement
         if (scrollRef) {
+          let safetyTimer: NodeJS.Timeout
           // Function to handle scroll completion
           const handleScrollEnd = () => {
+            clearTimeout(safetyTimer)
             dispatch(setScrollToMentionedMessageAC(false))
           }
 
@@ -127,10 +130,20 @@ const MessagesScrollToUnreadMentionsButton: React.FC<MessagesScrollToUnreadMenti
           } else {
             ;(scrollRef as Element).addEventListener('scroll', handleScrollEvent)
           }
+          // Safety net: if the target is already in view no scroll (and no
+          // scrollend) ever fires — don't leave listeners dangling on the
+          // long-lived scroll container.
+          safetyTimer = setTimeout(() => {
+            scrollRef.removeEventListener('scrollend', handleScrollEndEvent)
+            scrollRef.removeEventListener('scroll', handleScrollEvent)
+            clearTimeout(scrollTimeout)
+            dispatch(setScrollToMentionedMessageAC(false))
+          }, 3000)
           dispatch(setScrollToMentionedMessageAC(true))
-          scrollRef.scrollTo({
-            top: repliedMessage.offsetTop - scrollRef.offsetHeight / 2,
-            behavior: 'smooth'
+          scrollMessageInList(repliedMessage, {
+            container: scrollRef,
+            behavior: 'smooth',
+            alignment: 'center'
           })
         }
         repliedMessage.classList.add('highlight')
@@ -140,7 +153,7 @@ const MessagesScrollToUnreadMentionsButton: React.FC<MessagesScrollToUnreadMenti
       }
     } else if (channel?.id) {
       // await handleGetMessages(undefined, messageId)
-      dispatch(getMessagesAC(channel, undefined, messageId))
+      dispatch(loadAroundMessageAC(channel, messageId))
     }
   }
 

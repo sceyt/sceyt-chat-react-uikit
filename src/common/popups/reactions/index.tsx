@@ -1,5 +1,6 @@
 import styled from 'styled-components'
 import React, { useEffect, useMemo, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { shallowEqual } from 'react-redux'
 import { useSelector, useDispatch } from 'store/hooks'
 import { LOADING_STATE, USER_PRESENCE_STATUS } from '../../../helpers/constants'
@@ -29,6 +30,8 @@ interface IReactionsPopupProps {
   handleReactionsPopupClose: () => void
   bottomPosition: number
   horizontalPositions: { left: number; right: number }
+  anchorTop: number
+  anchorBottom: number
   reactionTotals: {
     key: string
     count: number
@@ -45,13 +48,15 @@ export default function ReactionsPopup({
   handleReactionsPopupClose,
   handleAddDeleteEmoji,
   bottomPosition,
-  // horizontalPositions,
+  horizontalPositions,
+  anchorTop,
+  anchorBottom,
   reactionTotals,
   reactionsDetailsPopupBorderRadius,
   reactionsDetailsPopupHeaderItemsStyle,
   rtlDirection,
   openUserProfile
-}: IReactionsPopupProps) {
+}: IReactionsPopupProps): React.ReactElement {
   const {
     [THEME_COLORS.ACCENT]: accentColor,
     [THEME_COLORS.TEXT_PRIMARY]: textPrimary,
@@ -160,17 +165,32 @@ export default function ReactionsPopup({
     return botPost >= (reactionsHeight > 320 ? 320 : reactionsHeight) ? 'bottom' : 'top'
   }, [bottomPosition, messageInputHeight, reactionsHeight])
 
-  return (
+  const fixedStyle = useMemo((): React.CSSProperties => {
+    const top = popupVerticalPosition === 'bottom' ? anchorBottom : undefined
+    const bottom = popupVerticalPosition === 'top' ? window.innerHeight - anchorTop : undefined
+    const left = !rtlDirection ? horizontalPositions.left : undefined
+    const right = rtlDirection ? horizontalPositions.right : undefined
+    return {
+      position: 'fixed',
+      top,
+      bottom,
+      left,
+      right,
+      zIndex: 12
+    }
+  }, [popupVerticalPosition, anchorTop, anchorBottom, horizontalPositions, rtlDirection])
+
+  return createPortal(
     <Container
       ref={popupRef}
       popupVerticalPosition={popupVerticalPosition}
-      // popupHorizontalPosition={popupHorizontalPosition}
       className='reactions_popup'
       height={popupHeight}
       visible={!calculateSizes}
       rtlDirection={rtlDirection}
       borderRadius={reactionsDetailsPopupBorderRadius}
       backgroundColor={backgroundSections}
+      style={fixedStyle}
     >
       <ReactionScoresCont
         ref={scoresRef}
@@ -259,8 +279,9 @@ export default function ReactionsPopup({
           </ReactionItem>
         ))}
       </ReactionsList>
-    </Container>
-  )
+    </Container>,
+    document.body
+  ) as unknown as React.ReactElement
 }
 
 const Container = styled.div<{
@@ -272,13 +293,6 @@ const Container = styled.div<{
   rtlDirection?: boolean
   backgroundColor: string
 }>`
-  position: absolute;
-  /*right: ${(props) => props.popupHorizontalPosition === 'left' && (props.rtlDirection ? 'calc(100% - 80px)' : 0)};*/
-  right: ${(props) => props.rtlDirection && 0};
-  /*left: ${(props) => props.popupHorizontalPosition === 'right' && (!props.rtlDirection ? 'calc(100% - 80px)' : 0)};*/
-  left: ${(props) => !props.rtlDirection && 0};
-  top: ${(props) => props.popupVerticalPosition === 'bottom' && '100%'};
-  bottom: ${(props) => props.popupVerticalPosition === 'top' && '42px'};
   width: 340px;
   height: ${(props) => props.height && props.height + 22}px;
   //overflow: ${(props) => !props.height && 'hidden'};
@@ -296,7 +310,6 @@ const Container = styled.div<{
   transition: all 0.2s;
 
   direction: initial;
-  z-index: 12;
   &::after {
     content: '';
     position: absolute;

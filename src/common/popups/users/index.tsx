@@ -145,18 +145,6 @@ const UsersPopup = ({
       : channel.type === DEFAULT_CHANNEL_TYPE.BROADCAST || channel.type === DEFAULT_CHANNEL_TYPE.PUBLIC
         ? 'Subscribers'
         : 'Members')
-  /* const handleGetUsers = (option) => {
-    dispatch(
-      getUsers({
-        query: userSearchValue,
-        filter: option || searchIn,
-        limit: 15
-      })
-    )
-  }
-  useEffect(() => {
-    dispatch(getRoles())
-  }, [channel]) */
 
   const handleMembersListScroll = (event: any) => {
     if (!userSearchValue && event.target.scrollHeight - event.target.scrollTop <= event.target.offsetHeight + 300) {
@@ -487,6 +475,9 @@ const UsersPopup = ({
                 </ListRow>
               )
             })}
+            {userSearchValue && filteredUsers.length === 0 && usersLoadingState !== LOADING_STATE.LOADING && (
+              <NoResults color={textSecondary}>No members found</NoResults>
+            )}
           </MembersContainer>
         </PopupBody>
 
@@ -580,6 +571,13 @@ const MembersContainer = styled(List)<{
   max-height: ${(props) => `calc(100% - (${(props.isAdd ? 67 : 70) + props.selectedMembersHeight}px))`};
   overflow-y: auto;
   padding-right: 16px;
+  scrollbar-width: none;
+  scrollbar-color: transparent transparent;
+  overscroll-behavior: none;
+
+  @supports (overflow: overlay) {
+    overflow-y: overlay;
+  }
 
   &::-webkit-scrollbar {
     width: 8px;
@@ -595,6 +593,11 @@ const MembersContainer = styled(List)<{
   }
   &.show-scrollbar::-webkit-scrollbar-track {
     background: transparent;
+  }
+
+  &.show-scrollbar {
+    scrollbar-width: thin;
+    scrollbar-color: ${(props) => props.thumbColor} transparent;
   }
 `
 
@@ -690,6 +693,9 @@ const SelectedMembersContainer = styled.div<{ thumbColor: string }>`
   padding: 2px 12px 0;
   box-sizing: border-box;
   overflow-y: auto;
+  scrollbar-width: none;
+  scrollbar-color: transparent transparent;
+  overscroll-behavior: none;
 
   &::-webkit-scrollbar {
     width: 8px;
@@ -726,6 +732,15 @@ const SelectedMemberName = styled.span`
   font-size: 14px;
   line-height: 16px;
   margin-left: 8px;
+  color: ${(props) => props.color};
+`
+
+const NoResults = styled.div<{ color: string }>`
+  font-size: 15px;
+  line-height: 16px;
+  font-weight: 500;
+  text-align: center;
+  margin-top: 20px;
   color: ${(props) => props.color};
 `
 

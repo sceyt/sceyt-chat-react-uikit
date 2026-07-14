@@ -23,6 +23,30 @@ import { forwardMessageAC } from 'store/message/actions'
 import { connectionStatusSelector } from 'store/user/selector'
 import { handleUploadAttachments } from 'store/message/saga'
 import { attachmentTypes } from 'helpers/constants'
+import { getClient } from 'common/client'
+
+function loadImage(src: string): Promise<{ width: number; height: number }> {
+  return new Promise((resolve, reject) => {
+    const img = document.createElement('img')
+
+    img.setAttribute('fetchpriority', 'high')
+    img.style.display = 'none'
+
+    img.onload = () => {
+      const sizes = {
+        width: img.naturalWidth,
+        height: img.naturalHeight
+      }
+      img.remove()
+      resolve(sizes)
+    }
+
+    img.onerror = reject
+
+    document.body.appendChild(img)
+    img.src = src
+  })
+}
 
 interface InviteLinkModalProps {
   onClose: () => void
@@ -97,6 +121,61 @@ export default function InviteLinkModal({ onClose, SVGOrPNGLogoIcon, channelId }
   const handleShare = async () => {
     setShareMode(activeTab)
     setOpenForwardPopup(true)
+  }
+
+  const fetchOGMetadata = async (url: string) => {
+    const client = getClient()
+    if (!client || client.connectionState !== 'Connected') return null
+    try {
+      const queryBuilder = new client.MessageLinkOGQueryBuilder(url)
+      queryBuilder.setUrl(url)
+      const query = await queryBuilder.build()
+      const urlMetadata = await query.loadOGData()
+      if (!urlMetadata) return null
+
+      // Try to load image to get dimensions; fall back to favicon if image fails
+      const imageUrl = urlMetadata?.og?.image?.[0]?.url
+      const faviconUrl = urlMetadata?.og?.favicon?.url
+      if (imageUrl) {
+        try {
+          const imageDimensions = await loadImage(imageUrl)
+          urlMetadata.imageWidth = imageDimensions.width
+          urlMetadata.imageHeight = imageDimensions.height
+        } catch {
+          // Image failed — try favicon for dimensions
+          if (faviconUrl) {
+            try {
+              const faviconDimensions = await loadImage(faviconUrl)
+              urlMetadata.imageWidth = faviconDimensions.width
+              urlMetadata.imageHeight = faviconDimensions.height
+            } catch {
+              // Favicon also failed — dimensions will be omitted
+            }
+          }
+        }
+      } else if (faviconUrl) {
+        try {
+          const faviconDimensions = await loadImage(faviconUrl)
+          urlMetadata.imageWidth = faviconDimensions.width
+          urlMetadata.imageHeight = faviconDimensions.height
+        } catch {
+          // Favicon failed — dimensions will be omitted
+        }
+      }
+
+      const metadata: Record<string, any> = {}
+      if (urlMetadata.imageWidth) metadata.szw = urlMetadata.imageWidth
+      if (urlMetadata.imageHeight) metadata.szh = urlMetadata.imageHeight
+      if (urlMetadata.og?.favicon?.url) metadata.tur = urlMetadata.og.favicon.url
+      if (urlMetadata.og?.description) metadata.dsc = urlMetadata.og.description
+      if (urlMetadata.og?.image?.[0]?.url) metadata.iur = urlMetadata.og.image[0].url
+      if (urlMetadata.og?.title) metadata.ttl = urlMetadata.og.title
+
+      return metadata
+    } catch (error) {
+      console.log('Failed to fetch OG metadata', url)
+      return null
+    }
   }
 
   const handleForwardChannels = async (channelIds: string[]) => {
@@ -208,14 +287,19 @@ export default function InviteLinkModal({ onClose, SVGOrPNGLogoIcon, channelId }
     for (const channelId of channelIds) {
       const channel = getChannelFromMap(channelId)
       if (shareMode === 'link') {
-        const linkAttachmentBuilder = channel.createAttachmentBuilder(inviteUrl, attachmentTypes.link)
-        const linkAttachmentToSend = linkAttachmentBuilder.setName('Invite link').setUpload(false).create()
+        const metadata = await fetchOGMetadata(inviteUrl)
+        const linkAttachment = {
+          type: attachmentTypes.link,
+          data: inviteUrl,
+          upload: false,
+          metadata
+        }
         const message = {
           metadata: '',
           body: inviteUrl,
           mentionedUsers: [],
           type: 'text',
-          attachments: [linkAttachmentToSend]
+          attachments: [linkAttachment]
         }
         dispatch(forwardMessageAC(message as any, channelId, connectionStatus, false))
       } else {

@@ -1,11 +1,17 @@
-import React, { useEffect } from 'react'
+import React, { useEffect, useState } from 'react'
 import styled from 'styled-components'
 import { shallowEqual } from 'react-redux'
 import { useSelector } from 'store/hooks'
 import Details from '../ChannelDetails'
-import { channelInfoIsOpenSelector } from '../../store/channel/selector'
+import MessagesSearch from '../MessagesSearch'
+import { channelInfoIsOpenSelector, messageSearchIsOpenSelector } from '../../store/channel/selector'
 import { MuteTime } from '../../types'
 import { setShowChannelDetails } from '../../helpers/channelHalper'
+import { THEME } from 'helpers/constants'
+import { ThemeMode } from 'components/ChatContainer'
+import { themeSelector } from 'store/theme/selector'
+import { useColor } from 'hooks'
+import { THEME_COLORS } from 'components'
 export interface IDetailsProps {
   size?: 'small' | 'medium' | 'large'
 
@@ -268,13 +274,34 @@ const ChannelDetailsContainer = ({
   showGroupsInCommon
 }: IDetailsProps) => {
   const channelDetailsIsOpen = useSelector(channelInfoIsOpenSelector, shallowEqual)
+  const messageSearchIsOpen = useSelector(messageSearchIsOpenSelector, shallowEqual)
+  const [windowWidth, setWindowWidth] = useState(window?.innerWidth)
+  const theme = useSelector(themeSelector)
+  const { [THEME_COLORS.BACKGROUND]: bgColor } = useColor()
 
   useEffect(() => {
     setShowChannelDetails(true)
   }, [])
+
+  useEffect(() => {
+    const handleWindowResize = () => {
+      setWindowWidth(window.innerWidth)
+    }
+    window.addEventListener('resize', handleWindowResize)
+    return () => {
+      window.removeEventListener('resize', handleWindowResize)
+    }
+  }, [])
+
   return (
-    <DetailsWrapper id='channel_details_wrapper'>
-      {channelDetailsIsOpen && (
+    <DetailsWrapper
+      id={messageSearchIsOpen ? 'messages_search_wrapper' : 'channel_details_wrapper'}
+      window={windowWidth}
+      theme={theme}
+      bgColor={bgColor}
+    >
+      {messageSearchIsOpen && <MessagesSearch size={size} />}
+      {channelDetailsIsOpen && !messageSearchIsOpen && (
         <Details
           size={size}
           showAboutChannel={showAboutChannel}
@@ -395,7 +422,19 @@ const ChannelDetailsContainer = ({
   )
 }
 
-const DetailsWrapper = styled.div`
+const DetailsWrapper = styled.div<{ window?: number; bgColor: string; theme: ThemeMode }>`
   user-select: text;
+  ${(props) =>
+    props.window &&
+    props.window < 1200 &&
+    `
+    position: absolute;
+    right: 0;
+    top: 0;
+    background: ${props.bgColor};
+    z-index: 10;
+    box-shadow: ${props.theme === THEME.DARK ? '0 0 12px rgba(0, 0, 0, 0.5)' : '0 0 12px rgba(0, 0, 0, 0.08)'};
+    height: 100%;
+  `}
 `
 export default ChannelDetailsContainer

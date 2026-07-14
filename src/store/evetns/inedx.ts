@@ -9,6 +9,7 @@ import {
   deleteChannelFromAllChannels,
   getActiveChannelId,
   getChannelFromAllChannels,
+  getChannelFromAllChannelsMap,
   getChannelFromMap,
   getChannelGroupName,
   getChannelTypesFilter,
@@ -19,6 +20,7 @@ import {
   removeChannelFromMap,
   setChannelInMap,
   updateChannelLastMessageOnAllChannels,
+  updateChannelMemberInAllChannels,
   updateChannelOnAllChannels
 } from '../../helpers/channelHalper'
 import {
@@ -26,6 +28,7 @@ import {
   markMessagesAsDeliveredAC,
   removeChannelAC,
   removeChannelCachesAC,
+  resendPendingChannelReadsAC,
   setActiveChannelAC,
   setAddedToChannelAC,
   setChannelToAddAC,
@@ -41,14 +44,16 @@ import {
   updateSearchedChannelDataAC
 } from '../channel/actions'
 import {
-  addMessageAC,
+  addMessagesAC,
   addPollVotesToListAC,
   addReactionToMessageAC,
   clearMessagesAC,
   deletePollVotesFromListAC,
   deleteReactionFromMessageAC,
-  removePendingMessageAC,
-  scrollToNewMessageAC,
+  loadOGMetadataForLinkAC,
+  removeChannelMarkersAC,
+  removePendingMessageMutationAC,
+  resendPendingMessageMutationsAC,
   updateMessageAC,
   updateMessagesMarkersAC,
   updateMessagesStatusAC
@@ -56,26 +61,18 @@ import {
 import { CONNECTION_EVENT_TYPES, CONNECTION_STATUS } from '../user/constants'
 import { getContactsAC, setConnectionStatusAC } from '../user/actions'
 import {
-  addAllMessages,
   addMessageToMap,
-  addReactionOnAllMessages,
+  appendMessageToLatestSegment,
   addReactionToMessageOnMap,
   checkChannelExistsOnMessagesMap,
-  getHasNextCached,
-  getMessageFromPendingMessagesMap,
-  getMessagesFromMap,
-  MESSAGE_LOAD_DIRECTION,
+  messagesShareReference,
   removeAllMessages,
   removeMessagesFromMap,
-  removeReactionOnAllMessages,
   removeReactionToMessageOnMap,
-  updateMarkersOnAllMessages,
+  shouldReplaceLastMessage,
   updateMessageDeliveryStatusAndMarkers,
-  updateMessageOnAllMessages,
   updateMessageOnMap,
-  updateMessageStatusOnAllMessages,
-  updateMessageStatusOnMap,
-  updatePendingMessageOnMap
+  updateMessageStatusOnMap
 } from '../../helpers/messagesHalper'
 import { getShowNotifications, setNotification } from '../../helpers/notifications'
 import {
@@ -87,13 +84,406 @@ import {
 } from '../member/actions'
 import { browserTabIsActiveSelector, contactsMapSelector } from '../user/selector'
 import { getShowOnlyContactUsers } from '../../helpers/contacts'
-import { attachmentTypes } from '../../helpers/constants'
+import { attachmentTypes, DEFAULT_CHANNEL_TYPE, MESSAGE_STATUS } from '../../helpers/constants'
+import { updateTabAttachmentCache } from '../message/saga'
 import { MessageTextFormat } from '../../messageUtils'
 import { isJSON } from '../../helpers/message'
 import log from 'loglevel'
 import store from 'store'
 import { updateActiveChannelMembersAdd, updateActiveChannelMembersRemove } from '../member/helpers'
 import { MESSAGE_TYPE } from '../../types/enum'
+import { navigateToLatest } from 'helpers/messageListNavigator'
+
+const getStoredChannel = (channelId: string) =>
+  getChannelFromMap(channelId) ||
+  getChannelFromAllChannels(channelId) ||
+  getChannelFromAllChannelsMap(channelId) ||
+  null
+
+const lastMessageNeedsUpdate = (
+  currentLastMessage: IMessage | null | undefined,
+  nextLastMessage: IMessage | null | undefined
+) => {
+  if (!nextLastMessage) {
+    return false
+  }
+
+  if (!currentLastMessage) {
+    return true
+  }
+
+  return !(
+    messagesShareReference(currentLastMessage, nextLastMessage) &&
+    currentLastMessage.id === nextLastMessage.id &&
+    currentLastMessage.tid === nextLastMessage.tid &&
+    currentLastMessage.state === nextLastMessage.state &&
+    currentLastMessage.deliveryStatus === nextLastMessage.deliveryStatus
+  )
+}
+
+function* handleConnectionStatusChangedEvent(status: string) {
+  log.info('connection status changed . . . . . ', status)
+  yield put(setConnectionStatusAC(status))
+  if (status === CONNECTION_STATUS.CONNECTED) {
+    yield put(getRolesAC())
+    yield put(resendPendingMessageMutationsAC(status))
+    yield put(resendPendingChannelReadsAC(status))
+  }
+}
+
+const getResolvedChannelLastMessage = (
+  channelId: string,
+  nextLastMessage?: IMessage | null,
+  sourceMessage?: IMessage | null
+) => {
+  const storedChannel = getStoredChannel(channelId)
+  if (!nextLastMessage?.id) {
+    return storedChannel?.lastMessage?.id ? storedChannel.lastMessage : null
+  }
+
+  if (
+    nextLastMessage &&
+    shouldReplaceLastMessage(storedChannel?.lastMessage, nextLastMessage, sourceMessage || nextLastMessage)
+  ) {
+    return nextLastMessage
+  }
+
+  return storedChannel?.lastMessage?.id ? storedChannel.lastMessage : null
+}
+
+export function* handleChannelMessageEvent(args: { channel: IChannel; message: IMessage }, SceytChatClient: any): any {
+  const { channel, message } = args
+  log.info('channel MESSAGE ... id : ', message.id, ', channel.id: ', channel.id)
+  const messageToHandle = handleNewMessages ? handleNewMessages(message, channel) : message
+  const channelFilterTypes = getChannelTypesFilter()
+  if (
+    !messageToHandle ||
+    !channel ||
+    !(channelFilterTypes?.length ? channelFilterTypes.includes(channel.type) : true)
+  ) {
+    return
+  }
+
+  channel.metadata = isJSON(channel.metadata) ? JSON.parse(channel.metadata) : channel.metadata
+  const activeChannelId = getActiveChannelId()
+  const channelExists = checkChannelExists(channel.id)
+  const channelForAdd = JSON.parse(JSON.stringify(channel))
+  const storedChannel = getStoredChannel(channel.id)
+  const candidateLastMessage = channelForAdd.lastMessage || message
+  const resolvedLastMessage = message.repliedInThread
+    ? storedChannel?.lastMessage || null
+    : getResolvedChannelLastMessage(channel.id, candidateLastMessage, message)
+  const shouldUpdateLastMessage = lastMessageNeedsUpdate(storedChannel?.lastMessage, resolvedLastMessage)
+  const messages = store.getState().MessageReducer.activeChannelMessages
+  const lastMessageIsInActiveWindow =
+    storedChannel?.lastMessage?.id || storedChannel?.lastMessage?.tid
+      ? (store.getState().MessageReducer.activeChannelMessages as IMessage[])?.some(
+          (m) => m.id === storedChannel.lastMessage?.id || storedChannel?.lastMessage?.tid === m.tid
+        )
+      : false
+  const isSameLastMessage =
+    storedChannel?.lastMessage &&
+    resolvedLastMessage &&
+    ((resolvedLastMessage.id && storedChannel.lastMessage.id === resolvedLastMessage.id) ||
+      (resolvedLastMessage.tid && storedChannel.lastMessage.tid === resolvedLastMessage.tid))
+  const resolvedLastMessageUpdate = isSameLastMessage
+    ? {
+        ...storedChannel!.lastMessage!,
+        id: message.id,
+        deliveryStatus: message!.deliveryStatus,
+        state: MESSAGE_STATUS.UNMODIFIED
+      }
+    : resolvedLastMessage
+
+  yield put(addChannelAC(channelForAdd))
+  if (!channelExists) {
+    setChannelInMap(channel)
+  } else if (shouldUpdateLastMessage) {
+    yield put(updateChannelLastMessageAC(resolvedLastMessageUpdate!, channelForAdd))
+  }
+
+  if (channel.id === activeChannelId) {
+    const visibleMessagesMap = store.getState().MessageReducer?.visibleMessagesMap || {}
+    const lastMessageIsVisible = storedChannel?.lastMessage?.id
+      ? Object.values(visibleMessagesMap as any).some(
+          (visibleMessage: any) => visibleMessage.id === storedChannel.lastMessage?.id
+        )
+      : false
+
+    const messagesHasNext = store.getState().MessageReducer.messagesHasNext
+
+    if ((!messagesHasNext && lastMessageIsInActiveWindow) || !messages.length || !messages) {
+      const existingMessage = (store.getState().MessageReducer.activeChannelMessages as IMessage[]).find(
+        (m) => (message.id && m.id === message.id) || (message.tid && m.tid === message.tid)
+      )
+      if (existingMessage) {
+        yield put(
+          updateMessageAC(existingMessage.id || existingMessage.tid!, {
+            ...existingMessage,
+            id: message.id,
+            deliveryStatus: message.deliveryStatus,
+            state: MESSAGE_STATUS.UNMODIFIED
+          })
+        )
+      } else {
+        yield put(addMessagesAC([message], 'next'))
+      }
+      yield put(loadOGMetadataForLinkAC([message]))
+      const tabIsActive = yield select(browserTabIsActiveSelector)
+      if (lastMessageIsVisible && tabIsActive) {
+        setTimeout(() => {
+          navigateToLatest(true)
+        }, 50)
+      }
+    }
+  }
+
+  addMessageToMap(channel.id, message)
+  const channelDataUpdate: Omit<Partial<IChannel>, 'lastReactedMessage'> & {
+    userMessageReactions: any[]
+    lastReactedMessage: null
+  } = {
+    messageCount: channelForAdd.messageCount,
+    unread: channelForAdd.unread,
+    newMessageCount: channelForAdd.newMessageCount,
+    newMentionCount: channelForAdd.newMentionCount,
+    newReactedMessageCount: channelForAdd.newReactedMessageCount,
+    lastReceivedMsgId: channelForAdd.lastReceivedMsgId,
+    lastDisplayedMessageId: channelForAdd.lastDisplayedMessageId,
+    messageRetentionPeriod: channelForAdd.messageRetentionPeriod,
+    messages: channelForAdd.messages,
+    newReactions: channelForAdd.newReactions,
+    userMessageReactions: [],
+    lastReactedMessage: null,
+    ...(shouldUpdateLastMessage && resolvedLastMessageUpdate ? { lastMessage: resolvedLastMessageUpdate } : {})
+  }
+  if (storedChannel?.lastMessage?.id) {
+    appendMessageToLatestSegment(channel.id, message.id, storedChannel.lastMessage.id)
+  }
+  yield put(updateChannelDataAC(channel.id, channelDataUpdate))
+  const groupName = getChannelGroupName(channel)
+  yield put(updateSearchedChannelDataAC(channel.id, channelDataUpdate, groupName))
+
+  const showNotifications = getShowNotifications()
+  if (showNotifications && !message.silent && message.user.id !== SceytChatClient.user.id && !channel.muted) {
+    if (Notification.permission === 'granted') {
+      const tabIsActive = yield select(browserTabIsActiveSelector)
+      if (document.visibilityState !== 'visible' || !tabIsActive || channel.id !== activeChannelId) {
+        const contactsMap = yield select(contactsMapSelector)
+        const getFromContacts = getShowOnlyContactUsers()
+        const state = store.getState()
+        const theme = state.ThemeReducer.theme || 'light'
+        const accentColor = state.ThemeReducer.newTheme?.colors?.accent?.[theme] || '#3B82F6'
+        const textSecondary = state.ThemeReducer.newTheme?.colors?.textSecondary?.[theme] || '#6B7280'
+        const messageBody = MessageTextFormat({
+          text: message.body,
+          message,
+          contactsMap,
+          getFromContacts,
+          isLastMessage: false,
+          asSampleText: true,
+          accentColor,
+          textSecondary
+        })
+        setNotification(
+          message?.type === MESSAGE_TYPE.VIEW_ONCE ? `Self-destructing` : messageBody,
+          message.user,
+          channel,
+          undefined,
+          message.attachments && message.attachments.length
+            ? message.attachments.find((att: IAttachment) => att.type !== attachmentTypes.link)
+            : undefined
+        )
+      }
+    }
+  }
+  if (message.user.id !== SceytChatClient.user.id) {
+    yield put(markMessagesAsDeliveredAC(channel.id, [message.id]))
+  }
+
+  updateChannelOnAllChannels(channel.id, channelDataUpdate)
+  if (shouldUpdateLastMessage) {
+    updateChannelLastMessageOnAllChannels(channel.id, resolvedLastMessageUpdate!)
+  }
+
+  if (message.attachments?.length) {
+    updateTabAttachmentCache(channel.id, message.attachments, message.user)
+  }
+}
+
+export function* handleUnreadMessagesInfoEvent(args: { channel: IChannel }): any {
+  const { channel } = args
+
+  if (!channel) {
+    return
+  }
+
+  const resolvedLastMessage = getResolvedChannelLastMessage(channel.id, channel.lastMessage)
+  const shouldUpdateLastMessage = lastMessageNeedsUpdate(getStoredChannel(channel.id)?.lastMessage, resolvedLastMessage)
+  const channelUpdateParams = {
+    ...(shouldUpdateLastMessage && resolvedLastMessage ? { lastMessage: resolvedLastMessage } : {}),
+    newMessageCount: channel.newMessageCount,
+    newMentionCount: channel.newMentionCount,
+    unread: channel.unread,
+    newReactedMessageCount: channel.newReactedMessageCount,
+    newReactions: channel.newReactions,
+    lastReactedMessage: channel.lastReactedMessage,
+    lastReceivedMsgId: channel.lastReceivedMsgId,
+    lastDisplayedMessageId: channel.lastDisplayedMessageId,
+    messageRetentionPeriod: channel.messageRetentionPeriod
+  }
+
+  yield put(updateChannelDataAC(channel.id, channelUpdateParams))
+  updateChannelOnAllChannels(channel.id, channelUpdateParams)
+}
+
+export function* handleChannelMarkedAsReadEvent(args: { channel: IChannel }): any {
+  const { channel } = args
+
+  if (!channel) {
+    return
+  }
+
+  const channelUpdateParams = {
+    unread: false,
+    newMessageCount: 0,
+    newMentionCount: 0,
+    muted: channel.muted,
+    mutedTill: channel.mutedTill,
+    ...(channel.lastReceivedMsgId ? { lastReceivedMsgId: channel.lastReceivedMsgId } : {}),
+    ...(channel.lastDisplayedMessageId ? { lastDisplayedMessageId: channel.lastDisplayedMessageId } : {})
+  }
+
+  yield put(updateChannelDataAC(channel.id, channelUpdateParams))
+  const groupName = getChannelGroupName(channel)
+  yield put(updateSearchedChannelDataAC(channel.id, channelUpdateParams, groupName))
+  updateChannelOnAllChannels(channel.id, channelUpdateParams)
+}
+
+export function* handleMessageMarkersReceivedEvent(
+  args: { channelId: string; markerList: IMarker },
+  SceytChatClient: any
+): any {
+  const { channelId, markerList } = args
+  const channel = getStoredChannel(channelId)
+  if (!channel) {
+    return
+  }
+
+  const isOwnMarker = markerList.user?.id === SceytChatClient.user.id
+  const activeChannelId = yield call(getActiveChannelId)
+  let updateLastMessage = false
+  const markersMap: any = {}
+  const markerUpdateParams = {
+    deliveryStatus: markerList.name,
+    marker: markerList
+  }
+
+  for (const messageId of markerList.messageIds) {
+    markersMap[messageId] = true
+    if (channel.lastMessage && messageId === channel.lastMessage.id) {
+      updateLastMessage = true
+    }
+  }
+
+  if (updateLastMessage) {
+    const lastMessage = {
+      ...channel.lastMessage,
+      ...updateMessageDeliveryStatusAndMarkers(channel.lastMessage, markerUpdateParams, isOwnMarker)
+    }
+
+    updateChannelLastMessageOnAllChannels(channel.id, lastMessage)
+    yield put(updateChannelLastMessageStatusAC(lastMessage, channel))
+  }
+
+  if (activeChannelId === channelId) {
+    yield put(updateMessagesStatusAC(markerList.name, markersMap, isOwnMarker, markerList))
+  }
+
+  updateMessageStatusOnMap(channel.id, { name: markerList.name, markersMap, marker: markerList }, isOwnMarker)
+
+  if (!isOwnMarker) {
+    yield put(updateMessagesMarkersAC(channelId, markerList.name, markerList))
+  }
+}
+
+export function* handleDeleteMessageEvent(args: { channel: IChannel; deletedMessage: IMessage }): any {
+  const { channel, deletedMessage } = args
+  const activeChannelId = yield call(getActiveChannelId)
+  const channelExists = checkChannelExists(channel.id)
+
+  if (channel.id === activeChannelId) {
+    yield put(updateMessageAC(deletedMessage.id, deletedMessage))
+  }
+  updateMessageOnMap(channel.id, {
+    messageId: deletedMessage.id,
+    params: deletedMessage
+  })
+  if (channelExists) {
+    yield put(
+      updateChannelDataAC(channel.id, {
+        newMessageCount: channel.newMessageCount,
+        muted: channel.muted,
+        mutedTill: channel.mutedTill
+      })
+    )
+    if (channel.lastMessage.id === deletedMessage.id) {
+      yield put(updateChannelLastMessageAC(deletedMessage, channel))
+    }
+  }
+  updateChannelOnAllChannels(
+    channel.id,
+    {
+      newMessageCount: channel.newMessageCount,
+      muted: channel.muted,
+      mutedTill: channel.mutedTill
+    },
+    deletedMessage
+  )
+  yield put(removePendingMessageMutationAC(deletedMessage.id))
+}
+
+export function* handleEditMessageEvent(args: { channel: IChannel; message: IMessage }): any {
+  const { channel, message } = args
+  const activeChannelId = yield call(getActiveChannelId)
+  const channelExists = checkChannelExists(channel.id)
+
+  if (channel.id === activeChannelId) {
+    yield put(
+      updateMessageAC(message.id, {
+        body: message.body,
+        state: message.state,
+        attachments: message.attachments,
+        bodyAttributes: message.bodyAttributes,
+        mentionedUsers: message.mentionedUsers,
+        updatedAt: message.updatedAt
+      })
+    )
+  }
+  if (channelExists) {
+    if (channel.lastMessage.id === message.id) {
+      yield put(updateChannelLastMessageAC(message, channel))
+    }
+  }
+  if (checkChannelExistsOnMessagesMap(channel.id)) {
+    updateMessageOnMap(channel.id, {
+      messageId: message.id,
+      params: message
+    })
+  }
+  updateChannelOnAllChannels(channel.id, {}, message)
+  yield put(removePendingMessageMutationAC(message.id))
+}
+
+export const __eventsTestables = {
+  handleChannelMessageEvent,
+  handleChannelMarkedAsReadEvent,
+  handleUnreadMessagesInfoEvent,
+  handleMessageMarkersReceivedEvent,
+  handleDeleteMessageEvent,
+  handleEditMessageEvent,
+  handleConnectionStatusChangedEvent
+}
 
 export default function* watchForEvents(): any {
   const SceytChatClient = getClient()
@@ -142,21 +532,19 @@ export default function* watchForEvents(): any {
         }
       })
     }
-    channelListener.onBlocked = (channel: IChannel) => {
-      if (shouldSkip(channel)) return
+    channelListener.onBlocked = (users: IUser[]) => {
       emitter({
         type: CHANNEL_EVENT_TYPES.BLOCK,
         args: {
-          channel
+          users
         }
       })
     }
-    channelListener.onUnblocked = (channel: IChannel) => {
-      if (shouldSkip(channel)) return
+    channelListener.onUnblocked = (users: IUser[]) => {
       emitter({
         type: CHANNEL_EVENT_TYPES.UNBLOCK,
         args: {
-          channel
+          users
         }
       })
     }
@@ -565,7 +953,7 @@ export default function* watchForEvents(): any {
             updateChannelOnAllChannels(chan.id, { memberCount: chan.memberCount + 1 })
             const updateChannelData = joinMembersEvent
               ? { members: membersList }
-              : yield call(updateActiveChannelMembersAdd, [joinedMember]) || {}
+              : yield call(updateActiveChannelMembersAdd, [joinedMember], chan.id) || {}
             yield put(
               updateChannelDataAC(chan.id, {
                 memberCount: chan.memberCount + 1,
@@ -599,7 +987,7 @@ export default function* watchForEvents(): any {
               let updateChannelData = {}
               if (activeChannelId === channel.id) {
                 yield put(removeMemberFromListAC([member], channel.id))
-                updateChannelData = yield call(updateActiveChannelMembersRemove, [member]) || {}
+                updateChannelData = yield call(updateActiveChannelMembersRemove, [member], channel.id) || {}
               }
 
               yield put(
@@ -634,16 +1022,39 @@ export default function* watchForEvents(): any {
           break
         }
         case CHANNEL_EVENT_TYPES.BLOCK: {
-          log.info('channel BLOCK ... ')
-          const { channel } = args
-          const channelExists = checkChannelExists(channel.id)
-          if (channelExists) {
-            yield put(removeChannelAC(channel.id))
+          log.info('user BLOCK ... ')
+          const { users } = args as { users: IUser[] }
+          const blockedUsers = users.map((u) => ({ ...u, blocked: true }))
+          updateChannelMemberInAllChannels(blockedUsers)
+          const allChannels: IChannel[] = store.getState().ChannelReducer.channels
+          for (const user of blockedUsers) {
+            const directChannel = allChannels.find(
+              (ch) => ch.type === DEFAULT_CHANNEL_TYPE.DIRECT && ch.members?.some((m) => m.id === user.id)
+            )
+            if (directChannel) {
+              const updatedMembers = directChannel.members?.map((m) => (m.id === user.id ? { ...m, blocked: true } : m))
+              yield put(updateChannelDataAC(directChannel.id, { members: updatedMembers }))
+            }
           }
           break
         }
         case CHANNEL_EVENT_TYPES.UNBLOCK: {
-          log.info('channel UNBLOCK ... ')
+          log.info('user UNBLOCK ... ')
+          const { users } = args as { users: IUser[] }
+          const unblockedUsers = users.map((u) => ({ ...u, blocked: false }))
+          updateChannelMemberInAllChannels(unblockedUsers)
+          const allChannels: IChannel[] = store.getState().ChannelReducer.channels
+          for (const user of unblockedUsers) {
+            const directChannel = allChannels.find(
+              (ch) => ch.type === DEFAULT_CHANNEL_TYPE.DIRECT && ch.members?.some((m) => m.id === user.id)
+            )
+            if (directChannel) {
+              const updatedMembers = directChannel.members?.map((m) =>
+                m.id === user.id ? { ...m, blocked: false } : m
+              )
+              yield put(updateChannelDataAC(directChannel.id, { members: updatedMembers }))
+            }
+          }
           break
         }
         case CHANNEL_EVENT_TYPES.KICK_MEMBERS: {
@@ -664,7 +1075,7 @@ export default function* watchForEvents(): any {
               let updateChannelData = {}
               if (activeChannelId === channel.id) {
                 yield put(removeMemberFromListAC(removedMembers, channel.id))
-                updateChannelData = yield call(updateActiveChannelMembersRemove, removedMembers) || {}
+                updateChannelData = yield call(updateActiveChannelMembersRemove, removedMembers, channel.id) || {}
               }
 
               const groupName = getChannelGroupName(channel)
@@ -718,7 +1129,7 @@ export default function* watchForEvents(): any {
               }
               updateChannelData = addMembersEvent
                 ? { members: membersList }
-                : yield call(updateActiveChannelMembersAdd, addedMembers) || {}
+                : yield call(updateActiveChannelMembersAdd, addedMembers, channel.id) || {}
             }
             yield put(
               updateChannelDataAC(channel.id, {
@@ -769,7 +1180,9 @@ export default function* watchForEvents(): any {
             if (channel.mutedTill !== mutedTill) {
               fields.push('mutedTill')
             }
-            if (channel.metadata !== isJSON(metadata) ? JSON.parse(metadata) : metadata) {
+            const parsedChannelMeta = isJSON(channel.metadata) ? JSON.parse(channel.metadata) : channel.metadata
+            const parsedMeta = isJSON(metadata) ? JSON.parse(metadata) : metadata
+            if (JSON.stringify(parsedChannelMeta) !== JSON.stringify(parsedMeta)) {
               fields.push('metadata')
             }
           }
@@ -806,199 +1219,11 @@ export default function* watchForEvents(): any {
           break
         }
         case CHANNEL_EVENT_TYPES.MESSAGE: {
-          const { channel, message } = args
-          log.info('channel MESSAGE ... id : ', message.id, ', channel.id: ', channel.id)
-          const messageToHandle = handleNewMessages ? handleNewMessages(message, channel) : message
-          const channelFilterTypes = getChannelTypesFilter()
-          if (
-            messageToHandle &&
-            channel &&
-            (channelFilterTypes?.length ? channelFilterTypes.includes(channel.type) : true)
-          ) {
-            channel.metadata = isJSON(channel.metadata) ? JSON.parse(channel.metadata) : channel.metadata
-            const activeChannelId = getActiveChannelId()
-            const channelExists = checkChannelExists(channel.id)
-            const channelForAdd = JSON.parse(JSON.stringify(channel))
-
-            yield put(addChannelAC(channelForAdd))
-            if (!channelExists) {
-              setChannelInMap(channel)
-            } else if (!message.repliedInThread) {
-              yield put(updateChannelLastMessageAC(message, channelForAdd))
-            }
-
-            if (channel.id === activeChannelId) {
-              if (!getHasNextCached()) {
-                yield put(addMessageAC(message))
-              }
-              addAllMessages([message], MESSAGE_LOAD_DIRECTION.NEXT)
-              // addAllMessages([message], MESSAGE_LOAD_DIRECTION.NEXT)
-              // }
-              if (message.user.id !== SceytChatClient.user.id) {
-                // yield put(markMessagesAsReadAC(channel.id, [message.id]))
-              }
-              const hasNextMessage = store.getState().MessageReducer.messagesHasNext
-              if (!getHasNextCached() && !hasNextMessage) {
-                yield put(scrollToNewMessageAC(true, false, true))
-              }
-            }
-
-            addMessageToMap(channel.id, message)
-            yield put(
-              updateChannelDataAC(channel.id, {
-                messageCount: channelForAdd.messageCount,
-                unread: channelForAdd.unread,
-                newMessageCount: channelForAdd.newMessageCount,
-                newMentionCount: channelForAdd.newMentionCount,
-                newReactedMessageCount: channelForAdd.newReactedMessageCount,
-                lastReceivedMsgId: channelForAdd.lastReceivedMsgId,
-                lastDisplayedMessageId: channelForAdd.lastDisplayedMessageId,
-                messageRetentionPeriod: channelForAdd.messageRetentionPeriod,
-                lastMessage: channelForAdd.lastMessage,
-                messages: channelForAdd.messages,
-                newReactions: channelForAdd.newReactions,
-                userMessageReactions: [],
-                lastReactedMessage: null
-              })
-            )
-            const groupName = getChannelGroupName(channel)
-            yield put(
-              updateSearchedChannelDataAC(
-                channel.id,
-                {
-                  messageCount: channelForAdd.messageCount,
-                  unread: channelForAdd.unread,
-                  newMessageCount: channelForAdd.newMessageCount,
-                  newMentionCount: channelForAdd.newMentionCount,
-                  newReactedMessageCount: channelForAdd.newReactedMessageCount,
-                  lastReceivedMsgId: channelForAdd.lastReceivedMsgId,
-                  lastDisplayedMessageId: channelForAdd.lastDisplayedMessageId,
-                  messageRetentionPeriod: channelForAdd.messageRetentionPeriod,
-                  lastMessage: channelForAdd.lastMessage,
-                  messages: channelForAdd.messages,
-                  newReactions: channelForAdd.newReactions,
-                  userMessageReactions: [],
-                  lastReactedMessage: null
-                },
-                groupName
-              )
-            )
-            const showNotifications = getShowNotifications()
-            if (showNotifications && !message.silent && message.user.id !== SceytChatClient.user.id && !channel.muted) {
-              if (Notification.permission === 'granted') {
-                const tabIsActive = yield select(browserTabIsActiveSelector)
-                if (document.visibilityState !== 'visible' || !tabIsActive || channel.id !== activeChannelId) {
-                  const contactsMap = yield select(contactsMapSelector)
-                  const getFromContacts = getShowOnlyContactUsers()
-                  const state = store.getState()
-                  const theme = state.ThemeReducer.theme || 'light'
-                  const accentColor = state.ThemeReducer.newTheme?.colors?.accent?.[theme] || '#3B82F6'
-                  const textSecondary = state.ThemeReducer.newTheme?.colors?.textSecondary?.[theme] || '#6B7280'
-                  const messageBody = MessageTextFormat({
-                    text: message.body,
-                    message,
-                    contactsMap,
-                    getFromContacts,
-                    isLastMessage: false,
-                    asSampleText: true,
-                    accentColor,
-                    textSecondary
-                  })
-                  setNotification(
-                    message?.type === MESSAGE_TYPE.VIEW_ONCE ? `Self-destructing` : messageBody,
-                    message.user,
-                    channel,
-                    undefined,
-                    message.attachments && message.attachments.length
-                      ? message.attachments.find((att: IAttachment) => att.type !== attachmentTypes.link)
-                      : undefined
-                  )
-                }
-              }
-            }
-            if (message.repliedInThread && message.parentMessage.id) {
-              yield put(markMessagesAsDeliveredAC(message.parentMessage.id, [message.id]))
-            } else {
-              yield put(markMessagesAsDeliveredAC(channel.id, [message.id]))
-            }
-
-            updateChannelOnAllChannels(channel.id, {
-              messageCount: channelForAdd.messageCount,
-              unread: channelForAdd.unread,
-              newMessageCount: channelForAdd.newMessageCount,
-              newMentionCount: channelForAdd.newMentionCount,
-              newReactedMessageCount: channelForAdd.newReactedMessageCount,
-              lastReceivedMsgId: channelForAdd.lastReceivedMsgId,
-              lastDisplayedMessageId: channelForAdd.lastDisplayedMessageId,
-              messageRetentionPeriod: channelForAdd.messageRetentionPeriod,
-              lastMessage: channelForAdd.lastMessage,
-              messages: channelForAdd.messages,
-              newReactions: channelForAdd.newReactions,
-              lastReactedMessage: channel.lastReactedMessage,
-              userMessageReactions: channel.userMessageReactions
-            })
-            updateChannelLastMessageOnAllChannels(channel.id, channel.lastMessage)
-          }
+          yield call(handleChannelMessageEvent, args, SceytChatClient)
           break
         }
         case CHANNEL_EVENT_TYPES.MESSAGE_MARKERS_RECEIVED: {
-          const { channelId, markerList } = args
-          const channel = yield call(getChannelFromMap, channelId)
-          log.info('channel MESSAGE_MARKERS_RECEIVED ... channel: ', channel, 'markers list: ', markerList)
-
-          if (channel) {
-            const isOwnMarker = markerList.user?.id === SceytChatClient.user.id
-            const activeChannelId = yield call(getActiveChannelId)
-            let updateLastMessage = false
-            const markersMap: any = {}
-            const activeChannelMessages = getMessagesFromMap(activeChannelId)
-            for (const messageId of markerList.messageIds) {
-              if (activeChannelMessages?.[messageId]) {
-                yield put(removePendingMessageAC(channelId, messageId))
-              } else {
-                const isPendingMessage = getMessageFromPendingMessagesMap(activeChannelId, messageId)
-                if (isPendingMessage) {
-                  updatePendingMessageOnMap(activeChannelId, messageId, {
-                    deliveryStatus: markerList.name
-                  })
-                }
-              }
-              markersMap[messageId] = true
-              if (channel) {
-                if (channel.lastMessage && messageId === channel.lastMessage.id) {
-                  updateLastMessage = true
-                }
-              }
-              updateChannelOnAllChannels(
-                channelId,
-                {},
-                {
-                  id: messageId,
-                  deliveryStatus: markerList.name
-                }
-              )
-            }
-            if (updateLastMessage) {
-              const lastMessage = {
-                ...channel.lastMessage,
-                ...updateMessageDeliveryStatusAndMarkers(channel.lastMessage, markerList.name, isOwnMarker)
-              }
-
-              updateChannelLastMessageOnAllChannels(channel.id, lastMessage)
-              yield put(updateChannelLastMessageStatusAC(lastMessage, channel))
-            }
-            if (activeChannelId === channelId) {
-              yield put(updateMessagesStatusAC(markerList.name, markersMap, isOwnMarker))
-              updateMarkersOnAllMessages(markersMap, markerList.name, isOwnMarker)
-            }
-
-            updateMessageStatusOnMap(channel.id, { name: markerList.name, markersMap })
-            updateMessageStatusOnAllMessages(markerList.name, markersMap, isOwnMarker)
-            if (!isOwnMarker) {
-              yield put(updateMessagesMarkersAC(channelId, markerList.name, markerList))
-            }
-          }
-
+          yield call(handleMessageMarkersReceivedEvent, args, SceytChatClient)
           break
         }
         case CHANNEL_EVENT_TYPES.DELETE: {
@@ -1010,78 +1235,12 @@ export default function* watchForEvents(): any {
           break
         }
         case CHANNEL_EVENT_TYPES.DELETE_MESSAGE: {
-          const { channel, /* user, */ deletedMessage } = args
-          const activeChannelId = yield call(getActiveChannelId)
           log.info('channel DELETE_MESSAGE ... ')
-          const channelExists = checkChannelExists(channel.id)
-
-          if (channel.id === activeChannelId) {
-            updateMessageOnAllMessages(deletedMessage.id, deletedMessage)
-            yield put(updateMessageAC(deletedMessage.id, deletedMessage))
-          }
-          updateMessageOnMap(channel.id, {
-            messageId: deletedMessage.id,
-            params: deletedMessage
-          })
-          if (channelExists) {
-            yield put(
-              updateChannelDataAC(channel.id, {
-                newMessageCount: channel.newMessageCount,
-                muted: channel.muted,
-                mutedTill: channel.mutedTill
-              })
-            )
-            if (channel.lastMessage.id === deletedMessage.id) {
-              yield put(updateChannelLastMessageAC(deletedMessage, channel))
-            }
-          }
-          updateChannelOnAllChannels(
-            channel.id,
-            {
-              newMessageCount: channel.newMessageCount,
-              muted: channel.muted,
-              mutedTill: channel.mutedTill
-            },
-            deletedMessage
-          )
+          yield call(handleDeleteMessageEvent, args)
           break
         }
         case CHANNEL_EVENT_TYPES.EDIT_MESSAGE: {
-          const { channel, /* user, */ message } = args
-          const activeChannelId = yield call(getActiveChannelId)
-          const channelExists = checkChannelExists(channel.id)
-          if (channel.id === activeChannelId) {
-            yield put(
-              updateMessageAC(message.id, {
-                body: message.body,
-                state: message.state,
-                attachments: message.attachments,
-                bodyAttributes: message.bodyAttributes,
-                mentionedUsers: message.mentionedUsers,
-                updatedAt: message.updatedAt
-              })
-            )
-            updateMessageOnAllMessages(message.id, {
-              body: message.body,
-              state: message.state,
-              attachments: message.attachments,
-              bodyAttributes: message.bodyAttributes,
-              mentionedUsers: message.mentionedUsers,
-              updatedAt: message.updatedAt
-            })
-          }
-          if (channelExists) {
-            if (channel.lastMessage.id === message.id) {
-              yield put(updateChannelLastMessageAC(message, channel))
-            }
-          }
-          if (checkChannelExistsOnMessagesMap(channel.id)) {
-            updateMessageOnMap(channel.id, {
-              messageId: message.id,
-              params: message
-            })
-          }
-          updateChannelOnAllChannels(channel.id, {}, message)
+          yield call(handleEditMessageEvent, args)
           break
         }
         case CHANNEL_EVENT_TYPES.REACTION_ADDED: {
@@ -1091,7 +1250,6 @@ export default function* watchForEvents(): any {
 
           if (channel.id === activeChannelId) {
             yield put(addReactionToMessageAC(message, reaction, isSelf))
-            addReactionOnAllMessages(message, reaction, true)
           }
           if (message.user.id === SceytChatClient.user.id) {
             if (!isSelf && Notification.permission === 'granted') {
@@ -1195,7 +1353,6 @@ export default function* watchForEvents(): any {
               }
             )
             if (channel.id === activeChannelId) {
-              updateMessageOnAllMessages(messageId, {}, obj)
               yield put(updateMessageAC(messageId, {}, undefined, obj))
             }
           }
@@ -1231,7 +1388,6 @@ export default function* watchForEvents(): any {
               obj
             )
             if (channel.id === activeChannelId) {
-              updateMessageOnAllMessages(messageId, {}, obj)
               yield put(updateMessageAC(messageId, {}, undefined, obj))
             }
           }
@@ -1266,7 +1422,6 @@ export default function* watchForEvents(): any {
             }
 
             if (channel.id === activeChannelId) {
-              updateMessageOnAllMessages(messageId, {}, obj)
               yield put(updateMessageAC(messageId, {}, undefined, obj))
             }
           }
@@ -1287,7 +1442,6 @@ export default function* watchForEvents(): any {
           )
 
           if (channel.id === activeChannelId) {
-            updateMessageOnAllMessages(messageId, {}, obj)
             yield put(updateMessageAC(messageId, {}, undefined, obj))
             break
           }
@@ -1302,7 +1456,6 @@ export default function* watchForEvents(): any {
 
           if (channel.id === activeChannelId) {
             yield put(deleteReactionFromMessageAC(message, reaction, isSelf))
-            removeReactionOnAllMessages(message, reaction, true)
           }
           const channelUpdateParams = JSON.parse(JSON.stringify(channel))
           if (
@@ -1329,30 +1482,7 @@ export default function* watchForEvents(): any {
         }
 
         case CHANNEL_EVENT_TYPES.UNREAD_MESSAGES_INFO: {
-          const { channel } = args
-          // const { channel, channelUnreadCount } = args
-          // log.info('channel UNREAD_MESSAGES_INFO .unreadChannels', unreadChannels)
-          // log.info('channel UNREAD_MESSAGES_INFO .totalUnread', totalUnread)
-          // log.info('channel UNREAD_MESSAGES_INFO .channelUnreadCount', channelUnreadCount, 'channel: ', channel)
-          // yield put(setChannelUnreadCount(0, channel.id));
-          if (channel) {
-            const updatedChannel = JSON.parse(JSON.stringify(channel))
-            yield put(
-              updateChannelDataAC(channel.id, {
-                lastMessage: channel.lastMessage,
-                newMessageCount: channel.newMessageCount,
-                newMentionCount: channel.newMentionCount,
-                unread: channel.unread,
-                newReactedMessageCount: channel.newReactedMessageCount,
-                newReactions: channel.newReactions,
-                lastReactedMessage: channel.lastReactedMessage,
-                lastReceivedMsgId: channel.lastReceivedMsgId,
-                lastDisplayedMessageId: channel.lastDisplayedMessageId,
-                messageRetentionPeriod: channel.messageRetentionPeriod
-              })
-            )
-            updateChannelOnAllChannels(channel.id, updatedChannel)
-          }
+          yield call(handleUnreadMessagesInfoEvent, args)
           break
         }
 
@@ -1366,6 +1496,7 @@ export default function* watchForEvents(): any {
             removeAllMessages()
           }
           removeMessagesFromMap(channel.id)
+          yield put(removeChannelMarkersAC(channel.id))
           if (channelExist) {
             yield put(
               updateChannelDataAC(channel.id, {
@@ -1461,6 +1592,11 @@ export default function* watchForEvents(): any {
           const { channel } = args
           log.info('channel HIDE ... ')
           yield put(setChannelToHideAC(channel))
+          const activeChannelId = yield call(getActiveChannelId)
+          if (activeChannelId === channel.id) {
+            const lastChannel = yield call(getLastChannelFromMap, true)
+            yield put(switchChannelActionAC(lastChannel || null))
+          }
           break
         }
         case CHANNEL_EVENT_TYPES.UNHIDE: {
@@ -1486,18 +1622,7 @@ export default function* watchForEvents(): any {
           break
         }
         case CHANNEL_EVENT_TYPES.CHANNEL_MARKED_AS_READ: {
-          const { channel } = args
-          // log.info('channel CHANNEL_MARKED_AS_READ ... ', channel)
-          yield put(
-            updateChannelDataAC(channel.id, {
-              unread: channel.unread,
-              muted: channel.muted,
-              mutedTill: channel.mutedTill
-            })
-          )
-          const groupName = getChannelGroupName(channel)
-          yield put(updateSearchedChannelDataAC(channel.id, { unread: channel.unread }, groupName))
-          updateChannelOnAllChannels(channel.id, { unread: channel.unread })
+          yield call(handleChannelMarkedAsReadEvent, args)
           break
         }
         /*
@@ -1604,7 +1729,6 @@ export default function* watchForEvents(): any {
         case CHANNEL_EVENT_TYPES.CHANNEL_EVENT: {
           const { channelId, from, name } = args
           // const { user, channelId, name } = args
-          log.info('channel event received >>>... . . . . . ', args)
           if (from.id === SceytChatClient.user.id) {
             break
           }
@@ -1622,6 +1746,10 @@ export default function* watchForEvents(): any {
           } else if (name === 'stop_typing') {
             if (usersTimeout.typingTimeout[channelId] && usersTimeout.typingTimeout[channelId][from.id]) {
               clearTimeout(usersTimeout.typingTimeout[channelId][from.id])
+              delete usersTimeout.typingTimeout[channelId][from.id]
+              if (!Object.keys(usersTimeout.typingTimeout[channelId]).length) {
+                delete usersTimeout.typingTimeout[channelId]
+              }
             }
             yield put(switchTypingIndicatorAC(false, channelId, from))
           } else if (name === 'start_recording') {
@@ -1638,6 +1766,10 @@ export default function* watchForEvents(): any {
           } else if (name === 'stop_recording') {
             if (usersTimeout.recordingTimeout[channelId] && usersTimeout.recordingTimeout[channelId][from.id]) {
               clearTimeout(usersTimeout.recordingTimeout[channelId][from.id])
+              delete usersTimeout.recordingTimeout[channelId][from.id]
+              if (!Object.keys(usersTimeout.recordingTimeout[channelId]).length) {
+                delete usersTimeout.recordingTimeout[channelId]
+              }
             }
             yield put(switchRecordingIndicatorAC(false, channelId, from))
           }
@@ -1645,11 +1777,7 @@ export default function* watchForEvents(): any {
         }
         case CONNECTION_EVENT_TYPES.CONNECTION_STATUS_CHANGED: {
           const { status } = args
-          log.info('connection status changed . . . . . ', status)
-          yield put(setConnectionStatusAC(status))
-          if (status === CONNECTION_STATUS.CONNECTED) {
-            yield put(getRolesAC())
-          }
+          yield call(handleConnectionStatusChangedEvent, status)
           break
         }
         default:

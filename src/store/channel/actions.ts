@@ -24,6 +24,7 @@ import {
   updateChannelLastMessage,
   updateChannelLastMessageStatus,
   setChannelInfoOpenClose,
+  setMessageSearchOpenClose,
   toggleEditChannel,
   switchTypingIndicator,
   switchRecordingIndicator,
@@ -59,6 +60,7 @@ import {
   MARK_MESSAGES_AS_DELIVERED,
   MARK_MESSAGES_AS_READ,
   MARK_VOICE_MESSAGE_AS_PLAYED,
+  RESEND_PENDING_CHANNEL_READS,
   PIN_CHANNEL,
   UNPIN_CHANNEL,
   REMOVE_CHANNEL_CACHES,
@@ -202,8 +204,8 @@ export const updateChannelAC = (channelId: string, config: any) => ({
   payload: { channelId, config }
 })
 
-export const updateChannelDataAC = (channelId: string, config: any, moveUp?: boolean, sort?: boolean) =>
-  updateChannelData({ config, channelId, moveUp, sort })
+export const updateChannelDataAC = (channelId: string, config: any, moveUp?: boolean, sort?: boolean, add?: boolean) =>
+  updateChannelData({ config, channelId, moveUp, sort, add })
 
 export const updateChannelsMembersAC = (members: IUser[]) => updateChannelsMembers({ members })
 
@@ -283,6 +285,11 @@ export const markChannelAsReadAC = (channelId: string) => ({
   payload: { channelId }
 })
 
+export const resendPendingChannelReadsAC = (connectionState: string) => ({
+  type: RESEND_PENDING_CHANNEL_READS,
+  payload: { connectionState }
+})
+
 export const markChannelAsUnReadAC = (channelId: string) => ({
   type: MARK_CHANNEL_AS_UNREAD,
   payload: { channelId }
@@ -299,6 +306,8 @@ export const unpinChannelAC = (channelId: string) => ({
 })
 
 export const switchChannelInfoAC = (open: boolean) => setChannelInfoOpenClose({ open })
+
+export const switchMessageSearchAC = (open: boolean) => setMessageSearchOpenClose({ open })
 
 export const leaveChannelAC = (channelId: string) => ({
   type: LEAVE_CHANNEL,

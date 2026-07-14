@@ -93,6 +93,13 @@ export interface IMarker {
   createdAt: Date
   user: IUser | null
 }
+
+export interface IMessageListMarker {
+  messageIds: string[]
+  user: IUser | null
+  name?: string
+  createdAt: Date
+}
 export interface IPollOption {
   id: string
   name: string
@@ -236,6 +243,7 @@ export interface IChannel {
   deleteAllMessages: (forEveryone?: boolean) => Promise<void>
   hide: () => Promise<boolean>
   unhide: () => Promise<boolean>
+  markAsRead: () => Promise<IChannel>
   markAsUnRead: () => Promise<IChannel>
   pin: () => Promise<IChannel>
   unpin: () => Promise<IChannel>
@@ -245,7 +253,7 @@ export interface IChannel {
   // eslint-disable-next-line no-unused-vars
   markMessagesAsReceived: (_messageIds: string[]) => Promise<void>
   // eslint-disable-next-line no-unused-vars
-  markMessagesAsDisplayed: (_messageIds: string[]) => Promise<void>
+  markMessagesAsDisplayed: (_messageIds: string[]) => Promise<IMessageListMarker | void>
   startTyping: () => void
   stopTyping: () => void
   // eslint-disable-next-line no-unused-vars
@@ -326,6 +334,8 @@ export interface IOGMetadata {
   }
   imageWidth?: number
   imageHeight?: number
+  containerHeight?: number
+  faviconLoaded?: boolean
 }
 
 export type MuteTime = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 24

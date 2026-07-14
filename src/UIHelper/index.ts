@@ -612,45 +612,6 @@ export const CustomSwitcher = styled.div`
   display: inline-block;
   position: relative;
 `
-export const SwitcherLabel = styled.label`
-  width: 48px;
-  height: 28px;
-  background: rgb(226, 226, 226);
-  display: inline-block;
-  border-radius: 50px;
-  position: relative;
-  transition: all 0.3s ease;
-  transform-origin: 20% center;
-  border: 3px solid #fff;
-  cursor: pointer;
-
-  &:before {
-    content: '';
-    position: absolute;
-    display: block;
-    transition: all 0.2s ease;
-    width: 24px;
-    height: 24px;
-    top: 2px;
-    left: 2px;
-    border-radius: 20px;
-    box-shadow:
-      0 1px 2px rgba(0, 0, 0, 0.251475),
-      0 2px 6px rgba(0, 0, 0, 0.404256);
-    background: #fff;
-  }
-`
-/* export const SwitcherInput = styled.input`
-  display: none;
-
-  &:checked + label {
-    background-color: ${colors.cobalt1};
-
-    &:before {
-      transform: translateX(20px);
-    }
-  }
-` */
 
 export const UploadAvatarButton = styled.button<{ backgroundColor: string }>`
   display: block;
@@ -767,20 +728,16 @@ export const MessageText = styled.pre<{
           : '4px 0px 10px'
         : '8px 12px 10px')};
   padding-bottom: ${(props) => props.withAttachment && !props.withMediaAttachment && '2px'};
-  //font-size: ${(props) => props.fontSize || '15px'};
   font-size: ${(props) => props.fontSize || '16px'};
   line-height: ${(props) => props.lineHeight || '20px'};
   font-weight: 400;
   word-wrap: break-word;
   white-space: pre-wrap;
-  //white-space: normal;
-  //letter-spacing: -0.2px;
   letter-spacing: 0.3px;
   color: ${(props) =>
     (props.incoming ? props?.incomingMessageStyles?.textColor : props?.outgoingMessageStyles?.textColor) ||
     props.color};
   user-select: text;
-  //overflow: hidden;
   ${(props) =>
     props.unsupportedMessage &&
     `

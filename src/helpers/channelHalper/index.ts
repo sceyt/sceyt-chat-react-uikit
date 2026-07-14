@@ -15,11 +15,19 @@ type defaultRolesByChannelTypesMap = {
   [key: string]: string
 }
 
+export type PendingChannelRead = {
+  channelId: string
+  messageIds: string[]
+  readAll: boolean
+  queuedAt: number
+}
+
 let autoSelectFitsChannel = false
 let allChannels: IChannel[] = []
 let channelsMap: channelMap = {}
 const allChannelsMap: channelMap = {}
 const pendingDeleteChannelMap: { [key: string]: IChannel } = {}
+const pendingChannelReadMap: { [key: string]: PendingChannelRead } = {}
 
 let channelTypesMemberDisplayTextMap: channelTypesMemberDisplayTextMap
 let defaultRolesByChannelTypesMap: defaultRolesByChannelTypesMap
@@ -112,6 +120,7 @@ export type MemberSummary = {
   id: string
   role: string
 }
+
 export type JoinGroupPopupRenderParams = {
   onClose: () => void
   onJoin: () => void
@@ -285,10 +294,22 @@ export function getLastChannelFromMap(deletePending: boolean = false) {
 export function removeChannelFromMap(channelId: string) {
   delete channelsMap[channelId]
   delete allChannelsMap[channelId]
+  delete pendingChannelReadMap[channelId]
 }
 
 export function checkChannelExists(channelId: string) {
   return !!channelsMap[channelId]
+}
+
+export function getPendingLastMessages(): Record<string, IMessage> {
+  const result: Record<string, IMessage> = {}
+  for (const channelId of Object.keys(channelsMap)) {
+    const lastMessage = channelsMap[channelId]?.lastMessage
+    if (lastMessage && !lastMessage.id) {
+      result[channelId] = lastMessage
+    }
+  }
+  return result
 }
 
 export function destroyChannelsMap() {
@@ -297,6 +318,9 @@ export function destroyChannelsMap() {
   defaultRolesByChannelTypesMap = {}
   channelTypesMemberDisplayTextMap = {}
   memberCount = 0
+  Object.keys(allChannelsMap).forEach((channelId) => delete allChannelsMap[channelId])
+  Object.keys(pendingDeleteChannelMap).forEach((channelId) => delete pendingDeleteChannelMap[channelId])
+  Object.keys(pendingChannelReadMap).forEach((channelId) => delete pendingChannelReadMap[channelId])
 }
 
 export const query: any = {
@@ -422,6 +446,12 @@ export function updateChannelLastMessageOnAllChannels(channelId: string, message
         return chan
       })
     }
+    if (channelsMap[channelId]?.lastMessage?.id === message.id) {
+      channelsMap[channelId] = { ...channelsMap[channelId], lastMessage: message }
+    }
+    if (allChannelsMap[channelId]?.lastMessage?.id === message.id) {
+      allChannelsMap[channelId] = { ...allChannelsMap[channelId], lastMessage: message }
+    }
   } else {
     const updatedChannels = allChannels.filter((chan) => chan.id !== channelId)
     if (updateChannel) {
@@ -439,6 +469,12 @@ export function updateChannelLastMessageOnAllChannels(channelId: string, message
       allChannelsMap[channelId] = updateChannel
       // update channel on all channels
       allChannels = [updateChannel, ...updatedChannels]
+    }
+    if (channelsMap[channelId]) {
+      channelsMap[channelId] = { ...channelsMap[channelId], lastMessage: message }
+    }
+    if (allChannelsMap[channelId]) {
+      allChannelsMap[channelId] = { ...allChannelsMap[channelId], lastMessage: message }
     }
   }
 }
@@ -541,6 +577,43 @@ export const sortChannelByLastMessage = (channels: IChannel[]) => {
 
 export const setPendingDeleteChannel = (channel: IChannel) => {
   pendingDeleteChannelMap[channel?.id] = channel
+}
+
+export const setPendingChannelRead = ({
+  channelId,
+  messageIds = [],
+  readAll = false
+}: {
+  channelId: string
+  messageIds?: string[]
+  readAll?: boolean
+}): PendingChannelRead | null => {
+  if (!channelId) {
+    return null
+  }
+
+  const current = pendingChannelReadMap[channelId]
+  const nextReadAll = readAll || current?.readAll || false
+  const nextMessageIds = nextReadAll
+    ? []
+    : Array.from(new Set([...(current?.messageIds || []), ...messageIds.filter(Boolean)]))
+  const nextPendingRead = {
+    channelId,
+    messageIds: nextMessageIds,
+    readAll: nextReadAll,
+    queuedAt: Date.now()
+  }
+
+  pendingChannelReadMap[channelId] = nextPendingRead
+  return nextPendingRead
+}
+
+export const getPendingChannelRead = (channelId: string) => pendingChannelReadMap[channelId]
+
+export const getPendingChannelReads = () => Object.values(pendingChannelReadMap)
+
+export const removePendingChannelRead = (channelId: string) => {
+  delete pendingChannelReadMap[channelId]
 }
 
 export const getPendingDeleteChannel = (channelId: string) => {

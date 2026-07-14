@@ -28,6 +28,7 @@ interface IChannelProps {
   channelSubjectColor?: string
   channelAvatarSize?: number
   channelAvatarTextSize?: number
+  channelListWidth?: number
   // eslint-disable-next-line no-unused-vars
   createChatWithContact: (contact: IContact) => void
 }
@@ -44,7 +45,8 @@ const ContactItem: React.FC<IChannelProps> = ({
   channelSubjectLineHeight,
   channelSubjectColor,
   channelAvatarSize,
-  channelAvatarTextSize
+  channelAvatarTextSize,
+  channelListWidth
 }) => {
   const {
     [THEME_COLORS.TEXT_PRIMARY]: textPrimary,
@@ -83,15 +85,19 @@ const ContactItem: React.FC<IChannelProps> = ({
             )}
         </AvatarWrapper>
       )}
-      <ChannelInfo
-        avatar={showAvatar}
-        subjectFontSize={channelSubjectFontSize}
-        subjectLineHeight={channelSubjectLineHeight}
-        subjectColor={channelSubjectColor}
-        textColor={textPrimary}
-      >
-        <h3>{contactUserName}</h3>
-      </ChannelInfo>
+      {channelListWidth === undefined || channelListWidth >= 280 ? (
+        <ChannelInfo
+          avatar={showAvatar}
+          subjectFontSize={channelSubjectFontSize}
+          subjectLineHeight={channelSubjectLineHeight}
+          subjectColor={channelSubjectColor}
+          textColor={textPrimary}
+        >
+          <h3>{contactUserName}</h3>
+        </ChannelInfo>
+      ) : (
+        <React.Fragment />
+      )}
     </Container>
   )
 }

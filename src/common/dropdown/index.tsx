@@ -1,4 +1,5 @@
-import React, { useState, useRef, useEffect } from 'react'
+import React, { useState, useRef, useEffect, useMemo } from 'react'
+import { createPortal } from 'react-dom'
 import styled from 'styled-components'
 import { useColor, useDidUpdate, useEventListener } from '../../hooks'
 import { THEME_COLORS } from '../../UIHelper/constants'
@@ -158,9 +159,32 @@ const DropDown = ({
   } = useColor()
 
   const [isOpen, setIsOpen] = useState(false)
+  const [triggerRect, setTriggerRect] = useState<DOMRect | null>(null)
   const dropDownRef = useRef<any>(null)
   const dropDownBodyRef = useRef<any>(null)
+
+  const bodyStyle = useMemo((): React.CSSProperties => {
+    if (!triggerRect) return {}
+    const base: React.CSSProperties = { position: 'fixed', left: 'auto', right: 'auto', top: 'auto', bottom: 'auto' }
+    switch (position) {
+      case 'left':
+        return { ...base, top: triggerRect.bottom, left: triggerRect.left }
+      case 'top':
+        return { ...base, bottom: window.innerHeight - triggerRect.top, right: window.innerWidth - triggerRect.right }
+      case 'topRight':
+        return { ...base, bottom: window.innerHeight - triggerRect.top, left: triggerRect.left }
+      case 'right':
+      case 'center':
+        return { ...base, top: triggerRect.bottom, left: triggerRect.right }
+      default:
+        return { ...base, top: triggerRect.bottom, right: window.innerWidth - triggerRect.right }
+    }
+  }, [triggerRect, position])
+
   const toggleDropdown = () => {
+    if (!isOpen && dropDownRef.current) {
+      setTriggerRect(dropDownRef.current.getBoundingClientRect())
+    }
     setIsOpen(!isOpen)
     if (watchToggleState) {
       watchToggleState(!isOpen)
@@ -174,8 +198,8 @@ const DropDown = ({
         const dropDownElem = dropDownRef.current
         const dropDownBodyElem = dropDownBodyRef.current
 
-        // Click outside dropdown
-        if (dropDownElem && !dropDownElem.contains(e.target)) {
+        // Click outside dropdown (also check the portaled body)
+        if (dropDownElem && !dropDownElem.contains(e.target) && !dropDownBodyElem?.contains(e.target)) {
           log.info('call toggle dropdown. .. ')
           toggleDropdown()
         }
@@ -238,19 +262,22 @@ const DropDown = ({
         {React.isValidElement(trigger) ? trigger : <span>{trigger}</span>}
         {/* {React.cloneElement(trigger, { onClick: toggleDropdown })} */}
       </DropDownTriggerContainer>
-      {isOpen && (
-        <DropDownBody
-          backgroundColor={backgroundSections}
-          onScroll={handleScrolling}
-          className='dropdown-body'
-          ref={dropDownBodyRef}
-          position={position}
-          zIndex={zIndex}
-          borderColor={borderColor}
-        >
-          {children}
-        </DropDownBody>
-      )}
+      {isOpen &&
+        createPortal(
+          <DropDownBody
+            backgroundColor={backgroundSections}
+            onScroll={handleScrolling}
+            className='dropdown-body'
+            ref={dropDownBodyRef}
+            position={position}
+            zIndex={zIndex}
+            borderColor={borderColor}
+            style={bodyStyle}
+          >
+            {children}
+          </DropDownBody>,
+          document.body
+        )}
     </DropDownContainer>
   )
 }

@@ -8,7 +8,8 @@ import {
   addedChannelSelector,
   addedToChannelSelector,
   channelInfoIsOpenSelector,
-  channelListWidthSelector
+  channelListWidthSelector,
+  messageSearchIsOpenSelector
 } from '../../store/channel/selector'
 import {
   getChannelsAC,
@@ -58,12 +59,14 @@ export default function Chat({
   const dispatch = useDispatch()
   const channelListWidth = useSelector(channelListWidthSelector, shallowEqual)
   const channelDetailsIsOpen = useSelector(channelInfoIsOpenSelector, shallowEqual)
+  const messageSearchIsOpen = useSelector(messageSearchIsOpenSelector, shallowEqual)
   const addedChannel = useSelector(addedToChannelSelector)
   const channelCreated = useSelector(addedChannelSelector)
   const activeChannel = useSelector(activeChannelSelector)
   const autoSelectChannel = getAutoSelectFitsChannel()
   const [channelDetailsWidth, setChannelDetailsWidth] = useState<number>(0)
   const connectionStatus = useSelector(connectionStatusSelector, shallowEqual)
+  const [windowWidth, setWindowWidth] = useState(window?.innerWidth)
 
   useEffect(() => {
     if (hideChannelList && !channelListWidth && connectionStatus === CONNECTION_STATUS.CONNECTED) {
@@ -103,18 +106,31 @@ export default function Chat({
   }, [selectedChannelId])
 
   useDidUpdate(() => {
-    if (channelDetailsIsOpen) {
+    if (channelDetailsIsOpen || messageSearchIsOpen) {
       detailsSwitcherTimeout = setTimeout(() => {
-        const detailsContainer = document.getElementById('channel_details_wrapper')
-        if (detailsContainer) {
-          setChannelDetailsWidth(detailsContainer.offsetWidth)
+        const panelId = messageSearchIsOpen ? 'messages_search_wrapper' : 'channel_details_wrapper'
+        const panelContainer = document.getElementById(panelId)
+        if (windowWidth < 1200) {
+          setChannelDetailsWidth(0)
+        } else if (panelContainer) {
+          setChannelDetailsWidth(panelContainer.offsetWidth)
         }
       }, 1)
     } else {
       clearTimeout(detailsSwitcherTimeout)
       setChannelDetailsWidth(0)
     }
-  }, [channelDetailsIsOpen])
+  }, [channelDetailsIsOpen, messageSearchIsOpen, windowWidth])
+
+  useEffect(() => {
+    const handleWindowResize = () => {
+      setWindowWidth(window.innerWidth)
+    }
+    window.addEventListener('resize', handleWindowResize)
+    return () => {
+      window.removeEventListener('resize', handleWindowResize)
+    }
+  }, [])
 
   return (
     <Container className={className} widthOffset={channelListWidth} channelDetailsWidth={channelDetailsWidth}>
@@ -144,9 +160,9 @@ const Container = styled.div<{ widthOffset: number; channelDetailsWidth?: number
       ? `calc(100% - ${props.widthOffset + (props.channelDetailsWidth ? props.channelDetailsWidth + 1 : 0)}px)`
       : ''};
   display: flex;
-  transition: all 0.1s;
   flex-direction: column;
   overflow: hidden;
+  justify-content: space-between;
 `
 
 const SelectChatContainer = styled.div<{ backgroundColor: string }>`

@@ -84,6 +84,7 @@ interface MessagesProps {
     isThreadMessage?: boolean
     handleRetractVote?: () => void
     handleEndVote?: () => void
+    ifLatestAndHasNotPreview: boolean
   }>
   showOwnAvatar?: boolean
   messageReaction?: boolean
@@ -211,7 +212,9 @@ interface MessagesProps {
     listItemStyles?: IListItemStyles
   }
   ogMetadataProps?: OGMetadataProps
-  collapsedCharacterLimit?: number
+  collapsedLinesLimit?: number
+  createChatOnAvatarTap?: boolean
+  allowSendAttachment?: boolean
 }
 
 const MessagesContainer: React.FC<MessagesProps> = ({
@@ -364,7 +367,9 @@ const MessagesContainer: React.FC<MessagesProps> = ({
     infoPadding: '0 8px',
     isInviteLink: false
   },
-  collapsedCharacterLimit
+  collapsedLinesLimit,
+  createChatOnAvatarTap = true,
+  allowSendAttachment = true
 }) => {
   return (
     <React.Fragment>
@@ -502,7 +507,9 @@ const MessagesContainer: React.FC<MessagesProps> = ({
         shouldOpenUserProfileForMention={shouldOpenUserProfileForMention}
         showInfoMessageProps={showInfoMessageProps}
         ogMetadataProps={ogMetadataProps}
-        collapsedCharacterLimit={collapsedCharacterLimit}
+        collapsedLinesLimit={collapsedLinesLimit}
+        createChatOnAvatarTap={createChatOnAvatarTap}
+        allowSendAttachment={allowSendAttachment}
       />
     </React.Fragment>
   )

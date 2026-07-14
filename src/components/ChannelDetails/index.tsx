@@ -592,6 +592,13 @@ const ChatDetails = styled.div<{
   //height: ${(props) => (props.height ? `calc(100vh - ${props.heightOffset}px)` : '100vh')};
   height: ${(props) => props.height && `${props.height - (props.heightOffset ? props.heightOffset + 2 : 0)}px`};
   overflow-y: auto;
+  scrollbar-width: none;
+  scrollbar-color: transparent transparent;
+  overscroll-behavior: none;
+
+  @supports (overflow: overlay) {
+    overflow-y: overlay;
+  }
 
   &::-webkit-scrollbar {
     width: 8px;
@@ -607,6 +614,11 @@ const ChatDetails = styled.div<{
   }
   &.show-scrollbar::-webkit-scrollbar-track {
     background: transparent;
+  }
+
+  &.show-scrollbar {
+    scrollbar-width: thin;
+    scrollbar-color: ${(props) => props.thumbColor} transparent;
   }
 `
 const AboutChannel = styled.div`

@@ -7,6 +7,7 @@ import MessageList from './Messages'
 import SendMessage from './SendMessageInput'
 import ChannelDetails from './ChannelDetailsContainer'
 import MessagesScrollToBottomButton from './MessagesScrollToBottomButton'
+import MessagesSearch from './MessagesSearch'
 import MessagesScrollToUnreadMentionsButton from './MessagesScrollToUnreadMentionsButton'
 import CreateChannel from './../common/popups/createChannel'
 import ChannelSearch from './ChannelList/ChannelSearch'
@@ -18,6 +19,7 @@ import DropDown from '../common/dropdown'
 import { THEME_COLORS } from '../UIHelper/constants'
 import { OGMetadata } from './Message/OGMetadata'
 import PollMessage from './Message/PollMessage'
+import ForwardMessagePopup from 'common/popups/forwardMessage'
 import {
   createOrGetDirectChannel,
   switchChannelActiveChannel,
@@ -39,6 +41,7 @@ export {
   ChannelDetails,
   MessagesScrollToBottomButton,
   MessagesScrollToUnreadMentionsButton,
+  MessagesSearch,
   CreateChannel,
   ChannelSearch,
   Avatar,
@@ -57,7 +60,8 @@ export {
   createOrGetDirectChannel,
   switchChannelActiveChannel,
   blockUsers,
-  unBlockUsers
+  unBlockUsers,
+  ForwardMessagePopup
 }
 
 declare global {

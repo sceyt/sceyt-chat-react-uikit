@@ -6,8 +6,9 @@ export default function useOnScreen(ref: any, rootElement?: HTMLElement | null) 
   useEffect(() => {
     if (!ref?.current) return
 
+    const root = rootElement || document.getElementById('scrollableDiv')
     const observer = new IntersectionObserver(([entry]) => setIntersecting(entry.isIntersecting), {
-      root: rootElement || null, // Use the provided root element or default to viewport
+      root: root || null, // Use the chat scroll container when available, otherwise the viewport
       rootMargin: '0px',
       threshold: 0.1 // Trigger when 10% of the element is visible
     })

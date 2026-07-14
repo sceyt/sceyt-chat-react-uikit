@@ -26,7 +26,9 @@ import {
   setMutualChannelsHasNextAC,
   setMutualChannelsAC,
   setMutualChannelsLoadingStateAC,
-  updateMessageAsOpenedAC
+  updateMessageAsOpenedAC,
+  markMessagesAsDeliveredAC,
+  setChannelToHideAC
 } from './actions'
 import {
   BLOCK_CHANNEL,
@@ -45,6 +47,7 @@ import {
   MARK_CHANNEL_AS_UNREAD,
   MARK_MESSAGES_AS_DELIVERED,
   MARK_MESSAGES_AS_READ,
+  RESEND_PENDING_CHANNEL_READS,
   PIN_CHANNEL,
   UNPIN_CHANNEL,
   REMOVE_CHANNEL_CACHES,
@@ -83,6 +86,7 @@ import {
   setChannelInMap,
   addChannelsToAllChannels,
   getAllChannels,
+  getPendingLastMessages,
   getChannelFromAllChannels,
   updateChannelOnAllChannels,
   deleteChannelFromAllChannels,
@@ -94,14 +98,22 @@ import {
   setPendingDeleteChannel,
   getPendingDeleteChannels,
   removePendingDeleteChannel,
-  updateChannelMemberInAllChannels
+  updateChannelMemberInAllChannels,
+  getPendingChannelRead,
+  getPendingChannelReads,
+  removePendingChannelRead,
+  setPendingChannelRead
 } from '../../helpers/channelHalper'
-import { DEFAULT_CHANNEL_TYPE, LOADING_STATE, MESSAGE_DELIVERY_STATUS } from '../../helpers/constants'
-import { IAction, IChannel, IContact, IMember, IMessage } from '../../types'
+import type { PendingChannelRead } from '../../helpers/channelHalper'
+import { DEFAULT_CHANNEL_TYPE, LOADING_STATE, MESSAGE_DELIVERY_STATUS, USER_STATE } from '../../helpers/constants'
+import { MESSAGE_TYPE } from '../../types/enum'
+import { IAction, IChannel, IContact, IMember, IMessage, IMessageListMarker } from '../../types'
 import { getClient } from '../../common/client'
 import {
   clearMessagesAC,
   clearSelectedMessagesAC,
+  clearTabAttachmentsCacheAC,
+  removeChannelMarkersAC,
   sendTextMessageAC,
   setMessagesHasPrevAC,
   setUnreadScrollToAC,
@@ -111,20 +123,172 @@ import {
 import watchForEvents from '../evetns/inedx'
 import { CHECK_USER_STATUS, CONNECTION_STATUS } from '../user/constants'
 import {
+  compareMessageIds,
+  evictLruChannels,
+  getMessagesFromMap,
   removeAllMessages,
   removeMessagesFromMap,
-  updateMessageOnAllMessages,
+  trackChannelVisit,
   updateMessageOnMap
 } from '../../helpers/messagesHalper'
 import { setActionIsRestrictedAC, updateMembersPresenceAC } from '../member/actions'
 import { updateUserStatusOnMapAC } from '../user/actions'
 import { isJSON, makeUsername } from '../../helpers/message'
 import { getShowOnlyContactUsers } from '../../helpers/contacts'
-import { updateUserOnMap, usersMap } from '../../helpers/userHelper'
+import { updateUserOnMap, usersMap, hideUserPresence } from '../../helpers/userHelper'
 import log from 'loglevel'
 import { queryDirection } from 'store/message/constants'
 import store from 'store'
 import { isResendableError } from 'helpers/error'
+
+const getUniqueMessageIds = (messageIds: string[] = []) => Array.from(new Set(messageIds.filter(Boolean)))
+
+const getNewestMessageId = (messageIds: string[]) =>
+  getUniqueMessageIds(messageIds).reduce(
+    (latestMessageId, messageId) => (compareMessageIds(messageId, latestMessageId) > 0 ? messageId : latestMessageId),
+    ''
+  )
+
+const getLatestIncomingConfirmedMessageId = (channel?: IChannel | null) => {
+  if (!channel?.id) {
+    return ''
+  }
+
+  let latestIncomingConfirmedMessageId =
+    channel.lastMessage?.incoming && channel.lastMessage?.id ? channel.lastMessage.id : ''
+  const cachedMessages = Object.values(getMessagesFromMap(channel.id) || {})
+
+  cachedMessages.forEach((message) => {
+    if (message?.incoming && message.id && compareMessageIds(message.id, latestIncomingConfirmedMessageId) > 0) {
+      latestIncomingConfirmedMessageId = message.id
+    }
+  })
+
+  return latestIncomingConfirmedMessageId
+}
+
+const getLatestUnreadBoundaryId = (channel?: IChannel | null) =>
+  channel?.lastReceivedMsgId || getLatestIncomingConfirmedMessageId(channel)
+
+const READ_MARKER_RETRY_DELAYS_MS = [500, 1500]
+
+let waitForReadMarkerRetry = (retryDelayMs: number) => new Promise((resolve) => setTimeout(resolve, retryDelayMs))
+
+type ChannelReadProgressUpdate = {
+  lastDisplayedMessageId: string
+  unread?: boolean
+  newMessageCount?: number
+  newMentionCount?: number
+}
+
+const getStoredChannel = (channelId: string): IChannel | undefined => {
+  let channel: IChannel | undefined = getChannelFromMap(channelId)
+  if (!channel) {
+    channel = getChannelFromAllChannels(channelId)
+    if (channel) {
+      setChannelInMap(channel)
+    }
+  }
+
+  return channel
+}
+
+const deriveChannelReadProgressUpdate = ({
+  channel,
+  messageIds = [],
+  readAll = false,
+  fallbackBoundaryId
+}: {
+  channel: IChannel
+  messageIds?: string[]
+  readAll?: boolean
+  fallbackBoundaryId?: string
+}): ChannelReadProgressUpdate => {
+  const previousLastDisplayedMessageId = channel.lastDisplayedMessageId || ''
+  const latestUnreadBoundaryId = fallbackBoundaryId || getLatestUnreadBoundaryId(channel)
+
+  if (readAll) {
+    const nextLastDisplayedMessageId =
+      getNewestMessageId([previousLastDisplayedMessageId, latestUnreadBoundaryId].filter(Boolean)) ||
+      latestUnreadBoundaryId ||
+      previousLastDisplayedMessageId
+
+    return {
+      unread: false,
+      newMessageCount: 0,
+      newMentionCount: 0,
+      lastDisplayedMessageId: nextLastDisplayedMessageId
+    }
+  }
+
+  const readMessageIds = getUniqueMessageIds(messageIds)
+  const nextLastDisplayedMessageId =
+    getNewestMessageId([previousLastDisplayedMessageId, ...readMessageIds]) || previousLastDisplayedMessageId
+  const newlyCoveredUnreadCount = readMessageIds.filter((messageId) => {
+    if (compareMessageIds(messageId, previousLastDisplayedMessageId) <= 0) {
+      return false
+    }
+
+    return !latestUnreadBoundaryId || compareMessageIds(messageId, latestUnreadBoundaryId) <= 0
+  }).length
+  const nextNewMessageCount = Math.max(0, (channel.newMessageCount || 0) - newlyCoveredUnreadCount)
+  const reachedLatestUnreadBoundary =
+    !!latestUnreadBoundaryId && compareMessageIds(nextLastDisplayedMessageId, latestUnreadBoundaryId) >= 0
+
+  if (reachedLatestUnreadBoundary || (readMessageIds.length > 0 && nextNewMessageCount === 0)) {
+    return {
+      lastDisplayedMessageId: nextLastDisplayedMessageId,
+      unread: false,
+      newMessageCount: 0,
+      newMentionCount: 0
+    }
+  }
+
+  return {
+    lastDisplayedMessageId: nextLastDisplayedMessageId,
+    ...(newlyCoveredUnreadCount > 0 ? { newMessageCount: nextNewMessageCount } : {})
+  }
+}
+
+function* applyChannelReadProgress(channelId: string, updateData: ChannelReadProgressUpdate) {
+  updateChannelOnAllChannels(channelId, updateData)
+  yield put(updateChannelDataAC(channelId, updateData))
+}
+
+const shouldKeepQueuedPendingRead = (error: any) => isResendableError(error?.type)
+
+function* confirmDisplayedRead(channel: IChannel, pendingRead: PendingChannelRead): any {
+  const messageIds = getUniqueMessageIds(pendingRead.messageIds)
+
+  for (let attempt = 0; attempt <= READ_MARKER_RETRY_DELAYS_MS.length; attempt++) {
+    const connectionStatus = store.getState().UserReducer.connectionStatus
+    if (connectionStatus !== CONNECTION_STATUS.CONNECTED) {
+      return { status: 'queued' as const }
+    }
+
+    try {
+      if (pendingRead.readAll) {
+        yield call(channel.markAsRead)
+        return { status: 'success' as const }
+      }
+
+      const messageListMarker = (yield call(channel.markMessagesAsDisplayed, messageIds)) as IMessageListMarker | void
+      return { status: 'success' as const, messageListMarker }
+    } catch (error) {
+      if (!shouldKeepQueuedPendingRead(error)) {
+        return { status: 'drop' as const, error }
+      }
+
+      if (attempt === READ_MARKER_RETRY_DELAYS_MS.length) {
+        return { status: 'queued' as const, error }
+      }
+
+      yield call(waitForReadMarkerRetry, READ_MARKER_RETRY_DELAYS_MS[attempt])
+    }
+  }
+
+  return { status: 'queued' as const }
+}
 
 function* createChannel(action: IAction): any {
   try {
@@ -153,7 +317,7 @@ function* createChannel(action: IAction): any {
       const allChannels = getAllChannels()
       const memberId = channelData.members[0].id
       allChannels.forEach((channel: IChannel) => {
-        if (channel.type === DEFAULT_CHANNEL_TYPE.DIRECT) {
+        if (channel.type === DEFAULT_CHANNEL_TYPE.DIRECT && !channel.hidden) {
           if (isSelfChannel) {
             if (channel.members?.length === 1 && channel.members[0].id === memberId) {
               channelIsExistOnAllChannels = true
@@ -174,11 +338,11 @@ function* createChannel(action: IAction): any {
           isMockChannel: true,
           avatarUrl: '',
           createdAt: new Date(Date.now()),
-          hidden: false,
+          hidden: true,
           id: uuidv4(),
           lastMessage: null,
           memberCount: 2,
-          metadata: '',
+          metadata: createChannelData?.metadata || '',
           newMentionCount: 0,
           newMessageCount: 0,
           newReactedMessageCount: 0,
@@ -321,10 +485,33 @@ function* getChannels(action: IAction): any {
     log.info(
       `${new Date().toISOString()} [getChannels] activeChannel from map: ${activeChannel ? activeChannel?.id : 'null'}`
     )
+    const pendingLastMessages = getPendingLastMessages()
     yield call(destroyChannelsMap)
     log.info(`${new Date().toISOString()} [getChannels] channels map destroyed`)
 
     let { channels: mappedChannels, channelsForUpdateLastReactionMessage } = yield call(setChannelsInMap, channelList)
+    for (const channelId of Object.keys(pendingLastMessages)) {
+      const pendingLastMessage = pendingLastMessages[channelId]
+
+      // sendPendingMessages may have confirmed this message concurrently while
+      // getChannels was running (e.g. the reconnect handler spawned it before
+      // setChannelsAC was dispatched).  Re-read Redux state so we don't
+      // overwrite a confirmed lastMessage with the stale pending version.
+      const currentReduxLastMessage = (store.getState().ChannelReducer.channels as IChannel[]).find(
+        (ch) => ch.id === channelId
+      )?.lastMessage
+      const resolvedLastMessage =
+        currentReduxLastMessage?.id && !pendingLastMessage.id ? currentReduxLastMessage : pendingLastMessage
+
+      const mappedChannel = mappedChannels.find((ch: IChannel) => ch.id === channelId)
+      if (mappedChannel) {
+        mappedChannel.lastMessage = resolvedLastMessage
+      }
+      const mapEntry = getChannelFromMap(channelId)
+      if (mapEntry) {
+        setChannelInMap({ ...mapEntry, lastMessage: resolvedLastMessage })
+      }
+    }
     log.info(
       `${new Date().toISOString()} [getChannels] setChannelsInMap result: ${JSON.stringify({
         mappedChannelsCount: mappedChannels?.length || 0,
@@ -384,6 +571,17 @@ function* getChannels(action: IAction): any {
       `${new Date().toISOString()} [getChannels] setting channels in state, count: ${mappedChannels?.length || 0}`
     )
     yield put(setChannelsAC(mappedChannels))
+    for (const ch of mappedChannels) {
+      const lastMsg = ch.lastMessage
+      if (
+        ch.newMessageCount > 0 &&
+        lastMsg?.id &&
+        lastMsg.type !== MESSAGE_TYPE.SYSTEM &&
+        !lastMsg.userMarkers?.find((marker: any) => marker.name === MESSAGE_DELIVERY_STATUS.DELIVERED)
+      ) {
+        yield put(markMessagesAsDeliveredAC(ch.id, [lastMsg.id]))
+      }
+    }
     if (!channelId) {
       ;[activeChannel] = channelList
       log.info(
@@ -652,7 +850,15 @@ function* getChannelsForForward(): any {
       return channel.type === DEFAULT_CHANNEL_TYPE.BROADCAST || channel.type === DEFAULT_CHANNEL_TYPE.PUBLIC
         ? channel.userRole === 'admin' || channel.userRole === 'owner'
         : channel.type === DEFAULT_CHANNEL_TYPE.DIRECT
-          ? isSelfChannel || channel.members.find((member) => member.id && member.id !== SceytChatClient.user.id)
+          ? isSelfChannel ||
+            channel.members.find(
+              (member) =>
+                member.id &&
+                member.id !== SceytChatClient.user.id &&
+                !member.blocked &&
+                member.state !== USER_STATE.DELETED &&
+                !(hideUserPresence && hideUserPresence(member))
+            )
           : true
     })
     const { channels: mappedChannels } = yield call(setChannelsInMap, channelsToAdd)
@@ -714,10 +920,17 @@ function* searchChannelsForForward(action: IAction): any {
               directChannelUser,
               getFromContacts
             ).toLowerCase()
+            const isBlockedOrDeleted =
+              !isSelfChannel &&
+              directChannelUser &&
+              (directChannelUser.blocked ||
+                directChannelUser.state === USER_STATE.DELETED ||
+                !!(hideUserPresence && hideUserPresence(directChannelUser)))
             if (
-              userName.includes(lowerCaseSearchBy) ||
-              (isSelfChannel && 'me'.includes(lowerCaseSearchBy)) ||
-              (isSelfChannel && 'you'.includes(lowerCaseSearchBy))
+              !isBlockedOrDeleted &&
+              (userName.includes(lowerCaseSearchBy) ||
+                (isSelfChannel && 'me'.includes(lowerCaseSearchBy)) ||
+                (isSelfChannel && 'you'.includes(lowerCaseSearchBy)))
             ) {
               // directChannels.push(JSON.parse(JSON.stringify(channel)))
               chatsGroups.push(channel)
@@ -725,7 +938,9 @@ function* searchChannelsForForward(action: IAction): any {
           } else {
             if (channel.subject && channel.subject.toLowerCase().includes(lowerCaseSearchBy)) {
               if (channel.type === DEFAULT_CHANNEL_TYPE.PUBLIC || channel.type === DEFAULT_CHANNEL_TYPE.BROADCAST) {
-                publicChannels.push(channel)
+                if (channel.userRole === 'admin' || channel.userRole === 'owner') {
+                  publicChannels.push(channel)
+                }
               } else {
                 chatsGroups.push(channel)
               }
@@ -772,7 +987,8 @@ function* searchChannelsForForward(action: IAction): any {
       handleChannels(Object.values(channelsMap))
       const channelsToAdd = channelsData.channels.filter(
         (channel: IChannel) =>
-          channel.type === DEFAULT_CHANNEL_TYPE.PUBLIC || channel.type === DEFAULT_CHANNEL_TYPE.BROADCAST
+          (channel.type === DEFAULT_CHANNEL_TYPE.PUBLIC || channel.type === DEFAULT_CHANNEL_TYPE.BROADCAST) &&
+          (channel.userRole === 'admin' || channel.userRole === 'owner')
       )
       yield put(
         setSearchedChannelsForForwardAC({
@@ -951,13 +1167,23 @@ function* channelsForForwardLoadMore(action: IAction): any {
     yield put(setChannelsLoadingStateAC(LOADING_STATE.LOADING, true))
     const channelsData = yield call(channelQueryForward.loadNextPage)
     yield put(channelHasNextAC(channelsData.hasNext, true))
-    const channelsToAdd = channelsData.channels.filter((channel: IChannel) =>
-      channel.type === DEFAULT_CHANNEL_TYPE.BROADCAST || channel.type === DEFAULT_CHANNEL_TYPE.PUBLIC
+    const channelsToAdd = channelsData.channels.filter((channel: IChannel) => {
+      const isSelfChannel =
+        channel.memberCount === 1 && channel.members.length > 0 && channel.members[0].id === SceytChatClient.user.id
+      return channel.type === DEFAULT_CHANNEL_TYPE.BROADCAST || channel.type === DEFAULT_CHANNEL_TYPE.PUBLIC
         ? channel.userRole === 'admin' || channel.userRole === 'owner'
         : channel.type === DEFAULT_CHANNEL_TYPE.DIRECT
-          ? channel.members.find((member) => member.id && member.id !== SceytChatClient.user.id)
+          ? isSelfChannel ||
+            channel.members.find(
+              (member) =>
+                member.id &&
+                member.id !== SceytChatClient.user.id &&
+                !member.blocked &&
+                member.state !== USER_STATE.DELETED &&
+                !(hideUserPresence && hideUserPresence(member))
+            )
           : true
-    )
+    })
     const { channels: mappedChannels } = yield call(setChannelsInMap, channelsToAdd)
     yield put(addChannelsForForwardAC(mappedChannels))
     yield put(setChannelsLoadingStateAC(LOADING_STATE.LOADED, true))
@@ -972,38 +1198,44 @@ function* channelsForForwardLoadMore(action: IAction): any {
 function* markMessagesRead(action: IAction): any {
   const { payload } = action
   const { channelId, messageIds } = payload
-  const connectionStatus = store.getState().UserReducer.connectionStatus
-  if (connectionStatus !== CONNECTION_STATUS.CONNECTED) {
+  const requestedMessageIds = getUniqueMessageIds(messageIds)
+  if (!requestedMessageIds.length) {
     return
   }
-  let channel = yield call(getChannelFromMap, channelId)
   try {
-    if (!channel) {
-      channel = getChannelFromAllChannels(channelId)
-      if (channel) {
-        setChannelInMap(channel)
-      }
-    }
-    // const activeChannelId = yield call(getActiveChannelId)
+    const channel = yield call(getStoredChannel, channelId)
     if (channel) {
-      const messageListMarker = yield call(channel.markMessagesAsDisplayed, messageIds)
-      // use updateChannelDataAC already changes unreadMessageCount no need in setChannelUnreadCount
-      // yield put(setChannelUnreadCount(0, channel.id));
-      yield put(
-        updateChannelDataAC(channel.id, {
-          lastReadMessageId: channel.lastDisplayedMessageId
-        })
-      )
-      updateChannelOnAllChannels(channel.id, {
-        lastReadMessageId: channel.lastDisplayedMessageId
+      const optimisticUpdate = deriveChannelReadProgressUpdate({
+        channel,
+        messageIds: requestedMessageIds
       })
-      for (const messageId of messageListMarker.messageIds) {
+      yield call(applyChannelReadProgress, channel.id, optimisticUpdate)
+
+      const pendingRead = setPendingChannelRead({ channelId: channel.id, messageIds: requestedMessageIds })
+      const confirmation = yield call(confirmDisplayedRead, channel, pendingRead!)
+
+      if (confirmation.status === 'success') {
+        const queuedPendingRead = getPendingChannelRead(channel.id)
+        if (queuedPendingRead?.queuedAt === pendingRead?.queuedAt) {
+          removePendingChannelRead(channel.id)
+        }
+      } else if (confirmation.status === 'drop') {
+        removePendingChannelRead(channel.id)
+        return
+      } else {
+        return
+      }
+
+      const readMessageIds = getUniqueMessageIds(
+        ((confirmation.messageListMarker as any)?.messageIds as string[]) || requestedMessageIds
+      )
+      for (const messageId of readMessageIds) {
         const updateParams = {
           deliveryStatus: MESSAGE_DELIVERY_STATUS.READ,
           userMarkers: [
             {
-              user: messageListMarker.user,
-              createdAt: messageListMarker.createdAt,
+              user: (confirmation.messageListMarker as any)?.user || null,
+              createdAt: (confirmation.messageListMarker as any)?.createdAt || new Date(),
               messageId,
               name: MESSAGE_DELIVERY_STATUS.READ
             }
@@ -1011,11 +1243,10 @@ function* markMessagesRead(action: IAction): any {
         }
         yield put(updateMessageAC(messageId, updateParams))
         updateMessageOnMap(channel.id, { messageId, params: updateParams })
-        updateMessageOnAllMessages(messageId, updateParams)
       }
     }
   } catch (e) {
-    log.error(e, 'Error on mark messages read')
+    log.error(e, '[READ_MESSAGE] Error on mark messages read')
   }
 }
 
@@ -1051,7 +1282,6 @@ function* markVoiceMessageAsPlayed(action: IAction): any {
         }
         yield put(updateMessageAC(messageId, updateParams))
         updateMessageOnMap(channel.id, { messageId, params: updateParams })
-        updateMessageOnAllMessages(messageId, updateParams)
       }
     }
   } catch (e) {
@@ -1088,7 +1318,6 @@ function* updateMessageAsOpened(action: IAction): any {
       }
       yield put(updateMessageAC(messageId, updateParams))
       updateMessageOnMap(channel.id, { messageId, params: updateParams })
-      updateMessageOnAllMessages(messageId, updateParams)
     }
   }
 }
@@ -1152,7 +1381,6 @@ function* markMessagesDelivered(action: IAction): any {
         }
         yield put(updateMessageAC(messageId, updateParams))
         updateMessageOnMap(channel.id, { messageId, params: updateParams })
-        updateMessageOnAllMessages(messageId, updateParams)
       }
     }
   } catch (e) {
@@ -1193,8 +1421,13 @@ function* switchChannel(action: IAction): any {
       const currentActiveChannel = getChannelFromMap(getActiveChannelId())
       yield put(setUnreadScrollToAC(true))
       removeAllMessages()
+      yield put(clearTabAttachmentsCacheAC())
       yield put(setMessagesHasPrevAC(true))
       yield call(setActiveChannelId, channel && channel.id)
+      if (channel && channel.id) {
+        trackChannelVisit(channel.id)
+        evictLruChannels(channel.id)
+      }
       if (channel.isLinkedChannel) {
         channelToSwitch.linkedFrom = currentActiveChannel
       }
@@ -1256,22 +1489,102 @@ function* notificationsTurnOn(): any {
 function* markChannelAsRead(action: IAction): any {
   try {
     const { channelId } = action.payload
-    let channel = yield call(getChannelFromMap, channelId)
+    const channel = yield call(getStoredChannel, channelId)
     if (!channel) {
-      channel = getChannelFromAllChannels(channelId)
+      return
     }
-    // const updatedChannel = yield call(channel.markAsRead)
-    yield call(channel.markAsRead)
-    const updateData = {
-      unread: false,
-      newMessageCount: 0,
-      newMentionCount: 0
+
+    const optimisticUpdate = deriveChannelReadProgressUpdate({
+      channel,
+      readAll: true
+    })
+    yield call(applyChannelReadProgress, channel.id, optimisticUpdate)
+
+    const pendingRead = setPendingChannelRead({ channelId: channel.id, readAll: true })
+    const confirmation = yield call(confirmDisplayedRead, channel, pendingRead!)
+
+    if (confirmation.status === 'success') {
+      const queuedPendingRead = getPendingChannelRead(channel.id)
+      if (queuedPendingRead?.queuedAt === pendingRead?.queuedAt) {
+        removePendingChannelRead(channel.id)
+      }
+      return
     }
-    updateChannelOnAllChannels(channel.id, updateData)
-    yield put(updateChannelDataAC(channel.id, updateData))
+
+    if (confirmation.status === 'drop') {
+      removePendingChannelRead(channel.id)
+    }
+
+    log.error(confirmation.error, 'Error in set channel unread')
   } catch (error) {
     log.error(error, 'Error in set channel unread')
     // yield put(setErrorNotification(error.message));
+  }
+}
+
+function* resendPendingChannelReads(action: IAction): any {
+  try {
+    const { connectionState } = action.payload
+    if (connectionState !== CONNECTION_STATUS.CONNECTED) {
+      return
+    }
+
+    const pendingReads = getPendingChannelReads().sort((left, right) => left.queuedAt - right.queuedAt)
+
+    for (const pendingRead of pendingReads) {
+      if (store.getState().UserReducer.connectionStatus !== CONNECTION_STATUS.CONNECTED) {
+        return
+      }
+
+      const currentPendingRead = getPendingChannelRead(pendingRead.channelId)
+      if (!currentPendingRead || currentPendingRead.queuedAt !== pendingRead.queuedAt) {
+        continue
+      }
+
+      if (!pendingRead.readAll && !pendingRead.messageIds.length) {
+        removePendingChannelRead(pendingRead.channelId)
+        continue
+      }
+
+      const channel = yield call(getStoredChannel, pendingRead.channelId)
+      if (!channel) {
+        removePendingChannelRead(pendingRead.channelId)
+        continue
+      }
+
+      const confirmation = yield call(confirmDisplayedRead, channel, pendingRead)
+      const latestPendingRead = getPendingChannelRead(pendingRead.channelId)
+      if (!latestPendingRead || latestPendingRead.queuedAt !== pendingRead.queuedAt) {
+        continue
+      }
+
+      if (confirmation.status === 'success' || confirmation.status === 'drop') {
+        removePendingChannelRead(pendingRead.channelId)
+      }
+
+      if (confirmation.status === 'success' && !pendingRead.readAll) {
+        const readMessageIds = getUniqueMessageIds(
+          ((confirmation.messageListMarker as any)?.messageIds as string[]) || pendingRead.messageIds
+        )
+        for (const messageId of readMessageIds) {
+          const updateParams = {
+            deliveryStatus: MESSAGE_DELIVERY_STATUS.READ,
+            userMarkers: [
+              {
+                user: (confirmation.messageListMarker as any)?.user || null,
+                createdAt: (confirmation.messageListMarker as any)?.createdAt || new Date(),
+                messageId,
+                name: MESSAGE_DELIVERY_STATUS.READ
+              }
+            ]
+          }
+          yield put(updateMessageAC(messageId, updateParams))
+          updateMessageOnMap(channel.id, { messageId, params: updateParams })
+        }
+      }
+    }
+  } catch (error) {
+    log.error(error, '[READ_MESSAGE] Error on resend pending channel reads')
   }
 }
 
@@ -1330,6 +1643,7 @@ function* removeChannelCaches(action: IAction): any {
   const activeChannelId = yield call(getActiveChannelId)
   removeChannelFromMap(channelId)
   removeMessagesFromMap(channelId)
+  yield put(removeChannelMarkersAC(channelId))
   if (activeChannelId === channelId) {
     const activeChannel = yield call(getLastChannelFromMap)
     if (activeChannel) {
@@ -1411,12 +1725,22 @@ function* deleteChannel(action: IAction): any {
       return
     }
     if (channel) {
-      yield call(channel.delete)
-      yield put(setChannelToRemoveAC(channel))
-
-      yield put(removeChannelAC(channelId))
-
-      yield put(removeChannelCachesAC(channelId))
+      if (channel.type === DEFAULT_CHANNEL_TYPE.DIRECT) {
+        yield call(channel.deleteAllMessages)
+        yield call(channel.hide)
+        yield put(clearMessagesAC())
+        removeMessagesFromMap(channelId)
+        yield put(removeChannelMarkersAC(channelId))
+        removeAllMessages()
+        yield put(clearSelectedMessagesAC())
+        yield put(setChannelToHideAC(channel))
+        yield put(removeChannelCachesAC(channelId))
+      } else {
+        yield call(channel.delete)
+        yield put(setChannelToRemoveAC(channel))
+        yield put(removeChannelAC(channelId))
+        yield put(removeChannelCachesAC(channelId))
+      }
     }
   } catch (e) {
     log.error('ERROR in delete channel', e)
@@ -1581,9 +1905,9 @@ function* sendRecording(action: IAction): any {
 
   try {
     if (channel) {
-      if (state) {
+      if (state && channel?.startRecording) {
         yield call(channel.startRecording)
-      } else {
+      } else if (channel?.stopRecording) {
         yield call(channel.stopRecording)
       }
     }
@@ -1606,6 +1930,7 @@ function* clearHistory(action: IAction): any {
       yield call(channel.deleteAllMessages)
       yield put(clearMessagesAC())
       removeMessagesFromMap(channelId)
+      yield put(removeChannelMarkersAC(channelId))
       if (channelId === activeChannelId) {
         removeAllMessages()
       }
@@ -1640,6 +1965,7 @@ function* deleteAllMessages(action: IAction): any {
     if (channel) {
       yield call(channel.deleteAllMessages, true)
       removeMessagesFromMap(channelId)
+      yield put(removeChannelMarkersAC(channelId))
       if (channelId === activeChannelId) {
         yield put(clearMessagesAC())
         removeAllMessages()
@@ -1953,6 +2279,7 @@ export default function* ChannelsSaga() {
   yield takeLatest(TURN_OFF_NOTIFICATION, notificationsTurnOff)
   yield takeLatest(TURN_ON_NOTIFICATION, notificationsTurnOn)
   yield takeLatest(MARK_CHANNEL_AS_READ, markChannelAsRead)
+  yield takeLatest(RESEND_PENDING_CHANNEL_READS, resendPendingChannelReads)
   yield takeLatest(MARK_CHANNEL_AS_UNREAD, markChannelAsUnRead)
   yield takeLatest(CHECK_USER_STATUS, checkUsersStatus)
   yield takeLatest(SEND_TYPING, sendTyping)
@@ -1975,4 +2302,17 @@ export default function* ChannelsSaga() {
   yield takeLatest(GET_CHANNEL_BY_INVITE_KEY, getChannelByInviteKey)
   yield takeLatest(JOIN_TO_CHANNEL_WITH_INVITE_KEY, joinChannelWithInviteKey)
   yield takeLatest(SET_MESSAGE_RETENTION_PERIOD, setMessageRetentionPeriod)
+}
+
+export const __channelSagaTestables = {
+  markMessagesRead,
+  markChannelAsRead,
+  resendPendingChannelReads,
+  getChannels,
+  setWaitForReadMarkerRetry: (waitFn: typeof waitForReadMarkerRetry) => {
+    waitForReadMarkerRetry = waitFn
+  },
+  resetWaitForReadMarkerRetry: () => {
+    waitForReadMarkerRetry = (retryDelayMs: number) => new Promise((resolve) => setTimeout(resolve, retryDelayMs))
+  }
 }

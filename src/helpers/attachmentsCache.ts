@@ -1,5 +1,5 @@
 import log from 'loglevel'
-// const downloadedAttachments: { [key: string]: string } = {}
+import { getOrCreateBlobUrl, getRegisteredBlobUrl } from './attachmentBlobUrls'
 // Create a new cache
 
 const ATTACHMENTS_CACHE = 'attachments-cache'
@@ -65,6 +65,12 @@ export const removeAttachmentFromCache = async (attachmentId: string) => {
 
 export const getAttachmentUrlFromCache = async (attachmentUrl: string): Promise<string | false> => {
   const attachmentURLVersion = attachmentUrl + ATTACHMENT_VERSION
+  // Same key may already hold a live object URL — reuse it instead of pinning
+  // another copy of the blob per call.
+  const registeredUrl = getRegisteredBlobUrl(attachmentURLVersion)
+  if (registeredUrl) {
+    return registeredUrl
+  }
   if (!cacheAvailable) {
     log.error('Cache is not available')
     return Promise.reject(new Error('Cache not available'))
@@ -80,7 +86,7 @@ export const getAttachmentUrlFromCache = async (attachmentUrl: string): Promise<
   const response = await caches.match(request)
   if (response) {
     // Use the cached response
-    return URL.createObjectURL(await response.blob())
+    return getOrCreateBlobUrl(attachmentURLVersion, () => response.blob())
   } else {
     return false
   }
