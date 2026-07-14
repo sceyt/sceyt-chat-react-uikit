@@ -65,6 +65,9 @@ const MESSAGE_ACTIONS_HOVER_DELAY = 450
 const MESSAGE_ACTIONS_FLIP_THRESHOLD = 110
 const MAX_SELECTED_MESSAGES = 30
 const EMOJI_POPUP_THRESHOLD = 300
+// Set when any message's media is clicked (the slider is opening). Pending
+// hover timers check it so an actions bar can't pop open behind the slider.
+let lastMediaItemClickTime = 0
 
 const Message = ({
   message,
@@ -453,6 +456,11 @@ const Message = ({
   const handleMouseEnter = useCallback(() => {
     if (message.state !== MESSAGE_STATUS.DELETE && !selectionIsActive && !infoPopupOpen) {
       messageActionsTimeout.current = setTimeout(() => {
+        // A media click means the slider is opening — don't pop the bar
+        // behind it (taps don't produce the mouseleave that would cancel us).
+        if (Date.now() - lastMediaItemClickTime < MESSAGE_ACTIONS_HOVER_DELAY * 2) {
+          return
+        }
         const msgTop = messageItemRef.current?.getBoundingClientRect().top ?? 0
         setMessageActionsBelow(msgTop < MESSAGE_ACTIONS_FLIP_THRESHOLD)
         setMessageActionsShow(true)
@@ -487,12 +495,17 @@ const Message = ({
       if (messageActionsTimeout.current) {
         clearTimeout(messageActionsTimeout.current)
       }
+      lastMediaItemClickTime = Date.now()
       setMessageActionsShow(false)
+      // Tap flows produce no mouseleave on the previously tapped message, so
+      // its bar would stay open — claiming the menu id makes every other
+      // message close its bar (existing openedMessageMenuId listener).
+      dispatch(setMessageMenuOpenedAC(message.id || message.tid!))
       if (handleMediaItemClick) {
         handleMediaItemClick(attachment)
       }
     },
-    [handleMediaItemClick]
+    [handleMediaItemClick, dispatch, message.id, message.tid]
   )
 
   const handleReactionAddDelete = useCallback(
