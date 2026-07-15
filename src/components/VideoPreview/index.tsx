@@ -134,7 +134,7 @@ const VideoPreview = memo(
             parsedMetadata?.szh || 1080
           )
           // Use getVideoFirstFrame helper function - it handles everything internally
-          const result = await getVideoFirstFrame(videoSource, newWidth, newHeight, 0.8)
+          const result = await getVideoFirstFrame(videoSource, newWidth, newHeight)
 
           if (!result) {
             isExtractingRef.current = false

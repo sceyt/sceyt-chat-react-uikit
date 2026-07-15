@@ -1204,7 +1204,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
       // Pass the raw File/Blob so getVideoFirstFrame can sniff and correct the
       // MIME type — an object URL string locks in the original (possibly
       // Firefox-unsupported) type like video/quicktime.
-      const result = await getVideoFirstFrame(attachment.data, newWidth, newHeight, 0.8)
+      const result = await getVideoFirstFrame(attachment.data, newWidth, newHeight)
       if (result) {
         const { frameBlobUrl } = result
         dispatch(setUpdateMessageAttachmentAC(attachment?.metadata?.tmb || '', frameBlobUrl))

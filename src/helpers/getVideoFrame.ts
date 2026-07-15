@@ -42,7 +42,7 @@ const extractFrameFromUrl = (
   srcUrl: string,
   maxWidth?: number,
   maxHeight?: number,
-  quality: number = 0.8
+  quality: number = 1
 ): Promise<VideoFirstFrameResult | null> => {
   return new Promise((resolve) => {
     try {
@@ -196,7 +196,7 @@ const extractFrameFromBlob = async (
   blob: Blob,
   maxWidth?: number,
   maxHeight?: number,
-  quality: number = 0.8,
+  quality: number = 1,
   allowRemux: boolean = true
 ): Promise<VideoFirstFrameResult | null> => {
   const { safeBlob, info } = await normalizeVideoBlob(blob)
@@ -261,7 +261,7 @@ export async function getVideoFirstFrame(
   videoSrc: string | Blob,
   maxWidth?: number,
   maxHeight?: number,
-  quality: number = 0.8
+  quality: number = 1
 ): Promise<VideoFirstFrameResult | null> {
   try {
     if (videoSrc instanceof Blob) {

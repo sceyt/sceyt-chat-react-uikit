@@ -397,7 +397,7 @@ const Attachment = ({
           // URL. Once an object URL string is created from a mistyped blob,
           // Firefox has already locked in the bad type and there's no way
           // to fix it from the string alone.
-          const frameResult = await getVideoFirstFrame(body, renderWidth, renderHeight, 0.8)
+          const frameResult = await getVideoFirstFrame(body, renderWidth, renderHeight)
           if (frameResult) {
             const { frameBlobUrl, blob } = frameResult
             const response = new Response(blob, {
@@ -446,7 +446,7 @@ const Attachment = ({
             if (attachment.type === attachmentTypes.video) {
               // Same fix here: pass the raw blob, not blobUrl, so
               // getVideoFirstFrame can correct the MIME type if needed.
-              const frameResult = await getVideoFirstFrame(blob, renderWidth, renderHeight, 0.8)
+              const frameResult = await getVideoFirstFrame(blob, renderWidth, renderHeight)
               if (frameResult) {
                 const { frameBlobUrl, blob: frameBlob } = frameResult
                 await setAttachmentToCache(

@@ -494,7 +494,7 @@ export const handleUploadAttachments = async (attachments: IAttachment[], messag
             attachment?.metadata.szw || 1280,
             attachment?.metadata.szh || 1080
           )
-          const result = await getVideoFirstFrame(blobLocal, newWidth, newHeight, 0.8)
+          const result = await getVideoFirstFrame(blobLocal, newWidth, newHeight)
           if (result) {
             const { frameBlobUrl, blob } = result
             if (frameBlobUrl && blob) {
@@ -1014,7 +1014,7 @@ function* sendMessage(action: IAction): any {
                         parsedMetadata?.szw || 1280,
                         parsedMetadata?.szh || 1080
                       )
-                      const result = await getVideoFirstFrame(attachment.data, newWidth, newHeight, 0.8)
+                      const result = await getVideoFirstFrame(attachment.data, newWidth, newHeight)
                       if (result) {
                         const { frameBlobUrl, blob } = result
                         await setAttachmentToCache(
