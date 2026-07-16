@@ -65,7 +65,8 @@ import {
   compareMessageBodyAttributes,
   EditorTheme,
   getAllowEditDeleteIncomingMessage,
-  makeUsername
+  makeUsername,
+  trimMessageBodyWithAttributes
 } from '../../helpers/message'
 import { DropdownOptionLi, DropdownOptionsUl, TextInOneLine, UploadFile, ViewOnceToggleCont } from '../../UIHelper'
 import { THEME_COLORS } from '../../UIHelper/constants'
@@ -661,19 +662,22 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
       if (messageToEdit) {
         handleEditMessage()
       } else if (messageTextForSend?.trim() || (attachments.length && attachments.length > 0)) {
-        const messageTexToSend = messageTextForSend?.trim()
+        const { body: messageTexToSend, bodyAttributes: adjustedBodyAttributes } = trimMessageBodyWithAttributes(
+          messageText,
+          messageBodyAttributes
+        )
         const messageToSend: any = {
           // metadata: mentionedUsersPositions,
           body: messageTexToSend,
           // body: 'test message',
-          bodyAttributes: messageBodyAttributes,
+          bodyAttributes: adjustedBodyAttributes,
           mentionedUsers: [],
           attachments: [],
           type: 'text'
         }
         const mentionUsersToSend: any = []
-        if (messageBodyAttributes && messageBodyAttributes.length) {
-          messageBodyAttributes.forEach((att: any) => {
+        if (adjustedBodyAttributes && adjustedBodyAttributes.length) {
+          adjustedBodyAttributes.forEach((att: any) => {
             if (att.type === 'mention') {
               let mentionsToFind = [...mentionedUsers]
               const draftMessage = getDraftMessageFromMap(activeChannel.id)
@@ -810,11 +814,14 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
   }
 
   const handleEditMessage = () => {
-    const messageTexToSend = editMessageText.trim()
+    const { body: messageTexToSend, bodyAttributes: adjustedBodyAttributes } = trimMessageBodyWithAttributes(
+      editMessageText,
+      messageBodyAttributes
+    )
     const hasTextChanged = messageTexToSend !== messageToEdit.body
     const normalizeAttrs = (attrs: any) => (!attrs || attrs.length === 0 ? [] : attrs)
     const hasAttributesChanged = !compareMessageBodyAttributes(
-      normalizeAttrs(messageBodyAttributes),
+      normalizeAttrs(adjustedBodyAttributes),
       normalizeAttrs(messageToEdit.bodyAttributes)
     )
     if (!hasTextChanged && !hasAttributesChanged) {
@@ -861,8 +868,8 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
       const mentionedUsersPositions: any = []
       const mentionUsersToSend: any = []
       if (mentionedUsers && mentionedUsers.length) {
-        if (messageBodyAttributes && messageBodyAttributes.length) {
-          messageBodyAttributes.forEach((att: any) => {
+        if (adjustedBodyAttributes && adjustedBodyAttributes.length) {
+          adjustedBodyAttributes.forEach((att: any) => {
             if (att.type === 'mention') {
               let mentionsToFind = [...mentionedUsers]
               const draftMessage = getDraftMessageFromMap(activeChannel.id)
@@ -885,7 +892,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
         ...messageToEdit,
         attachments: updatedAttachments,
         metadata: mentionedUsersPositions,
-        bodyAttributes: messageBodyAttributes,
+        bodyAttributes: adjustedBodyAttributes,
         mentionedUsers: mentionUsersToSend,
         body: messageTexToSend
       }
