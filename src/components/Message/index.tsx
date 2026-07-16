@@ -496,6 +496,11 @@ const Message = ({
         clearTimeout(messageActionsTimeout.current)
       }
       lastMediaItemClickTime = Date.now()
+      // eslint-disable-next-line no-console
+      console.log(
+        '[MEDIA_OPEN] 2.wrapper ' +
+          JSON.stringify({ msgId: message.id, attId: attachment?.id, name: attachment?.name, url: attachment?.url })
+      )
       setMessageActionsShow(false)
       // Tap flows produce no mouseleave on the previously tapped message, so
       // its bar would stay open — claiming the menu id makes every other

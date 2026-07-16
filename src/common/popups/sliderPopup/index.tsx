@@ -390,7 +390,20 @@ const SliderPopup: React.FC<IProps> = ({
           log.error('Error getting initial attachment from cache:', error)
         })
     }
-    if (!attachmentsList.find((item: IMedia) => item.id === currentMediaFile.id)) {
+    const foundInStaleList = !!attachmentsList.find((item: IMedia) => item.id === currentMediaFile.id)
+    // eslint-disable-next-line no-console
+    console.log(
+      '[MEDIA_OPEN] 4.slider-mount ' +
+        JSON.stringify({
+          attId: currentMediaFile.id,
+          name: currentMediaFile.name,
+          msgId: currentMediaFile.messageId,
+          staleListLen: attachmentsList.length,
+          foundInStaleList,
+          staleListIds: attachmentsList.slice(0, 5).map((item: IMedia) => item.id)
+        })
+    )
+    if (!foundInStaleList) {
       dispatch(setAttachmentsForPopupAC([currentMediaFile]))
     }
     dispatch(getAttachmentsAC(channel.id, channelDetailsTabs.media, 34, queryDirection.NEAR, currentMediaFile.id, true))
@@ -398,7 +411,13 @@ const SliderPopup: React.FC<IProps> = ({
 
   const activeFileIndex = useMemo(() => {
     if (!currentFile?.id) return -1
-    return attachmentsList.findIndex((item: IMedia) => item.id === currentFile.id)
+    const index = attachmentsList.findIndex((item: IMedia) => item.id === currentFile.id)
+    // eslint-disable-next-line no-console
+    console.log(
+      '[MEDIA_OPEN] 5.activeIndex ' +
+        JSON.stringify({ index, attId: currentFile.id, name: currentFile.name, listLen: attachmentsList.length })
+    )
+    return index
   }, [attachmentsList, currentFile])
 
   // Handle when attachmentsList increases - maintain current element position instantly
@@ -419,6 +438,11 @@ const SliderPopup: React.FC<IProps> = ({
       const newIndex = attachmentsList.findIndex((item: IMedia) => item.id === currentFileId)
 
       // If current file is found in the new list
+      // eslint-disable-next-line no-console
+      console.log(
+        '[MEDIA_OPEN] 6.list-grew ' +
+          JSON.stringify({ prevLen: previousLength, newLen: newLength, attId: currentFileId, newIndex, activeFileIndex })
+      )
       if (newIndex >= 0) {
         // If index changed (items prepended), update currentFile to trigger position update
         // The activeFileIndex will recalculate, and Carousel will update via initialActiveIndex prop
@@ -597,6 +621,15 @@ const SliderPopup: React.FC<IProps> = ({
                 clearTimeout(timeout)
               }, 400)
               if (pageIndex >= 0 && pageIndex < attachmentsList.length) {
+                // eslint-disable-next-line no-console
+                console.log(
+                  '[MEDIA_OPEN] 7.carousel-change ' +
+                    JSON.stringify({
+                      pageIndex,
+                      attId: attachmentsList[pageIndex]?.id,
+                      name: attachmentsList[pageIndex]?.name
+                    })
+                )
                 setCurrentFile(attachmentsList[pageIndex])
                 setNextButtonDisabled(!attachmentsList[pageIndex + 1])
                 setPrevButtonDisabled(!attachmentsList[pageIndex - 1])

@@ -3428,6 +3428,18 @@ function* getMessageAttachments(action: IAction): any {
     )
     if (forPopup) {
       query.AttachmentByTypeQueryForPopup = AttachmentByTypeQuery
+      // eslint-disable-next-line no-console
+      console.log(
+        '[MEDIA_OPEN] 8.saga-forPopup ' +
+          JSON.stringify({
+            requestedAttId: attachmentId,
+            direction,
+            returned: attachments.length,
+            containsRequested: attachments.some((a: IAttachment) => a.id === attachmentId),
+            firstId: attachments[0]?.id,
+            lastId: attachments[attachments.length - 1]?.id
+          })
+      )
       yield put(setAttachmentsForPopupAC(JSON.parse(JSON.stringify(attachments))))
       const attachmentIndex = attachments.findIndex((attachment: IAttachment) => attachment.id === attachmentId)
       let hasPrev = false
