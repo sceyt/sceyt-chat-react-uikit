@@ -146,6 +146,7 @@ import {
   getFirstConfirmedMessageId,
   getMessageFromMap,
   getMessagesFromMap,
+  getLatestContiguousMessagesFromMap,
   getLatestMessagesFromMap,
   getLastConfirmedMessageId,
   getPendingMessagesFromMap,
@@ -2738,7 +2739,7 @@ function* loadDefaultMessages(action: IAction): any {
       const messageQuery =
         connectionState === CONNECTION_STATUS.CONNECTED ? yield call(messageQueryBuilder.build) : null
       query.messageQuery = messageQuery
-      const cachedMessages = getLatestMessagesFromMap(channel.id, MESSAGES_MAX_PAGE_COUNT)
+      const cachedMessages = getLatestContiguousMessagesFromMap(channel.id, MESSAGES_MAX_PAGE_COUNT)
 
       if (cachedMessages && cachedMessages.length) {
         // Cache available — show it immediately without a loading state
@@ -2878,7 +2879,7 @@ function* getMessagesQuery(action: IAction): any {
         appliedMessages = getCachedMessagesForResult(channel.id, result.messages)
         yield put(setMessagesHasPrevAC(true))
       } else {
-        const cachedMessages = getLatestMessagesFromMap(channel.id, MESSAGES_MAX_PAGE_COUNT)
+        const cachedMessages = getLatestContiguousMessagesFromMap(channel.id, MESSAGES_MAX_PAGE_COUNT)
         const cacheIsCurrent =
           !networkChanged &&
           cachedMessages.length > 0 &&

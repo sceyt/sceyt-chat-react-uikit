@@ -1721,6 +1721,151 @@ describe('MessageList', () => {
     }
   })
 
+  it('batches repeated scroll-to-bottom read markers into a single debounced READ_MESSAGE dispatch', () => {
+    jest.useFakeTimers()
+
+    try {
+      const channelId = 'channel-scroll-bottom-read-batch'
+      const latestIncoming = makeMessage({ id: '4102', channelId, body: 'incoming-latest', incoming: true })
+      const channel = makeChannel({
+        id: channelId,
+        lastMessage: latestIncoming,
+        newMessageCount: 2
+      })
+      const store = createMessageListStore({
+        ChannelReducer: {
+          activeChannel: channel
+        },
+        MessageReducer: {
+          activeChannelMessages: [makeMessage({ id: '4101', channelId, body: 'older' }), latestIncoming],
+          showScrollToNewMessageButton: true
+        },
+        UserReducer: {
+          user: { id: 'current-user' },
+          connectionStatus: CONNECTION_STATUS.CONNECTED
+        }
+      })
+      const dispatchSpy = jest.spyOn(store, 'dispatch')
+
+      renderMessageList(store)
+      dispatchSpy.mockClear()
+
+      fireEvent.click(screen.getByTestId('scroll-to-bottom'))
+      fireEvent.click(screen.getByTestId('scroll-to-bottom'))
+      fireEvent.click(screen.getByTestId('scroll-to-bottom'))
+
+      const readType = markMessagesAsReadAC(channelId, []).type
+      expect(dispatchSpy.mock.calls.filter(([action]) => action.type === readType)).toHaveLength(0)
+
+      act(() => {
+        jest.advanceTimersByTime(DEFAULT_MARKER_BATCH_DEBOUNCE_MS)
+      })
+
+      const readActions = dispatchSpy.mock.calls.map(([action]) => action).filter((action) => action.type === readType)
+      expect(readActions).toHaveLength(1)
+      expect(readActions[0].payload).toEqual(expect.objectContaining({ channelId, messageIds: ['4102'] }))
+    } finally {
+      jest.runOnlyPendingTimers()
+      jest.useRealTimers()
+    }
+  })
+
+  it('does not queue a scroll-to-bottom read marker when the latest message is an own outgoing message', () => {
+    jest.useFakeTimers()
+
+    try {
+      const channelId = 'channel-scroll-bottom-own-latest'
+      const ownLatest = makeMessage({
+        id: '4202',
+        channelId,
+        body: 'own-latest',
+        user: { id: 'current-user' } as any
+      })
+      const channel = makeChannel({
+        id: channelId,
+        lastMessage: ownLatest
+      })
+      const store = createMessageListStore({
+        ChannelReducer: {
+          activeChannel: channel
+        },
+        MessageReducer: {
+          activeChannelMessages: [makeMessage({ id: '4201', channelId, body: 'older' }), ownLatest],
+          showScrollToNewMessageButton: true
+        },
+        UserReducer: {
+          user: { id: 'current-user' },
+          connectionStatus: CONNECTION_STATUS.CONNECTED
+        }
+      })
+      const dispatchSpy = jest.spyOn(store, 'dispatch')
+
+      renderMessageList(store)
+      dispatchSpy.mockClear()
+
+      fireEvent.click(screen.getByTestId('scroll-to-bottom'))
+
+      act(() => {
+        jest.advanceTimersByTime(DEFAULT_MARKER_BATCH_DEBOUNCE_MS * 2)
+      })
+
+      const readType = markMessagesAsReadAC(channelId, []).type
+      expect(dispatchSpy.mock.calls.filter(([action]) => action.type === readType)).toHaveLength(0)
+    } finally {
+      jest.runOnlyPendingTimers()
+      jest.useRealTimers()
+    }
+  })
+
+  it('flushes a queued read marker on unmount so it is not lost with the debounce timer', async () => {
+    const channelId = 'channel-unmount-read-flush'
+    const latestIncoming = makeMessage({ id: '4302', channelId, body: 'incoming-latest', incoming: true })
+    const channel = makeChannel({
+      id: channelId,
+      lastMessage: latestIncoming,
+      newMessageCount: 1
+    })
+    const store = createMessageListStore({
+      ChannelReducer: {
+        activeChannel: channel
+      },
+      MessageReducer: {
+        activeChannelMessages: [makeMessage({ id: '4301', channelId, body: 'older' }), latestIncoming],
+        showScrollToNewMessageButton: true
+      },
+      UserReducer: {
+        user: { id: 'current-user' },
+        connectionStatus: CONNECTION_STATUS.CONNECTED
+      }
+    })
+    const dispatchSpy = jest.spyOn(store, 'dispatch')
+
+    const { unmount } = renderMessageList(store)
+    dispatchSpy.mockClear()
+
+    fireEvent.click(screen.getByTestId('scroll-to-bottom'))
+
+    const readType = markMessagesAsReadAC(channelId, []).type
+    expect(dispatchSpy.mock.calls.filter(([action]) => action.type === readType)).toHaveLength(0)
+
+    // unmount before the 500ms debounce elapses — the flush-on-unmount cleanup
+    // (deferred to a tick in this environment) must deliver the marker
+    unmount()
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 50))
+    })
+
+    const readActions = dispatchSpy.mock.calls.map(([action]) => action).filter((action) => action.type === readType)
+    expect(readActions).toHaveLength(1)
+    expect(readActions[0].payload).toEqual(expect.objectContaining({ channelId, messageIds: ['4302'] }))
+
+    // the debounce timer was cleared on unmount — no duplicate flush later
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, DEFAULT_MARKER_BATCH_DEBOUNCE_MS + 100))
+    })
+    expect(dispatchSpy.mock.calls.filter(([action]) => action.type === readType)).toHaveLength(1)
+  })
+
   it('reloads the latest window after an offline send from deep history instead of staying on the history page', async () => {
     const channelId = 'channel-offline-send-scroll'
     const pendingLatest = makePendingMessage({

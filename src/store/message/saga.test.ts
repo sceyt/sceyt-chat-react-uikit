@@ -3910,9 +3910,7 @@ describe('message saga message-list flows', () => {
     await task.toPromise()
 
     // In-memory channel map must have the confirmed id
-    expect(getChannelFromMap(channelId)?.lastMessage).toEqual(
-      expect.objectContaining({ id: confirmedMsg.id })
-    )
+    expect(getChannelFromMap(channelId)?.lastMessage).toEqual(expect.objectContaining({ id: confirmedMsg.id }))
 
     // Redux must dispatch the channel-list update regardless of active channel
     expect(
@@ -3927,6 +3925,182 @@ describe('message saga message-list flows', () => {
 
     // updateMessageAC must NOT be dispatched (user is in a different channel)
     expect(dispatched.some((action) => action.type === updateMessageAC('', {}).type)).toBe(false)
+  })
+
+  describe('channel-open latest-window completeness', () => {
+    // The messages map can hold DISJOINT windows for one channel (e.g. an old
+    // window from a jump-to-message plus the newest messages received later).
+    // Messages 702-709 were never cached. Opening the channel must not render
+    // a list that silently spans that gap.
+    const seedGappyCache = (channelId: string) => {
+      const oldWindow = ['700', '701'].map((id) => makeMessage({ id, channelId, body: `old-${id}`, incoming: true }))
+      const newWindow = ['710', '711'].map((id) => makeMessage({ id, channelId, body: `new-${id}`, incoming: true }))
+      oldWindow.forEach((message) => addMessageToMap(channelId, message))
+      setActiveSegment(channelId, '700', '701')
+      newWindow.forEach((message) => addMessageToMap(channelId, message))
+      setActiveSegment(channelId, '710', '711')
+    }
+
+    it('does not trust a gap-spanning cached window as the current latest window (getMessagesQuery)', async () => {
+      const channel = makeChannel({
+        id: 'channel-open-gappy-latest',
+        lastMessage: makeMessage({
+          id: '711',
+          channelId: 'channel-open-gappy-latest',
+          body: 'new-711',
+          incoming: true
+        })
+      })
+      seedGappyCache(channel.id)
+      const serverWindow = ['708', '709', '710', '711'].map((id) =>
+        makeMessage({ id, channelId: channel.id, body: `server-${id}`, incoming: true })
+      )
+      const query = createMessageQuery({
+        loadPrevious: jest.fn(() => resolveWithMockServerDelay({ messages: serverWindow, hasNext: false }))
+      })
+
+      mockStoreState.UserReducer.connectionStatus = CONNECTION_STATUS.CONNECTED
+      setActiveChannelId(channel.id)
+      setChannelInMap(channel)
+      setClient(createClient(query, { ...channel }))
+
+      const dispatched = await runMessageSaga(__messageSagaTestables.getMessagesQuery, loadLatestMessagesAC(channel))
+
+      const lastSetMessages = dispatched.filter((action) => action.type === setMessagesAC([], channel.id).type).at(-1)
+      const bodies = lastSetMessages.payload.messages.map((message: any) => message.body)
+      // must include the newest message...
+      expect(bodies).toContain(bodies.find((body: string) => body.endsWith('-711')))
+      // ...and must NOT straddle the uncached 702-709 gap
+      expect(bodies).not.toContain('old-700')
+      expect(bodies).not.toContain('old-701')
+    })
+
+    it('does not paint a gap-spanning cached window when opening a channel offline (loadDefaultMessages)', async () => {
+      const channel = makeChannel({
+        id: 'channel-open-gappy-offline',
+        lastMessage: makeMessage({
+          id: '711',
+          channelId: 'channel-open-gappy-offline',
+          body: 'new-711',
+          incoming: true
+        })
+      })
+      seedGappyCache(channel.id)
+
+      mockStoreState.UserReducer.connectionStatus = CONNECTION_STATUS.DISCONNECTED
+      setActiveChannelId(channel.id)
+      setChannelInMap(channel)
+
+      const dispatched = await runMessageSaga(
+        __messageSagaTestables.loadDefaultMessages,
+        loadDefaultMessagesAC(channel)
+      )
+
+      const lastSetMessages = dispatched.filter((action) => action.type === setMessagesAC([], channel.id).type).at(-1)
+      const bodies = lastSetMessages.payload.messages.map((message: any) => message.body)
+      expect(bodies).toContain('new-711')
+      expect(bodies).not.toContain('old-700')
+      expect(bodies).not.toContain('old-701')
+    })
+
+    it('replaces a gap-spanning cached paint with the contiguous server window when online (loadDefaultMessages)', async () => {
+      const channel = makeChannel({
+        id: 'channel-open-gappy-online',
+        lastMessage: makeMessage({
+          id: '711',
+          channelId: 'channel-open-gappy-online',
+          body: 'new-711',
+          incoming: true
+        })
+      })
+      seedGappyCache(channel.id)
+      const serverWindow = ['708', '709', '710', '711'].map((id) =>
+        makeMessage({ id, channelId: channel.id, body: `server-${id}`, incoming: true })
+      )
+      const query = createMessageQuery({
+        loadPrevious: jest.fn(() => resolveWithMockServerDelay({ messages: serverWindow, hasNext: false }))
+      })
+
+      mockStoreState.UserReducer.connectionStatus = CONNECTION_STATUS.CONNECTED
+      setActiveChannelId(channel.id)
+      setChannelInMap(channel)
+      setClient(createClient(query, { ...channel }))
+
+      const dispatched = await runMessageSaga(
+        __messageSagaTestables.loadDefaultMessages,
+        loadDefaultMessagesAC(channel)
+      )
+
+      expect(query.loadPrevious).toHaveBeenCalledTimes(1)
+      const lastSetMessages = dispatched.filter((action) => action.type === setMessagesAC([], channel.id).type).at(-1)
+      const bodies = lastSetMessages.payload.messages.map((message: any) => message.body)
+      expect(bodies).toEqual(['server-708', 'server-709', 'server-710', 'server-711'])
+    })
+
+    it('serves a contiguous cached latest window without a server round-trip (getMessagesQuery fast path)', async () => {
+      const channel = makeChannel({
+        id: 'channel-open-contiguous-cache',
+        lastMessage: makeMessage({
+          id: '711',
+          channelId: 'channel-open-contiguous-cache',
+          body: 'cached-711',
+          incoming: true
+        })
+      })
+      const cachedWindow = ['708', '709', '710', '711'].map((id) =>
+        makeMessage({ id, channelId: channel.id, body: `cached-${id}`, incoming: true })
+      )
+      cachedWindow.forEach((message) => addMessageToMap(channel.id, message))
+      setActiveSegment(channel.id, '708', '711')
+      const query = createMessageQuery()
+
+      mockStoreState.UserReducer.connectionStatus = CONNECTION_STATUS.CONNECTED
+      setActiveChannelId(channel.id)
+      setChannelInMap(channel)
+      setClient(createClient(query, { ...channel }))
+
+      const dispatched = await runMessageSaga(__messageSagaTestables.getMessagesQuery, loadLatestMessagesAC(channel))
+
+      expect(query.loadPrevious).not.toHaveBeenCalled()
+      const lastSetMessages = dispatched.filter((action) => action.type === setMessagesAC([], channel.id).type).at(-1)
+      const bodies = lastSetMessages.payload.messages.map((message: any) => message.body)
+      expect(bodies).toEqual(['cached-708', 'cached-709', 'cached-710', 'cached-711'])
+    })
+
+    it('flags hasNext when the offline near-unread window is older than the channel lastMessage (loadNearUnread)', async () => {
+      const channel = makeChannel({
+        id: 'channel-open-near-unread-offline',
+        newMessageCount: 5,
+        lastDisplayedMessageId: '705',
+        lastMessage: makeMessage({
+          id: '711',
+          channelId: 'channel-open-near-unread-offline',
+          body: 'uncached-711',
+          incoming: true
+        })
+      })
+      const cachedSegment = ['703', '704', '705', '706'].map((id) =>
+        makeMessage({ id, channelId: channel.id, body: `cached-${id}`, incoming: true })
+      )
+      cachedSegment.forEach((message) => addMessageToMap(channel.id, message))
+      setActiveSegment(channel.id, '703', '706')
+
+      mockStoreState.UserReducer.connectionStatus = CONNECTION_STATUS.DISCONNECTED
+      setActiveChannelId(channel.id)
+      setChannelInMap(channel)
+
+      const dispatched = await runMessageSaga(__messageSagaTestables.loadNearUnread, loadNearUnreadAC(channel))
+
+      const setMessagesAction = getActionByType(dispatched, setMessagesAC([], channel.id).type)
+      expect(setMessagesAction.payload.messages.map((message: any) => message.body)).toEqual([
+        'cached-703',
+        'cached-704',
+        'cached-705',
+        'cached-706'
+      ])
+      // 707-711 are not cached — the list must know there is more to load next
+      expect(dispatched).toContainEqual(setMessagesHasNextAC(true))
+    })
   })
 })
 

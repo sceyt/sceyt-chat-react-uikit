@@ -1220,7 +1220,12 @@ function* markMessagesRead(action: IAction): any {
           removePendingChannelRead(channel.id)
         }
       } else if (confirmation.status === 'drop') {
-        removePendingChannelRead(channel.id)
+        // only drop this confirmation's own queue entry — a newer read merged
+        // while the request was in flight must stay queued for replay
+        const queuedPendingRead = getPendingChannelRead(channel.id)
+        if (queuedPendingRead?.queuedAt === pendingRead?.queuedAt) {
+          removePendingChannelRead(channel.id)
+        }
         return
       } else {
         return
@@ -1512,7 +1517,12 @@ function* markChannelAsRead(action: IAction): any {
     }
 
     if (confirmation.status === 'drop') {
-      removePendingChannelRead(channel.id)
+      // only drop this confirmation's own queue entry — a newer read merged
+      // while the request was in flight must stay queued for replay
+      const queuedPendingRead = getPendingChannelRead(channel.id)
+      if (queuedPendingRead?.queuedAt === pendingRead?.queuedAt) {
+        removePendingChannelRead(channel.id)
+      }
     }
 
     log.error(confirmation.error, 'Error in set channel unread')

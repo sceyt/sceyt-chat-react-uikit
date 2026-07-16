@@ -698,6 +698,24 @@ export function getLatestMessagesFromMap(channelId: string, limit: number): IMes
     .slice(-limit)
 }
 
+// Latest-window variant of getLatestMessagesFromMap that respects segment
+// contiguity: the map can hold disjoint windows for one channel (e.g. an old
+// jump-to-message window plus the newest messages), and flattening them would
+// produce a list with a silent gap. Confirmed messages outside the latest
+// segment are excluded; pending messages (no id yet) are kept.
+export function getLatestContiguousMessagesFromMap(channelId: string, limit: number): IMessage[] {
+  const latestSegment = loadedSegmentsMap[channelId]?.at(-1)
+  const messages = Object.values(messagesMap[channelId] || {}).filter((m) => !!m.id || m.tid)
+  const contiguousMessages = latestSegment
+    ? messages.filter(
+        (m) =>
+          !m.id ||
+          (compareMessageIds(m.id, latestSegment.startId) >= 0 && compareMessageIds(m.id, latestSegment.endId) <= 0)
+      )
+    : messages
+  return contiguousMessages.sort(compareMessagesForList).slice(-limit)
+}
+
 export function getLatestCachedConfirmedMessageId(channelId: string): string {
   const latestSegment = loadedSegmentsMap[channelId]?.at(-1)
   if (latestSegment?.endId) {
