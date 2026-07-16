@@ -134,6 +134,7 @@ import {
   MESSAGES_MAX_LENGTH,
   MESSAGE_LOAD_DIRECTION,
   deletePendingAttachment,
+  getPendingAttachment,
   setPendingAttachment,
   removeReactionToMessageOnMap,
   sendMessageHandler,
@@ -186,10 +187,15 @@ import log from 'loglevel'
 import { getVideoFirstFrame } from 'helpers/getVideoFrame'
 import { MESSAGE_TYPE } from 'types/enum'
 import { setWaitToSendPendingMessagesAC } from 'store/user/actions'
-import { isResendableError } from 'helpers/error'
+import { createAttachmentUnavailableError, isResendableError } from 'helpers/error'
 import { calculateRenderedImageWidth } from 'helpers'
 import { PendingMessageMutation } from './reducers'
 
+// Automatic reconnect resends per message tid — a message that keeps failing is
+// dropped from the auto-resend cycle after this many attempts; the manual retry
+// on the failed message stays available and resets the budget.
+const MAX_AUTO_RESEND_ATTEMPTS = 5
+const autoResendAttempts = new Map<string, number>()
 const loadMoreMessagesInFlight = new Set<string>()
 const prefetchInFlight = new Set<string>()
 const queuedPrefetchRequests = new Map<string, { fromMessageId: string; pages: number }>()
@@ -420,7 +426,19 @@ export const handleUploadAttachments = async (attachments: IAttachment[], messag
       const handleUploadProgress = ({ loaded, total }: IProgress) => {
         store.dispatch(updateAttachmentUploadingProgressAC(loaded, total, attachment.tid))
       }
-      const fileType = attachment.url.type.split('/')[0]
+      if (!attachment.cachedUrl && !(attachment.url instanceof Blob)) {
+        // Resent messages may carry a serialized copy where the source File became a
+        // plain object; recover the live File kept by tid, or fail as non-resendable.
+        const pendingFile = getPendingAttachment(attachment.tid as string)?.file
+        if (pendingFile instanceof Blob) {
+          attachment = { ...attachment, url: pendingFile, data: pendingFile }
+        } else {
+          throw createAttachmentUnavailableError(
+            `Attachment file for tid ${attachment.tid} is no longer available for upload`
+          )
+        }
+      }
+      const fileType = attachment.url?.type?.split('/')[0]
       let fileSize = attachment.size
       let filePath: any
       let uriLocal
@@ -444,7 +462,7 @@ export const handleUploadAttachments = async (attachments: IAttachment[], messag
           log.warn('Upload returned null blob for attachment:', attachment.name)
         }
       }
-      if (!attachment.cachedUrl && attachment.url.type.split('/')[0] === 'image') {
+      if (!attachment.cachedUrl && fileType === 'image') {
         try {
           if (blobLocal && blobLocal.type.startsWith('image/')) {
             // Use the original file for pica resize — blobLocal is already AWS-resized, re-resizing it degrades quality
@@ -488,7 +506,7 @@ export const handleUploadAttachments = async (attachments: IAttachment[], messag
           log.error('Error resizing and caching image during upload:', error)
           // Continue even if caching fails
         }
-      } else if (!attachment.cachedUrl && attachment.url.type.split('/')[0] === 'video') {
+      } else if (!attachment.cachedUrl && fileType === 'video') {
         if (blobLocal) {
           const [newWidth, newHeight] = calculateRenderedImageWidth(
             attachment?.metadata.szw || 1280,
@@ -937,6 +955,14 @@ function* sendMessage(action: IAction): any {
       if (mediaAttachments && mediaAttachments.length) {
         for (let i = 0; i < mediaAttachments.length; i++) {
           let attachment = mediaAttachments[i]
+          if (customUploader && !attachment.cachedUrl && !(attachment.data instanceof Blob)) {
+            // On resend the message may be a serialized copy whose File was lost —
+            // recover the live File kept by tid so the upload gets real bytes.
+            const pendingFile = getPendingAttachment(attachment.tid as string)?.file
+            if (pendingFile instanceof Blob) {
+              attachment = { ...attachment, data: pendingFile }
+            }
+          }
 
           let uri
           if (attachment.cachedUrl) {
@@ -1201,6 +1227,9 @@ function* sendMessage(action: IAction): any {
             }
 
             const messageResponse = yield call(channel.sendMessage, messageToSend)
+            if (messageToSend.tid) {
+              autoResendAttempts.delete(messageToSend.tid)
+            }
             if (customUploader) {
               for (let k = 0; k < messageAttachment.length; k++) {
                 messageResponse.attachments[k] = {
@@ -1466,7 +1495,7 @@ function* forwardMessage(action: IAction): any {
         if (channel) {
           setChannelInMap(channel)
           addChannelToAllChannels({ ...channel })
-          const parsedChannel = JSON.parse(JSON.stringify(channel));
+          const parsedChannel = JSON.parse(JSON.stringify(channel))
           yield put(addChannelAC(parsedChannel))
         }
       } else {
@@ -1614,7 +1643,18 @@ function* forwardMessage(action: IAction): any {
 
 function* resendMessage(action: IAction): any {
   const { payload } = action
-  const { message, connectionState, channelId } = payload
+  const { message: payloadMessage, connectionState, channelId } = payload
+  // The dispatched message is usually a serialized Redux copy whose attachment
+  // File objects were lost — prefer the live by-reference map entry.
+  const liveMessage =
+    payloadMessage?.tid || payloadMessage?.id
+      ? getMessageFromMap(channelId, payloadMessage.tid || payloadMessage.id)
+      : null
+  const message = liveMessage || payloadMessage
+  // A manual retry grants a fresh automatic-resend budget.
+  if (message?.tid || message?.id) {
+    autoResendAttempts.delete(message.tid || message.id)
+  }
   const attachments = message?.attachments?.filter((att: IAttachment) => att?.type !== attachmentTypes.link)
 
   if (message.forwardingDetails) {
@@ -1732,6 +1772,15 @@ const sendPendingMessages = function* (connectionState: string) {
   for (const channelId in pendingMessagesMap) {
     for (const msg of pendingMessagesMap[channelId]) {
       const attachments = msg?.attachments?.filter((att: IAttachment) => att?.type !== attachmentTypes.link)
+      const resendKey = msg?.tid || msg?.id
+      if (resendKey) {
+        const attempts = autoResendAttempts.get(resendKey) || 0
+        if (attempts >= MAX_AUTO_RESEND_ATTEMPTS) {
+          log.info(`Skipping auto-resend of message ${resendKey} after ${attempts} failed attempts`)
+          continue
+        }
+        autoResendAttempts.set(resendKey, attempts + 1)
+      }
 
       try {
         if (msg?.forwardingDetails) {
@@ -4163,6 +4212,7 @@ export const __resetMessageSagaTestState = () => {
   queuedPrefetchRequests.clear()
   prefetchCompletionWaiters.clear()
   prefetchCancelVersions.clear()
+  autoResendAttempts.clear()
 }
 
 const REFRESH_WINDOW_HALF = 30
