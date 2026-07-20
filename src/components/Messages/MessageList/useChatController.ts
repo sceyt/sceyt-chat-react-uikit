@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import log from 'loglevel'
 import {
   addMessagesAC,
   cancelChannelMessageProcessesAC,
@@ -42,6 +43,7 @@ import {
   LOAD_MAX_MESSAGE_COUNT_PREFETCH,
   MESSAGE_LOAD_DIRECTION
 } from '../../../helpers/messagesHalper'
+import { compactReadMessageLogData } from '../../../helpers/readMessageLog'
 import { setAllowEditDeleteIncomingMessage } from '../../../helpers/message'
 import { CONNECTION_STATUS } from '../../../store/user/constants'
 import { LOADING_STATE, MESSAGE_DELIVERY_STATUS } from '../../../helpers/constants'
@@ -708,6 +710,17 @@ export function useChatController({
 
   const queueVisibleUnreadCheck = useCallback(() => {
     if (pendingVisibleUnreadFrameRef.current !== null || unreadScrollTo || !tabIsActive) {
+      if (!tabIsActive) {
+        log.info(
+          '[READ_MESSAGE] Visible unread scan skipped because tab is inactive',
+          compactReadMessageLogData({
+            source: 'controller',
+            channelId: channel.id,
+            unreadScrollTo,
+            pendingFrameScheduled: pendingVisibleUnreadFrameRef.current !== null
+          })
+        )
+      }
       return
     }
 
@@ -749,7 +762,28 @@ export function useChatController({
         .filter(Boolean) as IMessage[]
 
       const ids = visibleUnreadMessages.filter(isUnreadIncomingMessage).map((message) => message.id)
+      if (visibleUnreadMessages.length && !ids.length) {
+        log.info(
+          '[READ_MESSAGE] Visible unread scan found messages, but none were unread incoming',
+          compactReadMessageLogData({
+            source: 'controller',
+            channelId: channel.id,
+            visibleCandidateIds: visibleUnreadMessages.map((message) => message.id)
+          })
+        )
+      }
       if (!ids.length || !channel.id || !channel.newMessageCount) {
+        if (ids.length && (!channel.id || !channel.newMessageCount)) {
+          log.info(
+            '[READ_MESSAGE] Visible unread scan blocked before dispatch',
+            compactReadMessageLogData({
+              source: 'controller',
+              channelId: channel.id,
+              messageIds: ids,
+              newMessageCount: channel.newMessageCount || 0
+            })
+          )
+        }
         return
       }
 
@@ -757,6 +791,14 @@ export function useChatController({
         visibleUnreadReportedRef.current.add(id)
       })
       registerLocallyReadUnreadMessages(ids.length)
+      log.info(
+        '[READ_MESSAGE] Dispatching read marker from visible unread scan',
+        compactReadMessageLogData({
+          source: 'controller',
+          channelId: channel.id,
+          messageIds: ids
+        })
+      )
       dispatch(markMessagesAsReadAC(channel.id, ids))
     })
   }, [

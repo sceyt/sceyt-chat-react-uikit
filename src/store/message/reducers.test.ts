@@ -13,6 +13,7 @@ import MessageReducer, {
   setOGMetadata,
   OG_METADATA_MAX
 } from './reducers'
+import { addReactionToMessageAC, deleteReactionFromMessageAC } from './actions'
 import {
   addMessageToMap,
   clearMessagesMap,
@@ -24,7 +25,7 @@ import {
   updateMessageDeliveryStatusAndMarkers,
   updateMessageStatusOnMap
 } from '../../helpers/messagesHalper'
-import { makeMessage, makePendingMessage, resetMessageListFixtureIds } from '../../testUtils/messageFixtures'
+import { makeMessage, makePendingMessage, makeUser, resetMessageListFixtureIds } from '../../testUtils/messageFixtures'
 import { MESSAGE_DELIVERY_STATUS, MESSAGE_STATUS } from '../../helpers/constants'
 
 describe('message pending ordering', () => {
@@ -340,6 +341,54 @@ describe('message pending ordering', () => {
         attachments: []
       })
     )
+  })
+
+  it('adds self reactions even when the active message has no hydrated userReactions array yet', () => {
+    const channelId = 'channel-reaction-add'
+    const currentUser = makeUser({ id: 'current-user' })
+    const message = {
+      ...makeMessage({ id: '5001', channelId, user: currentUser }),
+      userReactions: undefined as any
+    }
+    const reaction = {
+      id: 'reaction-1',
+      key: 'fire',
+      score: 1,
+      reason: '',
+      createdAt: new Date('2026-04-01T12:30:00.000Z'),
+      messageId: message.id,
+      user: currentUser
+    }
+
+    const initialState = MessageReducer(undefined, setMessages({ messages: [message as any] }))
+    const nextState = MessageReducer(initialState, addReactionToMessageAC(message as any, reaction as any, true))
+
+    expect(nextState.activeChannelMessages[0].userReactions).toEqual([reaction])
+    expect(nextState.activeChannelMessages[0].reactionTotals).toEqual(message.reactionTotals)
+  })
+
+  it('removes self reactions safely when the active message has no hydrated userReactions array yet', () => {
+    const channelId = 'channel-reaction-delete'
+    const currentUser = makeUser({ id: 'current-user' })
+    const message = {
+      ...makeMessage({ id: '5002', channelId, user: currentUser }),
+      userReactions: undefined as any
+    }
+    const reaction = {
+      id: 'reaction-2',
+      key: 'smile',
+      score: 1,
+      reason: '',
+      createdAt: new Date('2026-04-01T12:31:00.000Z'),
+      messageId: message.id,
+      user: currentUser
+    }
+
+    const initialState = MessageReducer(undefined, setMessages({ messages: [message as any] }))
+    const nextState = MessageReducer(initialState, deleteReactionFromMessageAC(message as any, reaction as any, true))
+
+    expect(nextState.activeChannelMessages[0].userReactions).toEqual([])
+    expect(nextState.activeChannelMessages[0].reactionTotals).toEqual(message.reactionTotals)
   })
 
   it('keeps pending messages at the tail after paginating to older and newer pages around them', () => {

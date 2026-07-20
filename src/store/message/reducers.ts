@@ -482,18 +482,12 @@ const messageSlice = createSlice({
       const { message, reaction, isSelf } = action.payload
       state.activeChannelMessages = state.activeChannelMessages.map((msg) => {
         if (msg.id === message.id) {
-          let slfReactions = [...msg.userReactions]
-          if (isSelf) {
-            if (slfReactions) {
-              slfReactions.push(reaction)
-            } else {
-              slfReactions = [reaction]
-            }
-          }
+          const currentUserReactions = msg.userReactions || []
+          const userReactions = isSelf ? [...currentUserReactions, reaction] : currentUserReactions
           return {
             ...msg,
-            userReactions: slfReactions,
-            reactionTotals: message.reactionTotals
+            userReactions,
+            reactionTotals: message.reactionTotals || msg.reactionTotals || []
           }
         }
         return msg
@@ -511,13 +505,13 @@ const messageSlice = createSlice({
       const { reaction, message, isSelf } = action.payload
       state.activeChannelMessages = state.activeChannelMessages.map((msg) => {
         if (msg.id === message.id) {
-          let { userReactions } = msg
+          let userReactions = msg.userReactions || []
           if (isSelf) {
-            userReactions = msg.userReactions.filter((selfReaction: IReaction) => selfReaction.key !== reaction.key)
+            userReactions = userReactions.filter((selfReaction: IReaction) => selfReaction.key !== reaction.key)
           }
           return {
             ...msg,
-            reactionTotals: message.reactionTotals,
+            reactionTotals: message.reactionTotals || msg.reactionTotals || [],
             userReactions
           }
         }

@@ -895,22 +895,18 @@ export function updateMessageOnMap(
 export function addReactionToMessageOnMap(channelId: string, message: IMessage, reaction: IReaction, isSelf: boolean) {
   if (messagesMap[channelId]) {
     const messageShouldBeUpdated = messagesMap[channelId][message.id]
-
-    let slfReactions = [...messageShouldBeUpdated.userReactions]
-    if (isSelf) {
-      if (slfReactions) {
-        slfReactions.push(reaction)
-      } else {
-        slfReactions = [reaction]
-      }
+    if (!messageShouldBeUpdated) {
+      return
     }
+    const currentUserReactions = messageShouldBeUpdated.userReactions || []
+    const userReactions = isSelf ? [...currentUserReactions, reaction] : currentUserReactions
     if (message.tid && messagesMap[channelId][message.tid]) {
       delete messagesMap[channelId][message.tid]
     }
     messagesMap[channelId][message.id || message.tid!] = {
       ...messageShouldBeUpdated,
-      userReactions: slfReactions,
-      reactionTotals: message.reactionTotals
+      userReactions,
+      reactionTotals: message.reactionTotals || messageShouldBeUpdated.reactionTotals || []
     }
   }
 }
@@ -923,18 +919,19 @@ export function removeReactionToMessageOnMap(
 ) {
   if (messagesMap[channelId]) {
     const messageShouldBeUpdated = messagesMap[channelId][message.id]
-    let { userReactions } = messageShouldBeUpdated
+    if (!messageShouldBeUpdated) {
+      return
+    }
+    let userReactions = messageShouldBeUpdated.userReactions || []
     if (isSelf) {
-      userReactions = messageShouldBeUpdated.userReactions.filter(
-        (selfReaction: IReaction) => selfReaction.key !== reaction.key
-      )
+      userReactions = userReactions.filter((selfReaction: IReaction) => selfReaction.key !== reaction.key)
     }
     if (message.tid && messagesMap[channelId][message.tid]) {
       delete messagesMap[channelId][message.tid]
     }
     messagesMap[channelId][message.id || message.tid!] = {
       ...messageShouldBeUpdated,
-      reactionTotals: message.reactionTotals,
+      reactionTotals: message.reactionTotals || messageShouldBeUpdated.reactionTotals || [],
       userReactions
     }
   }

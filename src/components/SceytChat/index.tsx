@@ -142,20 +142,10 @@ const SceytChat = ({
     requestPermissionOnUserInteraction()
   }
 
-  const handleVisibilityChange = () => {
-    if (document[hidden as keyof Document]) {
-      dispatch(browserTabIsActiveAC(false))
-    } else {
-      dispatch(browserTabIsActiveAC(true))
-    }
-  }
-
-  const handleFocusChange = (focus: boolean) => {
-    if (focus) {
-      dispatch(browserTabIsActiveAC(true))
-    } else {
-      dispatch(browserTabIsActiveAC(false))
-    }
+  const syncBrowserTabIsActive = () => {
+    const isVisible = hidden ? !document[hidden as keyof Document] : document.visibilityState !== 'hidden'
+    const isFocused = typeof document.hasFocus === 'function' ? document.hasFocus() : true
+    dispatch(browserTabIsActiveAC(isVisible && isFocused))
   }
 
   useEffect(() => {
@@ -256,23 +246,25 @@ const SceytChat = ({
     // to the attachments cache instead of rendering a revoked URL.
     setBlobUrlEvictListener((keys) => dispatch(removeAttachmentUpdatedEntriesAC(keys)))
 
-    const handleWindowFocus = () => handleFocusChange(true)
-    const handleWindowBlur = () => handleFocusChange(false)
     if (showNotifications) {
       // Initialize notifications with cross-browser support
       initializeNotifications()
       window.sceytTabNotifications = null
       window.sceytTabUrl = window.location.href
-
-      window.addEventListener('focus', handleWindowFocus)
-      window.addEventListener('blur', handleWindowBlur)
     }
 
-    document.addEventListener(visibilityChange, handleVisibilityChange, false)
+    window.addEventListener('focus', syncBrowserTabIsActive)
+    window.addEventListener('blur', syncBrowserTabIsActive)
+    if (visibilityChange) {
+      document.addEventListener(visibilityChange, syncBrowserTabIsActive, false)
+    }
+    syncBrowserTabIsActive()
     return () => {
-      window.removeEventListener('focus', handleWindowFocus)
-      window.removeEventListener('blur', handleWindowBlur)
-      document.removeEventListener(visibilityChange, handleVisibilityChange)
+      window.removeEventListener('focus', syncBrowserTabIsActive)
+      window.removeEventListener('blur', syncBrowserTabIsActive)
+      if (visibilityChange) {
+        document.removeEventListener(visibilityChange, syncBrowserTabIsActive)
+      }
       clearMessagesMap()
       setActiveChannelId('')
       destroyChannelsMap()

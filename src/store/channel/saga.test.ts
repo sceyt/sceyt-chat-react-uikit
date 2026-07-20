@@ -1,4 +1,5 @@
 import { runSaga } from 'redux-saga'
+import log from 'loglevel'
 import {
   destroyChannelsMap,
   getChannelFromMap,
@@ -9,6 +10,7 @@ import {
   setPendingChannelRead
 } from '../../helpers/channelHalper'
 import { addMessageToMap } from '../../helpers/messagesHalper'
+import { compactReadMessageLogData } from '../../helpers/readMessageLog'
 import { MESSAGE_DELIVERY_STATUS } from '../../helpers/constants'
 import { makeChannel, makeMessage, makePendingMessage, makeUser } from '../../testUtils/messageFixtures'
 import { updateMessageAC } from '../message/actions'
@@ -38,6 +40,10 @@ const mockStore = {
   getState: jest.fn(() => mockStoreState)
 }
 
+let logWarnSpy: jest.SpyInstance
+let logErrorSpy: jest.SpyInstance
+let logInfoSpy: jest.SpyInstance
+
 jest.mock('store', () => ({
   __esModule: true,
   get default() {
@@ -49,6 +55,18 @@ jest.mock('../evetns/inedx', () => ({
   __esModule: true,
   default: jest.fn()
 }))
+
+beforeEach(() => {
+  logWarnSpy = jest.spyOn(log, 'warn').mockImplementation(() => undefined)
+  logErrorSpy = jest.spyOn(log, 'error').mockImplementation(() => undefined)
+  logInfoSpy = jest.spyOn(log, 'info').mockImplementation(() => undefined)
+})
+
+afterEach(() => {
+  logWarnSpy.mockRestore()
+  logErrorSpy.mockRestore()
+  logInfoSpy.mockRestore()
+})
 
 const runChannelSaga = async (saga: (...args: any[]) => Generator, ...args: any[]) => {
   const dispatched: any[] = []
@@ -114,6 +132,25 @@ describe('channel saga read markers', () => {
     expect(getChannelFromMap(channel.id).lastDisplayedMessageId).toBe('103')
     expect(getChannelFromMap(channel.id).newMessageCount).toBe(2)
     expect(getChannelFromMap(channel.id).unread).toBe(true)
+    expect(logInfoSpy).toHaveBeenCalledWith(
+      '[READ_MESSAGE] Received markMessagesRead action',
+      compactReadMessageLogData({
+        source: 'initial',
+        channelId: channel.id,
+        readAll: false,
+        messageIds: ['101', '103']
+      })
+    )
+    expect(logInfoSpy).toHaveBeenCalledWith(
+      '[READ_MESSAGE] Confirmed read marker',
+      compactReadMessageLogData({
+        source: 'initial',
+        channelId: channel.id,
+        readAll: false,
+        requestedMessageIds: ['101', '103'],
+        confirmedMessageIds: ['101', '103']
+      })
+    )
   })
 
   it('clears unread badge fields when displayed reads reach the latest unread boundary', async () => {
@@ -242,6 +279,41 @@ describe('channel saga read markers', () => {
     expect(channel.markMessagesAsDisplayed).toHaveBeenCalledTimes(3)
     expect(getPendingChannelRead(channel.id)).toEqual(
       expect.objectContaining({ channelId: channel.id, messageIds: ['501', '502'], readAll: false })
+    )
+    expect(logWarnSpy).toHaveBeenNthCalledWith(
+      1,
+      { type: 'InternalError', message: 'timeout' },
+      '[READ_MESSAGE] Retrying read marker (1/2)',
+      compactReadMessageLogData({
+        source: 'initial',
+        channelId: channel.id,
+        readAll: false,
+        messageIds: ['501', '502'],
+        retryDelayMs: 500
+      })
+    )
+    expect(logWarnSpy).toHaveBeenNthCalledWith(
+      2,
+      { type: 'InternalError', message: 'timeout' },
+      '[READ_MESSAGE] Retrying read marker (2/2)',
+      compactReadMessageLogData({
+        source: 'initial',
+        channelId: channel.id,
+        readAll: false,
+        messageIds: ['501', '502'],
+        retryDelayMs: 1500
+      })
+    )
+    expect(logErrorSpy).toHaveBeenCalledWith(
+      { type: 'InternalError', message: 'timeout' },
+      '[READ_MESSAGE] Exhausted read marker retries; keeping queued for replay',
+      compactReadMessageLogData({
+        source: 'initial',
+        channelId: channel.id,
+        readAll: false,
+        messageIds: ['501', '502'],
+        attempts: 3
+      })
     )
 
     ;(getChannelFromMap(channel.id) as any).markMessagesAsDisplayed = jest.fn().mockResolvedValue({
@@ -411,6 +483,16 @@ describe('channel saga READ_MESSAGE resendable mechanism', () => {
     expect(markMessagesAsDisplayed).toHaveBeenCalledTimes(1)
     expect(getPendingChannelRead(channel.id)).toBeUndefined()
     expect(dispatched.filter((action) => action.type === updateMessageAC('701', {}).type)).toHaveLength(0)
+    expect(logErrorSpy).toHaveBeenCalledWith(
+      { type: 'BadRequest', message: 'invalid ids' },
+      '[READ_MESSAGE] Dropping read marker after non-resendable error',
+      compactReadMessageLogData({
+        source: 'initial',
+        channelId: channel.id,
+        readAll: false,
+        messageIds: ['701', '702']
+      })
+    )
   })
 
   it('queues the read without calling the SDK when offline at dispatch time', async () => {
@@ -438,6 +520,16 @@ describe('channel saga READ_MESSAGE resendable mechanism', () => {
     // the optimistic channel update is still applied so the UI clears immediately
     expect(dispatched).toContainEqual(
       updateChannelDataAC(channel.id, expect.objectContaining({ lastDisplayedMessageId: '712' }))
+    )
+    expect(logWarnSpy).toHaveBeenCalledWith(
+      '[READ_MESSAGE] Queued read marker because connection is not ready',
+      compactReadMessageLogData({
+        source: 'initial',
+        channelId: channel.id,
+        readAll: false,
+        messageIds: ['711', '712'],
+        connectionStatus: CONNECTION_STATUS.DISCONNECTED
+      })
     )
   })
 
@@ -535,6 +627,137 @@ describe('channel saga READ_MESSAGE resendable mechanism', () => {
     expect(markMessagesAsDisplayed).not.toHaveBeenCalled()
     expect(getPendingChannelRead(channel.id)).toBeUndefined()
     expect(dispatched).toHaveLength(0)
+    expect(logWarnSpy).toHaveBeenCalledWith(
+      '[READ_MESSAGE] Skipping read marker because message id list is empty',
+      compactReadMessageLogData({
+        source: 'initial',
+        channelId: channel.id,
+        readAll: false,
+        messageIds: ['', '']
+      })
+    )
+  })
+
+  it('queues read-all without calling the SDK when offline at dispatch time', async () => {
+    mockStoreState.UserReducer.connectionStatus = CONNECTION_STATUS.DISCONNECTED
+    const channel = makeChannel({
+      id: 'channel-read-all-offline',
+      lastMessage: makeMessage({ id: '761', channelId: 'channel-read-all-offline', incoming: true }),
+      lastDisplayedMessageId: '760',
+      unread: true,
+      newMessageCount: 1,
+      newMentionCount: 1
+    })
+    ;(channel as any).markAsRead = jest.fn()
+    setChannelInMap(channel)
+
+    const dispatched = await runChannelSaga(__channelSagaTestables.markChannelAsRead, markChannelAsReadAC(channel.id))
+
+    expect((channel as any).markAsRead).not.toHaveBeenCalled()
+    expect(getPendingChannelRead(channel.id)).toEqual(
+      expect.objectContaining({ channelId: channel.id, readAll: true, messageIds: [] })
+    )
+    expect(dispatched).toContainEqual(
+      updateChannelDataAC(channel.id, {
+        unread: false,
+        newMessageCount: 0,
+        newMentionCount: 0,
+        lastDisplayedMessageId: '761'
+      })
+    )
+    expect(logWarnSpy).toHaveBeenCalledWith(
+      '[READ_MESSAGE] Queued read marker because connection is not ready',
+      compactReadMessageLogData({
+        source: 'initial',
+        channelId: channel.id,
+        readAll: true,
+        messageIds: [],
+        connectionStatus: CONNECTION_STATUS.DISCONNECTED
+      })
+    )
+  })
+
+  it('drops the read-all queue when markAsRead fails with a non-resendable error', async () => {
+    const channel = makeChannel({
+      id: 'channel-read-all-drop',
+      lastMessage: makeMessage({ id: '772', channelId: 'channel-read-all-drop', incoming: true }),
+      lastDisplayedMessageId: '770',
+      unread: true,
+      newMessageCount: 2
+    })
+    ;(channel as any).markAsRead = jest.fn().mockRejectedValue({ type: 'BadRequest', message: 'invalid boundary' })
+    setChannelInMap(channel)
+
+    await runChannelSaga(__channelSagaTestables.markChannelAsRead, markChannelAsReadAC(channel.id))
+
+    expect((channel as any).markAsRead).toHaveBeenCalledTimes(1)
+    expect(getPendingChannelRead(channel.id)).toBeUndefined()
+    expect(logErrorSpy).toHaveBeenCalledWith(
+      { type: 'BadRequest', message: 'invalid boundary' },
+      '[READ_MESSAGE] Dropping read marker after non-resendable error',
+      compactReadMessageLogData({
+        source: 'initial',
+        channelId: channel.id,
+        readAll: true,
+        messageIds: []
+      })
+    )
+  })
+
+  it('keeps exhausted resendable read-all retries queued and replays them after reconnect', async () => {
+    const channel = makeChannel({
+      id: 'channel-read-all-retry',
+      lastMessage: makeMessage({ id: '782', channelId: 'channel-read-all-retry', incoming: true }),
+      lastDisplayedMessageId: '780',
+      unread: true,
+      newMessageCount: 2
+    })
+    ;(channel as any).markAsRead = jest.fn().mockRejectedValue({ type: 'InternalError', message: 'timeout' })
+    setChannelInMap(channel)
+
+    await runChannelSaga(__channelSagaTestables.markChannelAsRead, markChannelAsReadAC(channel.id))
+
+    expect((channel as any).markAsRead).toHaveBeenCalledTimes(3)
+    expect(getPendingChannelRead(channel.id)).toEqual(
+      expect.objectContaining({ channelId: channel.id, readAll: true, messageIds: [] })
+    )
+
+    ;(getChannelFromMap(channel.id) as any).markAsRead = jest.fn(async () => ({
+      ...channel,
+      lastDisplayedMessageId: '782'
+    }))
+
+    const replayDispatched = await runChannelSaga(
+      __channelSagaTestables.resendPendingChannelReads,
+      resendPendingChannelReadsAC(CONNECTION_STATUS.CONNECTED)
+    )
+
+    expect((getChannelFromMap(channel.id) as any).markAsRead).toHaveBeenCalledTimes(1)
+    expect(getPendingChannelRead(channel.id)).toBeUndefined()
+    expect(replayDispatched.filter((action) => action.type === updateMessageAC('782', {}).type)).toHaveLength(0)
+  })
+
+  it('stops retrying read-all and keeps it queued when the connection drops between retries', async () => {
+    const channel = makeChannel({
+      id: 'channel-read-all-drop-midway',
+      lastMessage: makeMessage({ id: '792', channelId: 'channel-read-all-drop-midway', incoming: true }),
+      lastDisplayedMessageId: '790',
+      unread: true,
+      newMessageCount: 2
+    })
+    ;(channel as any).markAsRead = jest.fn().mockRejectedValue({ type: 'InternalError', message: 'timeout' })
+    setChannelInMap(channel)
+    __channelSagaTestables.setWaitForReadMarkerRetry(() => {
+      mockStoreState.UserReducer.connectionStatus = CONNECTION_STATUS.DISCONNECTED
+      return Promise.resolve()
+    })
+
+    await runChannelSaga(__channelSagaTestables.markChannelAsRead, markChannelAsReadAC(channel.id))
+
+    expect((channel as any).markAsRead).toHaveBeenCalledTimes(1)
+    expect(getPendingChannelRead(channel.id)).toEqual(
+      expect.objectContaining({ channelId: channel.id, readAll: true, messageIds: [] })
+    )
   })
 
   it('replays a queued read-all via markAsRead and clears it without per-message updates', async () => {
@@ -555,6 +778,25 @@ describe('channel saga READ_MESSAGE resendable mechanism', () => {
     expect((channel as any).markAsRead).toHaveBeenCalledTimes(1)
     expect(getPendingChannelRead(channel.id)).toBeUndefined()
     expect(dispatched.filter((action) => action.type === updateMessageAC('762', {}).type)).toHaveLength(0)
+    expect(logInfoSpy).toHaveBeenCalledWith(
+      '[READ_MESSAGE] Replaying queued read marker',
+      compactReadMessageLogData({
+        source: 'replay',
+        channelId: channel.id,
+        readAll: true,
+        messageIds: []
+      })
+    )
+    expect(logInfoSpy).toHaveBeenCalledWith(
+      '[READ_MESSAGE] Confirmed read marker',
+      compactReadMessageLogData({
+        source: 'replay',
+        channelId: channel.id,
+        readAll: true,
+        requestedMessageIds: [],
+        confirmedMessageIds: []
+      })
+    )
   })
 
   it('removes pending reads for channels that no longer exist instead of replaying them forever', async () => {
@@ -566,6 +808,15 @@ describe('channel saga READ_MESSAGE resendable mechanism', () => {
     )
 
     expect(getPendingChannelRead('channel-resend-missing')).toBeUndefined()
+    expect(logWarnSpy).toHaveBeenCalledWith(
+      '[READ_MESSAGE] Dropping queued replay because channel was not found',
+      compactReadMessageLogData({
+        source: 'replay',
+        channelId: 'channel-resend-missing',
+        readAll: false,
+        messageIds: ['771']
+      })
+    )
   })
 
   it('removes the pending read when the replay fails with a non-resendable error', async () => {
@@ -706,6 +957,104 @@ describe('channel saga READ_MESSAGE resendable mechanism', () => {
     expect(replayDispatched).toContainEqual(
       updateMessageAC('832', expect.objectContaining({ deliveryStatus: MESSAGE_DELIVERY_STATUS.READ }))
     )
+  })
+
+  it('keeps read-all queued while markAsRead hangs and lets the reconnect replay confirm it', async () => {
+    let resolveHangingCall!: (value: any) => void
+    const hangingCall = new Promise<any>((resolve) => {
+      resolveHangingCall = resolve
+    })
+    const channel = makeChannel({
+      id: 'channel-read-all-hanging-call',
+      lastMessage: makeMessage({ id: '842', channelId: 'channel-read-all-hanging-call', incoming: true }),
+      lastDisplayedMessageId: '840',
+      unread: true,
+      newMessageCount: 2
+    })
+    ;(channel as any).markAsRead = jest.fn(() => hangingCall)
+    setChannelInMap(channel)
+
+    const hangingTask = runSaga(
+      { dispatch: () => undefined, getState: () => mockStoreState },
+      __channelSagaTestables.markChannelAsRead,
+      markChannelAsReadAC(channel.id)
+    )
+    await new Promise((resolve) => setTimeout(resolve, 0))
+
+    expect((channel as any).markAsRead).toHaveBeenCalledTimes(1)
+    expect(getPendingChannelRead(channel.id)).toEqual(
+      expect.objectContaining({ channelId: channel.id, readAll: true, messageIds: [] })
+    )
+
+    ;(getChannelFromMap(channel.id) as any).markAsRead = jest.fn(async () => ({
+      ...channel,
+      lastDisplayedMessageId: '842'
+    }))
+
+    const replayDispatched = await runChannelSaga(
+      __channelSagaTestables.resendPendingChannelReads,
+      resendPendingChannelReadsAC(CONNECTION_STATUS.CONNECTED)
+    )
+
+    expect(getPendingChannelRead(channel.id)).toBeUndefined()
+    expect(replayDispatched.filter((action) => action.type === updateMessageAC('842', {}).type)).toHaveLength(0)
+
+    resolveHangingCall({ ...channel, lastDisplayedMessageId: '842' })
+    await hangingTask.toPromise()
+
+    expect(getPendingChannelRead(channel.id)).toBeUndefined()
+  })
+
+  it('preserves a newer read-all queue when an older per-message confirmation resolves later', async () => {
+    let resolveHangingCall!: (value: any) => void
+    const hangingCall = new Promise<any>((resolve) => {
+      resolveHangingCall = resolve
+    })
+    const channel = makeChannel({
+      id: 'channel-read-upgrade-to-read-all',
+      lastMessage: makeMessage({ id: '853', channelId: 'channel-read-upgrade-to-read-all', incoming: true }),
+      lastDisplayedMessageId: '850',
+      unread: true,
+      newMessageCount: 3,
+      markMessagesAsDisplayed: jest.fn(() => hangingCall)
+    })
+    ;(channel as any).markAsRead = jest.fn(async () => ({ ...channel, lastDisplayedMessageId: '853' }))
+    setChannelInMap(channel)
+
+    const hangingTask = runSaga(
+      { dispatch: () => undefined, getState: () => mockStoreState },
+      __channelSagaTestables.markMessagesRead,
+      markMessagesAsReadAC(channel.id, ['851', '852'])
+    )
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    expect(channel.markMessagesAsDisplayed).toHaveBeenCalledTimes(1)
+
+    mockStoreState.UserReducer.connectionStatus = CONNECTION_STATUS.DISCONNECTED
+    await runChannelSaga(__channelSagaTestables.markChannelAsRead, markChannelAsReadAC(channel.id))
+    expect((channel as any).markAsRead).not.toHaveBeenCalled()
+    expect(getPendingChannelRead(channel.id)).toEqual(
+      expect.objectContaining({ channelId: channel.id, readAll: true, messageIds: [] })
+    )
+
+    resolveHangingCall({
+      messageIds: ['851', '852'],
+      user: makeUser({ id: 'current-user' }),
+      createdAt: new Date('2026-07-16T11:10:00.000Z')
+    })
+    await hangingTask.toPromise()
+
+    expect(getPendingChannelRead(channel.id)).toEqual(
+      expect.objectContaining({ channelId: channel.id, readAll: true, messageIds: [] })
+    )
+
+    mockStoreState.UserReducer.connectionStatus = CONNECTION_STATUS.CONNECTED
+    await runChannelSaga(
+      __channelSagaTestables.resendPendingChannelReads,
+      resendPendingChannelReadsAC(CONNECTION_STATUS.CONNECTED)
+    )
+
+    expect((getChannelFromMap(channel.id) as any).markAsRead).toHaveBeenCalledTimes(1)
+    expect(getPendingChannelRead(channel.id)).toBeUndefined()
   })
 
   it('keeps the read queued while the SDK call hangs and lets the reconnect replay confirm it', async () => {

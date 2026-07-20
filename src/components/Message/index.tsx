@@ -1,6 +1,7 @@
 import styled from 'styled-components'
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { shallowEqual } from 'react-redux'
+import log from 'loglevel'
 import { useSelector, useDispatch } from 'store/hooks'
 import moment from 'moment'
 // Store
@@ -39,6 +40,7 @@ import { ReactComponent as ErrorIcon } from '../../assets/svg/errorIcon.svg'
 import { compareMessagesForList } from 'helpers/messagesHalper'
 import { getOpenChatOnUserInteraction } from 'helpers/channelHalper'
 import { DEFAULT_CHANNEL_TYPE, MESSAGE_DELIVERY_STATUS, MESSAGE_STATUS } from 'helpers/constants'
+import { compactReadMessageLogData } from 'helpers/readMessageLog'
 import { THEME_COLORS } from 'UIHelper/constants'
 import { IAttachment, IReaction, IUser } from 'types'
 // Components
@@ -550,20 +552,71 @@ const Message = ({
       message.userMarkers.length &&
       message.userMarkers.find((marker) => marker.name === MESSAGE_DELIVERY_STATUS.READ)
     )
-
-    if (
+    const shouldSendReadMarker =
       isVisible &&
       message.incoming &&
       !alreadyRead &&
       !disableAutoReadTracking &&
       isTabActive &&
-      channel.newMessageCount &&
+      !!channel.newMessageCount &&
       channel.newMessageCount > 0 &&
       connectionStatus === CONNECTION_STATUS.CONNECTED
-    ) {
+
+    if (message.incoming && isVisible) {
+      if (shouldSendReadMarker) {
+        log.info(
+          '[READ_MESSAGE] Message auto-read gate passed',
+          compactReadMessageLogData({
+            source: 'message',
+            channelId: channel.id,
+            messageId: message.id,
+            isVisible,
+            alreadyRead,
+            disableAutoReadTracking,
+            isTabActive,
+            newMessageCount: channel.newMessageCount || 0,
+            connectionStatus,
+            queued: !!queueReadMarker
+          })
+        )
+      } else {
+        log.info(
+          '[READ_MESSAGE] Message auto-read gate blocked',
+          compactReadMessageLogData({
+            source: 'message',
+            channelId: channel.id,
+            messageId: message.id,
+            isVisible,
+            alreadyRead,
+            disableAutoReadTracking,
+            isTabActive,
+            newMessageCount: channel.newMessageCount || 0,
+            connectionStatus
+          })
+        )
+      }
+    }
+
+    if (shouldSendReadMarker) {
       if (queueReadMarker) {
+        log.info(
+          '[READ_MESSAGE] Queueing read marker from Message component',
+          compactReadMessageLogData({
+            source: 'message',
+            channelId: channel.id,
+            messageId: message.id
+          })
+        )
         queueReadMarker(channel.id, message.id)
       } else {
+        log.info(
+          '[READ_MESSAGE] Dispatching read marker directly from Message component',
+          compactReadMessageLogData({
+            source: 'message',
+            channelId: channel.id,
+            messageId: message.id
+          })
+        )
         dispatch(markMessagesAsReadAC(channel.id, [message.id]))
       }
     }
@@ -638,6 +691,17 @@ const Message = ({
 
   useEffect(() => {
     if (isVisible) {
+      if (message.incoming) {
+        log.info(
+          '[READ_MESSAGE] Message row became visible',
+          compactReadMessageLogData({
+            source: 'message',
+            channelId: channel.id,
+            messageId: message.id,
+            localRef: message.tid || message.id || ''
+          })
+        )
+      }
       if (setLastVisibleMessageId) {
         setLastVisibleMessageId(message)
       }

@@ -33,7 +33,14 @@ import {
   updateChannelLastMessageAC,
   updateChannelLastMessageStatusAC
 } from '../channel/actions'
-import { addMessagesAC, resendPendingMessageMutationsAC, updateMessagesMarkersAC, updateMessagesStatusAC } from '../message/actions'
+import {
+  addMessagesAC,
+  addReactionToMessageAC,
+  deleteReactionFromMessageAC,
+  resendPendingMessageMutationsAC,
+  updateMessagesMarkersAC,
+  updateMessagesStatusAC
+} from '../message/actions'
 import { getRolesAC } from '../member/actions'
 import { setConnectionStatusAC } from '../user/actions'
 import { CONNECTION_STATUS } from '../user/constants'
@@ -261,6 +268,117 @@ describe('event message last-message handling', () => {
       { name: MESSAGE_DELIVERY_STATUS.READ, count: 1 }
     ])
     expect(getChannelFromMap(channelId)?.lastMessage.userMarkers).toEqual([])
+  })
+
+  it('keeps cached self reactions untouched for remote reaction-added events and tolerates missing cached messages', async () => {
+    const currentUser = makeUser({ id: 'current-user' })
+    const remoteUser = makeUser({ id: 'remote-user' })
+    const channelId = 'channel-reaction-added-event'
+    const selfReaction = {
+      id: 'self-reaction',
+      key: 'thumbsup',
+      score: 1,
+      reason: '',
+      createdAt: new Date('2026-04-02T12:10:00.000Z'),
+      messageId: '1300',
+      user: currentUser
+    }
+    const cachedMessage = makeMessage({
+      id: '1300',
+      channelId,
+      user: currentUser,
+      userReactions: [selfReaction]
+    })
+    const reaction = {
+      id: 'remote-reaction',
+      key: 'heart',
+      score: 1,
+      reason: '',
+      createdAt: new Date('2026-04-02T12:11:00.000Z'),
+      messageId: cachedMessage.id,
+      user: remoteUser
+    }
+    const missingMessage = makeMessage({
+      id: '1301',
+      channelId,
+      user: currentUser,
+      reactionTotals: [{ key: 'heart', count: 1, score: 1 }]
+    })
+    const channel = makeChannel({ id: channelId, lastMessage: cachedMessage, newReactions: [] })
+    const dispatched: any[] = []
+
+    setActiveChannelId(channelId)
+    addMessageToMap(channelId, cachedMessage)
+
+    await runSaga(
+      {
+        getState: getSagaState,
+        dispatch: (action) => {
+          dispatched.push(action)
+        }
+      },
+      __eventsTestables.handleReactionAddedEvent,
+      { channel, user: remoteUser, message: cachedMessage, reaction },
+      { user: currentUser }
+    ).toPromise()
+
+    await runSaga(
+      {
+        getState: getSagaState,
+        dispatch: (action) => {
+          dispatched.push(action)
+        }
+      },
+      __eventsTestables.handleReactionAddedEvent,
+      { channel, user: remoteUser, message: missingMessage, reaction },
+      { user: currentUser }
+    ).toPromise()
+
+    expect(dispatched).toContainEqual(addReactionToMessageAC(cachedMessage, reaction as any, false))
+    expect(getMessagesFromMap(channelId)[cachedMessage.id].userReactions).toEqual([selfReaction])
+    expect(getMessagesFromMap(channelId)[missingMessage.id]).toBeUndefined()
+  })
+
+  it('keeps cached self reactions untouched for remote reaction-deleted events', async () => {
+    const currentUser = makeUser({ id: 'current-user' })
+    const remoteUser = makeUser({ id: 'remote-user' })
+    const channelId = 'channel-reaction-deleted-event'
+    const reaction = {
+      id: 'self-reaction',
+      key: 'thumbsup',
+      score: 1,
+      reason: '',
+      createdAt: new Date('2026-04-02T12:20:00.000Z'),
+      messageId: '1310',
+      user: currentUser
+    }
+    const cachedMessage = makeMessage({
+      id: '1310',
+      channelId,
+      user: currentUser,
+      userReactions: [reaction]
+    })
+    const channel = makeChannel({ id: channelId, lastMessage: cachedMessage, newReactions: [] })
+    const dispatched: any[] = []
+
+    setActiveChannelId(channelId)
+    addMessageToMap(channelId, cachedMessage)
+    setChannelInMap(channel)
+
+    await runSaga(
+      {
+        getState: getSagaState,
+        dispatch: (action) => {
+          dispatched.push(action)
+        }
+      },
+      __eventsTestables.handleReactionDeletedEvent,
+      { channel, user: remoteUser, message: cachedMessage, reaction },
+      { user: currentUser }
+    ).toPromise()
+
+    expect(dispatched).toContainEqual(deleteReactionFromMessageAC(cachedMessage, reaction as any, false))
+    expect(getMessagesFromMap(channelId)[cachedMessage.id].userReactions).toEqual([reaction])
   })
 
   it(keepsNewestPendingTitle, async () => {

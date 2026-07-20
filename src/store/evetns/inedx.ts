@@ -475,6 +475,96 @@ export function* handleEditMessageEvent(args: { channel: IChannel; message: IMes
   yield put(removePendingMessageMutationAC(message.id))
 }
 
+export function* handleReactionAddedEvent(
+  args: { channel: IChannel; user: IUser; message: IMessage; reaction: IReaction },
+  SceytChatClient: any
+): any {
+  const { channel, user, message, reaction } = args
+  const isSelf = user.id === SceytChatClient.user.id
+  const activeChannelId = yield call(getActiveChannelId)
+
+  if (channel.id === activeChannelId) {
+    yield put(addReactionToMessageAC(message, reaction, isSelf))
+  }
+  if (message.user.id === SceytChatClient.user.id) {
+    if (!isSelf && Notification.permission === 'granted') {
+      if (document.visibilityState !== 'visible' || channel.id !== activeChannelId) {
+        const contactsMap = yield select(contactsMapSelector)
+        const getFromContacts = getShowOnlyContactUsers()
+        const state = store.getState()
+        const theme = state.ThemeReducer.theme || 'light'
+        const accentColor = state.ThemeReducer.newTheme?.colors?.accent?.[theme] || '#3B82F6'
+        const textSecondary = state.ThemeReducer.newTheme?.colors?.textSecondary?.[theme] || '#6B7280'
+        const messageBody = MessageTextFormat({
+          text: message.body,
+          message,
+          contactsMap,
+          getFromContacts,
+          isLastMessage: false,
+          asSampleText: true,
+          accentColor,
+          textSecondary
+        })
+        setNotification(
+          message?.type === MESSAGE_TYPE.VIEW_ONCE ? `Self-destructing` : messageBody,
+          reaction.user,
+          channel,
+          reaction.key,
+          message.attachments && message.attachments.length
+            ? message.attachments.find((att: IAttachment) => att.type !== attachmentTypes.link)
+            : undefined
+        )
+      }
+    }
+
+    if (channel.newReactions && channel.newReactions.length) {
+      const channelUpdateParams = {
+        userMessageReactions: channel.newReactions,
+        lastReactedMessage: message,
+        newReactions: channel.newReactions,
+        muted: channel.muted,
+        mutedTill: channel.mutedTill
+      }
+      yield put(updateChannelDataAC(channel.id, channelUpdateParams))
+    }
+    updateChannelOnAllChannels(channel.id, {
+      userMessageReactions: channel.newReactions,
+      lastReactedMessage: message,
+      newReactions: channel.newReactions,
+      muted: channel.muted,
+      mutedTill: channel.mutedTill
+    })
+  }
+
+  if (checkChannelExistsOnMessagesMap(channel.id)) {
+    addReactionToMessageOnMap(channel.id, message, reaction, isSelf)
+  }
+}
+
+export function* handleReactionDeletedEvent(
+  args: { channel: IChannel; user: IUser; message: IMessage; reaction: IReaction },
+  SceytChatClient: any
+): any {
+  const { channel, user, message, reaction } = args
+  log.info('channel REACTION_DELETED ... ', channel)
+  const channelFromMap = getChannelFromMap(channel.id)
+  const isSelf = user.id === SceytChatClient.user.id
+  const activeChannelId = yield call(getActiveChannelId)
+
+  if (channel.id === activeChannelId) {
+    yield put(deleteReactionFromMessageAC(message, reaction, isSelf))
+  }
+  const channelUpdateParams = JSON.parse(JSON.stringify(channel))
+  if (channelFromMap && channelFromMap.lastReactedMessage && channelFromMap.lastReactedMessage.id === message.id) {
+    channelUpdateParams.lastReactedMessage = null
+  }
+  yield put(updateChannelDataAC(channel.id, channelUpdateParams))
+  updateChannelOnAllChannels(channel.id, channelUpdateParams)
+  if (checkChannelExistsOnMessagesMap(channel.id)) {
+    removeReactionToMessageOnMap(channel.id, message, reaction, isSelf)
+  }
+}
+
 export const __eventsTestables = {
   handleChannelMessageEvent,
   handleChannelMarkedAsReadEvent,
@@ -482,6 +572,8 @@ export const __eventsTestables = {
   handleMessageMarkersReceivedEvent,
   handleDeleteMessageEvent,
   handleEditMessageEvent,
+  handleReactionAddedEvent,
+  handleReactionDeletedEvent,
   handleConnectionStatusChangedEvent
 }
 
@@ -1244,66 +1336,7 @@ export default function* watchForEvents(): any {
           break
         }
         case CHANNEL_EVENT_TYPES.REACTION_ADDED: {
-          const { channel, user, message, reaction } = args
-          const isSelf = user.id === SceytChatClient.user.id
-          const activeChannelId = yield call(getActiveChannelId)
-
-          if (channel.id === activeChannelId) {
-            yield put(addReactionToMessageAC(message, reaction, isSelf))
-          }
-          if (message.user.id === SceytChatClient.user.id) {
-            if (!isSelf && Notification.permission === 'granted') {
-              if (document.visibilityState !== 'visible' || channel.id !== activeChannelId) {
-                const contactsMap = yield select(contactsMapSelector)
-                const getFromContacts = getShowOnlyContactUsers()
-                const state = store.getState()
-                const theme = state.ThemeReducer.theme || 'light'
-                const accentColor = state.ThemeReducer.newTheme?.colors?.accent?.[theme] || '#3B82F6'
-                const textSecondary = state.ThemeReducer.newTheme?.colors?.textSecondary?.[theme] || '#6B7280'
-                const messageBody = MessageTextFormat({
-                  text: message.body,
-                  message,
-                  contactsMap,
-                  getFromContacts,
-                  isLastMessage: false,
-                  asSampleText: true,
-                  accentColor,
-                  textSecondary
-                })
-                setNotification(
-                  message?.type === MESSAGE_TYPE.VIEW_ONCE ? `Self-destructing` : messageBody,
-                  reaction.user,
-                  channel,
-                  reaction.key,
-                  message.attachments && message.attachments.length
-                    ? message.attachments.find((att: IAttachment) => att.type !== attachmentTypes.link)
-                    : undefined
-                )
-              }
-            }
-
-            if (channel.newReactions && channel.newReactions.length) {
-              const channelUpdateParams = {
-                userMessageReactions: channel.newReactions,
-                lastReactedMessage: message,
-                newReactions: channel.newReactions,
-                muted: channel.muted,
-                mutedTill: channel.mutedTill
-              }
-              yield put(updateChannelDataAC(channel.id, channelUpdateParams))
-            }
-            updateChannelOnAllChannels(channel.id, {
-              userMessageReactions: channel.newReactions,
-              lastReactedMessage: message,
-              newReactions: channel.newReactions,
-              muted: channel.muted,
-              mutedTill: channel.mutedTill
-            })
-          }
-
-          if (checkChannelExistsOnMessagesMap(channel.id)) {
-            addReactionToMessageOnMap(channel.id, message, reaction, true)
-          }
+          yield call(handleReactionAddedEvent, args, SceytChatClient)
           break
         }
         case CHANNEL_EVENT_TYPES.POLL_ADDED: {
@@ -1448,36 +1481,7 @@ export default function* watchForEvents(): any {
           break
         }
         case CHANNEL_EVENT_TYPES.REACTION_DELETED: {
-          const { channel, user, message, reaction } = args
-          log.info('channel REACTION_DELETED ... ', channel)
-          const channelFromMap = getChannelFromMap(channel.id)
-          const isSelf = user.id === SceytChatClient.user.id
-          const activeChannelId = yield call(getActiveChannelId)
-
-          if (channel.id === activeChannelId) {
-            yield put(deleteReactionFromMessageAC(message, reaction, isSelf))
-          }
-          const channelUpdateParams = JSON.parse(JSON.stringify(channel))
-          if (
-            channelFromMap &&
-            channelFromMap.lastReactedMessage &&
-            channelFromMap.lastReactedMessage.id === message.id
-          ) {
-            channelUpdateParams.lastReactedMessage = null
-          }
-          yield put(updateChannelDataAC(channel.id, channelUpdateParams))
-          updateChannelOnAllChannels(channel.id, channelUpdateParams)
-          /* if (!(channel.newReactions && channel.newReactions.length)) {
-          const channelUpdateParams = {
-            userMessageReactions: [],
-            lastReactedMessage: null
-          }
-          yield put(updateChannelDataAC(channel.id, channelUpdateParams))
-          updateChannelOnAllChannels(channel.id, channelUpdateParams)
-        } */
-          if (checkChannelExistsOnMessagesMap(channel.id)) {
-            removeReactionToMessageOnMap(channel.id, message, reaction, true)
-          }
+          yield call(handleReactionDeletedEvent, args, SceytChatClient)
           break
         }
 
