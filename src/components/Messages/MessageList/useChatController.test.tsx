@@ -1514,6 +1514,50 @@ describe('useChatController', () => {
     expect(screen.getByTestId('is-viewing-latest')).toHaveTextContent('true')
   })
 
+  it('marks the latest visible unread message after unread restoration clears without waiting for another scroll', async () => {
+    const channelId = 'channel-unread-clear-scan'
+    const latestUnreadMessage = makeMessage({
+      id: '2102',
+      channelId,
+      body: 'latest-unread',
+      incoming: true
+    })
+    const channel = makeChannel({
+      id: channelId,
+      newMessageCount: 1,
+      lastDisplayedMessageId: '2100',
+      lastMessage: latestUnreadMessage
+    })
+    const messages = [makeMessage({ id: '2101', channelId, body: 'outgoing', incoming: false }), latestUnreadMessage]
+    const dispatch = jest.fn()
+
+    renderController({
+      channel,
+      messages,
+      hasNextMessages: false,
+      connectionStatus: CONNECTION_STATUS.CONNECTED,
+      unreadScrollTo: true,
+      unreadMessageId: '2100',
+      dispatch
+    })
+
+    dispatch.mockClear()
+
+    await act(async () => {
+      flushAnimationFrames()
+      await Promise.resolve()
+    })
+    await flushEffects()
+
+    await act(async () => {
+      flushAnimationFrames()
+      await Promise.resolve()
+    })
+
+    expect(dispatch).toHaveBeenCalledWith(setUnreadScrollToAC(false))
+    expect(dispatch).toHaveBeenCalledWith(markMessagesAsReadAC(channel.id, ['2102']))
+  })
+
   it('dispatches loadLatestMessages when jumpToLatest is used while connected and latest is outside the window', () => {
     const channel = makeChannel({
       id: 'channel-connected',

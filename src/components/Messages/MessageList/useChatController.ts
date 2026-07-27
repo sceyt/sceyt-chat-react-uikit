@@ -430,6 +430,7 @@ export function useChatController({
   const highlightedItemIdRef = useRef<string | null>(null)
   const highlightTimeoutRef = useRef<NodeJS.Timeout | number | null>(null)
   const unreadRestoreCompletedRef = useRef(false)
+  const previousUnreadScrollToRef = useRef(unreadScrollTo)
   const historyLoadArmedRef = useRef(true)
   const latestLoadArmedRef = useRef(true)
   const pendingNewestCountRef = useRef(0)
@@ -2604,6 +2605,17 @@ export function useChatController({
       cancelAnimationFrame(frameId)
     }
   }, [dispatch, loadingNextMessages, loadingPrevMessages, messages.length, unreadScrollTo])
+
+  useEffect(() => {
+    const previousUnreadScrollTo = previousUnreadScrollToRef.current
+    previousUnreadScrollToRef.current = unreadScrollTo
+
+    if (!previousUnreadScrollTo || unreadScrollTo) {
+      return
+    }
+
+    queueVisibleUnreadCheck()
+  }, [queueVisibleUnreadCheck, unreadScrollTo])
 
   useEffect(
     () => () => {
