@@ -2912,6 +2912,32 @@ function* getMessagesQuery(action: IAction): any {
       }
       yield call(loadOGMetadataForLinkMessages, appliedMessages, true)
       const activeMessages: IMessage[] = store.getState().MessageReducer.activeChannelMessages || []
+      const latestLoadedMessageId = getLastConfirmedMessageId(appliedMessages)
+      const messagesReceivedDuringLoad = latestLoadedMessageId
+        ? activeMessages.filter(
+            (message) =>
+              message.channelId === channel.id &&
+              !!message.id &&
+              compareMessageIds(message.id, latestLoadedMessageId) > 0
+          )
+        : []
+
+      // A channel event can append a new message while this request is in flight.
+      // Its response is a point-in-time snapshot, so replacing the list with it
+      // must not discard messages that are already visible after that snapshot.
+      if (messagesReceivedDuringLoad.length) {
+        const messagesById = new Map<string, IMessage>()
+        ;[...appliedMessages, ...messagesReceivedDuringLoad].forEach((message) => {
+          messagesById.set(message.id || message.tid!, message)
+        })
+        appliedMessages = Array.from(messagesById.values()).sort(compareMessagesForList)
+
+        const firstAppliedMessageId = getFirstConfirmedMessageId(appliedMessages)
+        const lastAppliedMessageId = getLastConfirmedMessageId(appliedMessages)
+        if (firstAppliedMessageId && lastAppliedMessageId) {
+          setActiveSegment(channel.id, firstAppliedMessageId, lastAppliedMessageId)
+        }
+      }
       const activeConfirmedMessages = activeMessages.filter((message: IMessage) => !!message.id)
       const sameVisibleWindow = sameConfirmedWindow(activeConfirmedMessages, appliedMessages)
 

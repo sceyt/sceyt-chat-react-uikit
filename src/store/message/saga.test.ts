@@ -1331,6 +1331,67 @@ describe('message saga message-list flows', () => {
     expect(getMessageFromMap(channel.id, '703')?.body).toBe('server-703')
   })
 
+  it('keeps a message received while the initial latest-window request is in flight', async () => {
+    const channel = makeChannel({
+      id: 'channel-open-incoming-race',
+      lastMessage: makeMessage({
+        id: '702',
+        channelId: 'channel-open-incoming-race',
+        body: 'latest-before-open',
+        incoming: true
+      })
+    })
+    const initialServerWindow = [
+      makeMessage({ id: '701', channelId: channel.id, body: 'existing-701', incoming: true }),
+      channel.lastMessage!
+    ]
+    let resolveInitialLoad!: (value: QueryResult) => void
+    const initialLoad = new Promise<QueryResult>((resolve) => {
+      resolveInitialLoad = resolve
+    })
+    const query = createMessageQuery({
+      loadPrevious: jest.fn(() => initialLoad)
+    })
+
+    mockStoreState.UserReducer.connectionStatus = CONNECTION_STATUS.CONNECTED
+    mockStoreState.MessageReducer.activeChannelMessages = initialServerWindow
+    setActiveChannelId(channel.id)
+    setChannelInMap(channel)
+    initialServerWindow.forEach((message) => addMessageToMap(channel.id, message))
+    setActiveSegment(channel.id, '701', '702')
+    setClient(createClient(query, channel))
+
+    const dispatched: any[] = []
+    const task = runSaga(
+      {
+        dispatch: (action) => dispatched.push(action),
+        getState: () => mockStoreState
+      },
+      __messageSagaTestables.getMessagesQuery,
+      loadLatestMessagesAC(channel, undefined, true)
+    )
+
+    await flushMockServerDelay()
+    expect(query.loadPrevious).toHaveBeenCalledTimes(1)
+
+    // The same user sends from mobile while WAAFI Web is still opening the channel.
+    const incomingDuringOpen = makeMessage({
+      id: '703',
+      channelId: channel.id,
+      body: 'sent-from-mobile-during-open',
+      incoming: true
+    })
+    addMessageToMap(channel.id, incomingDuringOpen)
+    mockStoreState.MessageReducer.activeChannelMessages = [...initialServerWindow, incomingDuringOpen]
+
+    // The response was started before the mobile send, so it does not contain 703.
+    resolveInitialLoad({ messages: initialServerWindow, hasNext: false })
+    await task.toPromise()
+
+    const setMessagesAction = dispatched.filter((action) => action.type === setMessagesAC([], channel.id).type).at(-1)
+    expect(setMessagesAction.payload.messages.map((message: IMessage) => message.id)).toEqual(['701', '702', '703'])
+  })
+
   it('forces the true latest window when jump-to-latest bypasses unread state', async () => {
     const channel = makeChannel({
       id: 'channel-force-latest-window',
