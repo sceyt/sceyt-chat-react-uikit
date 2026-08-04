@@ -91,6 +91,12 @@ import { hideUserPresence } from '../../helpers/userHelper'
 import { getShowOnlyContactUsers } from '../../helpers/contacts'
 import { getFrame, getVideoFirstFrame } from '../../helpers/getVideoFrame'
 import { remuxVideoFileForUpload } from '../../helpers/videoConversion'
+import {
+  beginVideoPreparation,
+  clearVideoPreparation,
+  completeVideoPreparation,
+  failVideoPreparation
+} from '../../helpers/attachmentPreparation'
 import { CAN_USE_DOM } from '../../helpers/canUseDOM'
 
 // Hooks
@@ -752,7 +758,8 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
               upload: attachment.upload,
               metadata: attachment.metadata,
               type: attachment.type,
-              size: attachment.size
+              size: attachment.size,
+              thumbnailState: attachment.thumbnailState
             }
           })
           // Add viewOnce flag if enabled and valid
@@ -912,10 +919,12 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
     if (attachmentId) {
       const updatedAttachments = attachmentsUpdate.filter((item: any) => item.tid !== attachmentId)
       deleteVideoThumb(attachmentId)
+      clearVideoPreparation(attachmentId)
       releaseBlobUrls([`compose_${attachmentId}`])
       setAttachments(updatedAttachments)
       attachmentsUpdate = updatedAttachments
     } else {
+      attachmentsUpdate.forEach((attachment: any) => clearVideoPreparation(attachment.tid))
       releaseBlobUrls(attachmentsUpdate.map((item: any) => `compose_${item.tid}`))
       setAttachments([])
       attachmentsUpdate = []
@@ -1189,15 +1198,8 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
 
   const handleAddAttachment = async (file: File, isMediaAttachment: boolean) => {
     const customUploader = getCustomUploader()
-    if (file.type.split('/')[0] === 'video') {
-      // QuickTime .mov containers are unplayable in Firefox even when the codec
-      // is H.264 — remux to standard MP4 (stream copy, no re-encoding) before
-      // upload so every recipient can play the file and render thumbnails.
-      file = await remuxVideoFileForUpload(file)
-    }
     const fileType = file.type.split('/')[0]
     const tid = uuidv4()
-    const reader = new FileReader()
 
     const handleAttachmentImageForCache = async (attachment: any) => {
       const url = URL.createObjectURL(attachment.data)
@@ -1217,152 +1219,134 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
         dispatch(setUpdateMessageAttachmentAC(attachment?.metadata?.tmb || '', frameBlobUrl))
       }
     }
-    reader.onload = async () => {
-      // @ts-ignore
-      setPendingAttachment(tid, { file })
-      if (customUploader) {
-        if (fileType === 'image') {
-          resizeImage(file).then(async (resizedFile: any) => {
-            const { thumbnail, imageWidth, imageHeight } = await createImageThumbnail(file)
-            const attachment = {
-              data: file,
-              upload: false,
-              type: isMediaAttachment ? fileType : 'file',
-              attachmentUrl: createComposePreviewUrl(tid, resizedFile.blob as any),
-              tid,
-              size: isMediaAttachment ? (resizedFile?.blob ? resizedFile?.blob?.size : file.size) : file.size,
-              metadata: {
-                szw: imageWidth,
-                szh: imageHeight,
-                tmb: thumbnail
-              }
-            }
-            handleAttachmentImageForCache(attachment)
-            setAttachments((prevState: any[]) => [...prevState, attachment])
-          })
-        } else if (fileType === 'video') {
-          // Pass the File itself, not an object URL — lets getFrame correct a
-          // Firefox-unsupported MIME type (e.g. video/quicktime) via byte sniffing.
-          const { thumb, width, height, duration } = await getFrame(file, 0)
-          const attachment = {
-            data: file,
-            upload: false,
-            type: isMediaAttachment ? fileType : 'file',
+    // A File is already a Blob. Reading a multi-GB file into a binary string before
+    // rendering duplicates it in memory and blocks the preview on slower devices.
+    // Object URLs are supported by Chrome, Safari, Firefox, and Edge, and let the
+    // browser decode directly from the selected file.
+    setPendingAttachment(tid, { file })
+    if (fileType === 'video') {
+      beginVideoPreparation(tid, file)
+    }
+    // Keep videos chosen from the generic file picker as file cards. Once their
+    // background thumbnail is ready, AttachmentFile renders it like an ordinary
+    // document preview rather than switching the composer to an inline video tile.
+    const type =
+      fileType === 'video' && (!customUploader || isMediaAttachment)
+        ? 'video'
+        : isMediaAttachment && fileType === 'image'
+          ? 'image'
+          : 'file'
+    const attachment: any = {
+      data: file,
+      upload: !customUploader,
+      type,
+      tid,
+      size: file.size,
+      ...(fileType === 'video' && !isMediaAttachment ? { thumbnailState: 'loading' } : {}),
+      ...(fileType === 'image' || fileType === 'video'
+        ? {
             attachmentUrl: createComposePreviewUrl(tid, file),
-            tid,
-            size: file.size,
-            metadata: {
-              szw: width,
-              szh: height,
-              tmb: thumb,
-              dur: duration
-            }
+            // Keep the send payload valid even if the user clicks Send before the
+            // background metadata task has finished.
+            metadata: customUploader ? {} : '{}'
           }
-          handleAttachmentVideoForCache(attachment)
-          setAttachments((prevState: any[]) => [...prevState, attachment])
-        } else {
-          setAttachments((prevState: any[]) => [
-            ...prevState,
-            {
-              data: file,
-              upload: false,
-              type: 'file',
-              tid,
-              size: file.size
+        : {})
+    }
+    setAttachments((prevState: any[]) => [...prevState, attachment])
+
+    const updateAttachment = (patch: any) => {
+      setAttachments((prevState: any[]) =>
+        prevState.map((current: any) => (current.tid === tid ? { ...current, ...patch } : current))
+      )
+    }
+
+    // Yield once so React can paint the object-URL preview before optional CPU-heavy
+    // resizing, thumbnail generation, or QuickTime remuxing begins.
+    setTimeout(async () => {
+      if (fileType === 'image') {
+        try {
+          const { thumbnail, imageWidth, imageHeight } = await createImageThumbnail(file)
+          if (customUploader) {
+            const resizedFile = await resizeImage(file)
+            const patch = {
+              size: isMediaAttachment && resizedFile?.blob ? resizedFile.blob.size : file.size,
+              metadata: { szw: imageWidth, szh: imageHeight, tmb: thumbnail }
             }
-          ])
-        }
-      } else {
-        if (fileType === 'image') {
-          if (isMediaAttachment) {
-            const { thumbnail, imageWidth, imageHeight } = await createImageThumbnail(file)
-            const metas = { thumbnail, imageWidth, imageHeight }
-            if (file.type === 'image/gif') {
-              setAttachments((prevState: any[]) => [
-                ...prevState,
-                {
-                  data: file,
-                  upload: true,
-                  attachmentUrl: createComposePreviewUrl(tid, file),
-                  tid,
-                  type: fileType,
-                  size: file.size,
-                  metadata: JSON.stringify({
-                    tmb: metas.thumbnail,
-                    szw: metas.imageWidth,
-                    szh: metas.imageHeight
-                  })
-                }
-              ])
-            } else {
-              resizeImage(file).then(async (resizedFileData: any) => {
-                const resizedFile = new File([resizedFileData.blob], resizedFileData.file.name)
-                const attachment = {
-                  data: resizedFile,
-                  upload: true,
-                  attachmentUrl: createComposePreviewUrl(tid, resizedFile),
-                  tid,
-                  type: fileType,
-                  size: resizedFile.size,
-                  metadata: JSON.stringify({
-                    tmb: metas.thumbnail,
-                    szw: resizedFileData.newWidth,
-                    szh: resizedFileData.newHeight
-                  })
-                }
-                handleAttachmentImageForCache(attachment)
-                setAttachments((prevState: any[]) => [...prevState, attachment])
+            updateAttachment(patch)
+            handleAttachmentImageForCache({ ...attachment, ...patch })
+          } else if (isMediaAttachment && file.type !== 'image/gif') {
+            const resizedFileData = await resizeImage(file)
+            // canvas.toBlob may return null (for example when memory is constrained).
+            // Keep the original file usable rather than failing the attachment flow.
+            const resizedFile = resizedFileData.blob
+              ? new File([resizedFileData.blob], resizedFileData.file.name, { type: file.type })
+              : file
+            const patch = {
+              data: resizedFile,
+              size: resizedFile.size,
+              metadata: JSON.stringify({
+                tmb: thumbnail,
+                szw: resizedFileData.newWidth,
+                szh: resizedFileData.newHeight
               })
             }
+            updateAttachment(patch)
+            setPendingAttachment(tid, { file: resizedFile })
+            handleAttachmentImageForCache({ ...attachment, ...patch })
           } else {
-            const { thumbnail } = await createImageThumbnail(file, undefined, 50, 50)
-            setAttachments((prevState: any[]) => [
-              ...prevState,
-              {
-                data: file,
-                type: 'file',
-                upload: true,
-                attachmentUrl: createComposePreviewUrl(tid, file),
-                tid,
-                size: file.size,
-                metadata: JSON.stringify({
-                  tmb: thumbnail
-                })
-              }
-            ])
+            updateAttachment({
+              metadata: JSON.stringify({ tmb: thumbnail, szw: imageWidth, szh: imageHeight })
+            })
           }
-        } else if (fileType === 'video') {
-          const { thumb, width, height, duration } = await getFrame(file, 0)
-          const metas = JSON.stringify({ tmb: thumb, width, height, dur: duration })
-          const attachment = {
-            data: file,
-            type: 'video',
-            upload: true,
-            size: file.size,
-            attachmentUrl: createComposePreviewUrl(tid, file),
-            tid,
-            metadata: metas
+        } catch (error) {
+          // The original file preview/upload remains usable if optional optimization fails.
+          log.warn('Unable to prepare image attachment preview:', error)
+        }
+      } else if (fileType === 'video') {
+        const remuxPromise = remuxVideoFileForUpload(file)
+        let thumbnailSource = file
+        let metadata: any
+        try {
+          // Do not make preview visibility depend on metadata extraction. VideoPreview
+          // can use the object URL immediately while this fills in dimensions/thumb.
+          let frame
+          try {
+            frame = await getFrame(thumbnailSource, 0)
+          } catch (error) {
+            // A MOV may play in Safari but not be decodable in Firefox. Retry from
+            // the normalized MP4 rather than sending a video without a thumbnail.
+            thumbnailSource = await remuxPromise
+            frame = await getFrame(thumbnailSource, 0)
           }
-          handleAttachmentVideoForCache(attachment)
-          setAttachments((prevState: any[]) => [...prevState, attachment])
+          const { thumb, width, height, duration } = frame
+          metadata = customUploader
+            ? { szw: width, szh: height, tmb: thumb, dur: duration }
+            : JSON.stringify({ tmb: thumb, szw: width, szh: height, dur: duration })
+          updateAttachment({ metadata, thumbnailState: 'ready' })
+          handleAttachmentVideoForCache({ ...attachment, metadata })
+        } catch (error) {
+          log.warn('Unable to generate video thumbnail:', error)
+        }
+
+        // Preserve the Firefox-compatible QuickTime remux, but perform it only after
+        // the local preview has been painted. The compose preview intentionally keeps
+        // its original object URL, avoiding a second decode and visual flicker.
+        // Sending does not depend on optional local conversion. It can take a long
+        // time (or be unavailable for some codecs), while the SDK can upload the
+        // original file immediately.
+        const uploadFile = await remuxPromise
+        if (uploadFile !== file) {
+          updateAttachment({ data: uploadFile, size: uploadFile.size })
+          setPendingAttachment(tid, { file: uploadFile })
+        }
+        if (metadata) {
+          completeVideoPreparation(tid, { file: uploadFile, metadata })
         } else {
-          setAttachments((prevState: any[]) => [
-            ...prevState,
-            {
-              data: file,
-              upload: true,
-              type: 'file',
-              size: file.size,
-              tid
-            }
-          ])
+          failVideoPreparation(tid)
+          updateAttachment({ thumbnailState: 'failed' })
         }
       }
-    }
-    reader.onerror = (e: any) => {
-      log.info(' error on read file onError', e)
-    }
-    reader.readAsBinaryString(file)
+    }, 0)
   }
 
   useEffect(() => {
@@ -1545,18 +1529,10 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
       attachments.length
     ) {
       if (attachments.length) {
-        let videoAttachment = false
-        attachments.forEach((att: any) => {
-          if ((att.type === 'video' || att.data.type.split('/')[0] === 'video') && att.type !== 'file') {
-            videoAttachment = true
-            if (readyVideoAttachments[att.tid]) {
-              setSendMessageIsActive(true)
-            }
-          }
-        })
-        if (!videoAttachment) {
-          setSendMessageIsActive(true)
-        }
+        // A local File is already a valid upload source. Do not require the browser
+        // to decode a playable frame before enabling Send: Safari/Firefox may not
+        // decode some video codecs or containers, but they can still upload them.
+        setSendMessageIsActive(true)
       } else {
         setSendMessageIsActive(true)
       }

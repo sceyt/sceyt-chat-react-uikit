@@ -191,6 +191,7 @@ import { setWaitToSendPendingMessagesAC } from 'store/user/actions'
 import { createAttachmentUnavailableError, isResendableError } from 'helpers/error'
 import { calculateRenderedImageWidth } from 'helpers'
 import { PendingMessageMutation } from './reducers'
+import { clearVideoPreparation, waitForVideoPreparation } from '../../helpers/attachmentPreparation'
 
 // Automatic reconnect resends per message tid — a message that keeps failing is
 // dropped from the auto-resend cycle after this many attempts; the manual retry
@@ -203,6 +204,24 @@ const queuedPrefetchRequests = new Map<string, { fromMessageId: string; pages: n
 const prefetchCompletionWaiters = new Map<string, Array<() => void>>()
 const prefetchCancelVersions = new Map<string, number>()
 const ACTIVE_CHANNEL_RECONNECT_REFRESH_TIMEOUT_MS = 1500
+
+const applyPreparedVideoAttachments = async (attachments: IAttachment[]) => {
+  await Promise.all(
+    attachments.map(async (attachment) => {
+      if (!attachment.tid) return
+      const prepared = await waitForVideoPreparation(attachment.tid)
+      if (prepared?.status === 'ready' && prepared.metadata) {
+        attachment.url = prepared.file
+        attachment.data = prepared.file
+        attachment.name = prepared.file.name
+        attachment.size = prepared.file.size
+        attachment.metadata = prepared.metadata
+      }
+      clearVideoPreparation(attachment.tid)
+    })
+  )
+  return attachments
+}
 
 let activeDisplayedCacheKey: string | null = null
 
@@ -1207,6 +1226,20 @@ function* sendMessage(action: IAction): any {
         }
 
         try {
+          // The optimistic message is already visible at this point. Hold only the
+          // network handoff until a local video thumbnail is ready or preparation
+          // reports a real failure,
+          // then replace the attachment builder with the prepared file/metadata.
+          yield call(applyPreparedVideoAttachments, messageAttachment)
+          const pendingAttachments = messageAttachment.map((attachment: any) => ({
+            ...attachment,
+            data: attachment.data || attachment.url
+          }))
+          updateMessageOnMap(channel.id, {
+            messageId: messageToSend.tid!,
+            params: { attachments: pendingAttachments }
+          })
+          yield put(updateMessageAC(messageToSend.tid!, { attachments: pendingAttachments }))
           const messageCopy = JSON.parse(JSON.stringify(messagesToSend[i]))
           if (connectionState === CONNECTION_STATUS.CONNECTED) {
             let attachmentsToSend = messageAttachment

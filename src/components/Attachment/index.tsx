@@ -1,4 +1,4 @@
-import styled from 'styled-components'
+import styled, { keyframes } from 'styled-components'
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { useSelector, useDispatch } from 'store/hooks'
 import { CircularProgressbar } from 'react-circular-progressbar'
@@ -1003,7 +1003,9 @@ const Attachment = ({
           width={fileAttachmentWidth}
           borderColor={borderColor}
         >
-          {attachmentThumb ? (
+          {(attachment as any).thumbnailState === 'loading' ? (
+            <FileThumbnailSkeleton color={overlayBackground2} />
+          ) : attachmentThumb ? (
             <FileThumbnail
               src={withPrefix ? `data:image/jpeg;base64,${attachmentThumb}` : attachmentThumb}
               loading='lazy'
@@ -1229,6 +1231,27 @@ const FileThumbnail = styled.img<any>`
   height: 40px;
   object-fit: cover;
   border-radius: 8px;
+`
+
+const fileThumbnailShimmer = keyframes`
+  0% { background-position: -120px 0; }
+  100% { background-position: 120px 0; }
+`
+
+const FileThumbnailSkeleton = styled.div<{ color: string }>`
+  min-width: 40px;
+  max-width: 40px;
+  height: 40px;
+  border-radius: 8px;
+  background-color: ${(props) => props.color};
+  background-image: linear-gradient(
+    90deg,
+    ${(props) => props.color},
+    rgba(255, 255, 255, 0.55),
+    ${(props) => props.color}
+  );
+  background-size: 240px 100%;
+  animation: ${fileThumbnailShimmer} 1.1s ease infinite;
 `
 
 const DownloadFile = styled.span<{ backgroundColor: string; widthThumb?: boolean }>`
