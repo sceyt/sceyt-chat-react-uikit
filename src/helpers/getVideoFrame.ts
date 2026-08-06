@@ -367,11 +367,16 @@ export const compressAndCacheImage = async (
       // Convert blob to File for resizeImageWithPica function
       const file = new File([blob], 'image.jpeg', { type: blob.type })
 
+      // maxWidth/maxHeight are CSS render sizes. Without accounting for
+      // devicePixelRatio, a Retina/HiDPI screen has to upscale the raster to
+      // fill the box, which looks soft regardless of how high `quality` is.
+      const dpr = Math.min(window.devicePixelRatio || 1, 2)
+
       // Compress the image with Pica (high-quality resizing)
       const { blob: compressedBlob } = await resizeImageWithPica(
         file,
-        maxWidth || 1280,
-        maxHeight || 1080,
+        (maxWidth || 1280) * dpr,
+        (maxHeight || 1080) * dpr,
         quality || 1
       )
       const returningUrl = compressedBlob ? URL.createObjectURL(compressedBlob) : ''

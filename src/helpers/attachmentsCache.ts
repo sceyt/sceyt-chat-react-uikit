@@ -14,7 +14,7 @@ if (isBrowser) {
   cacheAvailable = 'caches' in global
 }
 
-export const ATTACHMENT_VERSION = `_1_0_1`
+export const ATTACHMENT_VERSION = `_1_0_2`
 
 export const setAttachmentToCache = async (attachmentUrl: string, attachmentResponse: Response) => {
   const attachmentURLVersion = attachmentUrl + ATTACHMENT_VERSION

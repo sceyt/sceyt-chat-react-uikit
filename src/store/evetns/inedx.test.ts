@@ -38,6 +38,7 @@ import {
   addReactionToMessageAC,
   deleteReactionFromMessageAC,
   resendPendingMessageMutationsAC,
+  updateMessageAC,
   updateMessagesMarkersAC,
   updateMessagesStatusAC
 } from '../message/actions'
@@ -792,6 +793,65 @@ describe('event message last-message handling', () => {
       '903'
     ])
     expect(getActiveSegment()).toEqual({ startId: '900', endId: '903' })
+  })
+
+  it('reproduces a reconnect confirmation that updates the chat list but leaves the active thread pending', async () => {
+    const channelId = 'channel-reconnect-pending-thread'
+    const pendingMessage = makePendingMessage({
+      tid: 'offline-message-tid',
+      channelId,
+      body: 'sent during packet loss',
+      state: MESSAGE_STATUS.PENDING
+    })
+    const confirmedMessage = makeMessage({
+      id: '840827767688048640',
+      tid: pendingMessage.tid,
+      channelId,
+      body: pendingMessage.body,
+      incoming: false,
+      state: MESSAGE_STATUS.UNMODIFIED,
+      deliveryStatus: MESSAGE_DELIVERY_STATUS.SENT
+    })
+    const storedChannel = makeChannel({ id: channelId, lastMessage: pendingMessage })
+
+    setActiveChannelId(channelId)
+    setChannelInMap(storedChannel)
+    addChannelToAllChannels(storedChannel)
+    addMessageToMap(channelId, pendingMessage)
+    setActiveSegment(channelId, '840827767688048630', '840827767688048639')
+    mockStore.getState = jest.fn(() => ({
+      ...defaultStoreState,
+      MessageReducer: {
+        ...defaultStoreState.MessageReducer,
+        // The reconnect event arrives while the active list is a history window.
+        messagesHasNext: true,
+        activeChannelMessages: [pendingMessage]
+      }
+    }))
+
+    const dispatched: any[] = []
+    await runSaga(
+      { getState: getSagaState, dispatch: (action) => dispatched.push(action) },
+      __eventsTestables.handleChannelMessageEvent,
+      { channel: { ...storedChannel, lastMessage: confirmedMessage }, message: confirmedMessage },
+      { user: { id: 'current-user' } }
+    ).toPromise()
+
+    // The channel/list receives the confirmed copy.
+    expect(dispatched).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ type: updateChannelLastMessageAC(confirmedMessage, storedChannel).type })
+      ])
+    )
+    // The active thread does not receive the equivalent reconciliation action.
+    // This is the reported inconsistency and should be inverted when the fix is approved.
+    expect(
+      dispatched.some(
+        (action) =>
+          action.type === updateMessageAC(pendingMessage.tid!, {}).type &&
+          action.payload?.messageId === pendingMessage.tid
+      )
+    ).toBe(false)
   })
 
   it('extends an inactive channel cached latest segment when a background message arrives after the cached latest edge', async () => {
