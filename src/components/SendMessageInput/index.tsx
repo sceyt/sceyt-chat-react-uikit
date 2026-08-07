@@ -1778,7 +1778,6 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
     }
   }, [showLinkPreview])
 
-  console.log(replyLinkPreviewImageFailed)
   return (
     <SendMessageWrapper ref={sendMessageWrapperRef} backgroundColor={backgroundColor || background}>
       <Container
