@@ -1,4 +1,4 @@
-import { compressAndCacheImage } from './getVideoFrame'
+import { compressAndCacheImage, getVideoFirstFrame, scaleForDevicePixelRatio } from './getVideoFrame'
 import { resizeImageWithPica } from './resizeImage'
 import { setAttachmentToCache } from './attachmentsCache'
 
@@ -147,5 +147,158 @@ describe('compressAndCacheImage', () => {
 
     expect(result).toBe('')
     expect(mockSetAttachmentToCache).not.toHaveBeenCalled()
+  })
+})
+
+describe('scaleForDevicePixelRatio', () => {
+  afterEach(() => {
+    setDevicePixelRatio(1)
+  })
+
+  it('scales the value up by devicePixelRatio', () => {
+    setDevicePixelRatio(2)
+    expect(scaleForDevicePixelRatio(400)).toBe(800)
+  })
+
+  it('caps the scaling at the given cap on higher-density screens', () => {
+    setDevicePixelRatio(3)
+    expect(scaleForDevicePixelRatio(400)).toBe(800)
+    expect(scaleForDevicePixelRatio(400, 3)).toBe(1200)
+  })
+
+  it('defaults to a 1x scale when devicePixelRatio is unavailable', () => {
+    setDevicePixelRatio(undefined)
+    expect(scaleForDevicePixelRatio(400)).toBe(400)
+  })
+
+  it('passes falsy values through unchanged instead of scaling them', () => {
+    setDevicePixelRatio(2)
+    expect(scaleForDevicePixelRatio(undefined)).toBeUndefined()
+    expect(scaleForDevicePixelRatio(0)).toBe(0)
+  })
+})
+
+describe('getVideoFirstFrame', () => {
+  let fakeVideo: any
+  let capturedCanvases: HTMLCanvasElement[]
+  let realCreateElement: typeof document.createElement
+
+  const waitUntil = async (predicate: () => boolean, maxTicks = 50) => {
+    for (let i = 0; i < maxTicks; i++) {
+      if (predicate()) {
+        return
+      }
+      await new Promise((resolve) => setTimeout(resolve, 0))
+    }
+    throw new Error('condition not met in time')
+  }
+
+  // Drives the fake video's play()-rejection fallback (simplest capture path)
+  // to a queued requestAnimationFrame, then flushes it. Loops because the
+  // play() rejection resolves on a microtask whose timing isn't guaranteed
+  // relative to this call.
+  const waitForCapturedFrame = async () => {
+    for (let i = 0; i < 40; i++) {
+      if (capturedCanvases.length > 0) {
+        return
+      }
+      await new Promise((resolve) => setTimeout(resolve, 0))
+      ;(window as any).__flushAnimationFrames()
+    }
+    throw new Error('frame was not captured in time')
+  }
+
+  beforeEach(() => {
+    setDevicePixelRatio(1)
+    global.URL.createObjectURL = jest.fn(() => 'blob:mock/video')
+    global.URL.revokeObjectURL = jest.fn()
+
+    capturedCanvases = []
+    fakeVideo = {
+      style: {},
+      videoWidth: 1920,
+      videoHeight: 1080,
+      duration: 12,
+      setAttribute: jest.fn(),
+      // Rejecting play() drives the code down its simplest capture path
+      // (autoplay-blocked fallback) instead of needing to simulate 'timeupdate'.
+      play: jest.fn(() => Promise.reject(new Error('autoplay blocked'))),
+      pause: jest.fn(),
+      addEventListener: jest.fn(),
+      removeEventListener: jest.fn()
+    }
+
+    realCreateElement = document.createElement.bind(document)
+    jest.spyOn(document, 'createElement').mockImplementation((tagName: string) => {
+      if (tagName === 'video') {
+        return fakeVideo
+      }
+      const el = realCreateElement(tagName)
+      if (tagName === 'canvas') {
+        capturedCanvases.push(el as HTMLCanvasElement)
+      }
+      return el
+    })
+    jest.spyOn(document.body, 'appendChild').mockImplementation((node: any) => {
+      node.parentNode = { removeChild: jest.fn() }
+      return node
+    })
+
+    // jsdom's canvas has no real 2D context; fake a successful draw + encode
+    // so the code takes its success path instead of falling through to the
+    // (harder to simulate) data-URL retry.
+    jest.spyOn(HTMLCanvasElement.prototype, 'getContext').mockImplementation(() => ({ drawImage: jest.fn() }) as any)
+    jest
+      .spyOn(HTMLCanvasElement.prototype, 'toBlob')
+      .mockImplementation(function (this: HTMLCanvasElement, callback: BlobCallback) {
+        callback(new Blob(['frame'], { type: 'image/jpeg' }))
+      })
+  })
+
+  afterEach(() => {
+    jest.restoreAllMocks()
+  })
+
+  it('scales the captured frame size by devicePixelRatio for a Blob source', async () => {
+    setDevicePixelRatio(2)
+    const videoBlob = new Blob(['fake-video-bytes'], { type: 'video/mp4' })
+
+    const framePromise = getVideoFirstFrame(videoBlob, 400, 300)
+
+    await waitUntil(() => typeof fakeVideo.onloadedmetadata === 'function')
+    fakeVideo.onloadedmetadata()
+
+    await waitUntil(() => typeof fakeVideo.onseeked === 'function')
+    fakeVideo.onseeked()
+
+    await waitForCapturedFrame()
+
+    const result = await framePromise
+
+    expect(result).not.toBeNull()
+    expect(capturedCanvases).toHaveLength(1)
+    expect(capturedCanvases[0].width).toBe(800)
+    expect(capturedCanvases[0].height).toBe(600)
+  })
+
+  it('does not scale the frame size when no maxWidth/maxHeight is requested', async () => {
+    setDevicePixelRatio(2)
+    const videoBlob = new Blob(['fake-video-bytes'], { type: 'video/mp4' })
+
+    const framePromise = getVideoFirstFrame(videoBlob)
+
+    await waitUntil(() => typeof fakeVideo.onloadedmetadata === 'function')
+    fakeVideo.onloadedmetadata()
+
+    await waitUntil(() => typeof fakeVideo.onseeked === 'function')
+    fakeVideo.onseeked()
+
+    await waitForCapturedFrame()
+
+    await framePromise
+
+    // Falls back to half the native video resolution, unrelated to DPR.
+    expect(capturedCanvases[0].width).toBe(960)
+    expect(capturedCanvases[0].height).toBe(540)
   })
 })

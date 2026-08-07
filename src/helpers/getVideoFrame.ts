@@ -19,6 +19,18 @@ export interface VideoFirstFrameResult {
   duration: number
 }
 
+// Callers pass maxWidth/maxHeight as CSS render sizes. Scaling by
+// devicePixelRatio (capped to avoid oversized payloads on 3x+ screens) gives
+// the output enough native pixels to stay sharp on Retina/HiDPI displays —
+// `quality` alone can't fix this, it only controls compression artifacts.
+export const scaleForDevicePixelRatio = (value?: number, cap: number = 2): number | undefined => {
+  if (!value) {
+    return value
+  }
+  const dpr = Math.min(window.devicePixelRatio || 1, cap)
+  return value * dpr
+}
+
 // Return a blob whose declared type a video element can trust in all browsers,
 // along with what the bytes revealed about the container.
 const normalizeVideoBlob = async (blob: Blob): Promise<{ safeBlob: Blob; info: VideoContainerInfo }> => {
@@ -264,8 +276,11 @@ export async function getVideoFirstFrame(
   quality: number = 1
 ): Promise<VideoFirstFrameResult | null> {
   try {
+    const scaledMaxWidth = scaleForDevicePixelRatio(maxWidth)
+    const scaledMaxHeight = scaleForDevicePixelRatio(maxHeight)
+
     if (videoSrc instanceof Blob) {
-      return await extractFrameFromBlob(videoSrc, maxWidth, maxHeight, quality)
+      return await extractFrameFromBlob(videoSrc, scaledMaxWidth, scaledMaxHeight, quality)
     }
 
     // A blob: URL string carries a locked-in MIME type we cannot see or fix.
@@ -273,15 +288,15 @@ export async function getVideoFirstFrame(
     if (videoSrc.startsWith('blob:')) {
       try {
         const blob = await (await fetch(videoSrc)).blob()
-        return await extractFrameFromBlob(blob, maxWidth, maxHeight, quality)
+        return await extractFrameFromBlob(blob, scaledMaxWidth, scaledMaxHeight, quality)
       } catch (error) {
         log.warn('getVideoFirstFrame: failed to re-fetch blob url, trying directly', error)
-        return await extractFrameFromUrl(videoSrc, maxWidth, maxHeight, quality)
+        return await extractFrameFromUrl(videoSrc, scaledMaxWidth, scaledMaxHeight, quality)
       }
     }
 
     // Remote URL: try direct playback first (streams, no full download).
-    const direct = await extractFrameFromUrl(videoSrc, maxWidth, maxHeight, quality)
+    const direct = await extractFrameFromUrl(videoSrc, scaledMaxWidth, scaledMaxHeight, quality)
     if (direct) {
       return direct
     }
@@ -291,7 +306,7 @@ export async function getVideoFirstFrame(
     try {
       const response = await fetch(videoSrc)
       const blob = await response.blob()
-      return await extractFrameFromBlob(blob, maxWidth, maxHeight, quality)
+      return await extractFrameFromBlob(blob, scaledMaxWidth, scaledMaxHeight, quality)
     } catch (error) {
       log.error('getVideoFirstFrame: fetch retry failed:', error)
       return null
@@ -367,16 +382,11 @@ export const compressAndCacheImage = async (
       // Convert blob to File for resizeImageWithPica function
       const file = new File([blob], 'image.jpeg', { type: blob.type })
 
-      // maxWidth/maxHeight are CSS render sizes. Without accounting for
-      // devicePixelRatio, a Retina/HiDPI screen has to upscale the raster to
-      // fill the box, which looks soft regardless of how high `quality` is.
-      const dpr = Math.min(window.devicePixelRatio || 1, 2)
-
       // Compress the image with Pica (high-quality resizing)
       const { blob: compressedBlob } = await resizeImageWithPica(
         file,
-        (maxWidth || 1280) * dpr,
-        (maxHeight || 1080) * dpr,
+        scaleForDevicePixelRatio(maxWidth || 1280)!,
+        scaleForDevicePixelRatio(maxHeight || 1080)!,
         quality || 1
       )
       const returningUrl = compressedBlob ? URL.createObjectURL(compressedBlob) : ''
