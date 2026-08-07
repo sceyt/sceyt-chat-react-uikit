@@ -88,7 +88,7 @@ import {
 import { registerBlobUrl, releaseBlobUrls } from '../../helpers/attachmentBlobUrls'
 import { attachmentTypes, DEFAULT_CHANNEL_TYPE, MESSAGE_DELIVERY_STATUS, USER_STATE } from '../../helpers/constants'
 import { hideUserPresence } from '../../helpers/userHelper'
-import { getReplyLinkPreviewImage } from '../../helpers/replyPreview'
+import { getReplyLinkPreviewImage, shouldShowLinkPreviewErrorFallback } from '../../helpers/replyPreview'
 import { getShowOnlyContactUsers } from '../../helpers/contacts'
 import { getFrame, getVideoFirstFrame } from '../../helpers/getVideoFrame'
 import { remuxVideoFileForUpload } from '../../helpers/videoConversion'
@@ -1978,7 +1978,11 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
                             <ReplyIconWrapper backgroundColor={accentColor} iconColor={textOnPrimary}>
                               <ChooseFileIcon />
                             </ReplyIconWrapper>
-                          ) : getReplyLinkPreviewImage(messageForReply.attachments) && !replyLinkPreviewImageFailed ? (
+                          ) : getReplyLinkPreviewImage(messageForReply.attachments) &&
+                            !shouldShowLinkPreviewErrorFallback(
+                              getReplyLinkPreviewImage(messageForReply.attachments),
+                              replyLinkPreviewImageFailed
+                            ) ? (
                             <LinkPreviewImage
                               bg={background}
                               src={getReplyLinkPreviewImage(messageForReply.attachments) as string}
@@ -2092,7 +2096,11 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
                       <CloseIcon />
                     </CloseEditMode>
                     <LinkPreviewContent>
-                      {linkPreview.metadata.og?.image?.[0]?.url && !linkPreviewImageFailed ? (
+                      {linkPreview.metadata.og?.image?.[0]?.url &&
+                      !shouldShowLinkPreviewErrorFallback(
+                        linkPreview.metadata.og.image[0].url,
+                        linkPreviewImageFailed
+                      ) ? (
                         <LinkPreviewImage
                           onLoad={(e: any) => {
                             if (e.target?.naturalHeight && e.target?.naturalWidth) {
@@ -2109,7 +2117,10 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
                           alt='Link preview'
                           onError={() => setLinkPreviewImageFailed(true)}
                         />
-                      ) : linkPreview.metadata.og?.image?.[0]?.url ? (
+                      ) : shouldShowLinkPreviewErrorFallback(
+                          linkPreview.metadata.og?.image?.[0]?.url,
+                          linkPreviewImageFailed
+                        ) ? (
                         <LinkPreviewIcon color={accentColor} bg={background} />
                       ) : linkPreview.metadata.og?.favicon?.url ? (
                         <LinkPreviewImage src={linkPreview.metadata.og.favicon.url} alt='Favicon' />

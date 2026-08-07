@@ -9,3 +9,9 @@ export const getReplyLinkPreviewImage = (attachments?: Array<{ type?: string; me
   const imageUrl: string | null = compactMeta.iur || null
   return !compactMeta?.hld ? imageUrl : null
 }
+
+/** A loaded preview image is replaced with the link icon after its image request fails. */
+export const shouldShowLinkPreviewErrorFallback = (
+  imageUrl: string | null | undefined,
+  imageFailed: boolean
+): boolean => Boolean(imageUrl && imageFailed)
