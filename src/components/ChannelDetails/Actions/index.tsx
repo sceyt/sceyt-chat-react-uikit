@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react'
-import { useDispatch } from 'store/hooks'
+import { useDispatch, useSelector } from 'store/hooks'
 import styled from 'styled-components'
 // Hooks
 import usePermissions from '../../../hooks/usePermissions'
@@ -41,8 +41,21 @@ import { ReactComponent as UsersIcon } from '../../../assets/svg/users.svg'
 import { hideUserPresence } from '../../../helpers/userHelper'
 import { getDisappearingSettings } from '../../../helpers/channelHalper'
 import { formatDisappearingMessageTime } from '../../../helpers'
-import { SectionHeader, DropdownOptionLi, DropdownOptionsUl } from '../../../UIHelper'
+import {
+  Button,
+  CloseIcon,
+  DropdownOptionLi,
+  DropdownOptionsUl,
+  Popup,
+  PopupBody,
+  PopupDescription,
+  PopupFooter,
+  PopupName,
+  SectionHeader
+} from '../../../UIHelper'
 import { DEFAULT_CHANNEL_TYPE, USER_STATE } from '../../../helpers/constants'
+import { CONNECTION_STATUS } from '../../../store/user/constants'
+import { connectionStatusSelector } from '../../../store/user/selector'
 // import DropDown from '../../../common/dropdown'
 import { THEME_COLORS } from '../../../UIHelper/constants'
 import { IChannel, IMember, MuteTime } from '../../../types'
@@ -55,6 +68,7 @@ import DropDown from '../../../common/dropdown'
 import { useColor } from '../../../hooks'
 import log from 'loglevel'
 import GroupsInCommonPopup from 'common/popups/groupsInCommonPopup/indext'
+import PopupContainer from '../../../common/popups/popupContainer'
 
 interface IProps {
   setActionsHeight?: (height: number) => void
@@ -210,12 +224,14 @@ const Actions = ({
   showGroupsInCommon
 }: IProps) => {
   const {
+    [THEME_COLORS.ACCENT]: accentColor,
     [THEME_COLORS.TEXT_PRIMARY]: textPrimary,
     [THEME_COLORS.TEXT_SECONDARY]: textSecondary,
     [THEME_COLORS.ICON_PRIMARY]: iconPrimary,
     [THEME_COLORS.SURFACE_1]: surface1,
     [THEME_COLORS.WARNING]: warningColor,
-    [THEME_COLORS.BACKGROUND]: backgroundColor
+    [THEME_COLORS.BACKGROUND]: backgroundColor,
+    [THEME_COLORS.TEXT_ON_PRIMARY]: textOnPrimary
   } = useColor()
 
   const ChatClient = getClient()
@@ -223,6 +239,7 @@ const Actions = ({
   const [clearHistoryPopupOpen, setClearHistoryPopupOpen] = useState(false)
   const [deleteAllMessagesPopupOpen, setDeleteAllMessagesPopupOpenPopupOpen] = useState(false)
   const [leaveChannelPopupOpen, setLeaveChannelPopupOpen] = useState(false)
+  const [leaveChannelOfflinePopupOpen, setLeaveChannelOfflinePopupOpen] = useState(false)
   const [deleteChannelPopupOpen, setDeleteChannelPopupOpen] = useState(false)
   const [blockChannelPopupOpen, setBlockChannelPopupOpen] = useState(false)
   const [blockUserPopupOpen, setBlockUserPopupOpen] = useState(false)
@@ -237,6 +254,7 @@ const Actions = ({
   // const [showMuteDropdown, setShowMuteDropdown] = useState(false)
   // const dropDownElem = useRef<any>(null)
   const dispatch = useDispatch()
+  const connectionStatus = useSelector(connectionStatusSelector)
 
   const oneHour = 60 * 60 * 1000
   const twoHours = oneHour * 2
@@ -293,6 +311,10 @@ const Actions = ({
   }
 
   const handleLeaveChannel = () => {
+    if (connectionStatus !== CONNECTION_STATUS.CONNECTED) {
+      setLeaveChannelOfflinePopupOpen(true)
+      return
+    }
     dispatch(leaveChannelAC(channel.id))
   }
 
@@ -854,6 +876,32 @@ const Actions = ({
           }
           title={popupTitle}
         />
+      )}
+      {leaveChannelOfflinePopupOpen && (
+        <PopupContainer>
+          <Popup backgroundColor={backgroundColor} maxWidth='520px' minWidth='520px' padding='0'>
+            <PopupBody paddingH='24px' paddingV='24px'>
+              <CloseIcon color={iconPrimary} onClick={() => setLeaveChannelOfflinePopupOpen(false)} />
+              <PopupName color={textPrimary} isDelete marginBottom='20px'>
+                Failed to leave group
+              </PopupName>
+              <PopupDescription color={textPrimary} highlightColor={textSecondary}>
+                You’re offline. Reconnect and try again.
+              </PopupDescription>
+            </PopupBody>
+            <PopupFooter backgroundColor={surface1}>
+              <Button
+                type='button'
+                backgroundColor={accentColor}
+                color={textOnPrimary}
+                borderRadius='8px'
+                onClick={() => setLeaveChannelOfflinePopupOpen(false)}
+              >
+                Close
+              </Button>
+            </PopupFooter>
+          </Popup>
+        </PopupContainer>
       )}
       {deleteChannelPopupOpen && (
         <ConfirmPopup

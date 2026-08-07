@@ -5,10 +5,7 @@ import {
   $getRoot,
   $getSelection,
   $isRangeSelection,
-  COMMAND_PRIORITY_LOW,
   COMMAND_PRIORITY_NORMAL,
-  KEY_BACKSPACE_COMMAND,
-  KEY_DELETE_COMMAND,
   LexicalEditor,
   PASTE_COMMAND,
   RangeSelection
@@ -18,8 +15,8 @@ import { useDidUpdate } from '../../../hooks'
 import { bodyAttributesMapByType, makeUsername } from '../../../helpers/message'
 import { IMessage, IMember } from '../../../types'
 import { useCallback, useEffect } from 'react'
-import { $createMentionNode, $isMentionNode } from '../MentionNode'
-import { getSelectedNode, mergeRegister } from '../FloatingTextFormatToolbarPlugin'
+import { $createMentionNode } from '../MentionNode'
+import { mergeRegister } from '../FloatingTextFormatToolbarPlugin'
 
 interface FormattedSegment {
   text: string
@@ -277,22 +274,6 @@ function useFormatMessage(
     [editor, contactsMap, setMentionedMember, getFromContacts, activeChannelMembers, processMentionsInPastedText]
   )
 
-  const onDelete = useCallback(
-    (event: KeyboardEvent) => {
-      event.preventDefault()
-      editor.update(() => {
-        const selection = $getSelection()
-        if ($isRangeSelection(selection)) {
-          const node = getSelectedNode(selection)
-          if ($isMentionNode(node)) {
-            node.remove()
-          }
-        }
-      })
-      return false
-    },
-    [editor]
-  )
   useEffect(() => {
     return mergeRegister(
       editor.registerCommand(
@@ -302,11 +283,9 @@ function useFormatMessage(
           return true
         },
         COMMAND_PRIORITY_NORMAL
-      ),
-      editor.registerCommand(KEY_DELETE_COMMAND, onDelete, COMMAND_PRIORITY_LOW),
-      editor.registerCommand(KEY_BACKSPACE_COMMAND, onDelete, COMMAND_PRIORITY_LOW)
+      )
     )
-  }, [editor, handlePast, onDelete])
+  }, [editor, handlePast])
   useDidUpdate(() => {
     if (editorState) {
       editorState.read(() => {

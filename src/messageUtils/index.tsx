@@ -39,6 +39,11 @@ const PendingIconWrapper = styled(PendingIcon)`
   color: ${(props) => props.color};
 `
 
+const canActivateMention = () => {
+  const selection = typeof window !== 'undefined' ? window.getSelection() : null
+  return !selection || selection.isCollapsed
+}
+
 const MessageStatusIcon = ({
   messageStatus,
   messageStatusDisplayingType,
@@ -291,7 +296,7 @@ const MessageTextFormat = ({
                       key={attributeOffset + index}
                       data-mention={attribute.metadata}
                       onClick={() => {
-                        if (onMentionNameClick && shouldOpenUserProfileForMention) {
+                        if (canActivateMention() && onMentionNameClick && shouldOpenUserProfileForMention) {
                           onMentionNameClick(mentionDisplay)
                         }
                       }}
@@ -318,7 +323,7 @@ const MessageTextFormat = ({
                     key={attributeOffset}
                     data-mention={attribute.metadata}
                     onClick={() => {
-                      if (onMentionNameClick && shouldOpenUserProfileForMention) {
+                      if (canActivateMention() && onMentionNameClick && shouldOpenUserProfileForMention) {
                         onMentionNameClick(mentionDisplay)
                       }
                     }}

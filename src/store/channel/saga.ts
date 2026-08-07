@@ -1813,6 +1813,11 @@ function* leaveChannel(action: IAction): any {
     const { payload } = action
     const { channelId } = payload
 
+    if (store.getState().UserReducer.connectionStatus !== CONNECTION_STATUS.CONNECTED) {
+      log.warn('Cannot leave channel while offline')
+      return
+    }
+
     let channel = yield call(getChannelFromMap, channelId)
     if (!channel) {
       channel = getChannelFromAllChannels(channelId)
@@ -1823,10 +1828,8 @@ function* leaveChannel(action: IAction): any {
         messageBuilder.setBody('LG').setType('system').setDisplayCount(0).setSilent(true)
         const messageToSend = messageBuilder.create()
 
-        if (CONNECTION_STATUS.CONNECTED) {
-          log.info('send message for left')
-          yield call(channel.sendMessage, messageToSend)
-        }
+        log.info('send message for left')
+        yield call(channel.sendMessage, messageToSend)
         // yield put(sendTextMessageAC(messageToSend, channelId, CONNECTION_STATUS.CONNECTED))
       }
       log.info('leave')
@@ -2461,6 +2464,7 @@ export default function* ChannelsSaga() {
 }
 
 export const __channelSagaTestables = {
+  leaveChannel,
   markMessagesRead,
   markChannelAsRead,
   resendPendingChannelReads,

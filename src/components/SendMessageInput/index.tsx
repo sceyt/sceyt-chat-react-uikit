@@ -88,6 +88,7 @@ import {
 import { registerBlobUrl, releaseBlobUrls } from '../../helpers/attachmentBlobUrls'
 import { attachmentTypes, DEFAULT_CHANNEL_TYPE, MESSAGE_DELIVERY_STATUS, USER_STATE } from '../../helpers/constants'
 import { hideUserPresence } from '../../helpers/userHelper'
+import { getReplyLinkPreviewImage } from '../../helpers/replyPreview'
 import { getShowOnlyContactUsers } from '../../helpers/contacts'
 import { getFrame, getVideoFirstFrame } from '../../helpers/getVideoFrame'
 import { remuxVideoFileForUpload } from '../../helpers/videoConversion'
@@ -1103,11 +1104,6 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
     }
   }
 
-  const handleCut = () => {
-    setMessageText('')
-    setMentionedUsers([])
-  }
-
   const handleEmojiPopupToggle = (bool: boolean) => {
     setIsEmojisOpened(bool)
   }
@@ -1685,7 +1681,6 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
       }, 800)
     }
     messageContRef.current.addEventListener('paste', handlePastAttachments)
-    messageContRef.current.addEventListener('cut', handleCut)
     document.addEventListener('mousedown', handleClick)
     return () => {
       if (inputHeightTimeout) {
@@ -1696,7 +1691,6 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
 
       if (messageContRef && messageContRef.current) {
         messageContRef.current.removeEventListener('paste', handlePastAttachments)
-        messageContRef.current.removeEventListener('cut', handleCut)
       }
     }
   }, [])
@@ -1969,6 +1963,16 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
                               backgroundColor={selectedFileAttachmentsBoxBackground || ''}
                               isRepliedMessage
                             />
+                          ) : getReplyLinkPreviewImage(messageForReply.attachments) ? (
+                            <LinkPreviewImage
+                              bg={background}
+                              src={getReplyLinkPreviewImage(messageForReply.attachments) as string}
+                              alt='Link preview'
+                            />
+                          ) : messageForReply.attachments[0].type === attachmentTypes.link ? (
+                            <LinkPreviewIconWrapper bg={background}>
+                              <LinkPreviewIcon color={accentColor} bg={background} />
+                            </LinkPreviewIconWrapper>
                           ) : (
                             messageForReply.attachments[0].type === attachmentTypes.file && (
                               <ReplyIconWrapper backgroundColor={accentColor} iconColor={textOnPrimary}>
@@ -1978,18 +1982,21 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
                           ))}
                         <ReplyMessageBody linkColor={accentColor}>
                           <EditReplyMessageHeader color={accentColor}>
-                            {replyMessageIcon || <ReplyIcon />} Reply to
-                            <UserName>
-                              {user.id === messageForReply.user.id
-                                ? user.firstName
-                                  ? `${user.firstName} ${user.lastName}`
-                                  : user.id
-                                : makeUsername(
+                            {replyMessageIcon || <ReplyIcon />}
+                            {user.id === messageForReply.user.id ? (
+                              ' Reply You'
+                            ) : (
+                              <span>
+                                {' Reply to'}
+                                <UserName>
+                                  {makeUsername(
                                     contactsMap[messageForReply.user.id],
                                     messageForReply.user,
                                     getFromContacts
                                   )}
-                            </UserName>
+                                </UserName>
+                              </span>
+                            )}
                           </EditReplyMessageHeader>
                           {messageForReply.attachments && messageForReply.attachments.length ? (
                             messageForReply.attachments[0].type === attachmentTypes.voice ? (
@@ -2734,7 +2741,8 @@ const LexicalWrapper = styled.div<{
     & .mention {
       color: ${(props) => props.mentionColor};
       background-color: inherit !important;
-      user-modify: read-only;
+      user-select: text;
+      -webkit-user-select: text;
     }
 
     & span.bold {
@@ -3130,12 +3138,14 @@ const LinkPreviewContent = styled.div`
   overflow: hidden;
 `
 
-const LinkPreviewImage = styled.img`
+const LinkPreviewImage = styled.img<{ bg?: string }>`
   width: 40px;
   height: 40px;
   object-fit: cover;
-  border-radius: 8px;
+  border-radius: 4px;
   flex-shrink: 0;
+  margin-right: 8px;
+  background: ${(props) => props.bg};
 `
 
 const LinkPreviewIcon = styled(LinkIcon)<{ color: string; bg: string }>`
@@ -3144,6 +3154,14 @@ const LinkPreviewIcon = styled(LinkIcon)<{ color: string; bg: string }>`
     fill: ${(props) => props.bg};
     fill-opacity: 1;
   }
+`
+
+const LinkPreviewIconWrapper = styled.div<{ bg?: string }>`
+  width: 40px;
+  height: 40px;
+  border-radius: 4px;
+  margin-right: 8px;
+  background: ${(props) => props.bg};
 `
 
 const LinkPreviewTextContent = styled.div<{ hasImage: boolean }>`

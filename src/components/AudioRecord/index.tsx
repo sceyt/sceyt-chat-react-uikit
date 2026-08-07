@@ -19,8 +19,18 @@ import MicRecorder from 'mic-recorder-to-mp3'
 import { useDispatch } from 'store/hooks'
 import { sendRecordingAC, setChannelDraftMessageIsRemovedAC } from '../../store/channel/actions'
 import { getAudioRecordingFromMap, removeAudioRecordingFromMap, setAudioRecordingToMap } from 'helpers/messagesHalper'
-import { ViewOnceToggleCont } from 'UIHelper'
+import {
+  Button,
+  CloseIcon,
+  Popup,
+  PopupBody,
+  PopupDescription,
+  PopupFooter,
+  PopupName,
+  ViewOnceToggleCont
+} from 'UIHelper'
 import AudioVisualizationComponent from '../AudioPlayer/AudioVisualization'
+import PopupContainer from '../../common/popups/popupContainer'
 
 const fieldsObject = {
   channelId: '',
@@ -67,8 +77,10 @@ const AudioRecord: React.FC<AudioPlayerProps> = ({
     [THEME_COLORS.WARNING]: warningColor,
     [THEME_COLORS.ICON_PRIMARY]: iconPrimary,
     [THEME_COLORS.SURFACE_1]: surface1,
+    [THEME_COLORS.TEXT_PRIMARY]: textPrimary,
     [THEME_COLORS.ICON_INACTIVE]: iconInactive,
-    [THEME_COLORS.TEXT_ON_PRIMARY]: textOnPrimary
+    [THEME_COLORS.TEXT_ON_PRIMARY]: textOnPrimary,
+    [THEME_COLORS.BACKGROUND]: background
   } = useColor()
 
   const [recording, setStartRecording] = useState<any>(null)
@@ -80,6 +92,7 @@ const AudioRecord: React.FC<AudioPlayerProps> = ({
   const [sendingInterval, setSendingInterval] = useState<any>(null)
   const [currentChannelId, setCurrentChannelId] = useState<string>('')
   const [playAudio, setPlayAudio] = useState<any>(false)
+  const [microphonePermissionDenied, setMicrophonePermissionDenied] = useState(false)
   const recordButtonRef = useRef<any>(null)
   const audioElements = useRef<Record<string, HTMLAudioElement>>({})
   const intervalRef = useRef<any>({})
@@ -188,12 +201,6 @@ const AudioRecord: React.FC<AudioPlayerProps> = ({
   const startRecording = async (cId?: string) => {
     const id = cId || currentChannelId
     try {
-      const permissionStatus = await navigator.permissions.query({ name: 'microphone' } as any)
-      if (permissionStatus.state === 'granted') {
-        setShowRecording(true)
-      } else {
-        recordButtonRef.current.style.pointerEvents = 'none'
-      }
       if (recording) {
         stopRecording(true, id, false, recorder)
       } else if (currentRecordedFile) {
@@ -206,17 +213,19 @@ const AudioRecord: React.FC<AudioPlayerProps> = ({
         dispatch(setChannelDraftMessageIsRemovedAC(id))
         sendRecordedFile(currentRecordedFile, id)
       } else {
-        handleStartRecording()
-        setAudioRecordingToMap(id, {
-          file: null,
-          objectUrl: null,
-          thumb: null,
-          dur: 0
-        })
+        if (!recorder) return
         recorder
           .start()
           .then(() => {
-            recordButtonRef.current.style.pointerEvents = 'initial'
+            // Do not tell other participants that recording started until the
+            // browser has granted microphone access and the recorder is active.
+            handleStartRecording()
+            setAudioRecordingToMap(id, {
+              file: null,
+              objectUrl: null,
+              thumb: null,
+              dur: 0
+            })
             setShowRecording(true)
             setStartRecording(true)
             shouldDraw = true
@@ -310,12 +319,16 @@ const AudioRecord: React.FC<AudioPlayerProps> = ({
             soundAllowed(stream)
           })
           .catch((e: any) => {
-            handleStopRecording()
+            if (e?.name === 'NotAllowedError' || e?.name === 'PermissionDeniedError') {
+              setMicrophonePermissionDenied(true)
+            }
             log.error(e)
           })
       }
     } catch (e) {
-      handleStopRecording()
+      if ((e as any)?.name === 'NotAllowedError' || (e as any)?.name === 'PermissionDeniedError') {
+        setMicrophonePermissionDenied(true)
+      }
       log.error(e)
     }
   }
@@ -669,6 +682,33 @@ const AudioRecord: React.FC<AudioPlayerProps> = ({
       <RecordIconWrapper ref={recordButtonRef} onClick={() => startRecording(currentChannelId)} iconColor={accentColor}>
         {showRecording || currentRecordedFile ? <SendIcon /> : <RecordIcon />}
       </RecordIconWrapper>
+      {microphonePermissionDenied && (
+        <PopupContainer>
+          <Popup backgroundColor={background} maxWidth='520px' minWidth='520px' padding='0'>
+            <PopupBody paddingH='24px' paddingV='24px'>
+              <CloseIcon color={iconPrimary} onClick={() => setMicrophonePermissionDenied(false)} />
+              <PopupName color={textPrimary} marginBottom='20px'>
+                Microphone Permission Denied
+              </PopupName>
+              <PopupDescription color={textPrimary} highlightColor={textSecondary}>
+                We can&apos;t access your microphone. Enable microphone permission in your browser settings and try
+                again.
+              </PopupDescription>
+            </PopupBody>
+            <PopupFooter backgroundColor={surface1}>
+              <Button
+                type='button'
+                backgroundColor={accentColor}
+                color={textOnPrimary}
+                borderRadius='8px'
+                onClick={() => setMicrophonePermissionDenied(false)}
+              >
+                Close
+              </Button>
+            </PopupFooter>
+          </Popup>
+        </PopupContainer>
+      )}
     </Container>
   )
 }

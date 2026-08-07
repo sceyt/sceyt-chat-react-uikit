@@ -18,6 +18,7 @@ import { CONNECTION_STATUS } from '../user/constants'
 import {
   markChannelAsReadAC,
   markMessagesAsReadAC,
+  leaveChannelAC,
   resendPendingChannelReadsAC,
   setChannelsAC,
   updateChannelDataAC
@@ -435,6 +436,27 @@ describe('channel saga read markers', () => {
       })
     )
     expect(getChannelFromMap(channel.id).lastDisplayedMessageId).toBe('205')
+  })
+})
+
+describe('channel leave', () => {
+  beforeEach(() => {
+    jest.clearAllMocks()
+    destroyChannelsMap()
+    mockStoreState.UserReducer.connectionStatus = CONNECTION_STATUS.DISCONNECTED
+  })
+
+  it('does not call the SDK or remove a group while offline', async () => {
+    const channel = makeChannel({ id: 'offline-leave-channel', type: 'group' })
+    channel.leave = jest.fn()
+    channel.sendMessage = jest.fn()
+    setChannelInMap(channel)
+
+    const dispatched = await runChannelSaga(__channelSagaTestables.leaveChannel, leaveChannelAC(channel.id))
+
+    expect(channel.sendMessage).not.toHaveBeenCalled()
+    expect(channel.leave).not.toHaveBeenCalled()
+    expect(dispatched).toEqual([])
   })
 })
 

@@ -654,6 +654,9 @@ export const StyledText = styled.span<{
     color: ${(props) => props.color};
     font-weight: ${(props) => props.isLastMessage && '500'};
     cursor: ${(props) => props.shouldOpenUserProfileForMention && 'pointer'};
+    display: inline;
+    user-select: text;
+    -webkit-user-select: text;
   }
   &.bold {
     font-weight: 600;
