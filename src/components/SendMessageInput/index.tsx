@@ -475,9 +475,19 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
   const [detectedUrl, setDetectedUrl] = useState<string | null>(null)
   const [dismissedUrls, setDismissedUrls] = useState<Set<string>>(new Set())
   const [isClosingPreview, setIsClosingPreview] = useState(false)
+  const [replyLinkPreviewImageFailed, setReplyLinkPreviewImageFailed] = useState(false)
+  const [linkPreviewImageFailed, setLinkPreviewImageFailed] = useState(false)
   const addAttachmentByMenu = showChooseFileAttachment && showChooseMediaAttachment
   const linkify = new LinkifyIt()
   const oGMetadata = useSelector((state: any) => state.MessageReducer.oGMetadata)
+
+  useEffect(() => {
+    setReplyLinkPreviewImageFailed(false)
+  }, [messageForReply?.id, messageForReply?.tid])
+
+  useEffect(() => {
+    setLinkPreviewImageFailed(false)
+  }, [linkPreview?.url])
 
   const closePreviewWithAnimation = (callback?: () => void) => {
     if (linkPreview) {
@@ -1768,6 +1778,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
     }
   }, [showLinkPreview])
 
+  console.log(replyLinkPreviewImageFailed)
   return (
     <SendMessageWrapper ref={sendMessageWrapperRef} backgroundColor={backgroundColor || background}>
       <Container
@@ -1963,21 +1974,22 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
                               backgroundColor={selectedFileAttachmentsBoxBackground || ''}
                               isRepliedMessage
                             />
-                          ) : getReplyLinkPreviewImage(messageForReply.attachments) ? (
+                          ) : messageForReply.attachments[0].type === attachmentTypes.file ? (
+                            <ReplyIconWrapper backgroundColor={accentColor} iconColor={textOnPrimary}>
+                              <ChooseFileIcon />
+                            </ReplyIconWrapper>
+                          ) : getReplyLinkPreviewImage(messageForReply.attachments) && !replyLinkPreviewImageFailed ? (
                             <LinkPreviewImage
                               bg={background}
                               src={getReplyLinkPreviewImage(messageForReply.attachments) as string}
                               alt='Link preview'
+                              onError={() => setReplyLinkPreviewImageFailed(true)}
                             />
-                          ) : messageForReply.attachments[0].type === attachmentTypes.link ? (
-                            <LinkPreviewIconWrapper bg={background}>
-                              <LinkPreviewIcon color={accentColor} bg={background} />
-                            </LinkPreviewIconWrapper>
                           ) : (
-                            messageForReply.attachments[0].type === attachmentTypes.file && (
-                              <ReplyIconWrapper backgroundColor={accentColor} iconColor={textOnPrimary}>
-                                <ChooseFileIcon />
-                              </ReplyIconWrapper>
+                            messageForReply.attachments[0].type === attachmentTypes.link && (
+                              <LinkPreviewIconWrapper bg={background}>
+                                <LinkPreviewIcon color={accentColor} bg={background} />
+                              </LinkPreviewIconWrapper>
                             )
                           ))}
                         <ReplyMessageBody linkColor={accentColor}>
@@ -2080,7 +2092,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
                       <CloseIcon />
                     </CloseEditMode>
                     <LinkPreviewContent>
-                      {linkPreview.metadata.og?.image?.[0]?.url ? (
+                      {linkPreview.metadata.og?.image?.[0]?.url && !linkPreviewImageFailed ? (
                         <LinkPreviewImage
                           onLoad={(e: any) => {
                             if (e.target?.naturalHeight && e.target?.naturalWidth) {
@@ -2095,7 +2107,10 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
                           }}
                           src={linkPreview.metadata.og.image[0].url}
                           alt='Link preview'
+                          onError={() => setLinkPreviewImageFailed(true)}
                         />
+                      ) : linkPreview.metadata.og?.image?.[0]?.url ? (
+                        <LinkPreviewIcon color={accentColor} bg={background} />
                       ) : linkPreview.metadata.og?.favicon?.url ? (
                         <LinkPreviewImage src={linkPreview.metadata.og.favicon.url} alt='Favicon' />
                       ) : (
