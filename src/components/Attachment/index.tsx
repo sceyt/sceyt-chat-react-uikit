@@ -148,6 +148,10 @@ const Attachment = ({
   const [viewOnceVoiceModalOpen, setViewOnceVoiceModalOpen] = useState(false)
   const [downloadingFile, setDownloadingFile] = useState(false)
   const [attachmentUrl, setAttachmentUrl] = useState(attachmentUrlFromMap)
+  const attachmentIdentity = attachment.id || attachment.tid || 'unknown-attachment'
+  const attachmentKey = `${channelId || 'unknown-channel'}:${attachmentIdentity}:${attachment.url || ''}`
+  const currentAttachmentKeyRef = useRef(attachmentKey)
+  currentAttachmentKeyRef.current = attachmentKey
   const [imageLoaded, setImageLoaded] = useState(false)
   const [shouldAnimateImage, setShouldAnimateImage] = useState(false)
   const previousImageSrcRef = useRef<string | undefined>(undefined)
@@ -217,6 +221,31 @@ const Attachment = ({
       log.error('error on get attachmentThumb', e)
     }
   }
+
+  useEffect(() => {
+    if (attachment.type !== attachmentTypes.image) return
+    log.info(
+      '[MEDIA_ISSUE] image thumbnail source',
+      JSON.stringify({
+        channelId: channelId || null,
+        attachmentId: attachment.id || attachment.tid || null,
+        attachmentUrl: attachment.url || null,
+        mapUrl: attachmentUrlFromMap || null,
+        propUrl: attachment.attachmentUrl || null,
+        localUrl: attachmentUrl || null,
+        renderedSource: attachmentUrlFromMap || attachment.attachmentUrl || attachmentUrl || attachmentThumb || null
+      })
+    )
+  }, [
+    attachment.id,
+    attachment.tid,
+    attachment.type,
+    attachment.url,
+    attachment.attachmentUrl,
+    attachmentUrlFromMap,
+    attachmentUrl,
+    channelId
+  ])
 
   // Track image source changes to detect thumbnail -> full image transition
   useEffect(() => {
@@ -493,10 +522,27 @@ const Attachment = ({
       !attachmentUrlFromMap &&
       !(attachment.type === attachmentTypes.file || attachment.type === attachmentTypes.link)
     ) {
+      const requestAttachmentKey = attachmentKey
+      log.info(
+        '[MEDIA_ISSUE] image thumbnail load started',
+        JSON.stringify({
+          channelId: channelId || null,
+          attachmentId: attachment.id || attachment.tid || null,
+          url: attachment.url
+        })
+      )
       getAttachmentUrlFromCache(attachment.url)
         .then(async (cachedUrl: string | false) => {
           if (attachment.type === attachmentTypes.image && !isPreview) {
             if (cachedUrl) {
+              log.info(
+                '[MEDIA_ISSUE] image thumbnail cache resolved',
+                JSON.stringify({
+                  requestAttachmentKey,
+                  currentAttachmentKey: currentAttachmentKeyRef.current,
+                  cachedUrl
+                })
+              )
               // @ts-ignore
               // downloadImage(cachedUrl)
               setAttachmentUrl(cachedUrl)
@@ -519,6 +565,15 @@ const Attachment = ({
                 ).then(async (url) => {
                   const compressedUrl = await compressAndCacheImage(url, attachment.url, renderWidth, renderHeight)
                   if (compressedUrl) {
+                    log.info(
+                      '[MEDIA_ISSUE] image thumbnail download resolved',
+                      JSON.stringify({
+                        requestAttachmentKey,
+                        currentAttachmentKey: currentAttachmentKeyRef.current,
+                        sourceUrl: url,
+                        cachedUrl: compressedUrl
+                      })
+                    )
                     setAttachmentUrl(compressedUrl)
                   }
                   downloadImage(compressedUrl || url)
