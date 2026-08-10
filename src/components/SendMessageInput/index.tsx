@@ -1722,7 +1722,11 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
         viewOnce: false
       })
     } else if (draftMessage) {
-      if (restoredDraftChannelIdRef.current !== activeChannel.id) {
+      // Delay only while another channel's restore is genuinely in flight. A
+      // newly composed draft has no restored channel id, so deleting its final
+      // character must remove it immediately instead of leaving its last saved
+      // character visible in the channel list.
+      if (restoredDraftChannelIdRef.current && restoredDraftChannelIdRef.current !== activeChannel.id) {
         return
       }
       removeDraftMessageFromMap(activeChannel.id)
