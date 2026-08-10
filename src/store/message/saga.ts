@@ -493,34 +493,24 @@ export const handleUploadAttachments = async (attachments: IAttachment[], messag
                     type: (attachment.url as File).type || blobLocal.type
                   })
 
-            // Resize with Pica (high-quality resizing)
-            const [newWidth, newHeight] = calculateRenderedImageWidth(
-              attachment?.metadata.szw || 1280,
-              attachment?.metadata.szh || 1080
-            )
-            const { blob: resizedBlob } = await resizeImageWithPica(file, newWidth, newHeight, 1)
-            if (resizedBlob) {
-              // Cache the resized image using the uploaded URI as the cache key
-              const resizedResponse = new Response(resizedBlob, {
+            // The full-size local source is already available and is what the user
+            // saw before reloading the draft. Do not make a second, small WebP copy
+            // for the sender's message/list cache: that turned a 1298×1466 image
+            // into a 354×400 preview after a reload.
+            await setAttachmentToCache(uriLocal, new Response(file, { headers: { 'Content-Type': file.type } }))
+            filePath = URL.createObjectURL(file)
+            store.dispatch(setUpdateMessageAttachmentAC(uriLocal, filePath))
+            message.attachments[0] = { ...message.attachments[0], attachmentUrl: filePath }
+            setAttachmentToCache(
+              uriLocal + `_original_image_url`,
+              new Response(blobLocal, {
                 headers: {
-                  'Content-Type': resizedBlob.type || blobLocal.type
+                  'Content-Type': blobLocal.type
                 }
               })
-              await setAttachmentToCache(uriLocal, resizedResponse)
-              filePath = URL.createObjectURL(resizedBlob)
-              store.dispatch(setUpdateMessageAttachmentAC(uriLocal, filePath))
-              message.attachments[0] = { ...message.attachments[0], attachmentUrl: filePath }
-              setAttachmentToCache(
-                uriLocal + `_original_image_url`,
-                new Response(blobLocal, {
-                  headers: {
-                    'Content-Type': blobLocal.type
-                  }
-                })
-              )
-              const originalImageUrl = URL.createObjectURL(blobLocal)
-              store.dispatch(setUpdateMessageAttachmentAC(uriLocal + `_original_image_url`, originalImageUrl))
-            }
+            )
+            const originalImageUrl = URL.createObjectURL(blobLocal)
+            store.dispatch(setUpdateMessageAttachmentAC(uriLocal + `_original_image_url`, originalImageUrl))
           }
         } catch (error) {
           log.error('Error resizing and caching image during upload:', error)

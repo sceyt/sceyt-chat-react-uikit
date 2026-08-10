@@ -76,6 +76,7 @@ import { IMember, IMessage, IUser } from '../../types'
 import { getCustomUploader, getSendAttachmentsAsSeparateMessages } from '../../helpers/customUploader'
 import {
   checkDraftMessagesIsEmpty,
+  areDraftMessagesHydrated,
   deleteVideoThumb,
   draftMessagesMap,
   getAudioRecordingFromMap,
@@ -83,7 +84,8 @@ import {
   removeDraftMessageFromMap,
   setDraftMessageToMap,
   setPendingAttachment,
-  setSendMessageHandler
+  setSendMessageHandler,
+  subscribeToDraftMessages
 } from '../../helpers/messagesHalper'
 import { registerBlobUrl, releaseBlobUrls } from '../../helpers/attachmentBlobUrls'
 import { attachmentTypes, DEFAULT_CHANNEL_TYPE, MESSAGE_DELIVERY_STATUS, USER_STATE } from '../../helpers/constants'
@@ -157,10 +159,13 @@ function ClearEditorPlugin({ shouldClearEditor, setEditorCleared }: any) {
       editor.update(() => {
         const rootNode = $getRoot()
         rootNode.clear()
-        if (shouldClearEditor.draftMessage) {
+        if (shouldClearEditor.draftMessage?.editorState) {
+          editor.setEditorState(shouldClearEditor.draftMessage.editorState)
+        } else if (shouldClearEditor.draftMessage) {
           const paragraphNode = $createParagraphNode()
           paragraphNode.append($createTextNode(shouldClearEditor.draftMessage.text))
-          editor.setEditorState(shouldClearEditor.draftMessage.editorState)
+          rootNode.append(paragraphNode)
+          rootNode.selectEnd()
         } else {
           const paragraphNode = $createParagraphNode()
           rootNode.append(paragraphNode)
@@ -423,6 +428,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
   const [listenerIsAdded, setListenerIsAdded] = useState(false)
   const [messageText, setMessageText] = useState('')
   const [editMessageText, setEditMessageText] = useState('')
+  const [restoredEditMessage, setRestoredEditMessage] = useState<IMessage | null>(null)
   const [readyVideoAttachments, setReadyVideoAttachments] = useState<{ [key: string]: boolean }>({})
   const [showChooseAttachmentType, setShowChooseAttachmentType] = useState(false)
   const [isEmojisOpened, setIsEmojisOpened] = useState(false)
@@ -453,6 +459,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
   const [mediaExtensions, setMediaExtensions] = useState('.jpg,.jpeg,.png,.gif,.mp4,.mov,.avi,.wmv,.flv,.webm,.jfif')
   const [uploadErrorMessage, setUploadErrorMessage] = useState('')
   const [viewOnce, setViewOnce] = useState(false)
+  const [draftsHydrated, setDraftsHydrated] = useState(areDraftMessagesHydrated())
 
   const typingOrRecordingIndicator = useSelector(typingOrRecordingIndicatorArraySelector(activeChannel.id))
   const contactsMap = useSelector(contactsMapSelector)
@@ -466,6 +473,9 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
   const addAttachmentsBtnRef = useRef<any>(null)
   const metadataDebounceRef = useRef<NodeJS.Timeout | null>(null)
   const sendMessageWrapperRef = useRef<HTMLDivElement | null>(null)
+  const restoringDraftRef = useRef(false)
+  const restoredDraftChannelIdRef = useRef<string | null>(null)
+  const isNavigatingChannelRef = useRef(false)
 
   const [realEditorState, setRealEditorState] = useState()
   const [floatingAnchorElem, setFloatingAnchorElem] = useState<HTMLDivElement | null>(null)
@@ -480,6 +490,42 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
   const addAttachmentByMenu = showChooseFileAttachment && showChooseMediaAttachment
   const linkify = new LinkifyIt()
   const oGMetadata = useSelector((state: any) => state.MessageReducer.oGMetadata)
+
+  useEffect(() => subscribeToDraftMessages(() => setDraftsHydrated(areDraftMessagesHydrated())), [])
+
+  useEffect(() => {
+    if (!draftsHydrated || !activeChannel.id) {
+      return
+    }
+    const draftMessage = getDraftMessageFromMap(activeChannel.id)
+    if (!draftMessage) {
+      return
+    }
+    restoringDraftRef.current = true
+    if (draftMessage.messageToEdit) {
+      const restoredText = draftMessage.editMessageText ?? draftMessage.messageToEdit.body ?? ''
+      const restoredEdit = {
+        ...draftMessage.messageToEdit,
+        body: restoredText,
+        bodyAttributes: draftMessage.editBodyAttributes ?? draftMessage.messageToEdit.bodyAttributes,
+        mentionedUsers: draftMessage.mentionedUsers ?? draftMessage.messageToEdit.mentionedUsers
+      }
+      setEditMessageText(restoredText)
+      setMessageBodyAttributes(restoredEdit.bodyAttributes || [])
+      setMentionedUsers(restoredEdit.mentionedUsers || [])
+      setRestoredEditMessage(restoredEdit)
+      dispatch(setMessageToEditAC(draftMessage.messageToEdit))
+      restoredDraftChannelIdRef.current = activeChannel.id
+      return
+    }
+    setMessageText(draftMessage.text || '')
+    setMentionedUsers(draftMessage.mentionedUsers || [])
+    setAttachments(draftMessage.attachments || [])
+    setViewOnce(!!draftMessage.viewOnce)
+    if (draftMessage.messageForReply) dispatch(setMessageForReplyAC(draftMessage.messageForReply))
+    setShouldClearEditor({ clear: true, draftMessage })
+    restoredDraftChannelIdRef.current = activeChannel.id
+  }, [draftsHydrated, activeChannel.id])
 
   useEffect(() => {
     setReplyLinkPreviewImageFailed(false)
@@ -632,7 +678,12 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
     }
   }
 
-  const handleCloseReply = () => {
+  const handleCloseReply = (preserveDraft = false) => {
+    const shouldPreserveDraft = preserveDraft === true
+    if (!shouldPreserveDraft && !messageText.trim() && !attachments.length) {
+      removeDraftMessageFromMap(activeChannel.id)
+      dispatch(setChannelDraftMessageIsRemovedAC(activeChannel.id))
+    }
     dispatch(setMessageForReplyAC(null))
   }
 
@@ -764,6 +815,10 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
             return {
               name: attachment.data.name,
               data: attachment.data,
+              // Keep the restored object URL on the local optimistic attachment.
+              // The server upload still uses `data`; this only prevents the message
+              // list from falling back to the 6px thumbnail hash after a reload.
+              attachmentUrl: attachment.attachmentUrl,
               tid: attachment.tid,
               cachedUrl: attachment.cachedUrl,
               upload: attachment.upload,
@@ -803,6 +858,8 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
       }
       setAttachments([])
       attachmentsUpdate = []
+      removeDraftMessageFromMap(activeChannel.id)
+      dispatch(setChannelDraftMessageIsRemovedAC(activeChannel.id))
       setViewOnce(false)
       handleCloseReply()
       setShouldClearEditor({ clear: true })
@@ -920,8 +977,17 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
     handleCloseEditMode()
   }
 
-  const handleCloseEditMode = () => {
+  const handleCloseEditMode = (preserveDraft = false) => {
+    // This handler also resets editor state during channel navigation. Only an
+    // actual, explicitly cancelled edit may delete a draft; otherwise switching
+    // into a channel with a normal compose draft would remove that destination
+    // draft before its restore effect runs.
+    if (!preserveDraft && messageToEdit) {
+      removeDraftMessageFromMap(activeChannel.id)
+      dispatch(setChannelDraftMessageIsRemovedAC(activeChannel.id))
+    }
     setEditMessageText('')
+    setRestoredEditMessage(null)
     setMentionedUsers([])
     dispatch(setMessageToEditAC(null))
   }
@@ -1244,6 +1310,10 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
           : 'file'
     const attachment: any = {
       data: file,
+      // Keep this separately from File.name. IndexedDB implementations may restore
+      // a persisted File as a Blob, and the explicit name lets hydration rebuild a
+      // real File without changing the image bytes.
+      name: file.name,
       upload: !customUploader,
       type,
       tid,
@@ -1498,21 +1568,48 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
   useEffect(() => {
     if (prevActiveChannelId && activeChannel.id && prevActiveChannelId !== activeChannel.id) {
       setMessageText('')
-      handleCloseReply()
+      if (messageForReply) {
+        isNavigatingChannelRef.current = true
+        handleCloseReply(true)
+      }
       setAttachments([])
       attachmentsUpdate = []
-      handleCloseEditMode()
+      handleCloseEditMode(!!messageToEdit)
       clearTimeout(typingTimout)
 
       const draftMessage = getDraftMessageFromMap(activeChannel.id)
       if (draftMessage) {
-        if (draftMessage.messageForReply) {
-          dispatch(setMessageForReplyAC(draftMessage.messageForReply))
+        restoringDraftRef.current = true
+        if (draftMessage.messageToEdit) {
+          const restoredText = draftMessage.editMessageText ?? draftMessage.messageToEdit.body ?? ''
+          const restoredEdit = {
+            ...draftMessage.messageToEdit,
+            body: restoredText,
+            bodyAttributes: draftMessage.editBodyAttributes ?? draftMessage.messageToEdit.bodyAttributes,
+            mentionedUsers: draftMessage.mentionedUsers ?? draftMessage.messageToEdit.mentionedUsers
+          }
+          setEditMessageText(restoredText)
+          setMessageBodyAttributes(restoredEdit.bodyAttributes || [])
+          setMentionedUsers(restoredEdit.mentionedUsers || [])
+          setRestoredEditMessage(restoredEdit)
+          dispatch(setMessageToEditAC(draftMessage.messageToEdit))
+          restoredDraftChannelIdRef.current = activeChannel.id
         }
-        setMessageText(draftMessage.text)
-        setMentionedUsers(draftMessage.mentionedUsers)
+        if (!draftMessage.messageToEdit) {
+          if (draftMessage.messageForReply) {
+            dispatch(setMessageForReplyAC(draftMessage.messageForReply))
+          }
+          setMessageText(draftMessage.text)
+          setMentionedUsers(draftMessage.mentionedUsers)
+          setAttachments(draftMessage.attachments || [])
+          setViewOnce(!!draftMessage.viewOnce)
+          restoredDraftChannelIdRef.current = activeChannel.id
+          setShouldClearEditor({ clear: true, draftMessage })
+        }
+      } else {
+        setMentionedUsers([])
+        setShouldClearEditor({ clear: true, draftMessage })
       }
-      setShouldClearEditor({ clear: true, draftMessage })
     }
     if (activeChannel.id) {
       prevActiveChannelId = activeChannel.id
@@ -1525,10 +1622,45 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
     ) {
       dispatch(getMembersAC(activeChannel.id))
     }
-    setMentionedUsers([])
   }, [activeChannel.id])
 
   useEffect(() => {
+    // The parent hydrates IndexedDB asynchronously. Until this input has seen
+    // that result, an empty local editor must not delete a restored draft.
+    if (!draftsHydrated) {
+      return
+    }
+    if (restoringDraftRef.current) {
+      restoringDraftRef.current = false
+      return
+    }
+    if (messageToEdit) {
+      // Edit drafts are independent from compose drafts: retain the original
+      // target message for the edit request and persist only the replacement
+      // text/attributes the user has entered.
+      // Entering edit mode is itself a draft. The editor plugin fills
+      // editMessageText asynchronously, so fall back to the target body to
+      // preserve an immediate channel switch before that update arrives.
+      const persistedEditText = editMessageText || messageToEdit.body || ''
+      const normalizeAttrs = (attrs: any) => (!attrs || attrs.length === 0 ? [] : attrs)
+      const hasTextChanged = editMessageText !== messageToEdit.body
+      const hasAttributesChanged = !compareMessageBodyAttributes(
+        normalizeAttrs(messageBodyAttributes),
+        normalizeAttrs(messageToEdit.bodyAttributes)
+      )
+      const canSubmitEdit = !!editMessageText.trim() && (hasTextChanged || hasAttributesChanged)
+      setSendMessageIsActive(canSubmitEdit)
+      setDraftMessageToMap(activeChannel.id, {
+        // This is used only for the channel-list Draft indicator. The exact
+        // edit text is stored separately so it cannot become a new message.
+        text: persistedEditText || 'Edit message',
+        mentionedUsers,
+        messageToEdit,
+        editMessageText: persistedEditText,
+        editBodyAttributes: messageBodyAttributes
+      })
+      return
+    }
     if (
       messageText.trim() ||
       (editMessageText?.trim() && editMessageText && editMessageText?.trim() !== messageToEdit?.body) ||
@@ -1550,15 +1682,17 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
       }
     }
 
-    if (messageText.trim()) {
-      const draftMessage = getDraftMessageFromMap(activeChannel.id)
+    const draftMessage = getDraftMessageFromMap(activeChannel.id)
+    if (messageText.trim() || attachments.length) {
       if (draftMessage && draftMessage.mentionedUsers && draftMessage.mentionedUsers.length) {
         setDraftMessageToMap(activeChannel.id, {
           text: messageText,
           mentionedUsers: draftMessage.mentionedUsers,
           messageForReply,
           editorState: realEditorState,
-          bodyAttributes: messageBodyAttributes
+          bodyAttributes: messageBodyAttributes,
+          attachments,
+          viewOnce
         })
       } else {
         setDraftMessageToMap(activeChannel.id, {
@@ -1566,7 +1700,9 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
           mentionedUsers,
           messageForReply,
           editorState: realEditorState,
-          bodyAttributes: messageBodyAttributes
+          bodyAttributes: messageBodyAttributes,
+          attachments,
+          viewOnce
         })
       }
 
@@ -1574,7 +1710,21 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
         setListenerIsAdded(true)
         document.body.setAttribute('onbeforeunload', "return () => 'reload?'")
       }
-    } else if (getDraftMessageFromMap(activeChannel.id)) {
+    } else if (messageForReply || draftMessage?.messageForReply) {
+      // Attachment removal must be persisted even when the reply itself keeps
+      // the draft alive; otherwise reopening the channel restores stale media.
+      setDraftMessageToMap(activeChannel.id, {
+        text: '',
+        mentionedUsers: draftMessage?.mentionedUsers || mentionedUsers,
+        messageForReply: messageForReply || draftMessage?.messageForReply,
+        bodyAttributes: messageBodyAttributes,
+        attachments: [],
+        viewOnce: false
+      })
+    } else if (draftMessage) {
+      if (restoredDraftChannelIdRef.current !== activeChannel.id) {
+        return
+      }
       removeDraftMessageFromMap(activeChannel.id)
       dispatch(setChannelDraftMessageIsRemovedAC(activeChannel.id))
       if (checkDraftMessagesIsEmpty() && listenerIsAdded) {
@@ -1582,15 +1732,26 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
         document.body.removeAttribute('onbeforeunload')
       }
     }
-  }, [messageText, attachments, editMessageText, readyVideoAttachments, messageBodyAttributes, messageToEdit])
+  }, [
+    messageText,
+    attachments,
+    editMessageText,
+    readyVideoAttachments,
+    messageBodyAttributes,
+    messageToEdit,
+    viewOnce,
+    draftsHydrated
+  ])
 
   useDidUpdate(() => {
-    if (mentionedUsers && mentionedUsers.length) {
+    if (!messageToEdit && mentionedUsers && mentionedUsers.length) {
       setDraftMessageToMap(activeChannel.id, {
         text: messageText,
         mentionedUsers,
         messageForReply,
-        bodyAttributes: messageBodyAttributes
+        bodyAttributes: messageBodyAttributes,
+        attachments,
+        viewOnce
       })
     }
   }, [mentionedUsers])
@@ -1648,13 +1809,24 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
   })
 
   useDidUpdate(() => {
-    if (draftMessagesMap[activeChannel.id]) {
+    const persistedReply = draftMessagesMap[activeChannel.id]?.messageForReply
+    if (isNavigatingChannelRef.current) {
+      isNavigatingChannelRef.current = false
+      return
+    }
+    const hasDraftContent = !!(messageText.trim() || attachments.length || messageForReply || persistedReply)
+    if (hasDraftContent) {
       setDraftMessageToMap(activeChannel.id, {
         text: messageText,
         mentionedUsers,
-        messageForReply,
-        bodyAttributes: messageBodyAttributes
+        messageForReply: messageForReply || persistedReply,
+        bodyAttributes: messageBodyAttributes,
+        attachments,
+        viewOnce
       })
+    } else if (draftMessagesMap[activeChannel.id]) {
+      removeDraftMessageFromMap(activeChannel.id)
+      dispatch(setChannelDraftMessageIsRemovedAC(activeChannel.id))
     }
     if (messageForReply && messageToEdit) {
       handleCloseEditMode()
@@ -1925,7 +2097,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
                     borderBottom={linkPreview && linkPreview.metadata}
                     borderColor={borderColor}
                   >
-                    <CloseEditMode color={textSecondary} onClick={handleCloseEditMode}>
+                    <CloseEditMode color={textSecondary} onClick={() => handleCloseEditMode()}>
                       <CloseIcon />
                     </CloseEditMode>
                     <EditReplyMessageHeader color={accentColor}>
@@ -1957,7 +2129,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
                     borderBottom={linkPreview && linkPreview.metadata}
                     borderColor={borderColor}
                   >
-                    <CloseEditMode color={textSecondary} onClick={handleCloseReply}>
+                    <CloseEditMode color={textSecondary} onClick={() => handleCloseReply()}>
                       <CloseIcon />
                     </CloseEditMode>
                     {CustomReplyMessageContainer && customReplyMessageTypes?.includes(messageForReply.type) ? (
@@ -2313,6 +2485,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
                           <OnChangePlugin onChange={onChange} />
                           <EditMessagePlugin
                             editMessage={messageToEdit}
+                            draftMessage={restoredEditMessage?.id === messageToEdit?.id ? restoredEditMessage : null}
                             contactsMap={contactsMap}
                             getFromContacts={getFromContacts}
                             setMentionedMember={setMentionedUsers}
@@ -2897,7 +3070,7 @@ const ChosenAttachments = styled.div<{ fileBoxWidth?: string }>`
 
   & ${AttachmentFile} {
     width: 240px;
-    padding: 5px 12px;
+    padding: 5px;
     border-radius: 8px;
     height: 50px;
   }

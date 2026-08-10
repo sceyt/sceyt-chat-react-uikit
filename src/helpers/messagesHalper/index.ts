@@ -6,7 +6,13 @@ import { releaseBlobUrls } from '../attachmentBlobUrls'
 import { handleVoteDetails } from '../message'
 import store from 'store'
 import { removeChannelMarkersAC, removePendingPollActionAC, setPendingPollActionsMapAC } from 'store/message/actions'
-import { persistChannelMessages, restoreChannelMessages } from '../messagesIdb'
+import {
+  persistChannelMessages,
+  restoreChannelMessages,
+  persistDraft,
+  removePersistedDraft,
+  restoreDrafts
+} from '../messagesIdb'
 export const MESSAGES_MAX_PAGE_COUNT = 60
 export const MESSAGES_MAX_LENGTH = 40
 export const LOAD_MAX_MESSAGE_COUNT = 20
@@ -170,7 +176,18 @@ export type IAttachmentMeta = {
 }
 
 type draftMessagesMap = {
-  [key: string]: { text: string; mentionedUsers: any; messageForReply?: IMessage; bodyAttributes?: any }
+  [key: string]: {
+    text: string
+    mentionedUsers: any
+    messageForReply?: IMessage
+    bodyAttributes?: any
+    editorState?: any
+    attachments?: any[]
+    viewOnce?: boolean
+    messageToEdit?: IMessage
+    editMessageText?: string
+    editBodyAttributes?: any
+  }
 }
 type audioRecordingMap = { [key: string]: any }
 type messagesMap = {
@@ -1211,6 +1228,16 @@ export function getLatestPendingMessageFromMap(
 }
 
 export const draftMessagesMap: draftMessagesMap = {}
+const draftListeners = new Set<() => void>()
+let draftMessagesHydrated = false
+const notifyDraftListeners = () => draftListeners.forEach((listener) => listener())
+export const subscribeToDraftMessages = (listener: () => void) => {
+  draftListeners.add(listener)
+  return () => {
+    draftListeners.delete(listener)
+  }
+}
+export const areDraftMessagesHydrated = () => draftMessagesHydrated
 export const audioRecordingMap: audioRecordingMap = {}
 export const getDraftMessageFromMap = (channelId: string) => draftMessagesMap[channelId]
 export const getAudioRecordingFromMap = (channelId: string) => audioRecordingMap[channelId]
@@ -1223,6 +1250,13 @@ export const setAudioRecordingToMap = (channelId: string, audioRecording: any) =
 
 export const removeDraftMessageFromMap = (channelId: string) => {
   delete draftMessagesMap[channelId]
+  Promise.resolve(removePersistedDraft(channelId)).catch(() => undefined)
+  notifyDraftListeners()
+}
+
+export const clearDraftMessagesMap = () => {
+  Object.keys(draftMessagesMap).forEach((channelId) => delete draftMessagesMap[channelId])
+  notifyDraftListeners()
 }
 
 // Note: the recording's objectUrl is intentionally NOT revoked here — on send
@@ -1241,9 +1275,48 @@ export const setDraftMessageToMap = (
     messageForReply?: IMessage
     editorState?: any
     bodyAttributes?: any
+    attachments?: any[]
+    viewOnce?: boolean
+    messageToEdit?: IMessage
+    editMessageText?: string
+    editBodyAttributes?: any
   }
 ) => {
   draftMessagesMap[channelId] = draftMessage
+  Promise.resolve(persistDraft(channelId, draftMessage)).catch(() => undefined)
+  notifyDraftListeners()
+}
+
+export const hydrateDraftMessages = async (): Promise<void> => {
+  const persistedDrafts = await restoreDrafts()
+  persistedDrafts.forEach(({ channelId, draft }) => {
+    const attachments = (draft.attachments || []).map((attachment: any) => {
+      const data = attachment.data
+      // Structured cloning normally preserves File, but Safari and older IndexedDB
+      // implementations can restore it as a Blob. Recreate the File from the exact
+      // stored bytes so uploaders retain its filename and MIME type. Do not run image
+      // resizing here: a draft must upload the same already-prepared file it had
+      // before the reload.
+      const restoredData =
+        data instanceof Blob && typeof File !== 'undefined' && !(data instanceof File)
+          ? new File([data], attachment.name || 'attachment', {
+              type: data.type || attachment.mimeType || 'application/octet-stream',
+              lastModified: attachment.lastModified || Date.now()
+            })
+          : data
+      return {
+        ...attachment,
+        data: restoredData,
+        attachmentUrl:
+          restoredData instanceof Blob && typeof URL !== 'undefined'
+            ? URL.createObjectURL(restoredData)
+            : attachment.attachmentUrl
+      }
+    })
+    draftMessagesMap[channelId] = { ...draft, attachments }
+  })
+  draftMessagesHydrated = true
+  notifyDraftListeners()
 }
 
 export type PendingPollAction = {

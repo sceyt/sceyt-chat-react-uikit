@@ -28,7 +28,11 @@ import Avatar from '../Avatar'
 import { systemMessageUserName, formatDisappearingMessageTime } from '../../helpers'
 import { isJSON, isMessageUnsupported, lastMessageDateFormat, makeUsername } from '../../helpers/message'
 import { hideUserPresence } from '../../helpers/userHelper'
-import { getAudioRecordingFromMap, getDraftMessageFromMap } from '../../helpers/messagesHalper'
+import {
+  getAudioRecordingFromMap,
+  getDraftMessageFromMap,
+  subscribeToDraftMessages
+} from '../../helpers/messagesHalper'
 import { updateChannelOnAllChannels } from '../../helpers/channelHalper'
 import { attachmentTypes, DEFAULT_CHANNEL_TYPE, MESSAGE_STATUS, USER_PRESENCE_STATUS } from '../../helpers/constants'
 import { THEME_COLORS } from '../../UIHelper/constants'
@@ -171,17 +175,21 @@ const ChannelMessageText = ({
       {!isTypingOrRecording &&
         (draftMessageText ? (
           <DraftMessageText color={textSecondary}>
+            {!lastMessage.body && lastMessage.attachments?.length ? LastMessageAttachments({ lastMessage }) : null}
             {audioRecording && <VoiceIcon />}
-            {MessageTextFormat({
-              text: draftMessageText,
-              message: lastMessage,
-              contactsMap,
-              getFromContacts,
-              isLastMessage: true,
-              accentColor,
-              textSecondary,
-              unsupportedMessage
-            })}
+            {(!lastMessage.attachments?.length || lastMessage.body) &&
+              MessageTextFormat({
+                // Attachment-only drafts already get their label from
+                // LastMessageAttachments (Photo, Video, File, or Voice).
+                text: lastMessage.attachments?.length ? lastMessage.body : draftMessageText,
+                message: lastMessage,
+                contactsMap,
+                getFromContacts,
+                isLastMessage: true,
+                accentColor,
+                textSecondary,
+                unsupportedMessage
+              })}
           </DraftMessageText>
         ) : lastMessage.state === MESSAGE_STATUS.DELETE ? (
           'Message was deleted.'
@@ -344,6 +352,9 @@ const Channel: React.FC<IChannelProps> = ({
   const typingOrRecordingIndicator = useSelector(typingOrRecordingIndicatorArraySelector(channel.id))
   const [draftMessageText, setDraftMessageText] = useState<any>()
   const [draftMessage, setDraftMessage] = useState<any>()
+  const [draftRevision, setDraftRevision] = useState(0)
+
+  useEffect(() => subscribeToDraftMessages(() => setDraftRevision((revision) => revision + 1)), [])
   const lastMessage = useMemo(
     () => channel.lastReactedMessage || channel.lastMessage,
     [channel.lastReactedMessage, channel.lastMessage]
@@ -379,11 +390,27 @@ const Channel: React.FC<IChannelProps> = ({
       const draftAudioRecording = getAudioRecordingFromMap(channel.id)
       if (channelDraftMessage || draftAudioRecording) {
         if (channelDraftMessage) {
-          setDraftMessageText(channelDraftMessage.text)
+          const attachment = channelDraftMessage.attachments?.[0]
+          const mediaLabel =
+            attachment?.type === attachmentTypes.image
+              ? 'Photo'
+              : attachment?.type === attachmentTypes.video
+                ? 'Video'
+                : attachment?.type === attachmentTypes.voice
+                  ? 'Voice'
+                  : attachment
+                    ? 'File'
+                    : ''
+          setDraftMessageText(
+            channelDraftMessage.text || mediaLabel || (channelDraftMessage.messageForReply ? 'Reply' : '')
+          )
           setDraftMessage({
             mentionedUsers: channelDraftMessage.mentionedUsers,
             body: channelDraftMessage.text,
-            bodyAttributes: channelDraftMessage.bodyAttributes
+            bodyAttributes: channelDraftMessage.bodyAttributes,
+            attachments: channelDraftMessage.attachments,
+            viewOnce: channelDraftMessage.viewOnce,
+            type: channelDraftMessage.viewOnce ? MESSAGE_TYPE.VIEW_ONCE : undefined
           })
         } else if (draftAudioRecording) {
           setDraftMessageText('Voice')
@@ -394,7 +421,7 @@ const Channel: React.FC<IChannelProps> = ({
         setDraftMessage(undefined)
       }
     }
-  }, [activeChannel.id])
+  }, [activeChannel.id, draftRevision])
 
   useEffect(() => {
     if (channelDraftIsRemoved && channelDraftIsRemoved === channel.id) {

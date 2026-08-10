@@ -7,8 +7,9 @@ import { IMessage } from '../types'
 // Every operation degrades to a no-op when IndexedDB is unavailable.
 
 const DB_NAME = 'sceyt-uikit-messages'
-const DB_VERSION = 1
+const DB_VERSION = 2
 const CHANNELS_STORE = 'channels'
+const DRAFTS_STORE = 'drafts'
 const META_STORE = 'meta'
 const USER_META_KEY = 'userId'
 export const IDB_MAX_STORED_CHANNELS = 200
@@ -18,6 +19,12 @@ export type PersistedChannelCache = {
   channelId: string
   messages: IMessage[]
   segments: Array<{ startId: string; endId: string }>
+  savedAt: number
+}
+
+export type PersistedDraft = {
+  channelId: string
+  draft: any
   savedAt: number
 }
 
@@ -38,6 +45,9 @@ const openDb = (): Promise<IDBDatabase | null> => {
         if (!db.objectStoreNames.contains(CHANNELS_STORE)) {
           const store = db.createObjectStore(CHANNELS_STORE, { keyPath: 'channelId' })
           store.createIndex('savedAt', 'savedAt')
+        }
+        if (!db.objectStoreNames.contains(DRAFTS_STORE)) {
+          db.createObjectStore(DRAFTS_STORE, { keyPath: 'channelId' })
         }
         if (!db.objectStoreNames.contains(META_STORE)) {
           db.createObjectStore(META_STORE)
@@ -72,7 +82,8 @@ const sanitizeMessageForPersist = (message: IMessage): IMessage => {
   return {
     ...message,
     attachments: message.attachments.map((attachment: any) => {
-      const { data, ...rest } = attachment || {}
+      const rest = { ...(attachment || {}) }
+      delete rest.data
       if (rest.attachmentUrl && String(rest.attachmentUrl).startsWith('blob:')) {
         rest.attachmentUrl = undefined
       }
@@ -127,6 +138,57 @@ export const restoreChannelMessages = async (channelId: string): Promise<Persist
   }
 }
 
+export const persistDraft = async (channelId: string, draft: any): Promise<void> => {
+  const db = await openDb()
+  if (!db || !channelId) return
+  try {
+    // Lexical EditorState is session-bound and not structured-cloneable. Text,
+    // attributes and mentions are enough to rebuild the compose editor on reload.
+    const persistedDraft = { ...(draft || {}) }
+    delete persistedDraft.editorState
+    db.transaction(DRAFTS_STORE, 'readwrite').objectStore(DRAFTS_STORE).put({
+      channelId,
+      draft: persistedDraft,
+      savedAt: Date.now()
+    })
+  } catch (e) {
+    log.info('messagesIdb: failed to persist draft', e)
+  }
+}
+
+export const restoreDrafts = async (): Promise<PersistedDraft[]> => {
+  const db = await openDb()
+  if (!db) return []
+  try {
+    return await requestToPromise<PersistedDraft[]>(
+      db.transaction(DRAFTS_STORE, 'readonly').objectStore(DRAFTS_STORE).getAll()
+    )
+  } catch (e) {
+    log.info('messagesIdb: failed to restore drafts', e)
+    return []
+  }
+}
+
+export const removePersistedDraft = async (channelId: string): Promise<void> => {
+  const db = await openDb()
+  if (!db || !channelId) return
+  try {
+    db.transaction(DRAFTS_STORE, 'readwrite').objectStore(DRAFTS_STORE).delete(channelId)
+  } catch (e) {
+    log.info('messagesIdb: failed to remove draft', e)
+  }
+}
+
+export const clearPersistedDrafts = async (): Promise<void> => {
+  const db = await openDb()
+  if (!db) return
+  try {
+    db.transaction(DRAFTS_STORE, 'readwrite').objectStore(DRAFTS_STORE).clear()
+  } catch (e) {
+    log.info('messagesIdb: failed to clear drafts', e)
+  }
+}
+
 export const removePersistedChannel = async (channelId: string): Promise<void> => {
   const db = await openDb()
   if (!db) {
@@ -166,6 +228,7 @@ export const initMessagesIdbForUser = async (userId: string): Promise<void> => {
     const storedUserId = await requestToPromise<string | undefined>(metaTx.objectStore(META_STORE).get(USER_META_KEY))
     if (storedUserId !== userId) {
       await clearPersistedChannels()
+      await clearPersistedDrafts()
       db.transaction(META_STORE, 'readwrite').objectStore(META_STORE).put(userId, USER_META_KEY)
       return
     }

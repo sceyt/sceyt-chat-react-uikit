@@ -1,7 +1,7 @@
 import React from 'react'
 import { act, screen } from '@testing-library/react'
 import Channel from './index'
-import { DEFAULT_CHANNEL_TYPE } from '../../helpers/constants'
+import { attachmentTypes, DEFAULT_CHANNEL_TYPE } from '../../helpers/constants'
 import { setClient } from '../../common/client'
 import { updateChannelDataAC } from '../../store/channel/actions'
 import { useSelector } from '../../store/hooks'
@@ -170,5 +170,63 @@ describe('Channel draft preview', () => {
     expect(screen.getByText('Draft')).toBeInTheDocument()
     expect(screen.getByText('unsent draft text')).toBeInTheDocument()
     expect(screen.queryByTestId('message-status-icon')).not.toBeInTheDocument()
+  })
+
+  it('renders attachment-only drafts with the same attachment label as a last message', () => {
+    setDraftMessageToMap(channelId, {
+      text: '',
+      mentionedUsers: [],
+      attachments: [{ type: attachmentTypes.image, data: new File(['image'], 'photo.png', { type: 'image/png' }) }]
+    })
+
+    renderOwnLastMessageChannel()
+
+    expect(screen.getByText('Draft')).toBeInTheDocument()
+    expect(screen.getByText('Photo')).toBeInTheDocument()
+    expect(screen.queryByTestId('message-status-icon')).not.toBeInTheDocument()
+  })
+
+  it.each([
+    [attachmentTypes.video, 'Video'],
+    [attachmentTypes.file, 'File'],
+    [attachmentTypes.voice, 'Voice']
+  ])('renders an attachment-only %s draft as %s', (type, expectedLabel) => {
+    setDraftMessageToMap(channelId, {
+      text: '',
+      mentionedUsers: [],
+      attachments: [{ type, data: new File(['attachment'], 'attachment', { type: 'application/octet-stream' }) }]
+    })
+
+    renderOwnLastMessageChannel()
+
+    expect(screen.getByText('Draft')).toBeInTheDocument()
+    expect(screen.getByText(expectedLabel)).toBeInTheDocument()
+  })
+
+  it('shows draft text instead of an attachment label when the draft has both', () => {
+    setDraftMessageToMap(channelId, {
+      text: 'Photo caption draft',
+      mentionedUsers: [],
+      attachments: [{ type: attachmentTypes.image, data: new File(['image'], 'photo.png', { type: 'image/png' }) }]
+    })
+
+    renderOwnLastMessageChannel()
+
+    expect(screen.getByText('Photo caption draft')).toBeInTheDocument()
+    expect(screen.queryByText('Photo')).not.toBeInTheDocument()
+  })
+
+  it('shows an edit draft in the channel list', () => {
+    setDraftMessageToMap(channelId, {
+      text: 'Edited but unsent text',
+      mentionedUsers: [],
+      messageToEdit: { id: 'message-to-edit', body: 'Original text' },
+      editMessageText: 'Edited but unsent text'
+    })
+
+    renderOwnLastMessageChannel()
+
+    expect(screen.getByText('Draft')).toBeInTheDocument()
+    expect(screen.getByText('Edited but unsent text')).toBeInTheDocument()
   })
 })

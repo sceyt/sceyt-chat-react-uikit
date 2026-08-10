@@ -698,6 +698,7 @@ const Attachment = ({
             withBorder={!isPreview && !isDetailsView}
             src={
               attachmentUrlFromMap ||
+              attachment.attachmentUrl ||
               attachmentUrl ||
               (withPrefix && attachmentThumb ? `data:image/jpeg;base64,${attachmentThumb}` : attachmentThumb)
             }

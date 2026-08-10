@@ -59,12 +59,11 @@ import { IChannel, IContactsMap } from '../../types'
 import { setCustomUploader, setSendAttachmentsAsSeparateMessages } from '../../helpers/customUploader'
 import { IChatClientProps } from '../ChatContainer'
 import { defaultTheme, THEME_COLORS } from '../../UIHelper/constants'
-import { setHideUserPresence } from '../../helpers/userHelper'
-import { clearMessagesMap } from '../../helpers/messagesHalper'
+import { clearUsersMap, setHideUserPresence } from '../../helpers/userHelper'
+import { clearDraftMessagesMap, clearMessagesMap, hydrateDraftMessages } from '../../helpers/messagesHalper'
 import { releaseAllBlobUrls, setBlobUrlEvictListener } from '../../helpers/attachmentBlobUrls'
 import { removeAttachmentUpdatedEntriesAC } from '../../store/message/actions'
-import { initMessagesIdbForUser } from '../../helpers/messagesIdb'
-import { clearUsersMap } from '../../helpers/userHelper'
+import { clearPersistedDrafts, initMessagesIdbForUser } from '../../helpers/messagesIdb'
 import { setTheme, setThemeAC } from '../../store/theme/actions'
 import { SceytChatUIKitTheme, ThemeMode } from '../../components'
 import log from 'loglevel'
@@ -156,7 +155,7 @@ const SceytChat = ({
       // Scope the IndexedDB message spill to the connected user (wipes it on
       // account switch) and prune stale entries.
       if (client.user && client.user.id) {
-        initMessagesIdbForUser(client.user.id)
+        initMessagesIdbForUser(client.user.id).then(() => hydrateDraftMessages())
       }
 
       setClient(client)
@@ -172,6 +171,8 @@ const SceytChat = ({
       setActiveChannelId('')
       destroyChannelsMap()
       clearUsersMap()
+      clearDraftMessagesMap()
+      clearPersistedDrafts()
       releaseAllBlobUrls()
       dispatch(destroySession())
     }
