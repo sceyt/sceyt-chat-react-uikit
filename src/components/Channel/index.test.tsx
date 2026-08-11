@@ -131,7 +131,7 @@ describe('Channel draft preview', () => {
     removeDraftMessageFromMap(channelId)
   })
 
-  const renderOwnLastMessageChannel = () => {
+  const renderOwnLastMessageChannel = (channelOverrides: Partial<IChannel> = {}) => {
     const currentUser = makeUser({ id: 'current-user', firstName: 'Current' })
     const lastMessage = makeMessage({
       id: '1801',
@@ -145,7 +145,8 @@ describe('Channel draft preview', () => {
       type: DEFAULT_CHANNEL_TYPE.DIRECT,
       lastMessage,
       lastReceivedMsgId: lastMessage.id,
-      lastDisplayedMessageId: lastMessage.id
+      lastDisplayedMessageId: lastMessage.id,
+      ...channelOverrides
     })
     const store = createMessageListStore({
       ChannelReducer: {
@@ -170,6 +171,16 @@ describe('Channel draft preview', () => {
     expect(screen.getByText('Draft')).toBeInTheDocument()
     expect(screen.getByText('unsent draft text')).toBeInTheDocument()
     expect(screen.queryByTestId('message-status-icon')).not.toBeInTheDocument()
+  })
+
+  it('shows the latest message instead of a draft while the channel has unread messages', () => {
+    setDraftMessageToMap(channelId, { text: 'unsent draft text', mentionedUsers: [] })
+
+    renderOwnLastMessageChannel({ unread: true, newMessageCount: 1 })
+
+    expect(screen.queryByText('Draft')).not.toBeInTheDocument()
+    expect(screen.queryByText('unsent draft text')).not.toBeInTheDocument()
+    expect(screen.getByText('my sent message')).toBeInTheDocument()
   })
 
   it('renders attachment-only drafts with the same attachment label as a last message', () => {

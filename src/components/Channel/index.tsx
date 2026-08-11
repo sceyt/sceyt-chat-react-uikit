@@ -453,6 +453,10 @@ const Channel: React.FC<IChannelProps> = ({
   const unsupportedMessage = useMemo(() => {
     return isMessageUnsupported(lastMessage)
   }, [lastMessage?.type])
+  // Incoming unread messages take priority over a local draft: the row should
+  // describe the newest channel activity until those messages are read.
+  const shouldShowDraft = !!draftMessageText && !(channel.newMessageCount > 0)
+  const displayedLastMessage = shouldShowDraft ? draftMessage || lastMessage : lastMessage
 
   const MessageText = useMemo(() => {
     return (
@@ -467,8 +471,8 @@ const Channel: React.FC<IChannelProps> = ({
         channel={channel}
         textPrimary={textPrimary}
         textSecondary={textSecondary}
-        draftMessageText={draftMessageText}
-        lastMessage={draftMessage || lastMessage}
+        draftMessageText={shouldShowDraft ? draftMessageText : ''}
+        lastMessage={displayedLastMessage}
         isDirectChannel={isDirectChannel}
         unsupportedMessage={unsupportedMessage && !getCustomLatestMessage}
       />
@@ -477,6 +481,8 @@ const Channel: React.FC<IChannelProps> = ({
     typingOrRecording?.isTyping,
     typingOrRecording?.isRecording,
     draftMessageText,
+    shouldShowDraft,
+    displayedLastMessage,
     lastMessage,
     user,
     contactsMap,
@@ -661,7 +667,7 @@ const Channel: React.FC<IChannelProps> = ({
               ? getCustomLatestMessageComponent({
                   lastMessage,
                   typingOrRecording,
-                  draftMessageText,
+                  draftMessageText: shouldShowDraft ? draftMessageText : undefined,
                   textSecondary,
                   channel,
                   channelLastMessageFontSize: channelLastMessageFontSize || '14px',
@@ -676,7 +682,7 @@ const Channel: React.FC<IChannelProps> = ({
                   MessageText,
                   unsupportedMessage
                 })
-              : (lastMessage || typingOrRecording.items.length > 0 || draftMessageText) && (
+              : (lastMessage || typingOrRecording.items.length > 0 || shouldShowDraft) && (
                   <LastMessage
                     color={textSecondary}
                     markedAsUnread={!!(channel.unread || (channel.newMessageCount && channel.newMessageCount > 0))}
@@ -706,7 +712,7 @@ const Channel: React.FC<IChannelProps> = ({
                           </span>
                         </LastMessageAuthor>
                       ) : null
-                    ) : draftMessageText ? (
+                    ) : shouldShowDraft ? (
                       <DraftMessageTitle color={warningColor}>Draft</DraftMessageTitle>
                     ) : channel.lastReactedMessage && channel.newReactions && channel.newReactions[0] ? (
                       lastMessage.state !== MESSAGE_STATUS.DELETE &&
@@ -750,17 +756,17 @@ const Channel: React.FC<IChannelProps> = ({
                       (isDirectChannel
                         ? !typingOrRecording?.isTyping &&
                           !typingOrRecording?.isRecording &&
-                          (draftMessageText ||
+                          (shouldShowDraft ||
                             (lastMessage.user &&
                               lastMessage.state !== MESSAGE_STATUS.DELETE &&
                               (channel.lastReactedMessage && channel.newReactions && channel.newReactions[0]
                                 ? channel.newReactions[0].user && channel.newReactions[0].user.id === user.id
                                 : lastMessage.user.id === user.id && lastMessage.type !== MESSAGE_TYPE.SYSTEM)))
-                        : draftMessageText ||
+                        : shouldShowDraft ||
                           (lastMessage &&
                             lastMessage.state !== MESSAGE_STATUS.DELETE &&
                             lastMessage.type !== MESSAGE_TYPE.SYSTEM)) && (
-                        <Points color={(draftMessageText && warningColor) || textPrimary}>: </Points>
+                        <Points color={(shouldShowDraft && warningColor) || textPrimary}>: </Points>
                       )}
                     <LastMessageText
                       color={textSecondary}
@@ -785,7 +791,7 @@ const Channel: React.FC<IChannelProps> = ({
           <ChannelStatus color={iconInactive} ref={messageTimeAndStatusRef}>
             {/* While a draft is previewed, the last message's delivery status is
                 not what the row describes — show the draft alone. */}
-            {lastMessage && lastMessage.state !== MESSAGE_STATUS.DELETE && !draftMessageText && (
+            {lastMessage && lastMessage.state !== MESSAGE_STATUS.DELETE && !shouldShowDraft && (
               <DeliveryIconCont>
                 {lastMessage &&
                   lastMessage.user &&
@@ -808,7 +814,7 @@ const Channel: React.FC<IChannelProps> = ({
             moment(lastMessage.createdAt).format('HH:mm')} */}
             </LastMessageDate>
           </ChannelStatus>
-          <UnreadInfo bottom={!(lastMessage || typingOrRecording.items.length > 0 || draftMessageText) ? '5px' : ''}>
+          <UnreadInfo bottom={!(lastMessage || typingOrRecording.items.length > 0 || shouldShowDraft) ? '5px' : ''}>
             {channel.pinnedAt && (
               <PinnedIconWrapper
                 color={iconInactive}
