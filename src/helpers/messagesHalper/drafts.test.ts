@@ -28,16 +28,13 @@ describe('persistent drafts', () => {
     expect(persistDraft).toHaveBeenCalledWith('draft-channel', expect.objectContaining({ text: '' }))
   })
 
-  it('persists reply-only drafts without requiring text or attachments', () => {
+  it('does not persist an empty reply-only composer', () => {
     const parentMessage: any = { id: 'parent-message', body: 'Reply target' }
 
     setDraftMessageToMap('draft-channel', { text: '', mentionedUsers: [], messageForReply: parentMessage })
 
-    expect(getDraftMessageFromMap('draft-channel')?.messageForReply).toEqual(parentMessage)
-    expect(persistDraft).toHaveBeenCalledWith(
-      'draft-channel',
-      expect.objectContaining({ messageForReply: parentMessage })
-    )
+    expect(getDraftMessageFromMap('draft-channel')).toBeUndefined()
+    expect(removePersistedDraft).toHaveBeenCalledWith('draft-channel')
   })
 
   it('persists edit drafts with the original target and replacement text', () => {
@@ -57,7 +54,7 @@ describe('persistent drafts', () => {
     )
   })
 
-  it('persists entering edit mode even when the text is unchanged', () => {
+  it('does not persist an unchanged edit mode', () => {
     const messageToEdit: any = { id: 'unchanged-message', body: 'Original text', bodyAttributes: [] }
 
     setDraftMessageToMap('draft-channel', {
@@ -68,9 +65,23 @@ describe('persistent drafts', () => {
       editBodyAttributes: []
     })
 
-    expect(getDraftMessageFromMap('draft-channel')).toEqual(
-      expect.objectContaining({ messageToEdit, editMessageText: 'Original text' })
-    )
+    expect(getDraftMessageFromMap('draft-channel')).toBeUndefined()
+    expect(removePersistedDraft).toHaveBeenCalledWith('draft-channel')
+  })
+
+  it('does not persist an edit whose replacement text is empty', () => {
+    const messageToEdit: any = { id: 'cleared-message', body: 'Original text', bodyAttributes: [] }
+
+    setDraftMessageToMap('draft-channel', {
+      text: '',
+      mentionedUsers: [],
+      messageToEdit,
+      editMessageText: '',
+      editBodyAttributes: []
+    })
+
+    expect(getDraftMessageFromMap('draft-channel')).toBeUndefined()
+    expect(removePersistedDraft).toHaveBeenCalledWith('draft-channel')
   })
 
   it('persists text, mentions, formatting, and reply context together', () => {

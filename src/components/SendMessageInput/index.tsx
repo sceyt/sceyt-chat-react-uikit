@@ -1650,15 +1650,20 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
       )
       const canSubmitEdit = !!editMessageText.trim() && (hasTextChanged || hasAttributesChanged)
       setSendMessageIsActive(canSubmitEdit)
-      setDraftMessageToMap(activeChannel.id, {
-        // This is used only for the channel-list Draft indicator. The exact
-        // edit text is stored separately so it cannot become a new message.
-        text: persistedEditText || 'Edit message',
-        mentionedUsers,
-        messageToEdit,
-        editMessageText: persistedEditText,
-        editBodyAttributes: messageBodyAttributes
-      })
+      if (canSubmitEdit) {
+        setDraftMessageToMap(activeChannel.id, {
+          // This is used only for the channel-list Draft indicator. The exact
+          // edit text is stored separately so it cannot become a new message.
+          text: persistedEditText,
+          mentionedUsers,
+          messageToEdit,
+          editMessageText: persistedEditText,
+          editBodyAttributes: messageBodyAttributes
+        })
+      } else if (getDraftMessageFromMap(activeChannel.id)?.messageToEdit) {
+        removeDraftMessageFromMap(activeChannel.id)
+        dispatch(setChannelDraftMessageIsRemovedAC(activeChannel.id))
+      }
       return
     }
     if (
@@ -1710,17 +1715,6 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
         setListenerIsAdded(true)
         document.body.setAttribute('onbeforeunload', "return () => 'reload?'")
       }
-    } else if (messageForReply || draftMessage?.messageForReply) {
-      // Attachment removal must be persisted even when the reply itself keeps
-      // the draft alive; otherwise reopening the channel restores stale media.
-      setDraftMessageToMap(activeChannel.id, {
-        text: '',
-        mentionedUsers: draftMessage?.mentionedUsers || mentionedUsers,
-        messageForReply: messageForReply || draftMessage?.messageForReply,
-        bodyAttributes: messageBodyAttributes,
-        attachments: [],
-        viewOnce: false
-      })
     } else if (draftMessage) {
       // Delay only while another channel's restore is genuinely in flight. A
       // newly composed draft has no restored channel id, so deleting its final
@@ -1813,17 +1807,16 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
   })
 
   useDidUpdate(() => {
-    const persistedReply = draftMessagesMap[activeChannel.id]?.messageForReply
     if (isNavigatingChannelRef.current) {
       isNavigatingChannelRef.current = false
       return
     }
-    const hasDraftContent = !!(messageText.trim() || attachments.length || messageForReply || persistedReply)
+    const hasDraftContent = !!(messageText.trim() || attachments.length)
     if (hasDraftContent) {
       setDraftMessageToMap(activeChannel.id, {
         text: messageText,
         mentionedUsers,
-        messageForReply: messageForReply || persistedReply,
+        messageForReply,
         bodyAttributes: messageBodyAttributes,
         attachments,
         viewOnce
