@@ -1280,27 +1280,17 @@ export const setDraftMessageToMap = (
     messageToEdit?: IMessage
     editMessageText?: string
     editBodyAttributes?: any
-  }
+  },
+  options: { persist?: boolean } = {}
 ) => {
-  const hasAttachments = !!draftMessage.attachments?.length
-  const hasComposeText = !draftMessage.messageToEdit && !!draftMessage.text?.trim()
-  const editText = draftMessage.editMessageText?.trim() || ''
-  const hasChangedEdit =
-    !!draftMessage.messageToEdit &&
-    !!editText &&
-    (draftMessage.editMessageText !== draftMessage.messageToEdit.body ||
-      JSON.stringify(draftMessage.editBodyAttributes || []) !==
-        JSON.stringify(draftMessage.messageToEdit.bodyAttributes || []))
-
-  // A reply or edit mode is UI context, not message content. Persisting either
-  // on its own makes the chat list show a Draft even though there is nothing a
-  // user can send. Keep only actual compose content or a changed, sendable edit.
-  if (!hasComposeText && !hasAttachments && !hasChangedEdit) {
-    removeDraftMessageFromMap(channelId)
-    return
-  }
   draftMessagesMap[channelId] = draftMessage
-  Promise.resolve(persistDraft(channelId, draftMessage)).catch(() => undefined)
+  if (options.persist === false) {
+    // Reply/edit context with no sendable content is useful while navigating in
+    // the current session, but should not survive a browser restart.
+    Promise.resolve(removePersistedDraft(channelId)).catch(() => undefined)
+  } else {
+    Promise.resolve(persistDraft(channelId, draftMessage)).catch(() => undefined)
+  }
   notifyDraftListeners()
 }
 

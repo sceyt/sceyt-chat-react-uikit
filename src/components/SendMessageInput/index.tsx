@@ -1650,20 +1650,19 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
       )
       const canSubmitEdit = !!editMessageText.trim() && (hasTextChanged || hasAttributesChanged)
       setSendMessageIsActive(canSubmitEdit)
-      if (canSubmitEdit) {
-        setDraftMessageToMap(activeChannel.id, {
-          // This is used only for the channel-list Draft indicator. The exact
-          // edit text is stored separately so it cannot become a new message.
-          text: persistedEditText,
+      setDraftMessageToMap(
+        activeChannel.id,
+        {
+          // This is used only for restoration. The channel list suppresses an
+          // unchanged or empty edit so it does not appear as a visible Draft.
+          text: persistedEditText || 'Edit message',
           mentionedUsers,
           messageToEdit,
           editMessageText: persistedEditText,
           editBodyAttributes: messageBodyAttributes
-        })
-      } else if (getDraftMessageFromMap(activeChannel.id)?.messageToEdit) {
-        removeDraftMessageFromMap(activeChannel.id)
-        dispatch(setChannelDraftMessageIsRemovedAC(activeChannel.id))
-      }
+        },
+        { persist: canSubmitEdit }
+      )
       return
     }
     if (
@@ -1715,6 +1714,19 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
         setListenerIsAdded(true)
         document.body.setAttribute('onbeforeunload', "return () => 'reload?'")
       }
+    } else if (messageForReply || draftMessage?.messageForReply) {
+      setDraftMessageToMap(
+        activeChannel.id,
+        {
+          text: '',
+          mentionedUsers: draftMessage?.mentionedUsers || mentionedUsers,
+          messageForReply: messageForReply || draftMessage?.messageForReply,
+          bodyAttributes: messageBodyAttributes,
+          attachments: [],
+          viewOnce: false
+        },
+        { persist: false }
+      )
     } else if (draftMessage) {
       // Delay only while another channel's restore is genuinely in flight. A
       // newly composed draft has no restored channel id, so deleting its final
@@ -1743,14 +1755,18 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
 
   useDidUpdate(() => {
     if (!messageToEdit && mentionedUsers && mentionedUsers.length) {
-      setDraftMessageToMap(activeChannel.id, {
-        text: messageText,
-        mentionedUsers,
-        messageForReply,
-        bodyAttributes: messageBodyAttributes,
-        attachments,
-        viewOnce
-      })
+      setDraftMessageToMap(
+        activeChannel.id,
+        {
+          text: messageText,
+          mentionedUsers,
+          messageForReply,
+          bodyAttributes: messageBodyAttributes,
+          attachments,
+          viewOnce
+        },
+        { persist: !!(messageText.trim() || attachments.length) }
+      )
     }
   }, [mentionedUsers])
 
@@ -1807,20 +1823,25 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
   })
 
   useDidUpdate(() => {
+    const persistedReply = draftMessagesMap[activeChannel.id]?.messageForReply
     if (isNavigatingChannelRef.current) {
       isNavigatingChannelRef.current = false
       return
     }
-    const hasDraftContent = !!(messageText.trim() || attachments.length)
+    const hasDraftContent = !!(messageText.trim() || attachments.length || messageForReply || persistedReply)
     if (hasDraftContent) {
-      setDraftMessageToMap(activeChannel.id, {
-        text: messageText,
-        mentionedUsers,
-        messageForReply,
-        bodyAttributes: messageBodyAttributes,
-        attachments,
-        viewOnce
-      })
+      setDraftMessageToMap(
+        activeChannel.id,
+        {
+          text: messageText,
+          mentionedUsers,
+          messageForReply: messageForReply || persistedReply,
+          bodyAttributes: messageBodyAttributes,
+          attachments,
+          viewOnce
+        },
+        { persist: !!(messageText.trim() || attachments.length) }
+      )
     } else if (draftMessagesMap[activeChannel.id]) {
       removeDraftMessageFromMap(activeChannel.id)
       dispatch(setChannelDraftMessageIsRemovedAC(activeChannel.id))

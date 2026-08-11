@@ -391,6 +391,13 @@ const Channel: React.FC<IChannelProps> = ({
       if (channelDraftMessage || draftAudioRecording) {
         if (channelDraftMessage) {
           const attachment = channelDraftMessage.attachments?.[0]
+          const editText = channelDraftMessage.editMessageText ?? channelDraftMessage.messageToEdit?.body ?? ''
+          const hasChangedEdit =
+            !!channelDraftMessage.messageToEdit &&
+            !!editText.trim() &&
+            (editText !== channelDraftMessage.messageToEdit.body ||
+              JSON.stringify(channelDraftMessage.editBodyAttributes || []) !==
+                JSON.stringify(channelDraftMessage.messageToEdit.bodyAttributes || []))
           const mediaLabel =
             attachment?.type === attachmentTypes.image
               ? 'Photo'
@@ -401,17 +408,25 @@ const Channel: React.FC<IChannelProps> = ({
                   : attachment
                     ? 'File'
                     : ''
-          setDraftMessageText(
-            channelDraftMessage.text || mediaLabel || (channelDraftMessage.messageForReply ? 'Reply' : '')
-          )
-          setDraftMessage({
-            mentionedUsers: channelDraftMessage.mentionedUsers,
-            body: channelDraftMessage.text,
-            bodyAttributes: channelDraftMessage.bodyAttributes,
-            attachments: channelDraftMessage.attachments,
-            viewOnce: channelDraftMessage.viewOnce,
-            type: channelDraftMessage.viewOnce ? MESSAGE_TYPE.VIEW_ONCE : undefined
-          })
+          const draftText = channelDraftMessage.text?.trim() || mediaLabel
+          const isContextOnlyDraft =
+            (!!channelDraftMessage.messageForReply && !draftText) ||
+            (!!channelDraftMessage.messageToEdit && !hasChangedEdit)
+
+          if (isContextOnlyDraft) {
+            setDraftMessageText(undefined)
+            setDraftMessage(undefined)
+          } else {
+            setDraftMessageText(draftText)
+            setDraftMessage({
+              mentionedUsers: channelDraftMessage.mentionedUsers,
+              body: channelDraftMessage.text,
+              bodyAttributes: channelDraftMessage.bodyAttributes,
+              attachments: channelDraftMessage.attachments,
+              viewOnce: channelDraftMessage.viewOnce,
+              type: channelDraftMessage.viewOnce ? MESSAGE_TYPE.VIEW_ONCE : undefined
+            })
+          }
         } else if (draftAudioRecording) {
           setDraftMessageText('Voice')
           setDraftMessage(undefined)

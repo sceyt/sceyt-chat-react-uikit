@@ -183,6 +183,35 @@ describe('Channel draft preview', () => {
     expect(screen.getByText('my sent message')).toBeInTheDocument()
   })
 
+  it('does not show an empty reply draft in the channel list', () => {
+    setDraftMessageToMap(channelId, {
+      text: '',
+      mentionedUsers: [],
+      messageForReply: { id: 'reply-target', body: 'Reply target' }
+    })
+
+    renderOwnLastMessageChannel()
+
+    expect(screen.queryByText('Draft')).not.toBeInTheDocument()
+    expect(screen.getByText('my sent message')).toBeInTheDocument()
+  })
+
+  it('does not show an unchanged edit draft in the channel list', () => {
+    const messageToEdit = { id: 'message-to-edit', body: 'Original text', bodyAttributes: [] }
+    setDraftMessageToMap(channelId, {
+      text: 'Original text',
+      mentionedUsers: [],
+      messageToEdit,
+      editMessageText: 'Original text',
+      editBodyAttributes: []
+    })
+
+    renderOwnLastMessageChannel()
+
+    expect(screen.queryByText('Draft')).not.toBeInTheDocument()
+    expect(screen.getByText('my sent message')).toBeInTheDocument()
+  })
+
   it('renders attachment-only drafts with the same attachment label as a last message', () => {
     setDraftMessageToMap(channelId, {
       text: '',
