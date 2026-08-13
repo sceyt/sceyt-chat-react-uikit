@@ -88,6 +88,10 @@ import {
   subscribeToDraftMessages
 } from '../../helpers/messagesHalper'
 import { registerBlobUrl, releaseBlobUrls } from '../../helpers/attachmentBlobUrls'
+import {
+  mergePreparedAttachmentPatches,
+  waitForImageAttachmentPreparation
+} from '../../helpers/attachmentSendPreparation'
 import { attachmentTypes, DEFAULT_CHANNEL_TYPE, MESSAGE_DELIVERY_STATUS, USER_STATE } from '../../helpers/constants'
 import { hideUserPresence } from '../../helpers/userHelper'
 import { getReplyLinkPreviewImage, shouldShowLinkPreviewErrorFallback } from '../../helpers/replyPreview'
@@ -472,6 +476,11 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
   const emojiBtnRef = useRef<any>(null)
   const addAttachmentsBtnRef = useRef<any>(null)
   const metadataDebounceRef = useRef<NodeJS.Timeout | null>(null)
+  // Image/video metadata is prepared after the preview has been painted. Keep
+  // its promise and latest patch outside React state so a fast Send can await
+  // it without racing a pending state update.
+  const attachmentPreparationPromisesRef = useRef(new Map<string, Promise<void>>())
+  const preparedAttachmentPatchesRef = useRef(new Map<string, any>())
   const sendMessageWrapperRef = useRef<HTMLDivElement | null>(null)
   const restoringDraftRef = useRef(false)
   const restoredDraftChannelIdRef = useRef<string | null>(null)
@@ -699,7 +708,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
     }
   }
 
-  const handleSendEditMessage = (
+  const handleSendEditMessage = async (
     event?: any,
     pollDetails?: {
       name: string
@@ -810,22 +819,26 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
           dispatch(sendTextMessageAC(messageToSend, activeChannel.id, connectionStatus))
         }
         if (attachments.length) {
+          await waitForImageAttachmentPreparation(attachments, attachmentPreparationPromisesRef.current)
           const sendAsSeparateMessage = getSendAttachmentsAsSeparateMessages()
-          messageToSend.attachments = attachments.map((attachment: any) => {
+          messageToSend.attachments = mergePreparedAttachmentPatches(
+            attachments,
+            preparedAttachmentPatchesRef.current
+          ).map((preparedAttachment: any) => {
             return {
-              name: attachment.data.name,
-              data: attachment.data,
+              name: preparedAttachment.data.name,
+              data: preparedAttachment.data,
               // Keep the restored object URL on the local optimistic attachment.
               // The server upload still uses `data`; this only prevents the message
               // list from falling back to the 6px thumbnail hash after a reload.
-              attachmentUrl: attachment.attachmentUrl,
-              tid: attachment.tid,
-              cachedUrl: attachment.cachedUrl,
-              upload: attachment.upload,
-              metadata: attachment.metadata,
-              type: attachment.type,
-              size: attachment.size,
-              thumbnailState: attachment.thumbnailState
+              attachmentUrl: preparedAttachment.attachmentUrl,
+              tid: preparedAttachment.tid,
+              cachedUrl: preparedAttachment.cachedUrl,
+              upload: preparedAttachment.upload,
+              metadata: preparedAttachment.metadata,
+              type: preparedAttachment.type,
+              size: preparedAttachment.size,
+              thumbnailState: preparedAttachment.thumbnailState
             }
           })
           // Add viewOnce flag if enabled and valid
@@ -845,6 +858,10 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
               sendAsSeparateMessage
             )
           )
+          attachments.forEach((attachment: any) => {
+            attachmentPreparationPromisesRef.current.delete(attachment.tid)
+            preparedAttachmentPatchesRef.current.delete(attachment.tid)
+          })
           // }
         }
         setMessageText('')
@@ -997,11 +1014,15 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
       const updatedAttachments = attachmentsUpdate.filter((item: any) => item.tid !== attachmentId)
       deleteVideoThumb(attachmentId)
       clearVideoPreparation(attachmentId)
+      attachmentPreparationPromisesRef.current.delete(attachmentId)
+      preparedAttachmentPatchesRef.current.delete(attachmentId)
       releaseBlobUrls([`compose_${attachmentId}`])
       setAttachments(updatedAttachments)
       attachmentsUpdate = updatedAttachments
     } else {
       attachmentsUpdate.forEach((attachment: any) => clearVideoPreparation(attachment.tid))
+      attachmentPreparationPromisesRef.current.clear()
+      preparedAttachmentPatchesRef.current.clear()
       releaseBlobUrls(attachmentsUpdate.map((item: any) => `compose_${item.tid}`))
       setAttachments([])
       attachmentsUpdate = []
@@ -1331,6 +1352,10 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
     setAttachments((prevState: any[]) => [...prevState, attachment])
 
     const updateAttachment = (patch: any) => {
+      preparedAttachmentPatchesRef.current.set(tid, {
+        ...preparedAttachmentPatchesRef.current.get(tid),
+        ...patch
+      })
       setAttachments((prevState: any[]) =>
         prevState.map((current: any) => (current.tid === tid ? { ...current, ...patch } : current))
       )
@@ -1338,91 +1363,100 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
 
     // Yield once so React can paint the object-URL preview before optional CPU-heavy
     // resizing, thumbnail generation, or QuickTime remuxing begins.
-    setTimeout(async () => {
-      if (fileType === 'image') {
+    const preparationPromise = new Promise<void>((resolve) =>
+      setTimeout(async () => {
         try {
-          const { thumbnail, imageWidth, imageHeight } = await createImageThumbnail(file)
-          if (customUploader) {
-            const resizedFile = await resizeImage(file)
-            const patch = {
-              size: isMediaAttachment && resizedFile?.blob ? resizedFile.blob.size : file.size,
-              metadata: { szw: imageWidth, szh: imageHeight, tmb: thumbnail }
+          if (fileType === 'image') {
+            try {
+              const { thumbnail, imageWidth, imageHeight } = await createImageThumbnail(file)
+              if (customUploader) {
+                const resizedFile = await resizeImage(file)
+                const patch = {
+                  size: isMediaAttachment && resizedFile?.blob ? resizedFile.blob.size : file.size,
+                  metadata: { szw: imageWidth, szh: imageHeight, tmb: thumbnail }
+                }
+                updateAttachment(patch)
+                handleAttachmentImageForCache({ ...attachment, ...patch })
+              } else if (isMediaAttachment && file.type !== 'image/gif') {
+                const resizedFileData = await resizeImage(file)
+                // canvas.toBlob may return null (for example when memory is constrained).
+                // Keep the original file usable rather than failing the attachment flow.
+                const resizedFile = resizedFileData.blob
+                  ? new File([resizedFileData.blob], resizedFileData.file.name, { type: file.type })
+                  : file
+                const patch = {
+                  data: resizedFile,
+                  size: resizedFile.size,
+                  metadata: JSON.stringify({
+                    tmb: thumbnail,
+                    szw: resizedFileData.newWidth,
+                    szh: resizedFileData.newHeight
+                  })
+                }
+                updateAttachment(patch)
+                setPendingAttachment(tid, { file: resizedFile })
+                handleAttachmentImageForCache({ ...attachment, ...patch })
+              } else {
+                updateAttachment({
+                  metadata: JSON.stringify({ tmb: thumbnail, szw: imageWidth, szh: imageHeight })
+                })
+              }
+            } catch (error) {
+              // The original file preview/upload remains usable if optional optimization fails.
+              log.warn('Unable to prepare image attachment preview:', error)
             }
-            updateAttachment(patch)
-            handleAttachmentImageForCache({ ...attachment, ...patch })
-          } else if (isMediaAttachment && file.type !== 'image/gif') {
-            const resizedFileData = await resizeImage(file)
-            // canvas.toBlob may return null (for example when memory is constrained).
-            // Keep the original file usable rather than failing the attachment flow.
-            const resizedFile = resizedFileData.blob
-              ? new File([resizedFileData.blob], resizedFileData.file.name, { type: file.type })
-              : file
-            const patch = {
-              data: resizedFile,
-              size: resizedFile.size,
-              metadata: JSON.stringify({
-                tmb: thumbnail,
-                szw: resizedFileData.newWidth,
-                szh: resizedFileData.newHeight
-              })
+          } else if (fileType === 'video') {
+            const remuxPromise = remuxVideoFileForUpload(file)
+            let thumbnailSource = file
+            let metadata: any
+            try {
+              // Do not make preview visibility depend on metadata extraction. VideoPreview
+              // can use the object URL immediately while this fills in dimensions/thumb.
+              let frame
+              try {
+                frame = await getFrame(thumbnailSource, 0)
+              } catch (error) {
+                // A MOV may play in Safari but not be decodable in Firefox. Retry from
+                // the normalized MP4 rather than sending a video without a thumbnail.
+                thumbnailSource = await remuxPromise
+                frame = await getFrame(thumbnailSource, 0)
+              }
+              const { thumb, width, height, duration } = frame
+              metadata = customUploader
+                ? { szw: width, szh: height, tmb: thumb, dur: duration }
+                : JSON.stringify({ tmb: thumb, szw: width, szh: height, dur: duration })
+              updateAttachment({ metadata, thumbnailState: 'ready' })
+              handleAttachmentVideoForCache({ ...attachment, metadata })
+            } catch (error) {
+              log.warn('Unable to generate video thumbnail:', error)
             }
-            updateAttachment(patch)
-            setPendingAttachment(tid, { file: resizedFile })
-            handleAttachmentImageForCache({ ...attachment, ...patch })
-          } else {
-            updateAttachment({
-              metadata: JSON.stringify({ tmb: thumbnail, szw: imageWidth, szh: imageHeight })
-            })
-          }
-        } catch (error) {
-          // The original file preview/upload remains usable if optional optimization fails.
-          log.warn('Unable to prepare image attachment preview:', error)
-        }
-      } else if (fileType === 'video') {
-        const remuxPromise = remuxVideoFileForUpload(file)
-        let thumbnailSource = file
-        let metadata: any
-        try {
-          // Do not make preview visibility depend on metadata extraction. VideoPreview
-          // can use the object URL immediately while this fills in dimensions/thumb.
-          let frame
-          try {
-            frame = await getFrame(thumbnailSource, 0)
-          } catch (error) {
-            // A MOV may play in Safari but not be decodable in Firefox. Retry from
-            // the normalized MP4 rather than sending a video without a thumbnail.
-            thumbnailSource = await remuxPromise
-            frame = await getFrame(thumbnailSource, 0)
-          }
-          const { thumb, width, height, duration } = frame
-          metadata = customUploader
-            ? { szw: width, szh: height, tmb: thumb, dur: duration }
-            : JSON.stringify({ tmb: thumb, szw: width, szh: height, dur: duration })
-          updateAttachment({ metadata, thumbnailState: 'ready' })
-          handleAttachmentVideoForCache({ ...attachment, metadata })
-        } catch (error) {
-          log.warn('Unable to generate video thumbnail:', error)
-        }
 
-        // Preserve the Firefox-compatible QuickTime remux, but perform it only after
-        // the local preview has been painted. The compose preview intentionally keeps
-        // its original object URL, avoiding a second decode and visual flicker.
-        // Sending does not depend on optional local conversion. It can take a long
-        // time (or be unavailable for some codecs), while the SDK can upload the
-        // original file immediately.
-        const uploadFile = await remuxPromise
-        if (uploadFile !== file) {
-          updateAttachment({ data: uploadFile, size: uploadFile.size })
-          setPendingAttachment(tid, { file: uploadFile })
+            // Preserve the Firefox-compatible QuickTime remux, but perform it only after
+            // the local preview has been painted. The compose preview intentionally keeps
+            // its original object URL, avoiding a second decode and visual flicker.
+            // Sending does not depend on optional local conversion. It can take a long
+            // time (or be unavailable for some codecs), while the SDK can upload the
+            // original file immediately.
+            const uploadFile = await remuxPromise
+            if (uploadFile !== file) {
+              updateAttachment({ data: uploadFile, size: uploadFile.size })
+              setPendingAttachment(tid, { file: uploadFile })
+            }
+            if (metadata) {
+              completeVideoPreparation(tid, { file: uploadFile, metadata })
+            } else {
+              failVideoPreparation(tid)
+              updateAttachment({ thumbnailState: 'failed' })
+            }
+          }
+        } finally {
+          resolve()
         }
-        if (metadata) {
-          completeVideoPreparation(tid, { file: uploadFile, metadata })
-        } else {
-          failVideoPreparation(tid)
-          updateAttachment({ thumbnailState: 'failed' })
-        }
-      }
-    }, 0)
+      }, 0)
+    )
+    if (fileType === 'image') {
+      attachmentPreparationPromisesRef.current.set(tid, preparationPromise)
+    }
   }
 
   useEffect(() => {
