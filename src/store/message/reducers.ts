@@ -417,9 +417,14 @@ const messageSlice = createSlice({
             if (params?.deliveryStatus) {
               statusUpdatedMessage = updateMessageDeliveryStatusAndMarkers(message, params)
             }
+            const forwardingDetails =
+              message.forwardingDetails && params.forwardingDetails
+                ? { ...message.forwardingDetails, ...params.forwardingDetails }
+                : undefined
             const messageOldData: IMessage = {
               ...message,
               ...params,
+              ...(forwardingDetails ? { forwardingDetails } : {}),
               userMarkers: [...(message.userMarkers || []), ...(params.userMarkers || [])],
               ...statusUpdatedMessage
             }

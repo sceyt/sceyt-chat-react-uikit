@@ -2527,6 +2527,7 @@ describe('message saga message-list flows', () => {
 
   it('keeps an offline forwarded message as a failed pending item and reloads latest messages when history is open', async () => {
     const currentUser = makeUser({ id: 'current-user' })
+    const sourceUser = makeUser({ id: 'source-user' })
     const channel = makeChannel({
       id: 'channel-forward-offline',
       lastMessage: makeMessage({
@@ -2574,7 +2575,7 @@ describe('message saga message-list flows', () => {
       channelId: 'source-channel',
       body: 'forward body',
       metadata: {} as any,
-      user: currentUser,
+      user: sourceUser,
       attachments: []
     })
 
@@ -2596,6 +2597,8 @@ describe('message saga message-list flows', () => {
       expect.objectContaining({
         tid: 'offline-forward-tid',
         body: 'forward body',
+        user: expect.objectContaining({ id: currentUser.id }),
+        forwardingDetails: expect.objectContaining({ user: expect.objectContaining({ id: sourceUser.id }) }),
         state: MESSAGE_STATUS.FAILED
       })
     ])
@@ -2668,7 +2671,13 @@ describe('message saga message-list flows', () => {
       body: 'forward body',
       metadata: {} as any,
       user: sourceUser,
-      attachments: []
+      attachments: [],
+      parentMessage: makeMessage({
+        id: 'replied-to-message',
+        channelId: 'source-channel',
+        body: 'The original message',
+        user: currentUser
+      })
     })
 
     const dispatched = await runMessageSaga(
@@ -2698,14 +2707,30 @@ describe('message saga message-list flows', () => {
 
     expect(getPendingMessagesFromMap(channel.id)).toEqual([])
     expect(getMessageFromMap(channel.id, '722')).toEqual(
-      expect.objectContaining({ id: '722', tid: createdForward.tid })
+      expect.objectContaining({
+        id: '722',
+        tid: createdForward.tid,
+        parentMessage: null,
+        forwardingDetails: expect.objectContaining({
+          messageId: 'origin-connected',
+          user: expect.objectContaining({ id: sourceUser.id })
+        })
+      })
     )
     expect(getContiguousNextMessages(channel.id, { id: '721' } as IMessage, 10).map((message) => message.id)).toEqual([
       '722'
     ])
     expect(getActiveSegment()).toEqual({ startId: '719', endId: '722' })
     expect(getChannelFromMap(channel.id)?.lastMessage).toEqual(
-      expect.objectContaining({ id: '722', body: 'forward body' })
+      expect.objectContaining({
+        id: '722',
+        body: 'forward body',
+        parentMessage: null,
+        forwardingDetails: expect.objectContaining({
+          messageId: 'origin-connected',
+          user: expect.objectContaining({ id: sourceUser.id })
+        })
+      })
     )
   })
 

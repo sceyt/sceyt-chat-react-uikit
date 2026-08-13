@@ -876,9 +876,14 @@ export function updateMessageOnMap(
           const statusUpdatedMessage = updatedMessage.params?.deliveryStatus
             ? updateMessageDeliveryStatusAndMarkers(mes, updatedMessage.params)
             : {}
+          const forwardingDetails =
+            mes.forwardingDetails && updatedMessage.params?.forwardingDetails
+              ? { ...mes.forwardingDetails, ...updatedMessage.params.forwardingDetails }
+              : undefined
           updatedMessageData = {
             ...mes,
             ...updatedMessage.params,
+            ...(forwardingDetails ? { forwardingDetails } : {}),
             ...statusUpdatedMessage
           }
           let voteDetailsData = mes?.pollDetails

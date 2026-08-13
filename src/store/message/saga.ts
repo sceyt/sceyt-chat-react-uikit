@@ -583,12 +583,19 @@ export const handleUploadAttachments = async (attachments: IAttachment[], messag
   )
 }
 
-const addPendingMessage = (message: any, messageCopy: IMessage, channelId: string) => {
+const addPendingMessage = (
+  message: any,
+  messageCopy: IMessage,
+  channelId: string,
+  preserveParentMessage: boolean = true
+) => {
   const messageToAdd = {
     ...messageCopy,
     createdAt: new Date(Date.now()),
     mentionedUsers: message.mentionedUsers,
-    parentMessage: message.parentMessage
+    // A forward is a new standalone message. Do not carry the source reply's
+    // parent into the optimistic copy.
+    parentMessage: preserveParentMessage ? message.parentMessage : null
   }
   addMessageToMap(channelId, messageToAdd)
   const currentLastMessage = getStoredChannel(channelId)?.lastMessage || null
@@ -866,10 +873,11 @@ const updateMessage = function* (
   channelId: string,
   scrollToNewMessage: boolean = true,
   message: IMessage,
-  _isNotShowOwnMessageForward: boolean = false
+  _isNotShowOwnMessageForward: boolean = false,
+  preserveParentMessage: boolean = true
 ): any {
   if (actionType !== RESEND_MESSAGE) {
-    addPendingMessage(message, pending, channelId)
+    addPendingMessage(message, pending, channelId, preserveParentMessage)
     if (getActiveChannelId() === channelId) {
       yield put(setUnreadMessageIdAC(''))
       if (scrollToNewMessage) {
@@ -1589,7 +1597,9 @@ function* forwardMessage(action: IAction): any {
       pendingMessage = {
         ...messageToSend,
         createdAt: new Date(Date.now()),
-        user: message.user
+        // The forwarded message belongs to the current sender. The source
+        // author is recorded separately in forwardingDetails below.
+        user: SceytChatClient.user
       }
       if (isForward && pendingMessage && action.type !== RESEND_MESSAGE) {
         if (message.forwardingDetails) {
@@ -1612,7 +1622,8 @@ function* forwardMessage(action: IAction): any {
             channel.id,
             channelId === activeChannelId,
             message,
-            isNotShowOwnMessageForward
+            isNotShowOwnMessageForward,
+            false
           )
         }
       }
@@ -1623,13 +1634,23 @@ function* forwardMessage(action: IAction): any {
         })
         const messageUpdateData = {
           ...messageResponse,
-          channelId: channel.id
+          channelId: channel.id,
+          // The immediate send response may only contain the forwarding ID;
+          // retain the optimistic attribution until the complete server event
+          // arrives so the Forwarded label does not disappear.
+          forwardingDetails:
+            isForward && pendingMessage?.forwardingDetails
+              ? { ...pendingMessage.forwardingDetails, ...messageResponse.forwardingDetails }
+              : messageResponse.forwardingDetails,
+          parentMessage: isForward ? null : messageResponse.parentMessage
         }
         if (channelId === activeChannelId) {
           yield put(updateMessageAC(messageToSend.tid, JSON.parse(JSON.stringify(messageUpdateData)), true))
         }
         addConfirmedMessageToCache(channel.id, JSON.parse(JSON.stringify(messageUpdateData)))
-        const messageToUpdate = JSON.parse(JSON.stringify(messageResponse))
+        // Keep the channel preview in sync with the enriched cache entry. The
+        // raw response can omit forwarding attribution until history reloads.
+        const messageToUpdate = JSON.parse(JSON.stringify(messageUpdateData))
         if (channel.unread) {
           yield put(markChannelAsReadAC(channel.id))
         }

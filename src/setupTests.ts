@@ -1,5 +1,12 @@
 import '@testing-library/jest-dom/extend-expect'
 
+// Node versions used by some CI environments predate the global structured
+// clone API. A JSON clone is sufficient for test fixtures, which are plain
+// serializable data after sanitization.
+if (typeof globalThis.structuredClone !== 'function') {
+  globalThis.structuredClone = <T>(value: T): T => JSON.parse(JSON.stringify(value)) as T
+}
+
 jest.mock('store', () => ({
   getState: () => ({
     MessageReducer: {

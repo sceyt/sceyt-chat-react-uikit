@@ -217,6 +217,49 @@ describe('message pending ordering', () => {
     ])
   })
 
+  it('retains forwarding attribution when a partial server update only includes the source message ID', () => {
+    const channelId = 'channel-forwarding-details'
+    const sourceUser = makeUser({ id: 'source-user' })
+    const forwardedMessage = makeMessage({
+      id: '41',
+      channelId,
+      body: 'forwarded message',
+      forwardingDetails: {
+        messageId: 'source-message',
+        channelId: 'source-channel',
+        hops: 1,
+        user: sourceUser
+      } as any
+    })
+    const partialForwardingDetails = { messageId: 'source-message' } as any
+
+    const state = MessageReducer(undefined, setMessages({ messages: [forwardedMessage] }))
+    const updatedState = MessageReducer(
+      state,
+      updateMessage({ messageId: forwardedMessage.id, params: { forwardingDetails: partialForwardingDetails } as any })
+    )
+
+    expect(updatedState.activeChannelMessages[0].forwardingDetails).toEqual(
+      expect.objectContaining({
+        messageId: 'source-message',
+        user: expect.objectContaining({ id: sourceUser.id })
+      })
+    )
+
+    addMessageToMap(channelId, forwardedMessage)
+    updateMessageOnMap(channelId, {
+      messageId: forwardedMessage.id,
+      params: { forwardingDetails: partialForwardingDetails }
+    })
+
+    expect(getMessagesFromMap(channelId)[forwardedMessage.id].forwardingDetails).toEqual(
+      expect.objectContaining({
+        messageId: 'source-message',
+        user: expect.objectContaining({ id: sourceUser.id })
+      })
+    )
+  })
+
   it('updates reply parent snapshots when the source message is edited', () => {
     const channelId = 'channel-reply-edit-reducer'
     const sourceMessage = makeMessage({
