@@ -73,15 +73,42 @@ const requestToPromise = <T>(request: IDBRequest<T>): Promise<T> =>
     request.onerror = () => reject(request.error)
   })
 
+// Messages can contain SDK model instances. Besides Files and blob URLs, those
+// instances may expose helper functions as own properties, which IndexedDB's
+// structured clone algorithm rejects. Persist a plain data snapshot instead.
+const toStructuredCloneSafeValue = (value: any, seen = new WeakSet<object>()): any => {
+  if (value === null || typeof value !== 'object') {
+    return typeof value === 'function' || typeof value === 'symbol' ? undefined : value
+  }
+  if (value instanceof Date) {
+    return new Date(value.getTime())
+  }
+  if (seen.has(value)) {
+    return undefined
+  }
+  seen.add(value)
+  if (Array.isArray(value)) {
+    return value.map((item) => toStructuredCloneSafeValue(item, seen))
+  }
+  return Object.keys(value).reduce<Record<string, any>>((snapshot, key) => {
+    const safeValue = toStructuredCloneSafeValue(value[key], seen)
+    if (safeValue !== undefined) {
+      snapshot[key] = safeValue
+    }
+    return snapshot
+  }, {})
+}
+
 // Files and blob: URLs must never be persisted — Files aren't valid after a
 // reload and blob URLs are revoked with the session.
-const sanitizeMessageForPersist = (message: IMessage): IMessage => {
-  if (!message?.attachments?.length) {
-    return message
+export const sanitizeMessageForPersist = (message: IMessage): IMessage => {
+  const sanitizedMessage = toStructuredCloneSafeValue(message) as IMessage
+  if (!sanitizedMessage?.attachments?.length) {
+    return sanitizedMessage
   }
   return {
-    ...message,
-    attachments: message.attachments.map((attachment: any) => {
+    ...sanitizedMessage,
+    attachments: sanitizedMessage.attachments.map((attachment: any) => {
       const rest = { ...(attachment || {}) }
       delete rest.data
       if (rest.attachmentUrl && String(rest.attachmentUrl).startsWith('blob:')) {
