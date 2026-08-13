@@ -212,10 +212,13 @@ export function* handleChannelMessageEvent(args: { channel: IChannel; message: I
 
     const messagesHasNext = store.getState().MessageReducer.messagesHasNext
 
-    if ((!messagesHasNext && lastMessageIsInActiveWindow) || !messages.length || !messages) {
-      const existingMessage = (store.getState().MessageReducer.activeChannelMessages as IMessage[]).find(
-        (m) => (message.id && m.id === message.id) || (message.tid && m.tid === message.tid)
-      )
+    const existingMessage = (store.getState().MessageReducer.activeChannelMessages as IMessage[]).find(
+      (m) => (message.id && m.id === message.id) || (message.tid && m.tid === message.tid)
+    )
+    // A confirmed reconnect event must always replace its matching pending item,
+    // even if the thread is currently showing an older history page. Only brand
+    // new messages are withheld from that history window.
+    if (existingMessage || (!messagesHasNext && lastMessageIsInActiveWindow) || !messages.length || !messages) {
       if (existingMessage) {
         yield put(
           updateMessageAC(existingMessage.id || existingMessage.tid!, {
