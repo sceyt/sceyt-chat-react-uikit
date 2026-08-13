@@ -3383,7 +3383,6 @@ const LinkPreviewContainer = styled.div<{
 
 const LinkPreviewContent = styled.div`
   display: flex;
-  gap: 12px;
   flex: 1;
   overflow: hidden;
 `
