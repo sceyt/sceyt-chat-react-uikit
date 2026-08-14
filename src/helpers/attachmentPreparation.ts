@@ -1,6 +1,7 @@
 export type VideoPreparation = {
   file: File
   metadata?: any
+  videoPreviewBlob?: Blob
   status: 'loading' | 'ready' | 'failed'
 }
 

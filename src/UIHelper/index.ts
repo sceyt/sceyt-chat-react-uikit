@@ -946,6 +946,7 @@ export const UploadProgress = styled.div<{
   justify-content: center;
   background-image: url(${(props) =>
     props.backgroundImage && `${props.withPrefix ? 'data:image/jpeg;base64,' : ''}${props.backgroundImage}`});
+  background-clip: border-area;
   background-size: cover;
   background-position: center;
   border-radius: ${(props) =>

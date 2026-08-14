@@ -22,6 +22,7 @@ export const MESSAGE_STATUS = {
 }
 
 export const UPLOAD_STATE = {
+  PREPARING: 'preparing',
   UPLOADING: 'uploading',
   PAUSED: 'paused',
   SUCCESS: 'success',

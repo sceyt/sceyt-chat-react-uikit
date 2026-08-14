@@ -16,7 +16,14 @@ if (isBrowser) {
 
 export const ATTACHMENT_VERSION = `_1_0_2`
 
+const isCacheKey = (value: unknown): value is string => typeof value === 'string' && value.length > 0
+
 export const setAttachmentToCache = async (attachmentUrl: string, attachmentResponse: Response) => {
+  if (!isCacheKey(attachmentUrl)) {
+    log.warn('Skipping attachment cache write with an invalid key')
+    return
+  }
+
   const attachmentURLVersion = attachmentUrl + ATTACHMENT_VERSION
   if (cacheAvailable) {
     await caches.open(ATTACHMENTS_CACHE).then(async (cache) => {
@@ -52,6 +59,10 @@ export const setAttachmentToCache = async (attachmentUrl: string, attachmentResp
   }
 }
 export const removeAttachmentFromCache = async (attachmentId: string) => {
+  if (!isCacheKey(attachmentId)) {
+    return
+  }
+
   if (cacheAvailable) {
     const cacheKey =
       attachmentId?.startsWith('http://') || attachmentId?.startsWith('https://')
@@ -64,6 +75,10 @@ export const removeAttachmentFromCache = async (attachmentId: string) => {
 }
 
 export const getAttachmentUrlFromCache = async (attachmentUrl: string): Promise<string | false> => {
+  if (!isCacheKey(attachmentUrl)) {
+    return false
+  }
+
   const attachmentURLVersion = attachmentUrl + ATTACHMENT_VERSION
   // Same key may already hold a live object URL — reuse it instead of pinning
   // another copy of the blob per call.

@@ -2623,7 +2623,17 @@ describe('message saga message-list flows', () => {
       user: currentUser,
       forwardingDetails: {
         messageId: 'origin-connected'
-      } as any
+      } as any,
+      attachments: [
+        {
+          tid: 'forwarded-video-tid',
+          url: 'https://cdn.example.com/forwarded-video.mp4',
+          type: attachmentTypes.video,
+          name: 'forwarded-video.mp4',
+          size: 1234,
+          metadata: '{}'
+        } as any
+      ]
     })
     const confirmedForward = makeMessage({
       id: '722',
@@ -2634,8 +2644,34 @@ describe('message saga message-list flows', () => {
       user: currentUser,
       forwardingDetails: {
         messageId: 'origin-connected'
-      } as any
+      } as any,
+      // Simulate the incomplete immediate response that caused the thumbnail
+      // metadata to vanish until history was reloaded.
+      attachments: [
+        {
+          tid: 'forwarded-video-tid',
+          url: 'https://cdn.example.com/forwarded-video.mp4',
+          type: attachmentTypes.video,
+          name: 'forwarded-video.mp4',
+          size: 1234,
+          metadata: '{}'
+        } as any
+      ]
     })
+    const attachmentBuilder = {
+      setName: jest.fn().mockReturnThis(),
+      setMetadata: jest.fn().mockReturnThis(),
+      setFileSize: jest.fn().mockReturnThis(),
+      setUpload: jest.fn().mockReturnThis(),
+      create: jest.fn(() => ({
+        tid: 'forwarded-video-tid',
+        url: 'https://cdn.example.com/forwarded-video.mp4',
+        type: attachmentTypes.video,
+        name: 'forwarded-video.mp4',
+        size: 1234,
+        metadata: '{}'
+      }))
+    }
     const builder = {
       setBody: jest.fn().mockReturnThis(),
       setBodyAttributes: jest.fn().mockReturnThis(),
@@ -2650,6 +2686,7 @@ describe('message saga message-list flows', () => {
     }
 
     channel.createMessageBuilder = jest.fn(() => builder as any)
+    channel.createAttachmentBuilder = jest.fn(() => attachmentBuilder as any)
     channel.sendMessage = jest.fn(() => resolveWithMockServerDelay(confirmedForward))
 
     mockStoreState.UserReducer.connectionStatus = CONNECTION_STATUS.CONNECTED
@@ -2671,13 +2708,28 @@ describe('message saga message-list flows', () => {
       body: 'forward body',
       metadata: {} as any,
       user: sourceUser,
-      attachments: [],
       parentMessage: makeMessage({
         id: 'replied-to-message',
         channelId: 'source-channel',
         body: 'The original message',
         user: currentUser
-      })
+      }),
+      attachments: [
+        {
+          tid: 'source-video-tid',
+          url: 'https://cdn.example.com/forwarded-video.mp4',
+          type: attachmentTypes.video,
+          name: 'forwarded-video.mp4',
+          size: 1234,
+          metadata: {
+            szw: 1280,
+            szh: 720,
+            dur: 17,
+            tmb: 'first-frame-hash',
+            video_thumb: 'https://cdn.example.com/forwarded-video-thumb.jpg'
+          }
+        } as any
+      ]
     })
 
     const dispatched = await runMessageSaga(
@@ -2705,6 +2757,28 @@ describe('message saga message-list flows', () => {
       ])
     )
 
+    expect(attachmentBuilder.setMetadata).toHaveBeenCalledWith(
+      JSON.stringify({
+        szw: 1280,
+        szh: 720,
+        dur: 17,
+        tmb: 'first-frame-hash',
+        video_thumb: 'https://cdn.example.com/forwarded-video-thumb.jpg'
+      })
+    )
+    expect(builder.setAttachments).toHaveBeenCalledWith([
+      expect.objectContaining({
+        type: attachmentTypes.video,
+        metadata: JSON.stringify({
+          szw: 1280,
+          szh: 720,
+          dur: 17,
+          tmb: 'first-frame-hash',
+          video_thumb: 'https://cdn.example.com/forwarded-video-thumb.jpg'
+        })
+      })
+    ])
+
     expect(getPendingMessagesFromMap(channel.id)).toEqual([])
     expect(getMessageFromMap(channel.id, '722')).toEqual(
       expect.objectContaining({
@@ -2714,7 +2788,18 @@ describe('message saga message-list flows', () => {
         forwardingDetails: expect.objectContaining({
           messageId: 'origin-connected',
           user: expect.objectContaining({ id: sourceUser.id })
-        })
+        }),
+        attachments: [
+          expect.objectContaining({
+            metadata: expect.objectContaining({
+              video_thumb: 'https://cdn.example.com/forwarded-video-thumb.jpg',
+              szw: 1280,
+              szh: 720,
+              dur: 17,
+              tmb: 'first-frame-hash'
+            })
+          })
+        ]
       })
     )
     expect(getContiguousNextMessages(channel.id, { id: '721' } as IMessage, 10).map((message) => message.id)).toEqual([

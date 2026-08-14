@@ -185,13 +185,14 @@ import store from '../index'
 import { IProgress } from '../../components/ChatContainer'
 import { canBeViewOnce, isJSON } from '../../helpers/message'
 import log from 'loglevel'
-import { getVideoFirstFrame } from 'helpers/getVideoFrame'
+import { getVideoFirstFrame, getVideoPreviewFrame } from 'helpers/getVideoFrame'
 import { MESSAGE_TYPE } from 'types/enum'
 import { setWaitToSendPendingMessagesAC } from 'store/user/actions'
 import { createAttachmentUnavailableError, isResendableError } from 'helpers/error'
 import { calculateRenderedImageWidth } from 'helpers'
 import { PendingMessageMutation } from './reducers'
 import { clearVideoPreparation, waitForVideoPreparation } from '../../helpers/attachmentPreparation'
+import { parseAttachmentMetadata, shouldExtractVideoFirstFrame, withVideoThumb } from '../../helpers/videoPreview'
 
 // Automatic reconnect resends per message tid — a message that keeps failing is
 // dropped from the auto-resend cycle after this many attempts; the manual retry
@@ -216,11 +217,65 @@ const applyPreparedVideoAttachments = async (attachments: IAttachment[]) => {
         attachment.name = prepared.file.name
         attachment.size = prepared.file.size
         attachment.metadata = prepared.metadata
+        attachment.videoPreviewBlob = prepared.videoPreviewBlob
       }
       clearVideoPreparation(attachment.tid)
     })
   )
   return attachments
+}
+
+const prepareAndUploadVideoPreview = async (attachment: IAttachment, messageType: string | null | undefined) => {
+  const videoFile =
+    attachment.url instanceof Blob ? attachment.url : attachment.data instanceof Blob ? attachment.data : null
+  if (!videoFile) {
+    throw createAttachmentUnavailableError(`Video file for tid ${attachment.tid} is unavailable for preview generation`)
+  }
+
+  const previewBlob = attachment.videoPreviewBlob instanceof Blob ? attachment.videoPreviewBlob : undefined
+  const frame = previewBlob ? undefined : await getVideoPreviewFrame(videoFile)
+  const previewImageBlob = previewBlob || frame?.blob
+  if (!previewImageBlob) {
+    throw new Error('Unable to generate video preview image')
+  }
+
+  const previewName = `${attachment.name?.replace(/\.[^.]+$/, '') || 'video'}-preview.jpg`
+  const previewFile = new File([previewImageBlob], previewName, { type: previewImageBlob.type || 'image/jpeg' })
+  const customUploader = getCustomUploader()
+  let videoThumb: string
+  if (customUploader) {
+    // Reuse the application uploader so preview and video follow the same auth,
+    // storage, retry, and lifecycle rules. Preview files are temporary backend
+    // objects and must expire if no sent message references their returned URL.
+    const previewAttachment = {
+      tid: `${attachment.tid || 'video'}-preview-${Date.now()}`,
+      name: previewName,
+      type: attachmentTypes.image,
+      size: previewFile.size,
+      url: previewFile,
+      data: previewFile,
+      metadata: '{}',
+      upload: false
+    } as IAttachment
+    const uploadedPreview = await customUpload(previewAttachment, () => undefined, messageType)
+    videoThumb = uploadedPreview.uri
+  } else {
+    const client = getClient()
+    if (typeof client?.uploadFile !== 'function') {
+      throw new Error('The SDK uploadFile API is required before sending a video attachment')
+    }
+    videoThumb = await client.uploadFile({ data: previewFile, progress: () => undefined })
+  }
+
+  if (typeof videoThumb !== 'string' || !videoThumb) {
+    throw new Error('Video preview upload did not return a URL')
+  }
+
+  return {
+    ...attachment,
+    videoPreviewBlob: undefined,
+    metadata: withVideoThumb(attachment.metadata, videoThumb)
+  }
 }
 
 let activeDisplayedCacheKey: string | null = null
@@ -446,7 +501,8 @@ export const handleUploadAttachments = async (attachments: IAttachment[], messag
       const handleUploadProgress = ({ loaded, total }: IProgress) => {
         store.dispatch(updateAttachmentUploadingProgressAC(loaded, total, attachment.tid))
       }
-      if (!attachment.cachedUrl && !(attachment.url instanceof Blob)) {
+      const shouldRecoverVideoSource = attachment.type === attachmentTypes.video && !(attachment.url instanceof Blob)
+      if ((!attachment.cachedUrl || shouldRecoverVideoSource) && !(attachment.url instanceof Blob)) {
         // Resent messages may carry a serialized copy where the source File became a
         // plain object; recover the live File kept by tid, or fail as non-resendable.
         const pendingFile = getPendingAttachment(attachment.tid as string)?.file
@@ -459,6 +515,14 @@ export const handleUploadAttachments = async (attachments: IAttachment[], messag
         }
       }
       const fileType = attachment.url?.type?.split('/')[0]
+      if (attachment.type === attachmentTypes.video) {
+        attachment = await prepareAndUploadVideoPreview(attachment, message.type)
+        if (!attachment.cachedUrl) {
+          // The preview upload is complete. From this point, progress belongs
+          // only to the original video transfer.
+          store.dispatch(updateAttachmentUploadingStateAC(UPLOAD_STATE.UPLOADING, attachment.tid))
+        }
+      }
       let fileSize = attachment.size
       let filePath: any
       let uriLocal
@@ -518,50 +582,43 @@ export const handleUploadAttachments = async (attachments: IAttachment[], messag
         }
       } else if (!attachment.cachedUrl && fileType === 'video') {
         if (blobLocal) {
-          const [newWidth, newHeight] = calculateRenderedImageWidth(
-            attachment?.metadata.szw || 1280,
-            attachment?.metadata.szh || 1080
-          )
-          const result = await getVideoFirstFrame(blobLocal, newWidth, newHeight)
-          if (result) {
-            const { frameBlobUrl, blob } = result
-            if (frameBlobUrl && blob) {
-              const response = new Response(blob, {
-                headers: {
-                  'Content-Type': blob.type
-                }
-              })
-              if (blobLocal) {
-                await setAttachmentToCache(
-                  uriLocal + `_original_video_url`,
-                  new Response(blobLocal, {
-                    headers: {
-                      'Content-Type': blobLocal.type
-                    }
-                  })
-                )
-                const originalVideoUrl = URL.createObjectURL(blobLocal)
-                store.dispatch(setUpdateMessageAttachmentAC(uriLocal + `_original_video_url`, originalVideoUrl))
+          await setAttachmentToCache(
+            uriLocal + `_original_video_url`,
+            new Response(blobLocal, {
+              headers: {
+                'Content-Type': blobLocal.type
               }
-              await setAttachmentToCache(uriLocal, response)
-              store.dispatch(setUpdateMessageAttachmentAC(uriLocal, frameBlobUrl))
-              message.attachments[0] = { ...message.attachments[0], attachmentUrl: frameBlobUrl }
+            })
+          )
+          const originalVideoUrl = URL.createObjectURL(blobLocal)
+          store.dispatch(setUpdateMessageAttachmentAC(uriLocal + `_original_video_url`, originalVideoUrl))
+
+          if (shouldExtractVideoFirstFrame(attachment.metadata)) {
+            const parsedMetadata = parseAttachmentMetadata(attachment.metadata)
+            const [newWidth, newHeight] = calculateRenderedImageWidth(
+              parsedMetadata.szw || 1280,
+              parsedMetadata.szh || 1080
+            )
+            const result = await getVideoFirstFrame(blobLocal, newWidth, newHeight)
+            if (result) {
+              const { frameBlobUrl, blob } = result
+              if (frameBlobUrl && blob) {
+                const response = new Response(blob, {
+                  headers: {
+                    'Content-Type': blob.type
+                  }
+                })
+                await setAttachmentToCache(uriLocal, response)
+                store.dispatch(setUpdateMessageAttachmentAC(uriLocal, frameBlobUrl))
+                message.attachments[0] = { ...message.attachments[0], attachmentUrl: frameBlobUrl }
+              }
             }
           }
         }
       }
       store.dispatch(updateAttachmentUploadingStateAC(UPLOAD_STATE.SUCCESS, attachment.tid))
 
-      const parsedAttachmentMeta = (() => {
-        if (!attachment.metadata) return {}
-        try {
-          const parsed = typeof attachment.metadata === 'string' ? JSON.parse(attachment.metadata) : attachment.metadata
-          // Guard against double-stringified JSON (JSON.parse returning a string instead of object)
-          return typeof parsed === 'string' ? JSON.parse(parsed) : parsed || {}
-        } catch {
-          return {}
-        }
-      })()
+      const parsedAttachmentMeta = parseAttachmentMetadata(attachment.metadata)
       const attachmentMeta = attachment.cachedUrl
         ? attachment.metadata
         : JSON.stringify({
@@ -1001,8 +1058,16 @@ function* sendMessage(action: IAction): any {
                 updateAttachmentUploadingProgressAC(attachment.size * (percent / 100), attachment.size, attachment.tid)
               )
             }
+            // Render a spinner as soon as Send is pressed, but do not expose
+            // byte progress until the preview URL is ready and the real video
+            // upload starts.
             if (attachment.upload) {
-              store.dispatch(updateAttachmentUploadingStateAC(UPLOAD_STATE.UPLOADING, attachment.tid))
+              store.dispatch(
+                updateAttachmentUploadingStateAC(
+                  attachment.type === attachmentTypes.video ? UPLOAD_STATE.PREPARING : UPLOAD_STATE.UPLOADING,
+                  attachment.tid
+                )
+              )
             }
             messageAttachment.progress = (progressPercent: any) => {
               handleUpdateUploadProgress(progressPercent)
@@ -1014,22 +1079,28 @@ function* sendMessage(action: IAction): any {
                 store.dispatch(updateAttachmentUploadingStateAC(UPLOAD_STATE.FAIL, attachment.tid))
               } else {
                 const uriLocal = updatedAttachment.url
-                const fileType = attachment.data?.type?.split('/')[0]
+                // Preview preparation updates the attachment builder after this
+                // callback is registered. Use its final metadata so a new
+                // video_thumb prevents a redundant second frame extraction.
+                const completedAttachment = { ...attachment, ...messageAttachment }
+                const fileType = completedAttachment.data?.type?.split('/')[0]
 
                 const updateImage = async () => {
-                  if (!attachment.cachedUrl && fileType === 'image' && attachment.data) {
+                  if (!completedAttachment.cachedUrl && fileType === 'image' && completedAttachment.data) {
                     try {
-                      const parsedMetadata = isJSON(attachment.metadata)
-                        ? JSON.parse(attachment.metadata)
-                        : attachment.metadata
+                      const parsedMetadata = isJSON(completedAttachment.metadata)
+                        ? JSON.parse(completedAttachment.metadata)
+                        : completedAttachment.metadata
                       const [newWidth, newHeight] = calculateRenderedImageWidth(
                         parsedMetadata?.szw || 1280,
                         parsedMetadata?.szh || 1080
                       )
                       const file =
-                        attachment.data instanceof File
-                          ? attachment.data
-                          : new File([attachment.data], attachment.name || 'image', { type: attachment.data.type })
+                        completedAttachment.data instanceof File
+                          ? completedAttachment.data
+                          : new File([completedAttachment.data], completedAttachment.name || 'image', {
+                              type: completedAttachment.data.type
+                            })
                       const { blob: resizedBlob } = await resizeImageWithPica(file, newWidth, newHeight, 1)
                       if (resizedBlob) {
                         await setAttachmentToCache(
@@ -1049,31 +1120,41 @@ function* sendMessage(action: IAction): any {
                     } catch (err) {
                       log.error('Error caching resized image on upload completion:', err)
                     }
-                  } else if (!attachment.cachedUrl && fileType === 'video' && attachment.data) {
+                  } else if (!completedAttachment.cachedUrl && fileType === 'video' && completedAttachment.data) {
                     try {
-                      const parsedMetadata = isJSON(attachment.metadata)
-                        ? JSON.parse(attachment.metadata)
-                        : attachment.metadata
-                      const [newWidth, newHeight] = calculateRenderedImageWidth(
-                        parsedMetadata?.szw || 1280,
-                        parsedMetadata?.szh || 1080
+                      const originalVideoCacheKey = `${uriLocal}_original_video_url`
+                      // Publish the local source before any asynchronous cache
+                      // or fallback-thumbnail work. The confirmed sender message
+                      // can render before Cache Storage settles; without this
+                      // object URL it mistakes its own newly uploaded video for
+                      // a remote uncached attachment and downloads it again.
+                      const originalVideoUrl = URL.createObjectURL(completedAttachment.data)
+                      store.dispatch(setUpdateMessageAttachmentAC(originalVideoCacheKey, originalVideoUrl))
+                      await setAttachmentToCache(
+                        originalVideoCacheKey,
+                        new Response(completedAttachment.data, {
+                          headers: { 'Content-Type': completedAttachment.data.type || 'video/mp4' }
+                        })
                       )
-                      const result = await getVideoFirstFrame(attachment.data, newWidth, newHeight)
-                      if (result) {
-                        const { frameBlobUrl, blob } = result
-                        await setAttachmentToCache(
-                          uriLocal,
-                          new Response(blob, { headers: { 'Content-Type': blob.type } })
+
+                      // New videos already have video_thumb. Older/legacy
+                      // videos keep the first-frame fallback for compatibility.
+                      if (shouldExtractVideoFirstFrame(completedAttachment.metadata)) {
+                        const parsedMetadata = isJSON(completedAttachment.metadata)
+                          ? JSON.parse(completedAttachment.metadata)
+                          : completedAttachment.metadata
+                        const [newWidth, newHeight] = calculateRenderedImageWidth(
+                          parsedMetadata?.szw || 1280,
+                          parsedMetadata?.szh || 1080
                         )
-                        store.dispatch(setUpdateMessageAttachmentAC(uriLocal, frameBlobUrl))
-                        if (attachment.data) {
+                        const result = await getVideoFirstFrame(completedAttachment.data, newWidth, newHeight)
+                        if (result) {
+                          const { frameBlobUrl, blob } = result
                           await setAttachmentToCache(
-                            uriLocal + '_original_video_url',
-                            new Response(attachment.data, {
-                              headers: { 'Content-Type': attachment.data.type || 'video/mp4' }
-                            })
+                            uriLocal,
+                            new Response(blob, { headers: { 'Content-Type': blob.type } })
                           )
-                          store.dispatch(setUpdateMessageAttachmentAC(uriLocal + '_original_video_url', uriLocal))
+                          store.dispatch(setUpdateMessageAttachmentAC(uriLocal, frameBlobUrl))
                         }
                       }
                     } catch (err) {
@@ -1157,7 +1238,12 @@ function* sendMessage(action: IAction): any {
             attachmentsToSend.push(messageAttachment)
           }
           if (!messageAttachment.cachedUrl && customUploader) {
-            yield put(updateAttachmentUploadingStateAC(UPLOAD_STATE.UPLOADING, messageAttachment.tid))
+            yield put(
+              updateAttachmentUploadingStateAC(
+                messageAttachment.type === attachmentTypes.video ? UPLOAD_STATE.PREPARING : UPLOAD_STATE.UPLOADING,
+                messageAttachment.tid
+              )
+            )
           }
         }
 
@@ -1240,6 +1326,28 @@ function* sendMessage(action: IAction): any {
           yield put(updateMessageAC(messageToSend.tid!, { attachments: pendingAttachments }))
           const messageCopy = JSON.parse(JSON.stringify(messagesToSend[i]))
           if (connectionState === CONNECTION_STATUS.CONNECTED) {
+            if (!customUploader) {
+              for (let attachmentIndex = 0; attachmentIndex < messageAttachment.length; attachmentIndex++) {
+                if (messageAttachment[attachmentIndex].type === attachmentTypes.video) {
+                  const preparedVideoAttachment = yield call(
+                    prepareAndUploadVideoPreview,
+                    messageAttachment[attachmentIndex],
+                    message.type
+                  )
+                  // Keep the SDK-managed progress/completion callbacks that were
+                  // assigned to the default-upload attachment builder.
+                  messageAttachment[attachmentIndex] = {
+                    ...messageAttachment[attachmentIndex],
+                    ...preparedVideoAttachment
+                  }
+                  if (messageAttachment[attachmentIndex].upload) {
+                    yield put(
+                      updateAttachmentUploadingStateAC(UPLOAD_STATE.UPLOADING, messageAttachment[attachmentIndex].tid)
+                    )
+                  }
+                }
+              }
+            }
             let attachmentsToSend = messageAttachment
             if (customUploader) {
               attachmentsToSend = yield call(handleUploadAttachments, messageAttachment || [], messageCopy, channel)
@@ -1286,9 +1394,8 @@ function* sendMessage(action: IAction): any {
               attachmentsToUpdate = messageResponse.attachments.map((attachment: IAttachment) => {
                 const localAttachment = currentAttachmentsMap[attachment.tid!]
 
-                // Preserve local metadata (especially size) when the server response
-                // does not yet contain it or reports it as 0. This avoids showing
-                // "0 Bytes" in the UI until the backend has finalized attachment size.
+                // Preserve local metadata (especially video_thumb) when the server
+                // response has not yet echoed it back.
                 if (localAttachment && attachment.type !== attachmentTypes.voice) {
                   const merged: IAttachment = {
                     ...attachment
@@ -1296,6 +1403,10 @@ function* sendMessage(action: IAction): any {
 
                   if (!+merged.size && localAttachment.size) {
                     merged.size = localAttachment.size
+                  }
+                  merged.metadata = {
+                    ...parseAttachmentMetadata(localAttachment.metadata),
+                    ...parseAttachmentMetadata(attachment.metadata)
                   }
 
                   return merged
@@ -1314,7 +1425,7 @@ function* sendMessage(action: IAction): any {
             if (activeChannelId === channel.id) {
               yield put(updateMessageAC(messageToSend.tid as string, messageUpdateData, true))
             }
-            const messageToUpdate = JSON.parse(JSON.stringify(messageResponse))
+            const messageToUpdate = JSON.parse(JSON.stringify({ ...messageResponse, attachments: attachmentsToUpdate }))
             addConfirmedMessageToCache(channel.id, messageToUpdate)
             updateTabAttachmentCache(channel.id, attachmentsToUpdate, messageResponse.user)
             if (channel.unread) {
@@ -1549,14 +1660,21 @@ function* forwardMessage(action: IAction): any {
       )
     ) {
       if (message.attachments && message.attachments.length && action.type !== RESEND_MESSAGE) {
-        const attachmentBuilder = channel.createAttachmentBuilder(attachments[0].url, attachments[0].type)
-        const att = attachmentBuilder
-          .setName(attachments[0].name)
-          .setMetadata(attachments[0].metadata)
-          .setFileSize(attachments[0].size)
-          .setUpload(false)
-          .create()
-        attachments = [att]
+        // Attachment metadata is normalized to an object after a message is
+        // rendered locally, while the SDK builder expects its wire format.
+        // Forwarding an object directly loses video metadata such as
+        // video_thumb, szw, szh, dur and tmb.
+        attachments = attachments.map((attachment: IAttachment) => {
+          const attachmentBuilder = channel!.createAttachmentBuilder(attachment.url, attachment.type)
+          const metadata = JSON.stringify(parseAttachmentMetadata(attachment.metadata))
+          const forwardedAttachment = attachmentBuilder
+            .setName(attachment.name)
+            .setMetadata(metadata)
+            .setFileSize(attachment.size)
+            .setUpload(false)
+            .create()
+          return { ...forwardedAttachment, metadata }
+        })
       }
       const messageBuilder = channel.createMessageBuilder()
       let pollDetails = null
@@ -1632,9 +1750,27 @@ function* forwardMessage(action: IAction): any {
           ...messageToSend,
           ...(isNotShowOwnMessageForward ? { forwardingDetails: null } : {})
         })
+        const responseAttachments = (messageResponse.attachments || attachments || []).map(
+          (attachment: IAttachment, index: number) => {
+            const localAttachment = attachments[index]
+            if (!localAttachment) return attachment
+
+            // Some send responses omit attachment metadata until the message
+            // event/history response arrives. Keep the forwarded video's
+            // preview metadata available during that interval.
+            return {
+              ...attachment,
+              metadata: {
+                ...parseAttachmentMetadata(localAttachment.metadata),
+                ...parseAttachmentMetadata(attachment.metadata)
+              }
+            }
+          }
+        )
         const messageUpdateData = {
           ...messageResponse,
           channelId: channel.id,
+          attachments: responseAttachments,
           // The immediate send response may only contain the forwarding ID;
           // retain the optimistic attribution until the complete server event
           // arrives so the Forwarded label does not disappear.
@@ -1647,7 +1783,13 @@ function* forwardMessage(action: IAction): any {
         if (channelId === activeChannelId) {
           yield put(updateMessageAC(messageToSend.tid, JSON.parse(JSON.stringify(messageUpdateData)), true))
         }
-        addConfirmedMessageToCache(channel.id, JSON.parse(JSON.stringify(messageUpdateData)))
+        const confirmedForward = JSON.parse(JSON.stringify(messageUpdateData))
+        // Replace the optimistic forward by tid before promoting it in the
+        // cache. addMessageToMap intentionally only updates delivery fields
+        // for an existing message, which otherwise leaves its old attachment
+        // metadata behind.
+        updateMessageOnMap(channel.id, { messageId: messageToSend.tid, params: confirmedForward })
+        addConfirmedMessageToCache(channel.id, confirmedForward)
         // Keep the channel preview in sync with the enriched cache entry. The
         // raw response can omit forwarding attribution until history reloads.
         const messageToUpdate = JSON.parse(JSON.stringify(messageUpdateData))

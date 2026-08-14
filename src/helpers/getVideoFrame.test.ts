@@ -1,4 +1,12 @@
-import { compressAndCacheImage, getVideoFirstFrame, scaleForDevicePixelRatio } from './getVideoFrame'
+import {
+  compressAndCacheImage,
+  getVideoFirstFrame,
+  getVideoPreviewFrame,
+  readResponseBlobWithProgress,
+  scaleForDevicePixelRatio,
+  VIDEO_PREVIEW_JPEG_QUALITY,
+  VIDEO_PREVIEW_MAX_BYTES
+} from './getVideoFrame'
 import { resizeImageWithPica } from './resizeImage'
 import { setAttachmentToCache } from './attachmentsCache'
 
@@ -150,6 +158,27 @@ describe('compressAndCacheImage', () => {
   })
 })
 
+describe('readResponseBlobWithProgress', () => {
+  it('reports incremental byte progress for streamed default downloads', async () => {
+    const read = jest
+      .fn()
+      .mockResolvedValueOnce({ done: false, value: new Uint8Array([1, 2]) })
+      .mockResolvedValueOnce({ done: false, value: new Uint8Array([3, 4]) })
+      .mockResolvedValueOnce({ done: true })
+    const onProgress = jest.fn()
+    const response = {
+      headers: { get: jest.fn((name: string) => (name === 'content-length' ? '4' : 'image/jpeg')) },
+      body: { getReader: () => ({ read }) }
+    } as any
+
+    const blob = await readResponseBlobWithProgress(response, onProgress, 100)
+
+    expect(blob.size).toBe(4)
+    expect(onProgress).toHaveBeenNthCalledWith(1, { loaded: 2, total: 4 })
+    expect(onProgress).toHaveBeenNthCalledWith(2, { loaded: 4, total: 4 })
+  })
+})
+
 describe('scaleForDevicePixelRatio', () => {
   afterEach(() => {
     setDevicePixelRatio(1)
@@ -182,6 +211,7 @@ describe('getVideoFirstFrame', () => {
   let fakeVideo: any
   let capturedCanvases: HTMLCanvasElement[]
   let realCreateElement: typeof document.createElement
+  let toBlobSpy: jest.SpyInstance
 
   const waitUntil = async (predicate: () => boolean, maxTicks = 50) => {
     for (let i = 0; i < maxTicks; i++) {
@@ -248,11 +278,12 @@ describe('getVideoFirstFrame', () => {
     // so the code takes its success path instead of falling through to the
     // (harder to simulate) data-URL retry.
     jest.spyOn(HTMLCanvasElement.prototype, 'getContext').mockImplementation(() => ({ drawImage: jest.fn() }) as any)
-    jest
-      .spyOn(HTMLCanvasElement.prototype, 'toBlob')
-      .mockImplementation(function (this: HTMLCanvasElement, callback: BlobCallback) {
-        callback(new Blob(['frame'], { type: 'image/jpeg' }))
-      })
+    toBlobSpy = jest.spyOn(HTMLCanvasElement.prototype, 'toBlob').mockImplementation(function (
+      this: HTMLCanvasElement,
+      callback: BlobCallback
+    ) {
+      callback(new Blob(['frame'], { type: 'image/jpeg' }))
+    })
   })
 
   afterEach(() => {
@@ -300,5 +331,53 @@ describe('getVideoFirstFrame', () => {
     // Falls back to half the native video resolution, unrelated to DPR.
     expect(capturedCanvases[0].width).toBe(960)
     expect(capturedCanvases[0].height).toBe(540)
+  })
+
+  it('creates a compact, aspect-ratio-preserving JPEG for video_thumb independent of devicePixelRatio', async () => {
+    setDevicePixelRatio(2)
+    const videoBlob = new Blob(['fake-video-bytes'], { type: 'video/mp4' })
+
+    const framePromise = getVideoPreviewFrame(videoBlob)
+
+    await waitUntil(() => typeof fakeVideo.onloadedmetadata === 'function')
+    fakeVideo.onloadedmetadata()
+    await waitUntil(() => typeof fakeVideo.onseeked === 'function')
+    fakeVideo.onseeked()
+    await waitForCapturedFrame()
+
+    await framePromise
+
+    expect(capturedCanvases[0].width).toBe(1280)
+    expect(capturedCanvases[0].height).toBe(720)
+    expect(toBlobSpy).toHaveBeenCalledWith(expect.any(Function), 'image/jpeg', VIDEO_PREVIEW_JPEG_QUALITY)
+  })
+
+  it('re-encodes an oversized video preview at lower quality and smaller dimensions', async () => {
+    let encodeAttempt = 0
+    toBlobSpy.mockImplementation(function (this: HTMLCanvasElement, callback: BlobCallback) {
+      encodeAttempt += 1
+      callback(
+        new Blob([new Uint8Array(encodeAttempt < 5 ? VIDEO_PREVIEW_MAX_BYTES + 1 : VIDEO_PREVIEW_MAX_BYTES - 1)], {
+          type: 'image/jpeg'
+        })
+      )
+    })
+    const videoBlob = new Blob(['fake-video-bytes'], { type: 'video/mp4' })
+
+    const framePromise = getVideoPreviewFrame(videoBlob)
+
+    await waitUntil(() => typeof fakeVideo.onloadedmetadata === 'function')
+    fakeVideo.onloadedmetadata()
+    await waitUntil(() => typeof fakeVideo.onseeked === 'function')
+    fakeVideo.onseeked()
+    await waitForCapturedFrame()
+
+    const result = await framePromise
+
+    expect(result?.blob.size).toBeLessThanOrEqual(VIDEO_PREVIEW_MAX_BYTES)
+    expect(capturedCanvases).toHaveLength(2)
+    expect(capturedCanvases[1].width).toBe(960)
+    expect(capturedCanvases[1].height).toBe(540)
+    expect(toBlobSpy).toHaveBeenCalledTimes(5)
   })
 })

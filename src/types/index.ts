@@ -49,6 +49,7 @@ export interface IAttachment {
   user?: IUser
   tid?: string
   attachmentUrl: string
+  videoPreviewBlob?: Blob
   data: any
   cachedUrl?: string
 }

@@ -23,6 +23,16 @@ import { RESEND_MESSAGE } from './constants'
 import { setCustomUploader, setSendAttachmentsAsSeparateMessages } from '../../helpers/customUploader'
 import { handleUploadAttachments, __messageSagaTestables, __resetMessageSagaTestState } from './saga'
 
+const mockGetVideoFirstFrame = jest.fn()
+const mockGetVideoPreviewFrame = jest.fn()
+jest.mock('helpers/getVideoFrame', () => ({
+  getVideoFirstFrame: (...args: any[]) => mockGetVideoFirstFrame(...args),
+  getVideoPreviewFrame: (...args: any[]) => {
+    mockGetVideoPreviewFrame(...args)
+    return mockGetVideoFirstFrame(...args)
+  }
+}))
+
 const mockStoreState = {
   ChannelReducer: {
     channelsLoadingState: LOADING_STATE.LOADED,
@@ -103,13 +113,6 @@ const makeUploaderChannel = (id: string) => {
     id,
     lastMessage: makeMessage({ id: '900', channelId: id, body: 'last-message' })
   })
-  const attachmentBuilder = {
-    setName: jest.fn().mockReturnThis(),
-    setMetadata: jest.fn().mockReturnThis(),
-    setUpload: jest.fn().mockReturnThis(),
-    setFileSize: jest.fn().mockReturnThis(),
-    create: jest.fn(() => ({ type: attachmentTypes.image, metadata: '{}', upload: false }))
-  }
   const messageBuilder = {
     setBody: jest.fn().mockReturnThis(),
     setBodyAttributes: jest.fn().mockReturnThis(),
@@ -125,7 +128,25 @@ const makeUploaderChannel = (id: string) => {
     setDisableMentionsCount: jest.fn().mockReturnThis(),
     create: jest.fn(() => makePendingMessage({ channelId: id }))
   }
-  channel.createAttachmentBuilder = jest.fn(() => attachmentBuilder as any)
+  channel.createAttachmentBuilder = jest.fn((_url: any, type: string) => {
+    let metadata = '{}'
+    let upload = false
+    const attachmentBuilder = {
+      setName: jest.fn().mockReturnThis(),
+      setMetadata: jest.fn((value: string) => {
+        metadata = value
+        return attachmentBuilder
+      }),
+      setUpload: jest.fn((value: boolean) => {
+        upload = value
+        return attachmentBuilder
+      }),
+      setFileSize: jest.fn().mockReturnThis(),
+      create: jest.fn(() => ({ url: _url, data: _url, type, metadata, upload }))
+    }
+    ;(channel as any).__attachmentBuilder = attachmentBuilder
+    return attachmentBuilder as any
+  })
   channel.createMessageBuilder = jest.fn(() => messageBuilder as any)
   channel.sendMessage = jest.fn()
   return channel
@@ -205,6 +226,8 @@ describe('attachment upload recovery', () => {
     logErrorSpy = jest.spyOn(log, 'error').mockImplementation(() => undefined)
     logWarnSpy = jest.spyOn(log, 'warn').mockImplementation(() => undefined)
     logInfoSpy = jest.spyOn(log, 'info').mockImplementation(() => undefined)
+    mockGetVideoFirstFrame.mockReset()
+    mockGetVideoPreviewFrame.mockReset()
   })
 
   afterEach(() => {
@@ -437,5 +460,493 @@ describe('attachment upload recovery', () => {
       type: 'AttachmentUnavailable'
     })
     expect(uploadCalls).toHaveLength(0)
+  })
+
+  it('uploads a first-frame JPEG before the video and includes its URL in video metadata', async () => {
+    const channel = makeUploaderChannel('channel-video-preview')
+    const video = new File(['video-bytes'], 'clip.mp4', { type: 'video/mp4' })
+    const previewBlob = new Blob(['preview-bytes'], { type: 'image/jpeg' })
+    const uploadOrder: string[] = []
+    mockGetVideoFirstFrame.mockResolvedValue({ blob: previewBlob })
+    uploadBehavior = (uploadedAttachment, uploadTask) => {
+      if (uploadedAttachment.type === attachmentTypes.image) {
+        uploadOrder.push('preview')
+        uploadTask.success({ uri: 'https://cdn.example/clip-preview.jpg', blob: null })
+        return
+      }
+      uploadOrder.push('video')
+      uploadTask.success({ uri: 'https://cdn.example/clip.mp4', blob: null })
+    }
+    setCustomUploader({
+      upload: (attachment: any, uploadTask: any) => {
+        uploadCalls.push(attachment)
+        uploadBehavior(attachment, uploadTask)
+      },
+      download: jest.fn()
+    })
+    const attachment = {
+      tid: 'video-preview-tid',
+      type: attachmentTypes.video,
+      name: 'clip.mp4',
+      size: video.size,
+      url: video,
+      data: video,
+      metadata: '{"tmb":"thumb","szw":1280,"szh":720,"dur":12}',
+      upload: false
+    } as any
+
+    await handleUploadAttachments([attachment], { type: 'text' } as any, channel)
+
+    expect(mockGetVideoFirstFrame).toHaveBeenCalledWith(video)
+    expect(uploadCalls[0]).toEqual(expect.objectContaining({ name: 'clip-preview.jpg', type: attachmentTypes.image }))
+    expect(uploadOrder).toEqual(['preview', 'video'])
+    expect(channel.createAttachmentBuilder).toHaveBeenCalledWith('https://cdn.example/clip.mp4', attachmentTypes.video)
+    expect((channel as any).__attachmentBuilder.setMetadata).toHaveBeenCalledWith(
+      expect.stringContaining('"video_thumb":"https://cdn.example/clip-preview.jpg"')
+    )
+  })
+
+  it('uploads the JPEG already generated for the compose preview without extracting a second frame', async () => {
+    const channel = makeUploaderChannel('channel-reuse-video-preview')
+    const video = new File(['video-bytes'], 'clip.mp4', { type: 'video/mp4' })
+    const composePreviewBlob = new Blob(['compose-preview'], { type: 'image/jpeg' })
+    uploadBehavior = (uploadedAttachment, uploadTask) => {
+      uploadTask.success({
+        uri:
+          uploadedAttachment.type === attachmentTypes.image
+            ? 'https://cdn.example/compose-preview.jpg'
+            : 'https://cdn.example/clip.mp4',
+        blob: null
+      })
+    }
+    const attachment = {
+      tid: 'reuse-video-preview-tid',
+      type: attachmentTypes.video,
+      name: 'clip.mp4',
+      size: video.size,
+      url: video,
+      data: video,
+      metadata: '{"tmb":"thumb","szw":1280,"szh":720,"dur":12}',
+      videoPreviewBlob: composePreviewBlob,
+      upload: false
+    } as any
+
+    await handleUploadAttachments([attachment], { type: 'text' } as any, channel)
+
+    expect(mockGetVideoFirstFrame).not.toHaveBeenCalled()
+    expect(uploadCalls[0]).toEqual(
+      expect.objectContaining({ type: attachmentTypes.image, data: expect.any(File), size: composePreviewBlob.size })
+    )
+    expect((channel as any).__attachmentBuilder.setMetadata).toHaveBeenCalledWith(
+      expect.stringContaining('"video_thumb":"https://cdn.example/compose-preview.jpg"')
+    )
+  })
+
+  it('preserves video dimensions, replaces legacy previewImage, and does not extract a second frame after upload', async () => {
+    const channel = makeUploaderChannel('channel-video-thumb-metadata')
+    const video = new File(['video-bytes'], 'clip.mp4', { type: 'video/mp4' })
+    mockGetVideoFirstFrame.mockResolvedValue({ blob: new Blob(['preview'], { type: 'image/jpeg' }) })
+    setCustomUploader({
+      upload: (attachment: any, uploadTask: any) => {
+        uploadCalls.push(attachment)
+        uploadTask.success({
+          uri:
+            attachment.type === attachmentTypes.image
+              ? 'https://cdn.example/new-thumb.jpg'
+              : 'https://cdn.example/clip.mp4',
+          blob: attachment.type === attachmentTypes.video ? video : null
+        })
+      },
+      download: jest.fn()
+    })
+    const attachment = {
+      tid: 'video-thumb-metadata-tid',
+      type: attachmentTypes.video,
+      name: 'clip.mp4',
+      size: video.size,
+      url: video,
+      data: video,
+      metadata: '{"tmb":"legacy-thumb","szw":1280,"szh":720,"dur":12,"previewImage":"https://cdn/old.jpg"}',
+      upload: false
+    } as any
+
+    const originalCreateObjectURL = URL.createObjectURL
+    Object.defineProperty(URL, 'createObjectURL', {
+      configurable: true,
+      value: jest.fn().mockReturnValue('blob:original-video')
+    })
+    const [uploadedVideo] = await handleUploadAttachments([attachment], { type: 'text' } as any, channel)
+    const metadata = JSON.parse(uploadedVideo.metadata)
+    Object.defineProperty(URL, 'createObjectURL', { configurable: true, value: originalCreateObjectURL })
+
+    expect(mockGetVideoFirstFrame).toHaveBeenCalledTimes(1)
+    expect(metadata).toEqual({
+      tmb: 'legacy-thumb',
+      szw: 1280,
+      szh: 720,
+      dur: 12,
+      video_thumb: 'https://cdn.example/new-thumb.jpg'
+    })
+    expect(metadata.previewImage).toBeUndefined()
+  })
+
+  it('sends the video only after its preview URL is embedded in the attachment payload', async () => {
+    const currentUser = makeUser({ id: 'current-user' })
+    const channel = makeUploaderChannel('channel-video-preview-send')
+    const video = new File(['video-bytes'], 'clip.mp4', { type: 'video/mp4' })
+    const pendingMessage = makePendingMessage({
+      channelId: channel.id,
+      tid: 'video-preview-send-tid',
+      body: 'video',
+      user: currentUser,
+      attachments: [
+        {
+          tid: 'video-preview-send-file-tid',
+          type: attachmentTypes.video,
+          name: 'clip.mp4',
+          size: video.size,
+          data: video,
+          metadata: '{"tmb":"thumb","szw":1280,"szh":720,"dur":12}',
+          upload: false
+        } as any
+      ]
+    })
+    mockGetVideoFirstFrame.mockResolvedValue({ blob: new Blob(['preview'], { type: 'image/jpeg' }) })
+    channel.sendMessage = jest.fn((message: any) =>
+      Promise.resolve({
+        ...pendingMessage,
+        id: 'video-preview-send-server-id',
+        state: MESSAGE_STATUS.UNMODIFIED,
+        deliveryStatus: 'sent',
+        attachments: [
+          {
+            ...message.attachments[0],
+            id: 'video-preview-send-server-attachment-id',
+            tid: 'video-preview-send-file-tid',
+            url: 'https://cdn.example/clip.mp4'
+          }
+        ]
+      })
+    )
+    setActiveChannelId(channel.id)
+    setChannelInMap(channel)
+    addMessageToMap(channel.id, pendingMessage)
+
+    const dispatched = await runMessageSaga(__messageSagaTestables.sendMessage, {
+      type: RESEND_MESSAGE,
+      payload: {
+        message: pendingMessage,
+        connectionState: CONNECTION_STATUS.CONNECTED,
+        channelId: channel.id,
+        sendAttachmentsAsSeparateMessage: false
+      }
+    })
+
+    expect(dispatched).toContainEqual(
+      updateAttachmentUploadingStateAC(UPLOAD_STATE.PREPARING, 'video-preview-send-file-tid')
+    )
+    expect(mockStore.dispatch).toHaveBeenCalledWith(
+      updateAttachmentUploadingStateAC(UPLOAD_STATE.UPLOADING, 'video-preview-send-file-tid')
+    )
+    expect(channel.sendMessage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        attachments: [
+          expect.objectContaining({
+            metadata: expect.stringContaining('"video_thumb":"https://cdn.example/uploaded-1"')
+          })
+        ]
+      })
+    )
+  })
+
+  it('does not upload the video when preview generation fails', async () => {
+    const channel = makeUploaderChannel('channel-video-preview-failure')
+    const video = new File(['video-bytes'], 'clip.mp4', { type: 'video/mp4' })
+    const attachment = {
+      tid: 'video-preview-failure-tid',
+      type: attachmentTypes.video,
+      name: 'clip.mp4',
+      size: video.size,
+      url: video,
+      data: video,
+      metadata: '{}',
+      upload: false
+    } as any
+    mockGetVideoFirstFrame.mockResolvedValue(null)
+
+    await expect(handleUploadAttachments([attachment], { type: 'text' } as any, channel)).rejects.toThrow(
+      'Unable to generate video preview image'
+    )
+    expect(uploadCalls).toHaveLength(0)
+  })
+
+  it('does not upload the video when preview upload fails', async () => {
+    const channel = makeUploaderChannel('channel-video-preview-upload-failure')
+    const video = new File(['video-bytes'], 'clip.mp4', { type: 'video/mp4' })
+    const attachment = {
+      tid: 'video-preview-upload-failure-tid',
+      type: attachmentTypes.video,
+      name: 'clip.mp4',
+      size: video.size,
+      url: video,
+      data: video,
+      metadata: '{}',
+      upload: false
+    } as any
+    mockGetVideoFirstFrame.mockResolvedValue({ blob: new Blob(['preview'], { type: 'image/jpeg' }) })
+    setCustomUploader({
+      upload: (attachment: any, uploadTask: any) => {
+        uploadCalls.push(attachment)
+        if (attachment.type === attachmentTypes.image) {
+          uploadTask.failure(new Error('preview upload failed'))
+          return
+        }
+        uploadBehavior(attachment, uploadTask)
+      },
+      download: jest.fn()
+    })
+
+    await expect(handleUploadAttachments([attachment], { type: 'text' } as any, channel)).rejects.toThrow(
+      'preview upload failed'
+    )
+    expect(uploadCalls).toHaveLength(1)
+  })
+
+  it('marks the message failed and does not send the video when preview upload fails', async () => {
+    const currentUser = makeUser({ id: 'current-user' })
+    const channel = makeUploaderChannel('channel-video-preview-send-failure')
+    const video = new File(['video-bytes'], 'clip.mp4', { type: 'video/mp4' })
+    const pendingMessage = makePendingMessage({
+      channelId: channel.id,
+      tid: 'video-preview-send-message-tid',
+      body: 'video',
+      user: currentUser,
+      attachments: [
+        {
+          tid: 'video-preview-send-attachment-tid',
+          type: attachmentTypes.video,
+          name: 'clip.mp4',
+          size: video.size,
+          data: video,
+          metadata: '{}',
+          upload: false
+        } as any
+      ]
+    })
+    mockGetVideoFirstFrame.mockResolvedValue({ blob: new Blob(['preview'], { type: 'image/jpeg' }) })
+    setCustomUploader({
+      upload: (attachment: any, uploadTask: any) => {
+        uploadCalls.push(attachment)
+        if (attachment.type === attachmentTypes.image) {
+          uploadTask.failure(new Error('preview upload failed'))
+          return
+        }
+        uploadBehavior(attachment, uploadTask)
+      },
+      download: jest.fn()
+    })
+    setActiveChannelId(channel.id)
+    setChannelInMap(channel)
+    addMessageToMap(channel.id, pendingMessage)
+
+    const dispatched = await runMessageSaga(__messageSagaTestables.sendMessage, {
+      type: RESEND_MESSAGE,
+      payload: {
+        message: pendingMessage,
+        connectionState: CONNECTION_STATUS.CONNECTED,
+        channelId: channel.id,
+        sendAttachmentsAsSeparateMessage: false
+      }
+    })
+
+    expect(uploadCalls).toHaveLength(1)
+    expect(channel.sendMessage).not.toHaveBeenCalled()
+    expect(dispatched).toEqual(
+      expect.arrayContaining([
+        updateAttachmentUploadingStateAC(UPLOAD_STATE.FAIL, 'video-preview-send-attachment-tid'),
+        updateMessageAC('video-preview-send-message-tid', { state: MESSAGE_STATUS.FAILED })
+      ])
+    )
+    expect(getPendingMessagesFromMap(channel.id)).toEqual([
+      expect.objectContaining({ tid: 'video-preview-send-message-tid', state: MESSAGE_STATUS.FAILED })
+    ])
+  })
+
+  it('uploads the preview with the SDK before sending a default-upload video', async () => {
+    const currentUser = makeUser({ id: 'current-user' })
+    const channel = makeUploaderChannel('channel-video-preview-required')
+    const video = new File(['video-bytes'], 'clip.mp4', { type: 'video/mp4' })
+    const pendingMessage = makePendingMessage({
+      channelId: channel.id,
+      tid: 'video-preview-required-message-tid',
+      body: 'video',
+      user: currentUser,
+      attachments: [
+        {
+          tid: 'video-preview-required-attachment-tid',
+          type: attachmentTypes.video,
+          name: 'clip.mp4',
+          size: video.size,
+          data: video,
+          metadata: '{}',
+          upload: true
+        } as any
+      ]
+    })
+    const uploadFile = jest.fn().mockResolvedValue('https://cdn.example/default-preview.jpg')
+    setCustomUploader(undefined)
+    setClient({ user: { id: 'current-user' }, Channel: { create: jest.fn() }, uploadFile })
+    mockGetVideoFirstFrame.mockResolvedValue({ blob: new Blob(['preview'], { type: 'image/jpeg' }) })
+    channel.sendMessage = jest.fn(() =>
+      Promise.resolve({
+        ...makeServerResponse(
+          'video-preview-required-message-tid',
+          'video-preview-required-attachment-tid',
+          currentUser
+        ),
+        attachments: [
+          {
+            id: 'default-video-upload-id',
+            tid: 'video-preview-required-attachment-tid',
+            url: 'https://cdn.example/default-video.mp4',
+            type: attachmentTypes.video,
+            name: 'clip.mp4',
+            size: video.size,
+            metadata: '{}'
+          }
+        ]
+      })
+    )
+    setActiveChannelId(channel.id)
+    setChannelInMap(channel)
+    addMessageToMap(channel.id, pendingMessage)
+
+    const dispatched = await runMessageSaga(__messageSagaTestables.sendMessage, {
+      type: RESEND_MESSAGE,
+      payload: {
+        message: pendingMessage,
+        connectionState: CONNECTION_STATUS.CONNECTED,
+        channelId: channel.id,
+        sendAttachmentsAsSeparateMessage: false
+      }
+    })
+
+    expect(uploadFile).toHaveBeenCalledWith({ data: expect.any(File), progress: expect.any(Function) })
+    expect(mockGetVideoPreviewFrame).toHaveBeenCalledWith(video)
+    expect(mockStore.dispatch).toHaveBeenCalledWith(
+      updateAttachmentUploadingStateAC(UPLOAD_STATE.PREPARING, 'video-preview-required-attachment-tid')
+    )
+    expect(dispatched).toContainEqual(
+      updateAttachmentUploadingStateAC(UPLOAD_STATE.UPLOADING, 'video-preview-required-attachment-tid')
+    )
+    expect(channel.sendMessage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        attachments: [
+          expect.objectContaining({
+            metadata: expect.stringContaining('"video_thumb":"https://cdn.example/default-preview.jpg"'),
+            progress: expect.any(Function),
+            completion: expect.any(Function)
+          })
+        ]
+      })
+    )
+  })
+
+  it('does not send a default-upload video when the SDK preview upload fails', async () => {
+    const currentUser = makeUser({ id: 'current-user' })
+    const channel = makeUploaderChannel('channel-default-video-preview-failure')
+    const video = new File(['video-bytes'], 'clip.mp4', { type: 'video/mp4' })
+    const pendingMessage = makePendingMessage({
+      channelId: channel.id,
+      tid: 'default-video-preview-failure-message-tid',
+      user: currentUser,
+      attachments: [
+        {
+          tid: 'default-video-preview-failure-attachment-tid',
+          type: attachmentTypes.video,
+          name: 'clip.mp4',
+          size: video.size,
+          data: video,
+          metadata: '{}',
+          upload: true
+        } as any
+      ]
+    })
+    setCustomUploader(undefined)
+    setClient({
+      user: { id: 'current-user' },
+      Channel: { create: jest.fn() },
+      uploadFile: jest.fn().mockRejectedValue(new Error('preview upload failed'))
+    })
+    mockGetVideoFirstFrame.mockResolvedValue({ blob: new Blob(['preview'], { type: 'image/jpeg' }) })
+    setActiveChannelId(channel.id)
+    setChannelInMap(channel)
+    addMessageToMap(channel.id, pendingMessage)
+
+    const dispatched = await runMessageSaga(__messageSagaTestables.sendMessage, {
+      type: RESEND_MESSAGE,
+      payload: {
+        message: pendingMessage,
+        connectionState: CONNECTION_STATUS.CONNECTED,
+        channelId: channel.id,
+        sendAttachmentsAsSeparateMessage: false
+      }
+    })
+
+    expect(channel.sendMessage).not.toHaveBeenCalled()
+    expect(dispatched).toEqual(
+      expect.arrayContaining([
+        updateAttachmentUploadingStateAC(UPLOAD_STATE.FAIL, 'default-video-preview-failure-attachment-tid'),
+        updateMessageAC('default-video-preview-failure-message-tid', { state: MESSAGE_STATUS.FAILED })
+      ])
+    )
+  })
+
+  it('re-runs preview and video upload after a retryable video upload failure', async () => {
+    const channel = makeUploaderChannel('channel-video-preview-retry')
+    const video = new File(['video-bytes'], 'clip.mp4', { type: 'video/mp4' })
+    const attachment = {
+      tid: 'video-preview-retry-attachment-tid',
+      type: attachmentTypes.video,
+      name: 'clip.mp4',
+      size: video.size,
+      url: video,
+      data: video,
+      metadata: '{}',
+      upload: false
+    } as any
+    mockGetVideoFirstFrame.mockResolvedValue({ blob: new Blob(['preview'], { type: 'image/jpeg' }) })
+    let failVideoUpload = true
+    setCustomUploader({
+      upload: (attachment: any, uploadTask: any) => {
+        uploadCalls.push(attachment)
+        if (attachment.type === attachmentTypes.image) {
+          uploadTask.success({ uri: 'https://cdn.example/clip-preview.jpg', blob: null })
+          return
+        }
+        if (failVideoUpload) {
+          uploadTask.failure(networkingError())
+          return
+        }
+        uploadTask.success({ uri: 'https://cdn.example/clip.mp4', blob: null })
+      },
+      download: jest.fn()
+    })
+
+    await expect(handleUploadAttachments([attachment], { type: 'text' } as any, channel)).rejects.toMatchObject({
+      code: 'NetworkingError'
+    })
+
+    expect(uploadCalls.filter((uploadedAttachment) => uploadedAttachment.type === attachmentTypes.image)).toHaveLength(
+      1
+    )
+
+    failVideoUpload = false
+    await handleUploadAttachments([attachment], { type: 'text' } as any, channel)
+
+    expect(uploadCalls.filter((uploadedAttachment) => uploadedAttachment.type === attachmentTypes.image)).toHaveLength(
+      2
+    )
+    expect(uploadCalls).toHaveLength(4)
   })
 })

@@ -71,7 +71,7 @@ import {
 import { DropdownOptionLi, DropdownOptionsUl, TextInOneLine, UploadFile, ViewOnceToggleCont } from '../../UIHelper'
 import { THEME_COLORS } from '../../UIHelper/constants'
 import { createImageThumbnail, resizeImage } from '../../helpers/resizeImage'
-import { calculateRenderedImageWidth, detectBrowser, detectOS } from '../../helpers'
+import { detectBrowser, detectOS } from '../../helpers'
 import { IMember, IMessage, IUser } from '../../types'
 import { getCustomUploader, getSendAttachmentsAsSeparateMessages } from '../../helpers/customUploader'
 import {
@@ -96,7 +96,7 @@ import { attachmentTypes, DEFAULT_CHANNEL_TYPE, MESSAGE_DELIVERY_STATUS, USER_ST
 import { hideUserPresence } from '../../helpers/userHelper'
 import { getReplyLinkPreviewImage, shouldShowLinkPreviewErrorFallback } from '../../helpers/replyPreview'
 import { getShowOnlyContactUsers } from '../../helpers/contacts'
-import { getFrame, getVideoFirstFrame } from '../../helpers/getVideoFrame'
+import { getFrame, VideoThumbnailFrame } from '../../helpers/getVideoFrame'
 import { remuxVideoFileForUpload } from '../../helpers/videoConversion'
 import {
   beginVideoPreparation,
@@ -1298,20 +1298,6 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
       const url = URL.createObjectURL(attachment.data)
       dispatch(setUpdateMessageAttachmentAC(attachment?.metadata?.tmb || '', url))
     }
-    const handleAttachmentVideoForCache = async (attachment: any) => {
-      const [newWidth, newHeight] = calculateRenderedImageWidth(
-        attachment.metadata.szh || 400,
-        attachment.metadata.szh || 400
-      )
-      // Pass the raw File/Blob so getVideoFirstFrame can sniff and correct the
-      // MIME type — an object URL string locks in the original (possibly
-      // Firefox-unsupported) type like video/quicktime.
-      const result = await getVideoFirstFrame(attachment.data, newWidth, newHeight)
-      if (result) {
-        const { frameBlobUrl } = result
-        dispatch(setUpdateMessageAttachmentAC(attachment?.metadata?.tmb || '', frameBlobUrl))
-      }
-    }
     // A File is already a Blob. Reading a multi-GB file into a binary string before
     // rendering duplicates it in memory and blocks the preview on slower devices.
     // Object URLs are supported by Chrome, Safari, Firefox, and Edge, and let the
@@ -1409,10 +1395,10 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
             const remuxPromise = remuxVideoFileForUpload(file)
             let thumbnailSource = file
             let metadata: any
+            let frame: VideoThumbnailFrame | undefined
             try {
               // Do not make preview visibility depend on metadata extraction. VideoPreview
               // can use the object URL immediately while this fills in dimensions/thumb.
-              let frame
               try {
                 frame = await getFrame(thumbnailSource, 0)
               } catch (error) {
@@ -1426,7 +1412,8 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
                 ? { szw: width, szh: height, tmb: thumb, dur: duration }
                 : JSON.stringify({ tmb: thumb, szw: width, szh: height, dur: duration })
               updateAttachment({ metadata, thumbnailState: 'ready' })
-              handleAttachmentVideoForCache({ ...attachment, metadata })
+              dispatch(setUpdateMessageAttachmentAC(thumb, frame.frameBlobUrl))
+              setVideoIsReadyToSend(tid)
             } catch (error) {
               log.warn('Unable to generate video thumbnail:', error)
             }
@@ -1443,7 +1430,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
               setPendingAttachment(tid, { file: uploadFile })
             }
             if (metadata) {
-              completeVideoPreparation(tid, { file: uploadFile, metadata })
+              completeVideoPreparation(tid, { file: uploadFile, metadata, videoPreviewBlob: frame?.blob })
             } else {
               failVideoPreparation(tid)
               updateAttachment({ thumbnailState: 'failed' })

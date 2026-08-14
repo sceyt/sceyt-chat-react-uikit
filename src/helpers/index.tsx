@@ -2,10 +2,13 @@ import { IAttachment, IContact, IUser } from '../types'
 import FileSaver from 'file-saver'
 import moment from 'moment'
 import { getCustomDownloader, getCustomUploader } from './customUploader'
+import { readResponseBlobWithProgress } from './getVideoFrame'
 import log from 'loglevel'
 
 // eslint-disable-next-line
-export const urlRegex = /(https?:\/\/(?:www\.|(?!www))[a-zA-Z0-9][a-zA-Z0-9-]+[a-zA-Z0-9]\.[^\s]{2,}|www\.[a-zA-Z0-9][a-zA-Z0-9-]+[a-zA-Z0-9]\.[^\s]{2,}|https?:\/\/(?:www\.|(?!www))[a-zA-Z0-9]+\.[^\s]{2,}|www\.[a-zA-Z0-9]+\.[^\s]{2,})/gi
+export const urlRegex =
+  // eslint-disable-next-line max-len
+  /(https?:\/\/(?:www\.|(?!www))[a-zA-Z0-9][a-zA-Z0-9-]+[a-zA-Z0-9]\.[^\s]{2,}|www\.[a-zA-Z0-9][a-zA-Z0-9-]+[a-zA-Z0-9]\.[^\s]{2,}|https?:\/\/(?:www\.|(?!www))[a-zA-Z0-9]+\.[^\s]{2,}|www\.[a-zA-Z0-9]+\.[^\s]{2,})/gi
 
 export const bytesToSize = (bytes: number, decimals = 2) => {
   if (bytes === 0) return '0 Bytes'
@@ -96,7 +99,10 @@ export const downloadFile = async (
       }) */
     } else {
       response = await fetch(attachment.url)
-      const data = await response.blob()
+      if (!response.ok) {
+        throw new Error(`Unable to download attachment (${response.status})`)
+      }
+      const data = await readResponseBlobWithProgress(response, progressCallback, attachment.size || 0)
       if (done) {
         done(attachment.id || '')
       }
@@ -121,7 +127,7 @@ export const cancelDownloadFile = (attachmentId: string) => {
 }
 
 export const calculateRenderedImageWidth = (width: number, height: number, maxWidth?: number, maxHeight?: number) => {
-  const maxWdt = maxWidth || 420
+  const maxWdt = maxWidth || 400
   const maxHg = maxHeight || 400
   const minWidth = 165
   const minHeight = 165
