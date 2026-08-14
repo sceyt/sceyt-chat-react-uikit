@@ -678,6 +678,13 @@ const getStoredChannel = (channelId: string): IChannel | null =>
   getChannelFromAllChannelsMap(channelId) ||
   null
 
+// The SDK mutates its channel cache before its send promise (or message event)
+// is observed in a few reconnect paths. Redux still owns the channel-list UI,
+// so compare its preview separately before deciding an update can be skipped.
+const getReduxChannelLastMessage = (channelId: string): IMessage | null =>
+  (store.getState().ChannelReducer?.channels || []).find((channel: IChannel) => channel.id === channelId)
+    ?.lastMessage || null
+
 const shouldReplaceChannelLastMessage = (
   channelId: string,
   nextLastMessage: IMessage,
@@ -693,6 +700,11 @@ const getResolvedChannelLastMessage = (
 ) => {
   const currentLastMessage = getStoredChannel(channelId)?.lastMessage
   if (!nextLastMessage?.id) {
+    // A failed optimistic message must replace its own pending preview, but it
+    // must never displace a confirmed message or a newer pending message.
+    if (messagesShareReference(currentLastMessage, sourceMessage || nextLastMessage)) {
+      return nextLastMessage
+    }
     return currentLastMessage?.id ? currentLastMessage : null
   }
 
@@ -974,7 +986,8 @@ const syncFailedMessageState = function* (
     state: shouldSkipUpdate ? MESSAGE_STATUS.UNMODIFIED : MESSAGE_STATUS.FAILED
   }
   const resolvedLastMessage = getResolvedChannelLastMessage(channel.id, failedMessage, message)
-  if (lastMessageNeedsUpdate(getStoredChannel(channel.id)?.lastMessage, resolvedLastMessage)) {
+  const shouldUpdateChannelList = lastMessageNeedsUpdate(getReduxChannelLastMessage(channel.id), resolvedLastMessage)
+  if (shouldUpdateChannelList) {
     updateChannelLastMessageOnAllChannels(channel.id, resolvedLastMessage!)
     const channelUpdateParam = {
       lastMessage: resolvedLastMessage,
@@ -1432,7 +1445,7 @@ function* sendMessage(action: IAction): any {
               yield put(markChannelAsReadAC(channel.id))
             }
             const resolvedLastMessage = getResolvedChannelLastMessage(channel.id, messageToUpdate, messageToSend)
-            if (lastMessageNeedsUpdate(getStoredChannel(channel.id)?.lastMessage, resolvedLastMessage)) {
+            if (lastMessageNeedsUpdate(getReduxChannelLastMessage(channel.id), resolvedLastMessage)) {
               updateChannelLastMessageOnAllChannels(channel.id, resolvedLastMessage!)
               const channelUpdateParam = {
                 lastMessage: resolvedLastMessage,
@@ -1583,7 +1596,11 @@ function* sendTextMessage(action: IAction): any {
         yield put(markChannelAsReadAC(channel.id))
       }
       const resolvedLastMessage = getResolvedChannelLastMessage(channel.id, messageToUpdate, messageToSend)
-      if (lastMessageNeedsUpdate(getStoredChannel(channel.id)?.lastMessage, resolvedLastMessage)) {
+      const shouldUpdateChannelList = lastMessageNeedsUpdate(
+        getReduxChannelLastMessage(channel.id),
+        resolvedLastMessage
+      )
+      if (shouldUpdateChannelList) {
         updateChannelLastMessageOnAllChannels(channel.id, resolvedLastMessage!)
         const channelUpdateParam = {
           lastMessage: resolvedLastMessage,
@@ -1797,7 +1814,7 @@ function* forwardMessage(action: IAction): any {
           yield put(markChannelAsReadAC(channel.id))
         }
         const resolvedLastMessage = getResolvedChannelLastMessage(channel.id, messageToUpdate, messageToSend)
-        if (lastMessageNeedsUpdate(getStoredChannel(channel.id)?.lastMessage, resolvedLastMessage)) {
+        if (lastMessageNeedsUpdate(getReduxChannelLastMessage(channel.id), resolvedLastMessage)) {
           updateChannelLastMessageOnAllChannels(channel.id, resolvedLastMessage!)
           const channelUpdateParam = {
             lastMessage: resolvedLastMessage,

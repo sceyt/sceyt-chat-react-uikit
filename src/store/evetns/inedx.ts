@@ -100,6 +100,13 @@ const getStoredChannel = (channelId: string) =>
   getChannelFromAllChannelsMap(channelId) ||
   null
 
+// The SDK may mutate its cached channel before it emits the corresponding
+// message event. The channel list renders from Redux, so its preview needs an
+// independent comparison before an event update can be skipped.
+const getReduxChannelLastMessage = (channelId: string): IMessage | null =>
+  (store.getState().ChannelReducer?.channels || []).find((channel: IChannel) => channel.id === channelId)
+    ?.lastMessage || null
+
 const lastMessageNeedsUpdate = (
   currentLastMessage: IMessage | null | undefined,
   nextLastMessage: IMessage | null | undefined
@@ -173,7 +180,6 @@ export function* handleChannelMessageEvent(args: { channel: IChannel; message: I
   const resolvedLastMessage = message.repliedInThread
     ? storedChannel?.lastMessage || null
     : getResolvedChannelLastMessage(channel.id, candidateLastMessage, message)
-  const shouldUpdateLastMessage = lastMessageNeedsUpdate(storedChannel?.lastMessage, resolvedLastMessage)
   const messages = store.getState().MessageReducer.activeChannelMessages
   const lastMessageIsInActiveWindow =
     storedChannel?.lastMessage?.id || storedChannel?.lastMessage?.tid
@@ -194,11 +200,16 @@ export function* handleChannelMessageEvent(args: { channel: IChannel; message: I
         state: MESSAGE_STATUS.UNMODIFIED
       }
     : resolvedLastMessage
+  const shouldUpdateLastMessage = lastMessageNeedsUpdate(storedChannel?.lastMessage, resolvedLastMessageUpdate)
+  const shouldUpdateReduxLastMessage = lastMessageNeedsUpdate(
+    getReduxChannelLastMessage(channel.id),
+    resolvedLastMessageUpdate
+  )
 
   yield put(addChannelAC(channelForAdd))
   if (!channelExists) {
     setChannelInMap(channel)
-  } else if (shouldUpdateLastMessage) {
+  } else if (shouldUpdateLastMessage || shouldUpdateReduxLastMessage) {
     yield put(updateChannelLastMessageAC(resolvedLastMessageUpdate!, channelForAdd))
   }
 
@@ -258,7 +269,7 @@ export function* handleChannelMessageEvent(args: { channel: IChannel; message: I
     newReactions: channelForAdd.newReactions,
     userMessageReactions: [],
     lastReactedMessage: null,
-    ...(shouldUpdateLastMessage && resolvedLastMessageUpdate ? { lastMessage: resolvedLastMessageUpdate } : {})
+    ...(shouldUpdateReduxLastMessage && resolvedLastMessageUpdate ? { lastMessage: resolvedLastMessageUpdate } : {})
   }
   if (storedChannel?.lastMessage?.id) {
     appendMessageToLatestSegment(channel.id, message.id, storedChannel.lastMessage.id)

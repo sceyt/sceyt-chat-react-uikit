@@ -500,10 +500,20 @@ function* getChannels(action: IAction): any {
       const currentReduxLastMessage = (store.getState().ChannelReducer.channels as IChannel[]).find(
         (ch) => ch.id === channelId
       )?.lastMessage
-      const resolvedLastMessage =
-        currentReduxLastMessage?.id && !pendingLastMessage.id ? currentReduxLastMessage : pendingLastMessage
-
       const mappedChannel = mappedChannels.find((ch: IChannel) => ch.id === channelId)
+      const serverLastMessage = mappedChannel?.lastMessage
+      // A request can reach the server even when its response is lost during
+      // packet loss. In that case the refreshed channel has the confirmed
+      // message under the same client tid; keep it instead of restoring the
+      // stale local pending preview.
+      const serverConfirmedPendingMessage =
+        !!serverLastMessage?.id && !!pendingLastMessage.tid && serverLastMessage.tid === pendingLastMessage.tid
+      const resolvedLastMessage = serverConfirmedPendingMessage
+        ? serverLastMessage
+        : currentReduxLastMessage?.id && !pendingLastMessage.id
+          ? currentReduxLastMessage
+          : pendingLastMessage
+
       if (mappedChannel) {
         mappedChannel.lastMessage = resolvedLastMessage
       }

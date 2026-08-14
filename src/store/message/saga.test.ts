@@ -2120,6 +2120,8 @@ describe('message saga message-list flows', () => {
 
     setActiveChannelId(channel.id)
     setChannelInMap(channel)
+    // The optimistic list preview is pending before the offline send fails.
+    mockStoreState.ChannelReducer.channels = [{ ...channel, lastMessage: createdMessage }]
     setClient({
       user: { id: 'current-user' },
       Channel: { create: jest.fn() }
@@ -2154,7 +2156,15 @@ describe('message saga message-list flows', () => {
     expect(dispatched).toEqual(
       expect.arrayContaining([
         setUnreadMessageIdAC(''),
-        updateMessageAC('offline-tid', { state: MESSAGE_STATUS.FAILED })
+        updateMessageAC('offline-tid', { state: MESSAGE_STATUS.FAILED }),
+        updateChannelDataAC(
+          channel.id,
+          expect.objectContaining({
+            lastMessage: expect.objectContaining({ tid: 'offline-tid', state: MESSAGE_STATUS.FAILED }),
+            lastReactedMessage: null
+          }),
+          true
+        )
       ])
     )
 
@@ -4056,10 +4066,17 @@ describe('message saga message-list flows', () => {
     })
 
     channel.createMessageBuilder = jest.fn(() => builder as any)
-    channel.sendMessage = jest.fn(() => sendPromise)
+    channel.sendMessage = jest.fn(() => {
+      // The SDK may update its mutable channel instance before resolving the
+      // send call. Redux still has the pending channel-list preview at this
+      // point and must be reconciled when the resend completes.
+      setChannelInMap({ ...channel, lastMessage: confirmedMsg })
+      return sendPromise
+    })
 
     setChannelInMap(channel)
     addMessageToMap(channelId, pendingMsg)
+    mockStoreState.ChannelReducer.channels = [{ ...channel, lastMessage: pendingMsg }]
     setActiveChannelId('channel-B')
     setClient({ user: { id: 'current-user' }, Channel: { create: jest.fn() } })
 

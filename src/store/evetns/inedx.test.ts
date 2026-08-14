@@ -818,9 +818,15 @@ describe('event message last-message handling', () => {
     setChannelInMap(storedChannel)
     addChannelToAllChannels(storedChannel)
     addMessageToMap(channelId, pendingMessage)
+    // The SDK can update its mutable cache before it emits the confirmation
+    // event, while Redux still contains the pending channel-list preview.
+    setChannelInMap({ ...storedChannel, lastMessage: confirmedMessage })
     setActiveSegment(channelId, '840827767688048630', '840827767688048639')
     mockStore.getState = jest.fn(() => ({
       ...defaultStoreState,
+      ChannelReducer: {
+        channels: [{ ...storedChannel, lastMessage: pendingMessage }]
+      },
       MessageReducer: {
         ...defaultStoreState.MessageReducer,
         // The reconnect event arrives while the active list is a history window.
@@ -840,7 +846,13 @@ describe('event message last-message handling', () => {
     // The channel/list receives the confirmed copy.
     expect(dispatched).toEqual(
       expect.arrayContaining([
-        expect.objectContaining({ type: updateChannelLastMessageAC(confirmedMessage, storedChannel).type })
+        expect.objectContaining({ type: updateChannelLastMessageAC(confirmedMessage, storedChannel).type }),
+        expect.objectContaining({
+          type: updateChannelDataAC(channelId, {}, true).type,
+          payload: expect.objectContaining({
+            config: expect.objectContaining({ lastMessage: expect.objectContaining({ id: confirmedMessage.id }) })
+          })
+        })
       ])
     )
     // The active thread must receive the same confirmed message, even while a

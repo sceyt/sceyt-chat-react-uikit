@@ -1046,7 +1046,33 @@ describe('channel saga getChannels pending-message preservation', () => {
     destroyChannelsMap()
   })
 
-  it('preserves the confirmed lastMessage when sendPendingMessages confirms before setChannelsAC dispatches', async () => {
+  const refreshChannels = async (serverChannel: any) => {
+    const channelQuery = {
+      loadNextPage: jest.fn(async () => ({ channels: [serverChannel], hasNext: false }))
+    }
+    const channelQueryBuilder: any = {
+      types: jest.fn().mockReturnThis(),
+      memberCount: jest.fn().mockReturnThis(),
+      order: jest.fn().mockReturnThis(),
+      limit: jest.fn().mockReturnThis(),
+      build: jest.fn(async () => channelQuery)
+    }
+    setClient({
+      user: { id: 'current-user' },
+      ChannelListQueryBuilder: jest.fn(() => channelQueryBuilder)
+    } as any)
+
+    const dispatched: any[] = []
+    await runSaga(
+      { dispatch: (action) => dispatched.push(action), getState: () => mockStoreState },
+      __channelSagaTestables.getChannels,
+      { type: 'GET_CHANNELS', payload: { params: { limit: 20 } } }
+    ).toPromise()
+
+    return dispatched.find((action) => action.type === setChannelsAC([]).type)
+  }
+
+  it('keeps a server-confirmed lastMessage when its pending send response was lost', async () => {
     const currentUser = makeUser({ id: 'current-user' })
     const channelId = 'channel-race-condition'
     const pendingMsg = makePendingMessage({
@@ -1068,8 +1094,9 @@ describe('channel saga getChannels pending-message preservation', () => {
 
     const channel = makeChannel({ id: channelId, lastMessage: pendingMsg as any })
 
-    // Simulate: sendPendingMessages already confirmed the message and updated Redux
-    mockStoreState.ChannelReducer.channels = [{ ...channel, lastMessage: confirmedMsg }]
+    // The UI still has the optimistic preview, but the request reached the
+    // server and the refreshed channel has the confirmed message with its tid.
+    mockStoreState.ChannelReducer.channels = [{ ...channel, lastMessage: pendingMsg }]
 
     // channelsMap still has the pending version (as it was before confirmation)
     setChannelInMap({ ...channel, lastMessage: pendingMsg as any })
@@ -1105,11 +1132,75 @@ describe('channel saga getChannels pending-message preservation', () => {
     const channelInAction = setChannelsAction?.payload?.channels?.find((ch: any) => ch.id === channelId)
     expect(channelInAction).toBeDefined()
 
-    // The confirmed message must be preserved — must NOT revert to the pending version
+    // The confirmed server message must win — must NOT revert to the pending version.
     expect(channelInAction.lastMessage.id).toBe(confirmedMsg.id)
     expect(channelInAction.lastMessage.id).not.toBe('')
 
     // channelsMap also updated to confirmed
     expect(getChannelFromMap(channelId)?.lastMessage?.id).toBe(confirmedMsg.id)
+  })
+
+  it('keeps a newer local pending preview when the refreshed server message has another tid', async () => {
+    const channelId = 'channel-keep-newer-pending'
+    const pendingMessage = makePendingMessage({
+      channelId,
+      tid: 'new-pending-tid',
+      body: 'new local message',
+      metadata: '{}',
+      createdAt: new Date('2026-06-01T11:00:00.000Z')
+    })
+    const serverMessage = makeMessage({
+      id: '998',
+      tid: 'old-server-tid',
+      channelId,
+      body: 'older server message',
+      metadata: {} as any
+    })
+    const channel = makeChannel({ id: channelId, lastMessage: pendingMessage as any })
+
+    mockStoreState.ChannelReducer.channels = [{ ...channel, lastMessage: pendingMessage }]
+    setChannelInMap({ ...channel, lastMessage: pendingMessage as any })
+
+    const setChannelsAction = await refreshChannels(makeChannel({ id: channelId, lastMessage: serverMessage }))
+    const channelInAction = setChannelsAction?.payload?.channels?.find((ch: any) => ch.id === channelId)
+
+    expect(channelInAction.lastMessage).toEqual(expect.objectContaining({ tid: pendingMessage.tid, id: '' }))
+    expect(getChannelFromMap(channelId)?.lastMessage).toEqual(
+      expect.objectContaining({ tid: pendingMessage.tid, id: '' })
+    )
+  })
+
+  it('keeps a Redux-confirmed preview when the refresh has not caught up yet', async () => {
+    const channelId = 'channel-keep-redux-confirmed'
+    const pendingMessage = makePendingMessage({
+      channelId,
+      tid: 'pending-tid',
+      body: 'local pending message',
+      metadata: '{}'
+    })
+    const reduxConfirmedMessage = makeMessage({
+      id: '1000',
+      tid: 'confirmed-tid',
+      channelId,
+      body: 'confirmed locally',
+      metadata: {} as any
+    })
+    const staleServerMessage = makeMessage({
+      id: '999',
+      tid: 'older-server-tid',
+      channelId,
+      body: 'stale server message',
+      metadata: {} as any
+    })
+    const channel = makeChannel({ id: channelId, lastMessage: pendingMessage as any })
+
+    mockStoreState.ChannelReducer.channels = [{ ...channel, lastMessage: reduxConfirmedMessage }]
+    setChannelInMap({ ...channel, lastMessage: pendingMessage as any })
+
+    const setChannelsAction = await refreshChannels(makeChannel({ id: channelId, lastMessage: staleServerMessage }))
+    const channelInAction = setChannelsAction?.payload?.channels?.find((ch: any) => ch.id === channelId)
+
+    expect(channelInAction.lastMessage).toEqual(expect.objectContaining({ id: reduxConfirmedMessage.id }))
+    expect(getChannelFromMap(channelId)?.lastMessage).toEqual(expect.objectContaining({ id: reduxConfirmedMessage.id }))
   })
 })
