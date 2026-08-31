@@ -144,6 +144,7 @@ import RecordingAnimation from './RecordingAnimation'
 import CreatePollPopup from './Poll/CreatePollPopup'
 import { MESSAGE_TYPE } from 'types/enum'
 import { getMembersAC } from 'store/member/actions'
+import { hasSendableTextOrPoll } from './sendMessageUtils'
 
 function AutoFocusPlugin({ messageForReply }: any) {
   const [editor] = useLexicalComposerContext()
@@ -721,7 +722,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
   ) => {
     const { shiftKey, type, code } = event
     const isEnter: boolean = (code === 'Enter' || code === 'NumpadEnter') && shiftKey === false
-    const isPoll = pollDetails && pollDetails.options.length > 0 && pollDetails.name.trim()
+    const isPoll = Boolean(pollDetails && pollDetails.options.length > 0 && pollDetails.name.trim())
     const messageTextForSend = isPoll ? pollDetails?.name.trim() : messageText.trim()
     const shouldSend =
       (isEnter || type === 'click') &&
@@ -807,7 +808,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
             }
           }
         }
-        if (messageTexToSend?.trim() && !attachments.length) {
+        if (hasSendableTextOrPoll(messageTexToSend, isPoll) && !attachments.length) {
           if (linkAttachment) {
             messageToSend.attachments = [linkAttachment]
           }
