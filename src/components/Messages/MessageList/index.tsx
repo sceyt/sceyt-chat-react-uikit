@@ -68,6 +68,7 @@ import {
 } from '../../../helpers/messageListNavigator'
 import { getAudioRecordingFromMap, getMessageLocalRef } from '../../../helpers/messagesHalper'
 import { createMessageMarkerBatcher, DEFAULT_MARKER_BATCH_DEBOUNCE_MS } from '../../../helpers/messageMarkerBatcher'
+import { isDefaultSupportedMediaMimeType } from '../../SendMessageInput/sendMessageUtils'
 
 interface MessagesProps {
   fontFamily?: string
@@ -651,10 +652,7 @@ const MessageList: React.FC<MessagesProps> = ({
     } else {
       // Browser provides items (Chrome, Firefox) - detect type
       const fileList: DataTransferItem[] = Array.from(e.dataTransfer.items)
-      const hasMedia = fileList.some((item) => {
-        const fileType = item.type.split('/')[0]
-        return fileType === 'image' || fileType === 'video'
-      })
+      const hasMedia = fileList.some((item) => isDefaultSupportedMediaMimeType(item.type))
       filesType = hasMedia ? 'media' : 'file'
     }
 

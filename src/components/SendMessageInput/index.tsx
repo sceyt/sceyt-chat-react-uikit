@@ -144,7 +144,7 @@ import RecordingAnimation from './RecordingAnimation'
 import CreatePollPopup from './Poll/CreatePollPopup'
 import { MESSAGE_TYPE } from 'types/enum'
 import { getMembersAC } from 'store/member/actions'
-import { hasSendableTextOrPoll } from './sendMessageUtils'
+import { getMediaAttachmentValidationError, hasSendableTextOrPoll } from './sendMessageUtils'
 
 function AutoFocusPlugin({ messageForReply }: any) {
   const [editor] = useLexicalComposerContext()
@@ -1077,6 +1077,14 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
     }, 3000)
   }
 
+  const validateMediaAttachment = (file: File) =>
+    getMediaAttachmentValidationError(file, {
+      allowedExtensions: allowedMediaExtensions,
+      sizeLimitKb: mediaAttachmentSizeLimit,
+      invalidTypeMessage: allowedMediaExtensionsErrorMessage,
+      sizeLimitMessage: attachmentSizeLimitErrorMessage
+    })
+
   const handleFileUpload = (e: any) => {
     const isMediaAttachment = e.target.accept === mediaExtensions
     const fileList = Object.values(e.target.files)
@@ -1101,30 +1109,11 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
     }
 
     filesToProcess.forEach(async (file: any) => {
-      let allowUpload = true
-      let errorMessage = ''
-      if (isMediaAttachment) {
-        if (mediaAttachmentSizeLimit && file.size / 1024 > mediaAttachmentSizeLimit) {
-          allowUpload = false
-          errorMessage =
-            attachmentSizeLimitErrorMessage ?? `File size exceeds the limit of ${mediaAttachmentSizeLimit} KB.`
-        }
-        if (allowedMediaExtensions?.length) {
-          const fileName = file.name
-          const fileExtension = fileName.split('.').pop().toLowerCase()
-
-          if (!allowedMediaExtensions.includes(fileExtension)) {
-            allowUpload = false
-            errorMessage =
-              allowedMediaExtensionsErrorMessage ??
-              `Invalid file type. Allowed extensions are: ${allowedMediaExtensions.join(', ')}.`
-          }
-        }
-      }
-      if (allowUpload) {
+      const validationError = isMediaAttachment ? validateMediaAttachment(file) : null
+      if (!validationError) {
         await handleAddAttachmentWithViewOnceCheck(file, isMediaAttachment)
       } else {
-        showFileUploadError(errorMessage)
+        showFileUploadError(validationError)
       }
     })
 
@@ -1172,28 +1161,11 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
         }
 
         filesToProcess.forEach(async (file: any) => {
-          let allowUpload = true
-          let errorMessage = ''
-          if (mediaAttachmentSizeLimit && file.size / 1024 > mediaAttachmentSizeLimit) {
-            allowUpload = false
-            errorMessage =
-              attachmentSizeLimitErrorMessage ?? `File size exceeds the limit of ${mediaAttachmentSizeLimit} KB.`
-          }
-          if (allowedMediaExtensions?.length) {
-            const fileName = file.name
-            const fileExtension = fileName.split('.').pop().toLowerCase()
-
-            if (!allowedMediaExtensions.includes(fileExtension)) {
-              allowUpload = false
-              errorMessage =
-                allowedMediaExtensionsErrorMessage ??
-                `Invalid file type. Allowed extensions are: ${allowedMediaExtensions.join(', ')}.`
-            }
-          }
-          if (allowUpload) {
+          const validationError = validateMediaAttachment(file)
+          if (!validationError) {
             await handleAddAttachmentWithViewOnceCheck(file, true)
           } else {
-            showFileUploadError(errorMessage)
+            showFileUploadError(validationError)
           }
         })
       } else {
@@ -1494,32 +1466,11 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
 
       const isMediaAttachment = draggedAttachments[0].attachmentType === 'media'
       filesToProcess.forEach(async (file: any) => {
-        let allowUpload = true
-        let errorMessage = ''
-
-        if (isMediaAttachment) {
-          if (mediaAttachmentSizeLimit && file.size / 1024 > mediaAttachmentSizeLimit) {
-            allowUpload = false
-            errorMessage =
-              attachmentSizeLimitErrorMessage ?? `File size exceeds the limit of ${mediaAttachmentSizeLimit} KB.`
-          }
-          if (allowedMediaExtensions?.length) {
-            const fileName = file.name
-            const fileExtension = fileName.split('.').pop().toLowerCase()
-
-            if (!allowedMediaExtensions.includes(fileExtension)) {
-              allowUpload = false
-              errorMessage =
-                allowedMediaExtensionsErrorMessage ??
-                `Invalid file type. Allowed extensions are: ${allowedMediaExtensions.join(', ')}.`
-            }
-          }
-        }
-
-        if (allowUpload) {
+        const validationError = isMediaAttachment ? validateMediaAttachment(file) : null
+        if (!validationError) {
           await handleAddAttachmentWithViewOnceCheck(file, isMediaAttachment)
         } else {
-          showFileUploadError(errorMessage)
+          showFileUploadError(validationError)
         }
       })
       dispatch(setDraggedAttachmentsAC([], ''))
