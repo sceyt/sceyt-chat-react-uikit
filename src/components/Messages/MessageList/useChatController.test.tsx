@@ -1558,6 +1558,66 @@ describe('useChatController', () => {
     expect(dispatch).toHaveBeenCalledWith(markMessagesAsReadAC(channel.id, ['2102']))
   })
 
+  it('defers a scheduled unread read until the tab becomes active again', async () => {
+    const channelId = 'channel-unread-tab-focus-retry'
+    const unreadMessage = makeMessage({
+      id: '2202',
+      channelId,
+      body: 'unread-after-focus',
+      incoming: true
+    })
+    const channel = makeChannel({
+      id: channelId,
+      newMessageCount: 1,
+      lastDisplayedMessageId: '2200',
+      lastMessage: unreadMessage
+    })
+    const dispatch = jest.fn()
+    const rendered = renderController({
+      channel,
+      messages: [makeMessage({ id: '2201', channelId, incoming: false }), unreadMessage],
+      hasNextMessages: false,
+      connectionStatus: CONNECTION_STATUS.CONNECTED,
+      tabIsActive: true,
+      dispatch
+    })
+
+    dispatch.mockClear()
+    rendered.rerender(
+      <ControllerHarness
+        channel={channel}
+        messages={[makeMessage({ id: '2201', channelId, incoming: false }), unreadMessage]}
+        hasNextMessages={false}
+        connectionStatus={CONNECTION_STATUS.CONNECTED}
+        tabIsActive={false}
+        dispatch={dispatch}
+      />
+    )
+
+    act(() => {
+      flushAnimationFrames()
+    })
+    expect(dispatch).not.toHaveBeenCalledWith(markMessagesAsReadAC(channel.id, [unreadMessage.id]))
+
+    rendered.rerender(
+      <ControllerHarness
+        channel={channel}
+        messages={[makeMessage({ id: '2201', channelId, incoming: false }), unreadMessage]}
+        hasNextMessages={false}
+        connectionStatus={CONNECTION_STATUS.CONNECTED}
+        tabIsActive={true}
+        dispatch={dispatch}
+      />
+    )
+
+    await act(async () => {
+      flushAnimationFrames()
+      await Promise.resolve()
+    })
+
+    expect(dispatch).toHaveBeenCalledWith(markMessagesAsReadAC(channel.id, [unreadMessage.id]))
+  })
+
   it('dispatches loadLatestMessages when jumpToLatest is used while connected and latest is outside the window', () => {
     const channel = makeChannel({
       id: 'channel-connected',
