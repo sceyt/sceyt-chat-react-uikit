@@ -257,6 +257,15 @@ const Details = ({
     if (detailsContainer) {
       setChannelDetailsHeight(detailsContainer.offsetHeight)
     }
+
+    const handleResize = () => {
+      const container = document.getElementById('channel_details_wrapper')
+      if (container) {
+        setChannelDetailsHeight(container.offsetHeight)
+      }
+    }
+    window.addEventListener('resize', handleResize)
+    return () => window.removeEventListener('resize', handleResize)
   }, [])
 
   useEffect(() => {
@@ -592,7 +601,7 @@ const ChatDetails = styled.div<{
   //height: ${(props) => (props.height ? `calc(100vh - ${props.heightOffset}px)` : '100vh')};
   height: ${(props) => props.height && `${props.height - (props.heightOffset ? props.heightOffset + 2 : 0)}px`};
   overflow-y: auto;
-  scrollbar-width: none;
+  scrollbar-width: thin;
   scrollbar-color: transparent transparent;
   overscroll-behavior: none;
 
@@ -617,7 +626,6 @@ const ChatDetails = styled.div<{
   }
 
   &.show-scrollbar {
-    scrollbar-width: thin;
     scrollbar-color: ${(props) => props.thumbColor} transparent;
   }
 `

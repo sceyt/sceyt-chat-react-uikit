@@ -1366,7 +1366,7 @@ const AttachmentImgCont = styled.div<{
     props.backgroundColor &&
     `
     background-color: ${props.backgroundColor};
-    border-radius: 8px;
+    border-radius: ${props.borderRadius || '8px'};
     justify-content: center;
     align-items: center;
      & > svg:first-child {

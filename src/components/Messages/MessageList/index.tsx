@@ -461,6 +461,7 @@ const MessageList: React.FC<MessagesProps> = ({
   const [isDragging, setIsDragging] = useState<any>(null)
   const [stopScrolling, setStopScrolling] = useState<any>(false)
   const [stickyDate, setStickyDate] = useState<string>('')
+  const [isScrolling, setIsScrolling] = useState(false)
   const markerBatcherRef = React.useRef<ReturnType<typeof createMessageMarkerBatcher> | null>(null)
   if (!markerBatcherRef.current) {
     markerBatcherRef.current = createMessageMarkerBatcher({
@@ -1013,10 +1014,12 @@ const MessageList: React.FC<MessagesProps> = ({
           )}
           <Container
             id='scrollableDiv'
-            className={'show-scrollbar'}
+            className={isScrolling ? 'show-scrollbar' : ''}
             ref={scrollRef}
             stopScrolling={stopScrolling}
             onDragEnter={handleDragIn}
+            onMouseEnter={() => setIsScrolling(true)}
+            onMouseLeave={() => setIsScrolling(false)}
             backgroundColor={backgroundColor || themeBackgroundColor}
             thumbColor={surface2}
           >
@@ -1116,7 +1119,7 @@ const MessageList: React.FC<MessagesProps> = ({
           )}
         </ScrollViewport>
         <ScrollToBottomButton
-          show={!!showScrollToNewMessageButton && messages?.length}
+          show={!!showScrollToNewMessageButton && !!messages?.length}
           bottomOffset={sendMessageInputHeight}
           backgroundColor={surface1}
           badgeBackgroundColor={accentColor}
@@ -1124,7 +1127,7 @@ const MessageList: React.FC<MessagesProps> = ({
           onClick={handleScrollToBottom}
         />
         <ScrollToUnreadMentionsButton
-          show={!!channel.newMentionCount && messages?.length}
+          show={!!channel.newMentionCount && !!messages?.length}
           bottomOffset={sendMessageInputHeight}
           backgroundColor={surface1}
           badgeBackgroundColor={accentColor}
@@ -1150,7 +1153,7 @@ export const Container = styled.div<{ stopScrolling?: boolean; backgroundColor?:
   background-color: ${(props) => props.backgroundColor};
   overflow-y: auto;
   overflow-x: hidden;
-  scrollbar-width: none;
+  scrollbar-width: thin;
   scrollbar-color: transparent transparent;
   overscroll-behavior: none;
 
@@ -1171,7 +1174,6 @@ export const Container = styled.div<{ stopScrolling?: boolean; backgroundColor?:
   }
 
   &.show-scrollbar {
-    scrollbar-width: thin;
     scrollbar-color: ${(props) => props.thumbColor} transparent;
   }
 `
