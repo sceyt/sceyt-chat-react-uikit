@@ -250,9 +250,11 @@ const deriveChannelReadProgressUpdate = ({
   }
 }
 
-function* applyChannelReadProgress(channelId: string, updateData: ChannelReadProgressUpdate) {
+function* applyChannelReadProgress(channel: IChannel, updateData: ChannelReadProgressUpdate) {
+  const { id: channelId } = channel
   updateChannelOnAllChannels(channelId, updateData)
   yield put(updateChannelDataAC(channelId, updateData))
+  yield put(updateSearchedChannelDataAC(channelId, updateData, getChannelGroupName(channel)))
 }
 
 const shouldKeepQueuedPendingRead = (error: any) => isResendableError(error?.type)
@@ -1222,7 +1224,7 @@ function* markMessagesRead(action: IAction): any {
       channel,
       messageIds: requestedMessageIds
     })
-    yield call(applyChannelReadProgress, channel.id, optimisticUpdate)
+    yield call(applyChannelReadProgress, channel, optimisticUpdate)
 
     const pendingRead = setPendingChannelRead({ channelId: channel.id, messageIds: requestedMessageIds })
     const confirmation = yield call(confirmDisplayedRead, channel, pendingRead!)
@@ -1513,7 +1515,7 @@ function* markChannelAsRead(action: IAction): any {
       channel,
       readAll: true
     })
-    yield call(applyChannelReadProgress, channel.id, optimisticUpdate)
+    yield call(applyChannelReadProgress, channel, optimisticUpdate)
 
     const pendingRead = setPendingChannelRead({ channelId: channel.id, readAll: true })
     const confirmation = yield call(confirmDisplayedRead, channel, pendingRead!)

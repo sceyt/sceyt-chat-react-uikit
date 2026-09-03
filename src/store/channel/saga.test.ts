@@ -19,7 +19,8 @@ import {
   leaveChannelAC,
   resendPendingChannelReadsAC,
   setChannelsAC,
-  updateChannelDataAC
+  updateChannelDataAC,
+  updateSearchedChannelDataAC
 } from './actions'
 import { __channelSagaTestables } from './saga'
 import { setClient } from '../../common/client'
@@ -291,6 +292,18 @@ describe('channel saga read markers', () => {
         newMentionCount: 0,
         lastDisplayedMessageId: '205'
       })
+    )
+    expect(dispatched).toContainEqual(
+      updateSearchedChannelDataAC(
+        channel.id,
+        {
+          unread: false,
+          newMessageCount: 0,
+          newMentionCount: 0,
+          lastDisplayedMessageId: '205'
+        },
+        'chats_groups'
+      )
     )
     expect(getChannelFromMap(channel.id).lastDisplayedMessageId).toBe('205')
   })
