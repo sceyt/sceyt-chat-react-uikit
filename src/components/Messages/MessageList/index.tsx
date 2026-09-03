@@ -1141,7 +1141,6 @@ const MessageList: React.FC<MessagesProps> = ({
     </React.Fragment>
   )
 }
-// const MemoizedMessageList =
 
 export default MessageList
 
