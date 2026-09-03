@@ -1119,7 +1119,7 @@ const MessageList: React.FC<MessagesProps> = ({
           )}
         </ScrollViewport>
         <ScrollToBottomButton
-          show={!!showScrollToNewMessageButton && !!messages?.length}
+          show={!!showScrollToNewMessageButton && messages?.length}
           bottomOffset={sendMessageInputHeight}
           backgroundColor={surface1}
           badgeBackgroundColor={accentColor}
@@ -1127,7 +1127,7 @@ const MessageList: React.FC<MessagesProps> = ({
           onClick={handleScrollToBottom}
         />
         <ScrollToUnreadMentionsButton
-          show={!!channel.newMentionCount && !!messages?.length}
+          show={!!channel.newMentionCount && messages?.length}
           bottomOffset={sendMessageInputHeight}
           backgroundColor={surface1}
           badgeBackgroundColor={accentColor}
