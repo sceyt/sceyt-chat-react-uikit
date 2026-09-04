@@ -1637,7 +1637,7 @@ function* sendTextMessage(action: IAction): any {
 
 function* forwardMessage(action: IAction): any {
   const { payload } = action
-  const { message, channelId, connectionState, isForward } = payload
+  const { message, channelId, connectionState, isForward, accompanyingMessage } = payload
   const showOwnMessageForward = getShowOwnMessageForward()
   const SceytChatClient = getClient()
   const isNotShowOwnMessageForward = message?.user?.id === SceytChatClient.user.id && !showOwnMessageForward
@@ -1646,6 +1646,15 @@ function* forwardMessage(action: IAction): any {
   const activeChannelId = getActiveChannelId()
   let messageTid: string | null = null
   try {
+    // Send the optional note through the ordinary text-message path before the
+    // forwarded item. This preserves body attributes and mention notification
+    // handling, and guarantees both messages retain their expected order.
+    if (accompanyingMessage?.body) {
+      yield call(sendTextMessage, {
+        type: SEND_TEXT_MESSAGE,
+        payload: { message: accompanyingMessage, channelId, connectionState }
+      })
+    }
     channel = yield call(getChannelFromMap, channelId)
     if (!channel) {
       channel = getChannelFromAllChannels(channelId) || null

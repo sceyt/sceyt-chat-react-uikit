@@ -134,7 +134,7 @@ import { ReactComponent as LinkIcon } from '../../assets/svg/linkIcon.svg'
 import Attachment, { AttachmentFile, AttachmentImg } from '../Attachment'
 import DropDown from '../../common/dropdown'
 import ConfirmPopup from '../../common/popups/delete'
-import ForwardMessagePopup from '../../common/popups/forwardMessage'
+import ForwardMessagePopup, { IForwardMessageNote } from '../../common/popups/forwardMessage'
 import AudioRecord from '../AudioRecord'
 
 import { getClient } from '../../common/client'
@@ -1202,14 +1202,18 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
     setForwardPopupOpen(!forwardPopupOpen)
   }
 
-  const handleForwardMessage = (channelIds: string[]) => {
+  const handleForwardMessage = (channelIds: string[], accompanyingMessage?: IForwardMessageNote) => {
     const messagesArray = Array.from(selectedMessagesMap.values())
     // @ts-ignore
     messagesArray.sort((a: any, b: any) => new Date(a.createdAt) - new Date(b.createdAt))
     if (channelIds && channelIds.length) {
       channelIds.forEach((channelId) => {
-        messagesArray.forEach((message) => {
-          dispatch(forwardMessageAC(message, channelId, connectionStatus))
+        messagesArray.forEach((message, index) => {
+          // A bulk forward still has one accompanying note per destination,
+          // rather than duplicating it for every selected source message.
+          dispatch(
+            forwardMessageAC(message, channelId, connectionStatus, true, index === 0 ? accompanyingMessage : undefined)
+          )
         })
       })
     }
@@ -1917,8 +1921,10 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
     }
   }
 
-  const isPollMessageSelected = useMemo(() => {
-    return selectedMessagesMap?.values()?.some((message: IMessage) => message.type === MESSAGE_TYPE.POLL)
+  const canForwardMessage = useMemo(() => {
+    return selectedMessagesMap
+      ?.values()
+      ?.some((message: IMessage) => message.type === MESSAGE_TYPE.POLL || message.type === 'call')
   }, [selectedMessagesMap])
 
   const showLinkPreview = useMemo(
@@ -1958,7 +1964,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
             <MessageCountWrapper color={textPrimary}>
               {selectedMessagesMap.size} {selectedMessagesMap.size > 1 ? ' messages selected' : ' message selected'}
             </MessageCountWrapper>
-            {!isPollMessageSelected && (
+            {!canForwardMessage && (
               <CustomButton
                 onClick={handleToggleForwardMessagePopup}
                 backgroundColor={backgroundHovered}
@@ -1985,8 +1991,8 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
               <ForwardMessagePopup
                 handleForward={handleForwardMessage}
                 togglePopup={handleToggleForwardMessagePopup}
-                buttonText='Forward'
                 title='Forward message'
+                forwardMessages={Array.from(selectedMessagesMap.values())}
               />
             )}
             {deletePopupOpen && (

@@ -18,7 +18,7 @@ import {
   InviteKey,
   InviteLinkModalOptions
 } from 'helpers/channelHalper'
-import ForwardMessagePopup from '../forwardMessage'
+import ForwardMessagePopup, { IForwardMessageNote } from '../forwardMessage'
 import { forwardMessageAC } from 'store/message/actions'
 import { connectionStatusSelector } from 'store/user/selector'
 import { handleUploadAttachments } from 'store/message/saga'
@@ -178,7 +178,7 @@ export default function InviteLinkModal({ onClose, SVGOrPNGLogoIcon, channelId }
     }
   }
 
-  const handleForwardChannels = async (channelIds: string[]) => {
+  const handleForwardChannels = async (channelIds: string[], accompanyingMessage?: IForwardMessageNote) => {
     if (!channelIds?.length) {
       setOpenForwardPopup(false)
       return
@@ -301,7 +301,7 @@ export default function InviteLinkModal({ onClose, SVGOrPNGLogoIcon, channelId }
           type: 'text',
           attachments: [linkAttachment]
         }
-        dispatch(forwardMessageAC(message as any, channelId, connectionStatus, false))
+        dispatch(forwardMessageAC(message as any, channelId, connectionStatus, false, accompanyingMessage))
       } else {
         try {
           const message = {
@@ -348,7 +348,15 @@ export default function InviteLinkModal({ onClose, SVGOrPNGLogoIcon, channelId }
             message as any,
             channel
           )
-          dispatch(forwardMessageAC({ ...message, attachments: attachmentsToSend }, channelId, connectionStatus, false))
+          dispatch(
+            forwardMessageAC(
+              { ...message, attachments: attachmentsToSend },
+              channelId,
+              connectionStatus,
+              false,
+              accompanyingMessage
+            )
+          )
         } catch (e) {
           console.log('error', e)
           const linkAttachmentBuilder = channel.createAttachmentBuilder(inviteUrl, attachmentTypes.link)
@@ -360,7 +368,7 @@ export default function InviteLinkModal({ onClose, SVGOrPNGLogoIcon, channelId }
             type: 'text',
             attachments: [linkAttachmentToSend]
           }
-          dispatch(forwardMessageAC(message as any, channelId, connectionStatus, false))
+          dispatch(forwardMessageAC(message as any, channelId, connectionStatus, false, accompanyingMessage))
         }
       }
     }
@@ -552,9 +560,9 @@ export default function InviteLinkModal({ onClose, SVGOrPNGLogoIcon, channelId }
       {openForwardPopup && (
         <ForwardMessagePopup
           title={'Share invite'}
-          buttonText={'Share'}
           togglePopup={() => setOpenForwardPopup(false)}
           handleForward={handleForwardChannels}
+          forwardMessages={[{ body: 'Invite link' }]}
         />
       )}
     </PopupContainer>

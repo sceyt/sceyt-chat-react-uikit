@@ -56,6 +56,7 @@ import { copyRichTextToClipboard } from 'helpers/clipboard'
 import { MessageTextFormat } from 'messageUtils'
 import { getShowOnlyContactUsers } from 'helpers/contacts'
 import { useMessageState } from './hooks/useMessageState'
+import { IForwardMessageNote } from 'common/popups/forwardMessage'
 
 // Constants
 const MESSAGE_ACTIONS_HOVER_DELAY = 450
@@ -583,10 +584,10 @@ const Message = ({
   ])
 
   const handleForwardMessage = useCallback(
-    (channelIds: string[]) => {
+    (channelIds: string[], accompanyingMessage?: IForwardMessageNote) => {
       if (channelIds && channelIds.length) {
         channelIds.forEach((channelId) => {
-          dispatch(forwardMessageAC(message, channelId, connectionStatus))
+          dispatch(forwardMessageAC(message, channelId, connectionStatus, true, accompanyingMessage))
         })
       }
     },

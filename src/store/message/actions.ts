@@ -149,10 +149,16 @@ export function resendMessageAC(message: any, channelId: string, connectionState
   }
 }
 
-export function forwardMessageAC(message: any, channelId: string, connectionState: string, isForward: boolean = true) {
+export function forwardMessageAC(
+  message: any,
+  channelId: string,
+  connectionState: string,
+  isForward: boolean = true,
+  accompanyingMessage?: any
+) {
   return {
     type: FORWARD_MESSAGE,
-    payload: { message, channelId, connectionState, isForward }
+    payload: { message, channelId, connectionState, isForward, accompanyingMessage }
   }
 }
 

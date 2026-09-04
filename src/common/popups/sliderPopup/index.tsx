@@ -53,7 +53,7 @@ import {
 import { releaseAllOriginalBlobUrls } from '../../../helpers/attachmentBlobUrls'
 import VideoPlayer from '../../../components/VideoPlayer'
 import { CircularProgressbar } from 'react-circular-progressbar'
-import ForwardMessagePopup from '../forwardMessage'
+import ForwardMessagePopup, { IForwardMessageNote } from '../forwardMessage'
 import { getMessagesFromMap } from '../../../helpers/messagesHalper'
 import { getChannelFromMap } from '../../../helpers/channelHalper'
 import ConfirmPopup from '../delete'
@@ -185,7 +185,7 @@ const SliderPopup: React.FC<IProps> = ({
   }, [])
 
   const handleForwardMessage = useCallback(
-    async (channelIds: string[]) => {
+    async (channelIds: string[], accompanyingMessage?: IForwardMessageNote) => {
       try {
         let message = Object.values(getMessagesFromMap(channel.id) || {}).find(
           (message) => message.id === currentFile.messageId
@@ -204,7 +204,7 @@ const SliderPopup: React.FC<IProps> = ({
         }
         if (channelIds && channelIds.length && message) {
           channelIds.forEach((channelId) => {
-            dispatch(forwardMessageAC(message, channelId, connectionStatus))
+            dispatch(forwardMessageAC(message, channelId, connectionStatus, true, accompanyingMessage))
           })
         }
         setIsSliderOpen(false)
@@ -218,6 +218,10 @@ const SliderPopup: React.FC<IProps> = ({
   const handleToggleForwardMessagePopup = () => {
     setForwardPopupOpen(!forwardPopupOpen)
   }
+
+  const forwardPreviewMessage = currentFile
+    ? Object.values(getMessagesFromMap(channel.id) || {}).find((message) => message.id === currentFile.messageId)
+    : undefined
 
   const handleToggleDeleteMessagePopup = useCallback(async () => {
     if (!messageToDelete) {
@@ -732,8 +736,8 @@ const SliderPopup: React.FC<IProps> = ({
         <ForwardMessagePopup
           handleForward={handleForwardMessage}
           togglePopup={handleToggleForwardMessagePopup}
-          buttonText='Forward'
           title='Forward message'
+          forwardMessages={forwardPreviewMessage ? [forwardPreviewMessage] : []}
         />
       )}
       {messageToDelete && (

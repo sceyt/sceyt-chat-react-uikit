@@ -14,21 +14,23 @@ const loadFromMetadata = (firstAttachment: IAttachment | undefined) => {
   if (!firstAttachment) {
     return null
   }
-  if (firstAttachment?.metadata && isJSON(firstAttachment.metadata)) {
-    const compactMeta = JSON.parse(firstAttachment.metadata)
+  if (firstAttachment?.metadata) {
+    const compactMeta = isJSON(firstAttachment.metadata)
+      ? JSON.parse(firstAttachment.metadata)
+      : firstAttachment.metadata
     // Convert compact format to full OG format
     if (compactMeta?.hld) {
       return false
     }
     const fullMetadata: any = {
       og: {
-        title: compactMeta.ttl || firstAttachment?.name,
-        description: compactMeta.dsc,
-        image: compactMeta.iur ? [{ url: compactMeta.iur }] : undefined,
-        favicon: compactMeta.tur ? { url: compactMeta.tur } : undefined
+        title: compactMeta?.ttl || firstAttachment?.name,
+        description: compactMeta?.dsc,
+        image: compactMeta?.iur ? [{ url: compactMeta?.iur }] : undefined,
+        favicon: compactMeta?.tur ? { url: compactMeta?.tur } : undefined
       },
-      imageWidth: compactMeta.szw,
-      imageHeight: compactMeta.szh
+      imageWidth: compactMeta?.szw,
+      imageHeight: compactMeta?.szh
     }
     return fullMetadata
   }

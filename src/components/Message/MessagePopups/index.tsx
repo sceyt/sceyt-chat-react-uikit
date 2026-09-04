@@ -1,6 +1,6 @@
 import React from 'react'
 import ConfirmPopup from 'common/popups/delete'
-import ForwardMessagePopup from 'common/popups/forwardMessage'
+import ForwardMessagePopup, { IForwardMessageNote } from 'common/popups/forwardMessage'
 import MessageInfo from 'common/popups/messageInfo'
 import ConfirmEndPollPopup from 'common/popups/pollMessage/ConfirmEndPollPopup'
 import { IChannel, IMessage } from 'types'
@@ -19,7 +19,7 @@ interface MessagePopupsProps {
   anchorRef: React.RefObject<HTMLElement>
   onDeleteMessage: (deleteOption: 'forMe' | 'forEveryone') => void
   onToggleDeletePopup: () => void
-  onForwardMessage: (channelIds: string[]) => void
+  onForwardMessage: (channelIds: string[], accompanyingMessage?: IForwardMessageNote) => void
   onToggleForwardPopup: () => void
   onToggleInfoPopup: () => void
   onEndVote: () => void
@@ -67,8 +67,8 @@ const MessagePopups: React.FC<MessagePopupsProps> = ({
         <ForwardMessagePopup
           handleForward={onForwardMessage}
           togglePopup={onToggleForwardPopup}
-          buttonText='Forward'
           title='Forward message'
+          forwardMessages={[message]}
         />
       )}
       {infoPopupOpen && (
