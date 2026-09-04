@@ -204,6 +204,12 @@ const AudioRecord: React.FC<AudioPlayerProps> = ({
       if (recording) {
         stopRecording(true, id, false, recorder)
       } else if (currentRecordedFile) {
+        // A 0-duration recording (e.g. an accidental tap) isn't a meaningful voice
+        // message — discard it instead of sending.
+        if (!currentRecordedFile.dur) {
+          cancelRecording()
+          return
+        }
         removeAudioRecordingFromMap(id)
         setRecordedFile(null)
         setPlayAudio(false)
@@ -235,7 +241,11 @@ const AudioRecord: React.FC<AudioPlayerProps> = ({
             const init = () => {
               obj.canvas = document.getElementById(`waveform-${id}`)
               obj.ctx = obj.canvas.getContext('2d')
-              obj.width = 360
+              // Match the canvas's own rendered (CSS-clipped) width so new bars spawn where they're
+              // actually visible. The previous hardcoded 360 spawned bars ~86px past AudioWrapper's
+              // clipped edge, so nothing appeared to draw for the first ~1.4s of any recording.
+              const renderedWidth = Math.round(obj.canvas.getBoundingClientRect().width)
+              obj.width = renderedWidth > 0 ? renderedWidth : 300
               obj.height = 28
               obj.canvas.width = obj.width
               obj.canvas.height = obj.height
@@ -312,8 +322,12 @@ const AudioRecord: React.FC<AudioPlayerProps> = ({
               streamSource.connect(obj.analyser)
               obj.analyser.fftSize = 512
               obj.frequencyArray = new Float32Array(obj.analyser.fftSize)
-              init()
-              loop()
+              // Defer until the "recording" layout (AudioWrapper/Canvas widths) has painted,
+              // so init() measures the canvas's real rendered width, not its pre-expansion size.
+              requestAnimationFrame(() => {
+                init()
+                loop()
+              })
             }
 
             soundAllowed(stream)
@@ -408,6 +422,17 @@ const AudioRecord: React.FC<AudioPlayerProps> = ({
                 const objectUrl = URL.createObjectURL(blob)
                 const durationInt = Math.round(audioBuffer.duration)
                 if (send) {
+                  // A 0-duration recording (e.g. an accidental tap) isn't a meaningful voice
+                  // message — discard it instead of sending.
+                  if (!durationInt) {
+                    if (objectUrl.startsWith('blob:')) {
+                      URL.revokeObjectURL(objectUrl)
+                    }
+                    setShowRecording(false)
+                    removeAudioRecordingFromMap(id)
+                    dispatch(setChannelDraftMessageIsRemovedAC(id))
+                    return
+                  }
                   sendRecordedFile({ file, objectUrl, thumb: waveform, dur: durationInt }, id)
                   setShowRecording(false)
                   removeAudioRecordingFromMap(id)
@@ -585,8 +610,11 @@ const AudioRecord: React.FC<AudioPlayerProps> = ({
       setCurrentTime(0)
       setCurrentTimeSeconds(0)
     }
+    // Note: this cleanup used to also call handleStopRecording(), but a cleanup runs on
+    // EVERY change of showRecording — including the false→true transition that starts a
+    // recording — which killed shouldDraw (and the live waveform loop) within one frame of
+    // it being set to true. Actual unmount-time stopping is handled by the effect below.
     return () => {
-      handleStopRecording()
       setCurrentTime(0)
       setCurrentTimeSeconds(0)
     }
