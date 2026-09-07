@@ -69,6 +69,7 @@ import {
   updateMessageAC
 } from './actions'
 import { updateChannelDataAC, updateChannelLastMessageAC } from '../channel/actions'
+import { setWaitToSendPendingMessagesAC } from '../user/actions'
 import { __messageSagaTestables, __resetMessageSagaTestState } from './saga'
 import { navigateToLatest } from '../../helpers/messageListNavigator'
 import { IMessage } from '../../types'
@@ -3708,6 +3709,60 @@ describe('message saga message-list flows', () => {
     expect(getMessageFromMap(channel.id, 'resend-attachment-tid')).toEqual(
       expect.objectContaining({ tid: 'resend-attachment-tid', state: MESSAGE_STATUS.FAILED })
     )
+  })
+
+  it('resends queued messages immediately on reconnect while a deep-history window remains visible', async () => {
+    const channelId = 'channel-reconnect-resend-from-history'
+    const pendingMessage = makePendingMessage({
+      channelId,
+      tid: 'pending-from-history',
+      body: 'queued while offline',
+      metadata: '{}'
+    })
+    const confirmedMessage = makeMessage({
+      id: '900',
+      tid: pendingMessage.tid,
+      channelId,
+      body: pendingMessage.body,
+      metadata: {} as any
+    })
+    const channel = makeChannel({ id: channelId, lastMessage: pendingMessage })
+    const builder = {
+      setBody: jest.fn().mockReturnThis(),
+      setBodyAttributes: jest.fn().mockReturnThis(),
+      setAttachments: jest.fn().mockReturnThis(),
+      setMentionUserIds: jest.fn().mockReturnThis(),
+      setType: jest.fn().mockReturnThis(),
+      setDisplayCount: jest.fn().mockReturnThis(),
+      setSilent: jest.fn().mockReturnThis(),
+      setMetadata: jest.fn().mockReturnThis(),
+      setPollDetails: jest.fn().mockReturnThis(),
+      setDisableMentionsCount: jest.fn().mockReturnThis(),
+      create: jest.fn()
+    }
+    channel.createMessageBuilder = jest.fn(() => builder as any)
+    channel.sendMessage = jest.fn(() => Promise.resolve(confirmedMessage))
+
+    // The pending tail is outside the visible deep-history page. Reconnect
+    // must still drain it without relying on a latest-window reload.
+    mockStoreState.UserReducer = {
+      connectionStatus: CONNECTION_STATUS.CONNECTED,
+      waitToSendPendingMessages: true
+    }
+    mockStoreState.MessageReducer.activeChannelMessages = [
+      makeMessage({ id: '800', channelId, body: 'history-800' }),
+      makeMessage({ id: '801', channelId, body: 'history-801' })
+    ]
+    setActiveChannelId(channelId)
+    setChannelInMap(channel)
+    addMessageToMap(channelId, pendingMessage)
+
+    const dispatched = await runMessageSaga(__messageSagaTestables.resumePendingMessagesAfterReconnect, {
+      payload: { status: CONNECTION_STATUS.CONNECTED }
+    })
+
+    expect(dispatched).toContainEqual(setWaitToSendPendingMessagesAC(false))
+    expect(channel.sendMessage).toHaveBeenCalledWith(expect.objectContaining({ tid: pendingMessage.tid }))
   })
 
   it('keeps channel last message on confirmed server truth while reconnect resend confirms older pending messages', async () => {

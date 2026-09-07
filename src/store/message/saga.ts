@@ -188,6 +188,7 @@ import log from 'loglevel'
 import { getVideoFirstFrame, getVideoPreviewFrame } from 'helpers/getVideoFrame'
 import { MESSAGE_TYPE } from 'types/enum'
 import { setWaitToSendPendingMessagesAC } from 'store/user/actions'
+import { setConnectionStatus } from 'store/user/reducers'
 import { createAttachmentUnavailableError, isResendableError } from 'helpers/error'
 import { calculateRenderedImageWidth } from 'helpers'
 import { PendingMessageMutation } from './reducers'
@@ -2028,6 +2029,22 @@ const sendPendingMessages = function* (connectionState: string) {
   if (pendingPollActionsMap && Object.keys(pendingPollActionsMap).length > 0) {
     yield put(resendPendingPollActionsAC(connectionState))
   }
+}
+
+// Reconnect must resume the pending queue regardless of which message window
+// is currently visible. Previously this was only consumed by latest/unread
+// load workers, leaving queued messages unsent while the user viewed history.
+function* resumePendingMessagesAfterReconnect(action: IAction): any {
+  if (action.payload?.status !== CONNECTION_STATUS.CONNECTED) {
+    return
+  }
+
+  if (!store.getState().UserReducer.waitToSendPendingMessages) {
+    return
+  }
+
+  yield put(setWaitToSendPendingMessagesAC(false))
+  yield call(sendPendingMessages, CONNECTION_STATUS.CONNECTED)
 }
 
 const shouldAppendPendingMessages = (
@@ -4433,6 +4450,7 @@ export const __messageSagaTestables = {
   deleteMessage,
   resendPendingMessageMutations,
   sendPendingMessages,
+  resumePendingMessagesAfterReconnect,
   reloadActiveChannelAfterReconnect,
   loadNearUnread,
   loadDefaultMessages,
@@ -4547,6 +4565,7 @@ function* refreshCacheAroundMessage(action: IAction): any {
 }
 
 export default function* MessageSaga() {
+  yield takeEvery(setConnectionStatus.type, resumePendingMessagesAfterReconnect)
   yield takeEvery(SEND_MESSAGE, sendMessage)
   yield takeEvery(SEND_TEXT_MESSAGE, sendTextMessage)
   yield takeEvery(FORWARD_MESSAGE, forwardMessage)
