@@ -4,10 +4,11 @@ import ForwardMessagePopup, { IForwardPreviewMessage } from './index'
 import {
   createMessageListStore,
   makeChannel,
+  makeUser,
   renderWithSceytProvider,
   resetMessageListFixtureIds
 } from '../../../testUtils/messageListHarness'
-import { attachmentTypes, LOADING_STATE } from '../../../helpers/constants'
+import { attachmentTypes, DEFAULT_CHANNEL_TYPE, LOADING_STATE } from '../../../helpers/constants'
 import { IAttachment, IChannel } from '../../../types'
 
 // Attachment is a large, heavy component with its own extensive test surface —
@@ -76,6 +77,12 @@ const selectChannel = (subject: string) => fireEvent.click(screen.getByText(subj
 
 const setScrollHeight = (element: HTMLElement, value: number) =>
   Object.defineProperty(element, 'scrollHeight', { configurable: true, value })
+
+const makeMentionMembers = () => [
+  { ...makeUser({ id: 'current-user' }), role: 'owner' },
+  { ...makeUser({ id: 'alice', firstName: 'Alice', lastName: 'Anderson' }), role: 'member' },
+  { ...makeUser({ id: 'bob', firstName: 'Bob', lastName: 'Baker' }), role: 'member' }
+]
 
 describe('ForwardMessagePopup', () => {
   beforeEach(() => {
@@ -309,5 +316,99 @@ describe('ForwardMessagePopup', () => {
     setScrollHeight(textarea, 20)
     fireEvent.change(textarea, { target: { value: '' } })
     expect(textarea.style.height).toBe(NOTE_INPUT_MIN_HEIGHT_PX)
+  })
+
+  it('opens the mention dropdown and inserts a mention when exactly one channel is selected', () => {
+    const channels = [
+      makeChannel({
+        id: 'chan-1',
+        subject: 'Design Team',
+        type: DEFAULT_CHANNEL_TYPE.GROUP,
+        members: makeMentionMembers()
+      })
+    ]
+    renderPopup({ channels })
+
+    selectChannel('Design Team')
+    const textarea = screen.getByPlaceholderText('Write a message') as HTMLTextAreaElement
+
+    fireEvent.change(textarea, { target: { value: '@ali', selectionStart: 4 } })
+
+    expect(screen.getByText('Alice Anderson')).toBeInTheDocument()
+    expect(screen.queryByText('Bob Baker')).not.toBeInTheDocument()
+
+    fireEvent.click(screen.getByText('Alice Anderson'))
+
+    expect(textarea).toHaveValue('@Alice Anderson')
+    expect(screen.queryByText('Alice Anderson')).not.toBeInTheDocument()
+
+    // The inserted mention is rendered as a highlighted span in the overlay behind the textarea
+    // (its wrapper matches the same text since the mention is the note's only content, hence AllBy).
+    const mentionSpan = screen.getAllByText('@Alice Anderson').find((element) => element.tagName === 'SPAN')
+    expect(mentionSpan).toBeInTheDocument()
+  })
+
+  it('does not open the mention dropdown when more than one channel is selected', () => {
+    const channels = [
+      makeChannel({
+        id: 'chan-1',
+        subject: 'Design Team',
+        type: DEFAULT_CHANNEL_TYPE.GROUP,
+        members: makeMentionMembers()
+      }),
+      makeChannel({ id: 'chan-2', subject: 'Marketing' })
+    ]
+    renderPopup({ channels })
+
+    selectChannel('Design Team')
+    selectChannel('Marketing')
+    const textarea = screen.getByPlaceholderText('Write a message') as HTMLTextAreaElement
+
+    fireEvent.change(textarea, { target: { value: '@ali', selectionStart: 4 } })
+
+    expect(screen.queryByText('Alice Anderson')).not.toBeInTheDocument()
+  })
+
+  it('navigates mention candidates with arrow keys and inserts the highlighted one on Enter', () => {
+    const channels = [
+      makeChannel({
+        id: 'chan-1',
+        subject: 'Design Team',
+        type: DEFAULT_CHANNEL_TYPE.GROUP,
+        members: makeMentionMembers()
+      })
+    ]
+    renderPopup({ channels })
+
+    selectChannel('Design Team')
+    const textarea = screen.getByPlaceholderText('Write a message') as HTMLTextAreaElement
+
+    fireEvent.change(textarea, { target: { value: '@', selectionStart: 1 } })
+    expect(screen.getByText('Alice Anderson')).toBeInTheDocument()
+    expect(screen.getByText('Bob Baker')).toBeInTheDocument()
+
+    fireEvent.keyDown(textarea, { key: 'ArrowDown' })
+    fireEvent.keyDown(textarea, { key: 'Enter' })
+
+    expect(textarea).toHaveValue('@Bob Baker')
+  })
+
+  it('does not open the mention dropdown for a direct channel', () => {
+    const channels = [
+      makeChannel({
+        id: 'chan-1',
+        subject: 'Jordyn Aminoff',
+        type: DEFAULT_CHANNEL_TYPE.DIRECT,
+        members: makeMentionMembers()
+      })
+    ]
+    renderPopup({ channels })
+
+    selectChannel('Jordyn Aminoff')
+    const textarea = screen.getByPlaceholderText('Write a message') as HTMLTextAreaElement
+
+    fireEvent.change(textarea, { target: { value: '@ali', selectionStart: 4 } })
+
+    expect(screen.queryByText('Alice Anderson')).not.toBeInTheDocument()
   })
 })

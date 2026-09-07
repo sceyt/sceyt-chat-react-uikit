@@ -99,6 +99,24 @@ const getForwardPreviewLabel = (message?: IForwardPreviewMessage) => {
   }
 }
 
+/** Splits note text into plain/mention runs (from noteAttributes) for the highlight overlay. */
+const buildMentionSegments = (text: string, attributes: IBodyAttribute[]) => {
+  const mentionRanges = attributes
+    .filter((attribute) => attribute.type === 'mention')
+    .sort((a, b) => a.offset - b.offset)
+  const segments: { text: string; isMention: boolean }[] = []
+  let cursor = 0
+  mentionRanges.forEach((range) => {
+    const start = Math.max(cursor, Math.min(range.offset, text.length))
+    const end = Math.max(start, Math.min(range.offset + range.length, text.length))
+    if (start > cursor) segments.push({ text: text.slice(cursor, start), isMention: false })
+    if (end > start) segments.push({ text: text.slice(start, end), isMention: true })
+    cursor = end
+  })
+  if (cursor < text.length) segments.push({ text: text.slice(cursor), isMention: false })
+  return segments
+}
+
 const ChannelMembersItem = ({
   channel,
   directChannelUser,
@@ -193,7 +211,9 @@ function ForwardMessagePopup({
   const [noteAttributes, setNoteAttributes] = useState<IBodyAttribute[]>([])
   const [noteMentionedUsers, setNoteMentionedUsers] = useState<IUser[]>([])
   const [mentionQuery, setMentionQuery] = useState<{ start: number; value: string } | null>(null)
+  const [highlightedMentionIndex, setHighlightedMentionIndex] = useState(0)
   const noteInputRef = useRef<HTMLTextAreaElement>(null)
+  const noteHighlightRef = useRef<HTMLDivElement>(null)
   const noteContainerRef = useRef<HTMLDivElement>(null)
   const [noteContainerHeight, setNoteContainerHeight] = useState(0)
   const loadingRef = useRef(false)
@@ -205,7 +225,14 @@ function ForwardMessagePopup({
     warningTimeoutRef.current = setTimeout(() => setWarningChannelId(null), 3000)
   }
 
+  // Mentioning a member only makes sense when the note is going to a single channel — with
+  // multiple recipients selected there's no one member list to mention from. A direct channel
+  // has just the one other person in it, so there's no one to pick from either.
+  const mentionsAllowed =
+    selectedChannels.length === 1 && selectedChannels[0].channel.type !== DEFAULT_CHANNEL_TYPE.DIRECT
+
   const mentionCandidates = useMemo(() => {
+    if (!mentionsAllowed) return []
     const members = selectedChannels.flatMap((selectedChannel) =>
       channelMembersMap[selectedChannel.id]?.length
         ? channelMembersMap[selectedChannel.id]
@@ -216,7 +243,7 @@ function ForwardMessagePopup({
       if (member.id !== user.id) membersById.set(member.id, member)
     })
     return Array.from(membersById.values())
-  }, [channelMembersMap, selectedChannels, user.id])
+  }, [channelMembersMap, mentionsAllowed, selectedChannels, user.id])
 
   const visibleMentionCandidates = useMemo(() => {
     if (!mentionQuery) return []
@@ -228,6 +255,14 @@ function ForwardMessagePopup({
       })
       .slice(0, 5)
   }, [contactsMap, getFromContacts, mentionCandidates, mentionQuery])
+
+  const noteSegments = useMemo(() => buildMentionSegments(noteText, noteAttributes), [noteText, noteAttributes])
+
+  const handleNoteScroll = (event: React.UIEvent<HTMLTextAreaElement>) => {
+    if (noteHighlightRef.current) {
+      noteHighlightRef.current.scrollTop = event.currentTarget.scrollTop
+    }
+  }
 
   const handleForwardMessage = () => {
     const { body, bodyAttributes } = trimMessageBodyWithAttributes(noteText, noteAttributes)
@@ -351,8 +386,14 @@ function ForwardMessagePopup({
     const nextText = event.target.value.slice(0, maxNoteLength)
     reconcileNoteAttributes(noteText, nextText)
     setNoteText(nextText)
-    setMentionQuery(getMentionQuery(nextText, Math.min(event.target.selectionStart, nextText.length)))
+    setMentionQuery(
+      mentionsAllowed ? getMentionQuery(nextText, Math.min(event.target.selectionStart, nextText.length)) : null
+    )
   }
+
+  useEffect(() => {
+    setHighlightedMentionIndex(0)
+  }, [visibleMentionCandidates])
 
   useLayoutEffect(() => {
     const noteInput = noteInputRef.current
@@ -394,6 +435,25 @@ function ForwardMessagePopup({
   }
 
   const handleNoteKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
+    if (mentionQuery && visibleMentionCandidates.length > 0) {
+      if (event.key === 'ArrowDown') {
+        event.preventDefault()
+        setHighlightedMentionIndex((index) => (index + 1) % visibleMentionCandidates.length)
+        return
+      }
+      if (event.key === 'ArrowUp') {
+        event.preventDefault()
+        setHighlightedMentionIndex(
+          (index) => (index - 1 + visibleMentionCandidates.length) % visibleMentionCandidates.length
+        )
+        return
+      }
+      if (event.key === 'Enter') {
+        event.preventDefault()
+        insertMention(visibleMentionCandidates[highlightedMentionIndex])
+        return
+      }
+    }
     if (event.key === 'Escape' && mentionQuery) {
       event.preventDefault()
       setMentionQuery(null)
@@ -755,6 +815,17 @@ function ForwardMessagePopup({
               )}
               <ForwardNoteInputRow>
                 <ForwardNoteInputWrapper>
+                  <ForwardNoteHighlightLayer ref={noteHighlightRef} color={textPrimary} aria-hidden='true'>
+                    {noteSegments.map((segment, index) =>
+                      segment.isMention ? (
+                        <ForwardNoteMentionText key={index} color={accentColor}>
+                          {segment.text}
+                        </ForwardNoteMentionText>
+                      ) : (
+                        <React.Fragment key={index}>{segment.text}</React.Fragment>
+                      )
+                    )}
+                  </ForwardNoteHighlightLayer>
                   <ForwardNoteInput
                     id='forward-message-note'
                     ref={noteInputRef}
@@ -763,6 +834,7 @@ function ForwardMessagePopup({
                     maxLength={maxNoteLength}
                     onChange={handleNoteChange}
                     onKeyDown={handleNoteKeyDown}
+                    onScroll={handleNoteScroll}
                     onBlur={() => window.setTimeout(() => setMentionQuery(null), 150)}
                     placeholder='Write a message'
                     className={isNoteScrolling ? 'show-scrollbar' : ''}
@@ -772,13 +844,15 @@ function ForwardMessagePopup({
                   />
                   {mentionQuery && visibleMentionCandidates.length > 0 && (
                     <ForwardMentionList backgroundColor={background} borderColor={tooltipBackground}>
-                      {visibleMentionCandidates.map((member) => {
+                      {visibleMentionCandidates.map((member, index) => {
                         const displayName = makeUsername(contactsMap[member.id], member, getFromContacts)
                         return (
                           <ForwardMentionOption
                             key={member.id}
                             type='button'
+                            isActive={index === highlightedMentionIndex}
                             onMouseDown={(event: React.MouseEvent<HTMLButtonElement>) => event.preventDefault()}
+                            onMouseEnter={() => setHighlightedMentionIndex(index)}
                             onClick={() => insertMention(member)}
                             color={textPrimary}
                           >
@@ -975,6 +1049,8 @@ const ForwardNoteInputWrapper = styled.div`
 
 const ForwardNoteInput = styled.textarea<{ color: string; thumbColor: string }>`
   display: block;
+  position: relative;
+  z-index: 1;
   width: 100%;
   height: ${NOTE_INPUT_MIN_HEIGHT}px;
   max-height: ${NOTE_INPUT_MAX_HEIGHT}px;
@@ -985,7 +1061,10 @@ const ForwardNoteInput = styled.textarea<{ color: string; thumbColor: string }>`
   outline: none;
   background: transparent;
   padding: 0;
-  color: ${(props) => props.color};
+  /* The note's own glyphs are invisible — ForwardNoteHighlightLayer renders the visible
+     (mention-highlighted) text underneath. Only the caret/selection paint here. */
+  color: transparent;
+  caret-color: ${(props) => props.color};
   font: inherit;
   line-height: ${NOTE_INPUT_LINE_HEIGHT}px;
   scrollbar-width: thin;
@@ -1015,6 +1094,24 @@ const ForwardNoteInput = styled.textarea<{ color: string; thumbColor: string }>`
   &.show-scrollbar {
     scrollbar-color: ${(props) => props.thumbColor} transparent;
   }
+`
+
+const ForwardNoteHighlightLayer = styled.div<{ color: string }>`
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  overflow: hidden;
+  box-sizing: border-box;
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+  color: ${(props) => props.color};
+  font: inherit;
+  line-height: ${NOTE_INPUT_LINE_HEIGHT}px;
+`
+
+const ForwardNoteMentionText = styled.span<{ color: string }>`
+  color: ${(props) => props.color};
 `
 
 const SendNoteButton = styled.button<{ iconColor: string }>`
@@ -1054,14 +1151,14 @@ const ForwardMentionList = styled.div<{ backgroundColor: string; borderColor: st
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
 `
 
-const ForwardMentionOption = styled.button<{ color: string }>`
+const ForwardMentionOption = styled.button<{ color: string; isActive?: boolean }>`
   display: flex;
   align-items: center;
   width: 100%;
   gap: 8px;
   padding: 8px 10px;
   border: 0;
-  background: transparent;
+  background: ${(props) => (props.isActive ? 'rgba(127, 127, 127, 0.12)' : 'transparent')};
   color: ${(props) => props.color};
   font: inherit;
   text-align: left;
