@@ -1640,6 +1640,37 @@ describe('useChatController', () => {
     expect(dispatch).toHaveBeenCalledWith(loadLatestMessagesAC(channel, undefined, undefined, true, true))
   })
 
+  it('loads the latest window after sending from history when the channel tail is an id-less pending message', () => {
+    const channelId = 'channel-pending-send-from-history'
+    const cachedLatestMessages = ['900', '901'].map((id) =>
+      makeMessage({ id, channelId, body: `cached-latest-${id}`, incoming: true })
+    )
+    cachedLatestMessages.forEach((message) => addMessageToMap(channelId, message))
+    setActiveSegment(channelId, '900', '901')
+
+    const pendingMessage = makePendingMessage({ channelId, body: 'new-pending-message' })
+    const channel = makeChannel({ id: channelId, lastMessage: pendingMessage })
+    const historyWindow = [
+      makeMessage({ id: '800', channelId, body: 'history-800' }),
+      makeMessage({ id: '801', channelId, body: 'history-801' }),
+      pendingMessage
+    ]
+    const dispatch = jest.fn()
+
+    renderController({
+      channel,
+      messages: historyWindow,
+      hasNextMessages: false,
+      connectionStatus: CONNECTION_STATUS.CONNECTED,
+      dispatch
+    })
+
+    dispatch.mockClear()
+    fireEvent.click(screen.getByTestId('jump-to-latest'))
+
+    expect(dispatch).toHaveBeenCalledWith(loadLatestMessagesAC(channel, undefined, undefined, true, true))
+  })
+
   it('dispatches loadDefaultMessages when jumpToLatest is used while disconnected and latest is outside the window', () => {
     const channel = makeChannel({
       id: 'channel-offline',

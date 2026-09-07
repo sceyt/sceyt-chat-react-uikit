@@ -69,6 +69,7 @@ import {
   updateMessageAC
 } from './actions'
 import { updateChannelDataAC, updateChannelLastMessageAC } from '../channel/actions'
+import { setWaitToSendPendingMessagesAC } from '../user/actions'
 import { __messageSagaTestables, __resetMessageSagaTestState } from './saga'
 import { navigateToLatest } from '../../helpers/messageListNavigator'
 import { IMessage } from '../../types'
@@ -3710,6 +3711,60 @@ describe('message saga message-list flows', () => {
     )
   })
 
+  it('resends queued messages immediately on reconnect while a deep-history window remains visible', async () => {
+    const channelId = 'channel-reconnect-resend-from-history'
+    const pendingMessage = makePendingMessage({
+      channelId,
+      tid: 'pending-from-history',
+      body: 'queued while offline',
+      metadata: '{}'
+    })
+    const confirmedMessage = makeMessage({
+      id: '900',
+      tid: pendingMessage.tid,
+      channelId,
+      body: pendingMessage.body,
+      metadata: {} as any
+    })
+    const channel = makeChannel({ id: channelId, lastMessage: pendingMessage })
+    const builder = {
+      setBody: jest.fn().mockReturnThis(),
+      setBodyAttributes: jest.fn().mockReturnThis(),
+      setAttachments: jest.fn().mockReturnThis(),
+      setMentionUserIds: jest.fn().mockReturnThis(),
+      setType: jest.fn().mockReturnThis(),
+      setDisplayCount: jest.fn().mockReturnThis(),
+      setSilent: jest.fn().mockReturnThis(),
+      setMetadata: jest.fn().mockReturnThis(),
+      setPollDetails: jest.fn().mockReturnThis(),
+      setDisableMentionsCount: jest.fn().mockReturnThis(),
+      create: jest.fn()
+    }
+    channel.createMessageBuilder = jest.fn(() => builder as any)
+    channel.sendMessage = jest.fn(() => Promise.resolve(confirmedMessage))
+
+    // The pending tail is outside the visible deep-history page. Reconnect
+    // must still drain it without relying on a latest-window reload.
+    mockStoreState.UserReducer = {
+      connectionStatus: CONNECTION_STATUS.CONNECTED,
+      waitToSendPendingMessages: true
+    }
+    mockStoreState.MessageReducer.activeChannelMessages = [
+      makeMessage({ id: '800', channelId, body: 'history-800' }),
+      makeMessage({ id: '801', channelId, body: 'history-801' })
+    ]
+    setActiveChannelId(channelId)
+    setChannelInMap(channel)
+    addMessageToMap(channelId, pendingMessage)
+
+    const dispatched = await runMessageSaga(__messageSagaTestables.resumePendingMessagesAfterReconnect, {
+      payload: { status: CONNECTION_STATUS.CONNECTED }
+    })
+
+    expect(dispatched).toContainEqual(setWaitToSendPendingMessagesAC(false))
+    expect(channel.sendMessage).toHaveBeenCalledWith(expect.objectContaining({ tid: pendingMessage.tid }))
+  })
+
   it('keeps channel last message on confirmed server truth while reconnect resend confirms older pending messages', async () => {
     const currentUser = makeUser({ id: 'current-user' })
     const channelId = 'channel-resend-last-message-order'
@@ -4253,6 +4308,52 @@ describe('message saga message-list flows', () => {
       const lastSetMessages = dispatched.filter((action) => action.type === setMessagesAC([], channel.id).type).at(-1)
       const bodies = lastSetMessages.payload.messages.map((message: any) => message.body)
       expect(bodies).toEqual(['cached-708', 'cached-709', 'cached-710', 'cached-711'])
+    })
+
+    it('refreshes the server latest window when an outgoing-message jump explicitly forces latest', async () => {
+      // A user can be many pages up while the cache still has an older latest
+      // segment. Sending a message invokes loadLatestMessages with
+      // forceLatestWindow=true; it must not reuse that segment just because its
+      // final id matches the channel snapshot captured before the send.
+      const channel = makeChannel({
+        id: 'channel-send-from-history-force-latest',
+        lastMessage: makeMessage({
+          id: '711',
+          channelId: 'channel-send-from-history-force-latest',
+          body: 'cached-latest-before-send',
+          incoming: true
+        })
+      })
+      const cachedWindow = ['708', '709', '710', '711'].map((id) =>
+        makeMessage({ id, channelId: channel.id, body: `cached-${id}`, incoming: true })
+      )
+      const serverLatestWindow = ['709', '710', '711', '712'].map((id) =>
+        makeMessage({ id, channelId: channel.id, body: `server-${id}`, incoming: true })
+      )
+      cachedWindow.forEach((message) => addMessageToMap(channel.id, message))
+      setActiveSegment(channel.id, '708', '711')
+      const query = createMessageQuery({
+        loadPrevious: jest.fn(() => resolveWithMockServerDelay({ messages: serverLatestWindow, hasNext: false }))
+      })
+
+      mockStoreState.UserReducer.connectionStatus = CONNECTION_STATUS.CONNECTED
+      setActiveChannelId(channel.id)
+      setChannelInMap(channel)
+      setClient(createClient(query, { ...channel }))
+
+      const dispatched = await runMessageSaga(
+        __messageSagaTestables.getMessagesQuery,
+        loadLatestMessagesAC(channel, undefined, undefined, true, true)
+      )
+
+      expect(query.loadPrevious).toHaveBeenCalledTimes(1)
+      const lastSetMessages = dispatched.filter((action) => action.type === setMessagesAC([], channel.id).type).at(-1)
+      expect(lastSetMessages.payload.messages.map((message: any) => message.body)).toEqual([
+        'server-709',
+        'server-710',
+        'server-711',
+        'server-712'
+      ])
     })
 
     it('flags hasNext when the offline near-unread window is older than the channel lastMessage (loadNearUnread)', async () => {

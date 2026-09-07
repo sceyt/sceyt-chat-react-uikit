@@ -581,9 +581,17 @@ export function useChatController({
     const visibleMessageRefs = new Set(messages.map((message) => getMessageLocalRef(message)).filter(Boolean))
     return pendingMessages.some((message) => !visibleMessageRefs.has(getMessageLocalRef(message)))
   }, [channel.id, messages])
+  // An optimistic outgoing message becomes channel.lastMessage before it has a
+  // confirmed id. Keep using the cached confirmed tail to detect that a
+  // history window still has newer content; otherwise jumpToLatest mistakes
+  // the bottom of that history page for the actual chat tail.
+  const cachedLatestConfirmedMessageId = newestConfirmedMessageId ? getLatestCachedConfirmedMessageId(channel.id) : ''
   const hasNext =
     hasNextMessages ||
     (newestConfirmedMessage ? hasNextContiguousInMap(channel.id, newestConfirmedMessage) : false) ||
+    (newestConfirmedMessageId && cachedLatestConfirmedMessageId
+      ? compareMessageIds(cachedLatestConfirmedMessageId, newestConfirmedMessageId) > 0
+      : false) ||
     (newestConfirmedMessageId && channel.lastMessage?.id
       ? compareMessageIds(channel.lastMessage.id, newestConfirmedMessageId) > 0
       : false) ||
