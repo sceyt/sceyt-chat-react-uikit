@@ -4255,6 +4255,52 @@ describe('message saga message-list flows', () => {
       expect(bodies).toEqual(['cached-708', 'cached-709', 'cached-710', 'cached-711'])
     })
 
+    it('refreshes the server latest window when an outgoing-message jump explicitly forces latest', async () => {
+      // A user can be many pages up while the cache still has an older latest
+      // segment. Sending a message invokes loadLatestMessages with
+      // forceLatestWindow=true; it must not reuse that segment just because its
+      // final id matches the channel snapshot captured before the send.
+      const channel = makeChannel({
+        id: 'channel-send-from-history-force-latest',
+        lastMessage: makeMessage({
+          id: '711',
+          channelId: 'channel-send-from-history-force-latest',
+          body: 'cached-latest-before-send',
+          incoming: true
+        })
+      })
+      const cachedWindow = ['708', '709', '710', '711'].map((id) =>
+        makeMessage({ id, channelId: channel.id, body: `cached-${id}`, incoming: true })
+      )
+      const serverLatestWindow = ['709', '710', '711', '712'].map((id) =>
+        makeMessage({ id, channelId: channel.id, body: `server-${id}`, incoming: true })
+      )
+      cachedWindow.forEach((message) => addMessageToMap(channel.id, message))
+      setActiveSegment(channel.id, '708', '711')
+      const query = createMessageQuery({
+        loadPrevious: jest.fn(() => resolveWithMockServerDelay({ messages: serverLatestWindow, hasNext: false }))
+      })
+
+      mockStoreState.UserReducer.connectionStatus = CONNECTION_STATUS.CONNECTED
+      setActiveChannelId(channel.id)
+      setChannelInMap(channel)
+      setClient(createClient(query, { ...channel }))
+
+      const dispatched = await runMessageSaga(
+        __messageSagaTestables.getMessagesQuery,
+        loadLatestMessagesAC(channel, undefined, undefined, true, true)
+      )
+
+      expect(query.loadPrevious).toHaveBeenCalledTimes(1)
+      const lastSetMessages = dispatched.filter((action) => action.type === setMessagesAC([], channel.id).type).at(-1)
+      expect(lastSetMessages.payload.messages.map((message: any) => message.body)).toEqual([
+        'server-709',
+        'server-710',
+        'server-711',
+        'server-712'
+      ])
+    })
+
     it('flags hasNext when the offline near-unread window is older than the channel lastMessage (loadNearUnread)', async () => {
       const channel = makeChannel({
         id: 'channel-open-near-unread-offline',

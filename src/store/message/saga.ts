@@ -3094,6 +3094,7 @@ function* getMessagesQuery(action: IAction): any {
         const cachedMessages = getLatestContiguousMessagesFromMap(channel.id, MESSAGES_MAX_PAGE_COUNT)
         const cacheIsCurrent =
           !networkChanged &&
+          !forceLatestWindow &&
           cachedMessages.length > 0 &&
           getLastConfirmedMessageId(cachedMessages) === channel.lastMessage?.id
 
