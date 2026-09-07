@@ -148,6 +148,10 @@ interface IMessageBodyProps {
   handleToggleForwardMessagePopup: () => void
   handleToggleInfoMessagePopupOpen: () => void
   handleReplyMessage: (rely: boolean) => void
+  handleOpenPinMessage: () => void
+  handleUnpinMessage: () => void
+  pinnedMessage?: any
+  isPinned?: boolean
   handleToggleDeleteMessagePopup: () => void
   handleToggleReportPopupOpen: () => void
   handleResendMessage: () => void
@@ -306,6 +310,10 @@ const MessageBody = ({
   closeMessageActions,
   handleDeletePendingMessage,
   handleReplyMessage,
+  handleOpenPinMessage,
+  handleUnpinMessage,
+  pinnedMessage,
+  isPinned,
   handleToggleDeleteMessagePopup,
   handleToggleReportPopupOpen,
   handleResendMessage,
@@ -617,7 +625,7 @@ const MessageBody = ({
     // TODO implement remove failed attachment
     // dispatch(removeFailedAttachment(message.tid, attachmentId));
   }
-  if (message.id === '847315742421716992'){
+  if (message.id === '847315742421716992') {
     console.log(message)
   }
 
@@ -703,6 +711,10 @@ const MessageBody = ({
             handleOpenForwardMessage={handleToggleForwardMessagePopup}
             handleResendMessage={handleResendMessage}
             handleReplyMessage={() => handleReplyMessage(false)}
+            handleOpenPinMessage={handleOpenPinMessage}
+            handleUnpinMessage={handleUnpinMessage}
+            pinnedMessage={pinnedMessage}
+            isPinned={isPinned}
             handleReportMessage={handleToggleReportPopupOpen}
             handleSelectMessage={handleSelectMessage}
             handleOpenEmojis={handleOpenEmojis}
@@ -731,6 +743,10 @@ const MessageBody = ({
             handleRetractVote={handleRetractVote}
             handleEndVote={handleEndVote}
             handleOpenEmojis={handleOpenEmojis}
+            handleOpenPinMessage={handleOpenPinMessage}
+            handleUnpinMessage={handleUnpinMessage}
+            pinnedMessage={pinnedMessage}
+            isPinned={isPinned}
             selfMessage={message.user && messageUserID === getComparableUserId(user)}
             isThreadMessage={isThreadMessage}
             openBelow={messageActionsBelow}

@@ -53,6 +53,7 @@ import { LOADING_STATE, MESSAGE_DELIVERY_STATUS } from '../../../helpers/constan
 import MessageDivider from '../../MessageDivider'
 import SliderPopup from '../../../common/popups/sliderPopup'
 import SystemMessage from '../SystemMessage'
+import PinnedMessagesBanner from '../PinnedMessagesBanner'
 import Message from '../../Message'
 import { IAttachmentProperties, IMessageStyles } from '../../Message/Message.types'
 import { HiddenMessageProperty, MESSAGE_TYPE } from 'types/enum'
@@ -103,6 +104,9 @@ interface MessagesProps {
     handleReplyMessage?: () => void
     handleRetractVote?: () => void
     handleEndVote?: () => void
+    handleOpenPinMessage?: () => void
+    handleUnpinMessage?: () => void
+    pinnedMessage?: any
 
     isThreadMessage?: boolean
     rtlDirection?: boolean
@@ -131,6 +135,9 @@ interface MessagesProps {
     handleSelectMessage?: () => void
     handleOpenEmojis?: () => void
     handleReplyMessage?: () => void
+    handleOpenPinMessage?: () => void
+    handleUnpinMessage?: () => void
+    pinnedMessage?: any
     handleMouseEnter: () => void
     handleMouseLeave: () => void
     closeMessageActions?: () => void
@@ -1006,6 +1013,7 @@ const MessageList: React.FC<MessagesProps> = ({
       )}
       <React.Fragment>
         {/* {!hideMessages && ( */}
+        {channel?.id && <PinnedMessagesBanner channelId={channel.id} />}
         <ScrollViewport>
           {isJumpingToItem && (
             <JumpOverlay>

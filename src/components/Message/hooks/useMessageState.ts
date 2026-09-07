@@ -4,6 +4,7 @@ export interface MessageState {
   deletePopupOpen: boolean
   forwardPopupOpen: boolean
   infoPopupOpen: boolean
+  pinPopupOpen: boolean
   messageActionsShow: boolean
   showEndVoteConfirmPopup: boolean
   emojisPopupOpen: boolean
@@ -20,6 +21,7 @@ export interface MessageStateSetters {
   setDeletePopupOpen: (value: boolean | ((prev: boolean) => boolean)) => void
   setForwardPopupOpen: (value: boolean | ((prev: boolean) => boolean)) => void
   setInfoPopupOpen: (value: boolean | ((prev: boolean) => boolean)) => void
+  setPinPopupOpen: (value: boolean | ((prev: boolean) => boolean)) => void
   setMessageActionsShow: (value: boolean | ((prev: boolean) => boolean)) => void
   setShowEndVoteConfirmPopup: (value: boolean | ((prev: boolean) => boolean)) => void
   setEmojisPopupOpen: (value: boolean | ((prev: boolean) => boolean)) => void
@@ -39,6 +41,7 @@ export const useMessageState = () => {
   // Reserved for future use - report popup functionality
   const [, setReportPopupOpen] = useState(false)
   const [infoPopupOpen, setInfoPopupOpen] = useState(false)
+  const [pinPopupOpen, setPinPopupOpen] = useState(false)
   const [messageActionsShow, setMessageActionsShow] = useState(false)
   const [showEndVoteConfirmPopup, setShowEndVoteConfirmPopup] = useState(false)
   const [emojisPopupOpen, setEmojisPopupOpen] = useState(false)
@@ -55,6 +58,7 @@ export const useMessageState = () => {
     deletePopupOpen,
     forwardPopupOpen,
     infoPopupOpen,
+    pinPopupOpen,
     messageActionsShow,
     showEndVoteConfirmPopup,
     emojisPopupOpen,
@@ -71,6 +75,7 @@ export const useMessageState = () => {
     setDeletePopupOpen,
     setForwardPopupOpen,
     setInfoPopupOpen,
+    setPinPopupOpen,
     setMessageActionsShow,
     setShowEndVoteConfirmPopup,
     setEmojisPopupOpen,

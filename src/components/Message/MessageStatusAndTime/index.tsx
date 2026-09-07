@@ -9,6 +9,7 @@ import { THEME_COLORS } from '../../../UIHelper/constants'
 import { IMessage } from '../../../types'
 // Components
 import { MessageStatusIcon } from '../../../messageUtils'
+import { ReactComponent as PinIcon } from '../../../assets/svg/pin.svg'
 
 interface IMessageStatusAndTime {
   message: IMessage
@@ -85,6 +86,14 @@ const MessageStatusAndTime = ({
       ) : (
         ''
       )}
+      {message?.pinDetails?.pinned && (
+        <PinnedMessageIcon
+          color={messageTimeColor || (withAttachment && !fileAttachment ? messageTimeColorOnAttachment : textSecondary)}
+          aria-label='Pinned message'
+        >
+          <PinIcon />
+        </PinnedMessageIcon>
+      )}
       {messageTimeVisible && (
         <HiddenMessageTime color={messageTimeColor || textSecondary} fontSize={messageTimeFontSize}>{`${moment(
           message?.createdAt
@@ -112,6 +121,7 @@ export default React.memo(MessageStatusAndTime, (prevProps, nextProps) => {
     prevProps.message?.state === nextProps.message?.state &&
     prevProps.message?.deliveryStatus === nextProps.message?.deliveryStatus &&
     prevProps.message?.createdAt === nextProps.message?.createdAt &&
+    prevProps.message?.pinDetails?.pinned === nextProps.message?.pinDetails?.pinned &&
     prevProps.showMessageTimeAndStatusOnlyOnHover === nextProps.showMessageTimeAndStatusOnlyOnHover &&
     prevProps.messageStatusSize === nextProps.messageStatusSize &&
     prevProps.messageStatusColor === nextProps.messageStatusColor &&
@@ -149,6 +159,18 @@ const HiddenMessageTime = styled.span<{ hide?: boolean; color: string; fontSize?
   font-weight: 400;
   font-size: ${(props) => props.fontSize || '12px'};
   color: ${(props) => props.color};
+`
+
+const PinnedMessageIcon = styled.span<{ color: string }>`
+  display: inline-flex;
+  align-items: center;
+  margin-right: 4px;
+  color: ${(props) => props.color};
+
+  & > svg {
+    width: 15px;
+    height: 15px;
+  }
 `
 
 const MessageStatusAndTimeContainer = styled.span<{

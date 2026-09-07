@@ -60,6 +60,7 @@ import {
 } from '../message/actions'
 import { CONNECTION_EVENT_TYPES, CONNECTION_STATUS } from '../user/constants'
 import { getContactsAC, setConnectionStatusAC } from '../user/actions'
+import { applyPinnedMessagesEventAC, removePinnedMessagesAC, resendPendingPinMutationsAC } from '../pinned/actions'
 import {
   addMessageToMap,
   appendMessageToLatestSegment,
@@ -135,6 +136,7 @@ function* handleConnectionStatusChangedEvent(status: string) {
     yield put(getRolesAC())
     yield put(resendPendingMessageMutationsAC(status))
     yield put(resendPendingChannelReadsAC(status))
+    yield put(resendPendingPinMutationsAC())
   }
 }
 
@@ -470,7 +472,8 @@ export function* handleEditMessageEvent(args: { channel: IChannel; message: IMes
         attachments: message.attachments,
         bodyAttributes: message.bodyAttributes,
         mentionedUsers: message.mentionedUsers,
-        updatedAt: message.updatedAt
+        updatedAt: message.updatedAt,
+        ...(message.pinDetails ? { pinDetails: message.pinDetails } : {})
       })
     )
   }
@@ -720,6 +723,13 @@ export default function* watchForEvents(): any {
           user,
           deletedMessage
         }
+      })
+    }
+    channelListener.onPinnedMessagesChanged = (channel: IChannel, event: any) => {
+      if (channel && shouldSkip(channel)) return
+      emitter({
+        type: CHANNEL_EVENT_TYPES.PINNED_MESSAGES_CHANGED,
+        args: { channel, event }
       })
     }
     channelListener.onReactionAdded = (channel: IChannel, user: IUser, message: IMessage, reaction: IReaction) => {
@@ -1343,6 +1353,12 @@ export default function* watchForEvents(): any {
         case CHANNEL_EVENT_TYPES.DELETE_MESSAGE: {
           log.info('channel DELETE_MESSAGE ... ')
           yield call(handleDeleteMessageEvent, args)
+          const { channel, deletedMessage } = args
+          yield put(removePinnedMessagesAC(channel.id, undefined, [deletedMessage.id || deletedMessage.tid]))
+          break
+        }
+        case CHANNEL_EVENT_TYPES.PINNED_MESSAGES_CHANGED: {
+          yield put(applyPinnedMessagesEventAC(args.channel, args.event))
           break
         }
         case CHANNEL_EVENT_TYPES.EDIT_MESSAGE: {

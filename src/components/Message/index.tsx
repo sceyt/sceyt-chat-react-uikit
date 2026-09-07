@@ -57,6 +57,9 @@ import { MessageTextFormat } from 'messageUtils'
 import { getShowOnlyContactUsers } from 'helpers/contacts'
 import { useMessageState } from './hooks/useMessageState'
 import { IForwardMessageNote } from 'common/popups/forwardMessage'
+import usePermissions from '../../hooks/usePermissions'
+import { pinnedMessagesSelector } from '../../store/pinned/selector'
+import { pinMessageAC, unpinMessageAC } from '../../store/pinned/actions'
 
 // Constants
 const MESSAGE_ACTIONS_HOVER_DELAY = 450
@@ -234,6 +237,7 @@ const Message = ({
     deletePopupOpen,
     forwardPopupOpen,
     infoPopupOpen,
+    pinPopupOpen,
     messageActionsShow,
     showEndVoteConfirmPopup,
     emojisPopupOpen,
@@ -249,6 +253,7 @@ const Message = ({
     setDeletePopupOpen,
     setForwardPopupOpen,
     setInfoPopupOpen,
+    setPinPopupOpen,
     setMessageActionsShow,
     setShowEndVoteConfirmPopup,
     setEmojisPopupOpen,
@@ -262,6 +267,14 @@ const Message = ({
     setReportPopupOpen
   } = stateSetters
   const scrollToNewMessage = useSelector(scrollToNewMessageSelector, shallowEqual)
+  const pins = useSelector(pinnedMessagesSelector(channel.id))
+  const [checkActionPermission] = usePermissions(channel.userRole || '')
+  const pinnedMessage = useMemo(
+    () => pins.find((pin: any) => (pin.message?.id || pin.message?.tid) === (message.id || message.tid)),
+    [pins, message.id, message.tid]
+  )
+  const isPinned = !!message.pinDetails?.pinned || !!pinnedMessage
+  const canPinForAll = checkActionPermission('pinMessage')
   const messageItemRef = useRef<HTMLDivElement>(null)
   const isVisible = useOnScreen(messageItemRef)
   // Whether the actions bar should open under the bubble (no room above).
@@ -360,6 +373,26 @@ const Message = ({
     setInfoPopupOpen((prev) => !prev)
     setMessageActionsShow(false)
   }, [])
+
+  const handleTogglePinMessagePopup = useCallback(() => {
+    setPinPopupOpen((prev) => !prev)
+    setMessageActionsShow(false)
+  }, [setPinPopupOpen, setMessageActionsShow])
+
+  const handlePinMessage = useCallback(
+    (scope: number) => {
+      dispatch(pinMessageAC(channel.id, message, scope))
+      setPinPopupOpen(false)
+    },
+    [channel.id, dispatch, message, setPinPopupOpen]
+  )
+
+  const handleUnpinMessage = useCallback(() => {
+    // pin_details can arrive with message history before the pin list does.
+    // Omitting the type lets the service remove the effective pin for this user.
+    dispatch(unpinMessageAC(channel.id, pinnedMessage || { message }))
+    setMessageActionsShow(false)
+  }, [channel.id, dispatch, message, pinnedMessage, setMessageActionsShow])
 
   const handleReplyMessage = useCallback(
     (threadReply?: boolean) => {
@@ -871,6 +904,10 @@ const Message = ({
             handleSelectMessage={handleSelectMessage}
             handleOpenEmojis={handleOpenEmojis}
             handleReplyMessage={handleReplyMessage}
+            handleOpenPinMessage={handleTogglePinMessagePopup}
+            handleUnpinMessage={handleUnpinMessage}
+            pinnedMessage={pinnedMessage}
+            isPinned={isPinned}
             handleMouseEnter={handleMouseEnter}
             handleMouseLeave={handleMouseLeave}
             closeMessageActions={closeMessageActions}
@@ -998,6 +1035,10 @@ const Message = ({
             handleToggleForwardMessagePopup={handleToggleForwardMessagePopup}
             handleToggleInfoMessagePopupOpen={handleToggleInfoMessagePopupOpen}
             handleReplyMessage={handleReplyMessage}
+            handleOpenPinMessage={handleTogglePinMessagePopup}
+            handleUnpinMessage={handleUnpinMessage}
+            pinnedMessage={pinnedMessage}
+            isPinned={isPinned}
             handleToggleDeleteMessagePopup={handleToggleDeleteMessagePopup}
             handleToggleReportPopupOpen={handleToggleReportPopupOpen}
             handleResendMessage={handleResendMessage}
@@ -1084,6 +1125,7 @@ const Message = ({
         deletePopupOpen={deletePopupOpen}
         forwardPopupOpen={forwardPopupOpen}
         infoPopupOpen={infoPopupOpen}
+        pinPopupOpen={pinPopupOpen}
         showEndVoteConfirmPopup={showEndVoteConfirmPopup}
         allowEditDeleteIncomingMessage={allowEditDeleteIncomingMessage}
         showInfoMessageProps={showInfoMessageProps}
@@ -1096,6 +1138,9 @@ const Message = ({
         onEndVote={endVote}
         onToggleEndVotePopup={() => setShowEndVoteConfirmPopup(false)}
         onOpenUserProfile={handleOpenUserProfile}
+        onTogglePinPopup={handleTogglePinMessagePopup}
+        onPinMessage={handlePinMessage}
+        canPinForAll={canPinForAll}
         anchorRef={messageItemRef}
       />
     </MessageItem>

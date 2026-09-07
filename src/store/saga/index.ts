@@ -3,7 +3,8 @@ import ChannelsSaga from '../channel/saga'
 import MessagesSaga from '../message/saga'
 import MembersSaga from '../member/saga'
 import UsersSaga from '../user/saga'
+import PinnedMessagesSaga from '../pinned/saga'
 
 export default function* rootSaga() {
-  yield all([ChannelsSaga(), MessagesSaga(), MembersSaga(), UsersSaga()])
+  yield all([ChannelsSaga(), MessagesSaga(), MembersSaga(), UsersSaga(), PinnedMessagesSaga()])
 }

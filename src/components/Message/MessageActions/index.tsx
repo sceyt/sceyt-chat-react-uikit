@@ -18,6 +18,8 @@ import { ReactComponent as CopyIcon } from '../../../assets/svg/copyIcon.svg'
 import { ReactComponent as ReplyThreadIcon } from '../../../assets/svg/replyInThreadIcon.svg'
 import { ReactComponent as ArrowDownIcon } from '../../../assets/svg/arrowDown.svg'
 import { ReactComponent as InfoIcon } from '../../../assets/svg/info-action.svg'
+import { ReactComponent as PinIcon } from '../../../assets/svg/pin.svg'
+import { ReactComponent as UnpinIcon } from '../../../assets/svg/unpin.svg'
 // Helpers
 import { THEME_COLORS } from '../../../UIHelper/constants'
 import { ItemNote } from '../../../UIHelper'
@@ -104,7 +106,11 @@ export default function MessageActions({
   myRole,
   isIncoming,
   messageActionIconsColor,
-  handleOpenEmojis
+  handleOpenEmojis,
+  handleOpenPinMessage,
+  handleUnpinMessage,
+  pinnedMessage,
+  isPinned
 }: any) {
   const {
     [THEME_COLORS.ACCENT]: accentColor,
@@ -262,6 +268,35 @@ export default function MessageActions({
             {copyIcon || <CopyIcon />}
           </Action>
         )}
+        {!isThreadMessage &&
+          messageStatus !== MESSAGE_DELIVERY_STATUS.PENDING &&
+          (isPinned || pinnedMessage ? (
+            <Action
+              order={5}
+              iconColor={messageActionIconsColor || iconInactive}
+              hoverBackgroundColor={backgroundHovered}
+              hoverIconColor={accentColor}
+              onClick={() => handleUnpinMessage?.()}
+            >
+              <ItemNote disabledColor={textSecondary} bgColor={tooltipBackground} direction='top'>
+                Unpin <ArrowDownIcon />
+              </ItemNote>
+              <UnpinIcon />
+            </Action>
+          ) : (
+            <Action
+              order={5}
+              iconColor={messageActionIconsColor || iconInactive}
+              hoverBackgroundColor={backgroundHovered}
+              hoverIconColor={accentColor}
+              onClick={() => handleOpenPinMessage?.()}
+            >
+              <ItemNote disabledColor={textSecondary} bgColor={tooltipBackground} direction='top'>
+                Pin <ArrowDownIcon />
+              </ItemNote>
+              <PinIcon />
+            </Action>
+          ))}
 
         {isPollMessage && allowVoteRetract && !pollClosed && !isViewOnceMessage && (
           <Action

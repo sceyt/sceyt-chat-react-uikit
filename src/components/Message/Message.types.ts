@@ -26,6 +26,10 @@ export interface IMessageActions {
   handleOpenEmojis?: () => void
   handleSelectMessage?: (event?: any) => void
   handleReplyMessage?: () => void
+  handleOpenPinMessage?: () => void
+  handleUnpinMessage?: () => void
+  pinnedMessage?: any
+  isPinned?: boolean
   isThreadMessage?: boolean
   rtlDirection?: boolean
   // Render the actions bar under the bubble (set when there is no room above)
@@ -70,6 +74,10 @@ interface ICustomMessageItem {
   handleOpenInfoMessage?: () => void
   handleOpenEmojis?: () => void
   handleReplyMessage?: (threadReply?: boolean) => void
+  handleOpenPinMessage?: () => void
+  handleUnpinMessage?: () => void
+  pinnedMessage?: any
+  isPinned?: boolean
   handleMouseEnter: () => void
   handleMouseLeave: () => void
   closeMessageActions?: () => void

@@ -57,6 +57,9 @@ const Message = ({
   const messageMetas = useMemo(() => {
     return isJSON(message.metadata) ? JSON.parse(message.metadata) : message.metadata
   }, [message.metadata])
+  const actorName = message.incoming
+    ? makeUsername(message.user && contactsMap[message.user.id], message.user, getFromContacts)
+    : 'You'
 
   useEffect(() => {
     if (isVisible && !unreadScrollTo) {
@@ -106,55 +109,59 @@ const Message = ({
       borderRadius={borderRadius}
     >
       <span>
-        {message.incoming
-          ? makeUsername(message.user && contactsMap[message.user.id], message.user, getFromContacts)
-          : 'You'}
-        {message.body === 'CC'
-          ? ' created this channel '
-          : message.body === 'CG'
-            ? ' created this group'
-            : message.body === 'AM'
-              ? ` added ${
-                  !!(messageMetas && messageMetas.m) &&
-                  messageMetas.m
-                    .slice(0, 5)
-                    .map((mem: string) =>
-                      mem === user.id
-                        ? 'You'
-                        : ` ${systemMessageUserName(mem, contactsMap[mem], message.mentionedUsers)}`
-                    )
-                } ${
-                  messageMetas && messageMetas.m && messageMetas.m.length > 5
-                    ? `and ${messageMetas.m.length - 5} more`
-                    : ''
-                }`
-              : message.body === 'RM'
-                ? ` removed ${
-                    messageMetas &&
-                    messageMetas.m &&
-                    messageMetas.m
-                      .slice(0, 5)
-                      .map((mem: string) =>
-                        mem === user.id
-                          ? 'You'
-                          : ` ${systemMessageUserName(mem, contactsMap[mem], message.mentionedUsers)}`
-                      )
-                  } ${
-                    messageMetas && messageMetas.m && messageMetas.m.length > 5
-                      ? `and ${messageMetas.m.length - 5} more`
-                      : ''
-                  }`
-                : message.body === 'LG'
-                  ? ' left the group'
-                  : message.body === 'JL'
-                    ? ` joined via invite link`
-                    : message.body === 'ADM'
-                      ? !Number(messageMetas?.autoDeletePeriod)
-                        ? ' disabled disappearing messages'
-                        : ` set the disappearing messages timer to ${formatDisappearingMessageTime(
-                            messageMetas?.autoDeletePeriod ? Number(messageMetas.autoDeletePeriod) : null
-                          )}`
-                      : ''}
+        {message.body === 'PM' ? (
+          `@${actorName} pinned a message.`
+        ) : (
+          <React.Fragment>
+            {actorName}
+            {message.body === 'CC'
+              ? ' created this channel '
+              : message.body === 'CG'
+                ? ' created this group'
+                : message.body === 'AM'
+                  ? ` added ${
+                      !!(messageMetas && messageMetas.m) &&
+                      messageMetas.m
+                        .slice(0, 5)
+                        .map((mem: string) =>
+                          mem === user.id
+                            ? 'You'
+                            : ` ${systemMessageUserName(mem, contactsMap[mem], message.mentionedUsers)}`
+                        )
+                    } ${
+                      messageMetas && messageMetas.m && messageMetas.m.length > 5
+                        ? `and ${messageMetas.m.length - 5} more`
+                        : ''
+                    }`
+                  : message.body === 'RM'
+                    ? ` removed ${
+                        messageMetas &&
+                        messageMetas.m &&
+                        messageMetas.m
+                          .slice(0, 5)
+                          .map((mem: string) =>
+                            mem === user.id
+                              ? 'You'
+                              : ` ${systemMessageUserName(mem, contactsMap[mem], message.mentionedUsers)}`
+                          )
+                      } ${
+                        messageMetas && messageMetas.m && messageMetas.m.length > 5
+                          ? `and ${messageMetas.m.length - 5} more`
+                          : ''
+                      }`
+                    : message.body === 'LG'
+                      ? ' left the group'
+                      : message.body === 'JL'
+                        ? ` joined via invite link`
+                        : message.body === 'ADM'
+                          ? !Number(messageMetas?.autoDeletePeriod)
+                            ? ' disabled disappearing messages'
+                            : ` set the disappearing messages timer to ${formatDisappearingMessageTime(
+                                messageMetas?.autoDeletePeriod ? Number(messageMetas.autoDeletePeriod) : null
+                              )}`
+                          : ''}
+          </React.Fragment>
+        )}
       </span>
     </Container>
   )

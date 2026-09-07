@@ -7,10 +7,12 @@ import { IMessage } from '../types'
 // Every operation degrades to a no-op when IndexedDB is unavailable.
 
 const DB_NAME = 'sceyt-uikit-messages'
-const DB_VERSION = 2
+const DB_VERSION = 3
 const CHANNELS_STORE = 'channels'
 const DRAFTS_STORE = 'drafts'
 const META_STORE = 'meta'
+const PINS_STORE = 'pins'
+const PIN_MUTATIONS_STORE = 'pinMutations'
 const USER_META_KEY = 'userId'
 export const IDB_MAX_STORED_CHANNELS = 200
 export const IDB_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000
@@ -26,6 +28,22 @@ export type PersistedDraft = {
   channelId: string
   draft: any
   savedAt: number
+}
+
+export type PersistedPinnedMessages = {
+  channelId: string
+  pins: any[]
+  nextToken?: string
+  savedAt: number
+}
+
+export type PersistedPinMutation = {
+  id: string
+  channelId: string
+  operation: 'PIN' | 'UNPIN'
+  messageId: string
+  pinType?: number
+  queuedAt: number
 }
 
 let dbPromise: Promise<IDBDatabase | null> | null = null
@@ -51,6 +69,14 @@ const openDb = (): Promise<IDBDatabase | null> => {
         }
         if (!db.objectStoreNames.contains(META_STORE)) {
           db.createObjectStore(META_STORE)
+        }
+        if (!db.objectStoreNames.contains(PINS_STORE)) {
+          const store = db.createObjectStore(PINS_STORE, { keyPath: 'channelId' })
+          store.createIndex('savedAt', 'savedAt')
+        }
+        if (!db.objectStoreNames.contains(PIN_MUTATIONS_STORE)) {
+          const store = db.createObjectStore(PIN_MUTATIONS_STORE, { keyPath: 'id' })
+          store.createIndex('channelId', 'channelId')
         }
       }
       request.onsuccess = () => resolve(request.result)
@@ -240,6 +266,81 @@ export const clearPersistedChannels = async (): Promise<void> => {
   }
 }
 
+export const persistPinnedMessages = async (channelId: string, pins: any[], nextToken?: string): Promise<void> => {
+  if (!channelId) return
+  const db = await openDb()
+  if (!db) return
+  try {
+    db.transaction(PINS_STORE, 'readwrite').objectStore(PINS_STORE).put({
+      channelId,
+      pins: toStructuredCloneSafeValue(pins),
+      nextToken,
+      savedAt: Date.now()
+    } as PersistedPinnedMessages)
+  } catch (e) {
+    log.info('messagesIdb: failed to persist pins', e)
+  }
+}
+
+export const restorePinnedMessages = async (channelId: string): Promise<PersistedPinnedMessages | null> => {
+  if (!channelId) return null
+  const db = await openDb()
+  if (!db) return null
+  try {
+    return (await requestToPromise<PersistedPinnedMessages | undefined>(
+      db.transaction(PINS_STORE, 'readonly').objectStore(PINS_STORE).get(channelId)
+    )) || null
+  } catch (e) {
+    log.info('messagesIdb: failed to restore pins', e)
+    return null
+  }
+}
+
+export const persistPinMutation = async (mutation: PersistedPinMutation): Promise<void> => {
+  const db = await openDb()
+  if (!db) return
+  try {
+    db.transaction(PIN_MUTATIONS_STORE, 'readwrite').objectStore(PIN_MUTATIONS_STORE).put(mutation)
+  } catch (e) {
+    log.info('messagesIdb: failed to persist pin mutation', e)
+  }
+}
+
+export const removePersistedPinMutation = async (id: string): Promise<void> => {
+  const db = await openDb()
+  if (!db || !id) return
+  try {
+    db.transaction(PIN_MUTATIONS_STORE, 'readwrite').objectStore(PIN_MUTATIONS_STORE).delete(id)
+  } catch (_) {
+    // A retry on next reconnect is safe.
+  }
+}
+
+export const restorePinnedMutations = async (): Promise<PersistedPinMutation[]> => {
+  const db = await openDb()
+  if (!db) return []
+  try {
+    return await requestToPromise<PersistedPinMutation[]>(
+      db.transaction(PIN_MUTATIONS_STORE, 'readonly').objectStore(PIN_MUTATIONS_STORE).getAll()
+    )
+  } catch (e) {
+    log.info('messagesIdb: failed to restore pin mutations', e)
+    return []
+  }
+}
+
+export const clearPersistedPins = async (): Promise<void> => {
+  const db = await openDb()
+  if (!db) return
+  try {
+    const tx = db.transaction([PINS_STORE, PIN_MUTATIONS_STORE], 'readwrite')
+    tx.objectStore(PINS_STORE).clear()
+    tx.objectStore(PIN_MUTATIONS_STORE).clear()
+  } catch (_) {
+    // ignore
+  }
+}
+
 // Wipes the spilled caches when a different user connects (multi-account
 // safety) and prunes stale/overflowing entries.
 export const initMessagesIdbForUser = async (userId: string): Promise<void> => {
@@ -256,6 +357,7 @@ export const initMessagesIdbForUser = async (userId: string): Promise<void> => {
     if (storedUserId !== userId) {
       await clearPersistedChannels()
       await clearPersistedDrafts()
+      await clearPersistedPins()
       db.transaction(META_STORE, 'readwrite').objectStore(META_STORE).put(userId, USER_META_KEY)
       return
     }

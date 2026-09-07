@@ -157,6 +157,11 @@ export interface IPollDetails {
   closed: boolean
 }
 
+export interface IPinDetails {
+  pinned: boolean
+  pinnedTill?: Date
+}
+
 export interface IMessage {
   id: string
   tid?: string
@@ -195,6 +200,7 @@ export interface IMessage {
     user: IUser
   }
   pollDetails?: IPollDetails
+  pinDetails?: IPinDetails
   viewOnce?: boolean
 }
 
