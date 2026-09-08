@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState, useCallback } from 'react'
+import React, { useEffect, useMemo, useState, useCallback } from 'react'
 import { createPortal } from 'react-dom'
 import { shallowEqual } from 'react-redux'
 import { useSelector, useDispatch } from 'store/hooks'
@@ -13,7 +13,8 @@ import { ReactComponent as LeftArrow } from '../../../assets/svg/sliderButtonLef
 import { ReactComponent as ForwardIcon } from '../../../assets/svg/forward.svg'
 import { ReactComponent as DeleteIcon } from '../../../assets/svg/deleteChannel.svg'
 import { bytesToSize, downloadFile } from '../../../helpers'
-import { makeUsername } from '../../../helpers/message'
+import { isJSON, makeUsername } from '../../../helpers/message'
+import { base64ToDataURL } from '../../../helpers/resizeImage'
 import { IAttachment, IChannel, IMedia, IMessage } from '../../../types'
 import { getCustomDownloader } from '../../../helpers/customUploader'
 import {
@@ -70,6 +71,18 @@ interface IProps {
   messageType?: string | null | undefined
 }
 
+const getMediaThumbnailSource = (file: IMedia): string | undefined => {
+  const metadata = isJSON(file.metadata) ? JSON.parse(file.metadata) : file.metadata
+  const thumbnail = metadata?.tmb
+  if (!thumbnail || typeof thumbnail !== 'string') return undefined
+
+  try {
+    return thumbnail.length < 70 ? base64ToDataURL(thumbnail) : `data:image/jpeg;base64,${thumbnail}`
+  } catch {
+    return undefined
+  }
+}
+
 const SliderPopup: React.FC<IProps> = ({
   channel,
   setIsSliderOpen,
@@ -121,9 +134,6 @@ const SliderPopup: React.FC<IProps> = ({
   const customDownloader = getCustomDownloader()
   const contactsMap = useSelector(contactsMapSelector)
   const attachmentsList = useSelector(attachmentsForPopupSelector, shallowEqual) || []
-  const previousListLengthRef = useRef<number>(attachmentsList.length)
-  const currentFileIdRef = useRef<string | undefined>(currentFile?.id)
-  const [skipTransition, setSkipTransition] = useState(false)
   const attachmentUserName = currentFile
     ? currentFile.user &&
       makeUsername(
@@ -349,69 +359,12 @@ const SliderPopup: React.FC<IProps> = ({
   }, [attachmentsList])
 
   useEffect(() => {
-    if (customDownloader && currentMediaFile && currentMediaFile.id) {
-      const attachmentUrl = currentMediaFile.url + prefixUrl
-      getAttachmentUrlFromCache(attachmentUrl)
-        .then((cachedUrl: string | false) => {
-          if (cachedUrl) {
-            if (currentMediaFile.type === 'image') {
-              downloadImage(cachedUrl as string, false, 'image')
-            } else {
-              dispatch(setUpdateMessageAttachmentAC(attachmentUrl, cachedUrl))
-              setPlayedVideo(currentMediaFile.id)
-            }
-          } else {
-            if (customDownloader) {
-              customDownloader(currentMediaFile.url, false, () => {}, messageType)
-                .then(async (url) => {
-                  try {
-                    const response = await fetch(url)
-                    setAttachmentToCache(attachmentUrl, response)
-                    if (currentMediaFile.type === 'image') {
-                      downloadImage(url, false, 'image')
-                    } else {
-                      dispatch(setUpdateMessageAttachmentAC(attachmentUrl, url))
-                      setPlayedVideo(currentMediaFile.id)
-                    }
-                  } catch (error) {
-                    log.error('Error fetching initial attachment:', error)
-                  }
-                })
-                .catch((error) => {
-                  log.error('Error downloading initial attachment:', error)
-                })
-            } else {
-              if (currentMediaFile.type === 'image') {
-                downloadImage(attachmentUrl, false, 'image')
-              } else {
-                dispatch(setUpdateMessageAttachmentAC(attachmentUrl, currentMediaFile.url))
-                setPlayedVideo(currentMediaFile.id)
-              }
-            }
-          }
-        })
-        .catch((error) => {
-          log.error('Error getting initial attachment from cache:', error)
-        })
-    }
-    const foundInStaleList = !!attachmentsList.find((item: IMedia) => item.id === currentMediaFile.id)
-    // eslint-disable-next-line no-console
-    console.log(
-      '[MEDIA_OPEN] 4.slider-mount ' +
-        JSON.stringify({
-          attId: currentMediaFile.id,
-          name: currentMediaFile.name,
-          msgId: currentMediaFile.messageId,
-          staleListLen: attachmentsList.length,
-          foundInStaleList,
-          staleListIds: attachmentsList.slice(0, 5).map((item: IMedia) => item.id)
-        })
-    )
-    if (!foundInStaleList) {
-      dispatch(setAttachmentsForPopupAC([currentMediaFile]))
-    }
+    // Always replace the shared popup list before querying near the selected
+    // attachment. Keeping a previous channel's list here creates a carousel
+    // index mismatch and causes the visible item to blink or never load.
+    dispatch(setAttachmentsForPopupAC([currentMediaFile]))
     dispatch(getAttachmentsAC(channel.id, channelDetailsTabs.media, 34, queryDirection.NEAR, currentMediaFile.id, true))
-  }, [])
+  }, [channel.id, currentMediaFile, dispatch])
 
   const activeFileIndex = useMemo(() => {
     if (!currentFile?.id) return -1
@@ -424,69 +377,14 @@ const SliderPopup: React.FC<IProps> = ({
     return index
   }, [attachmentsList, currentFile])
 
-  // Handle when attachmentsList increases - maintain current element position instantly
+  // Replace the selected item with the latest query result without changing
+  // its identity. Carousel tracks the matching id via activeFileIndex.
   useEffect(() => {
-    const currentFileId = currentFile?.id
-    const previousLength = previousListLengthRef.current
-    const newLength = attachmentsList.length
-
-    let timeoutId: NodeJS.Timeout | null = null
-
-    // If list increased and we have a current file, update carousel to maintain position
-    if (newLength > previousLength && currentFileId) {
-      // Set skipTransition synchronously BEFORE any state updates to prevent blinking
-      // This must happen in the same render cycle to prevent visual glitches
-      setSkipTransition(true)
-
-      // Calculate the new index of the current file
-      const newIndex = attachmentsList.findIndex((item: IMedia) => item.id === currentFileId)
-
-      // If current file is found in the new list
-      // eslint-disable-next-line no-console
-      console.log(
-        '[MEDIA_OPEN] 6.list-grew ' +
-          JSON.stringify({ prevLen: previousLength, newLen: newLength, attId: currentFileId, newIndex, activeFileIndex })
-      )
-      if (newIndex >= 0) {
-        // If index changed (items prepended), update currentFile to trigger position update
-        // The activeFileIndex will recalculate, and Carousel will update via initialActiveIndex prop
-        if (newIndex !== activeFileIndex) {
-          const newFile = attachmentsList[newIndex]
-          if (newFile) {
-            // Batch the state update to happen after skipTransition is set
-            // React will batch these updates, but skipTransition will be set first
-            setCurrentFile(newFile)
-          }
-        }
-
-        // Reset skipTransition after position update completes
-        // Use multiple requestAnimationFrame calls to ensure all DOM updates are complete
-        timeoutId = setTimeout(() => {
-          requestAnimationFrame(() => {
-            requestAnimationFrame(() => {
-              setSkipTransition(false)
-            })
-          })
-        }, 150)
-      } else {
-        // If current file not found, reset skipTransition after a delay
-        timeoutId = setTimeout(() => {
-          setSkipTransition(false)
-        }, 150)
-      }
+    const latestCurrentFile = attachmentsList.find((file: IMedia) => file.id === currentFile.id)
+    if (latestCurrentFile && latestCurrentFile !== currentFile) {
+      setCurrentFile(latestCurrentFile)
     }
-
-    // Update refs
-    previousListLengthRef.current = newLength
-    currentFileIdRef.current = currentFileId
-
-    // Return cleanup function that clears timeout if it was set
-    return () => {
-      if (timeoutId) {
-        clearTimeout(timeoutId)
-      }
-    }
-  }, [attachmentsList.length, currentFile?.id, activeFileIndex, attachmentsList])
+  }, [attachmentsList, currentFile])
 
   const handleCarouselItemMouseDown = useCallback((e: React.MouseEvent) => {
     if (e.button === 2) {
@@ -610,7 +508,6 @@ const SliderPopup: React.FC<IProps> = ({
             pagination={false}
             className='custom_carousel'
             initialActiveIndex={activeFileIndex >= 0 ? activeFileIndex : 0}
-            skipTransition={skipTransition}
             onNextStart={() => {
               setReadyToPlay(false)
               loadNextMoreAttachments()
@@ -682,19 +579,23 @@ const SliderPopup: React.FC<IProps> = ({
                 )}
                 {file.type === 'image' ? (
                   <React.Fragment>
-                    {attachmentUpdatedMap[getAttachmentURLWithVersion(file.url + '_original_image_url')] && (
+                    {(attachmentUpdatedMap[getAttachmentURLWithVersion(file.url + '_original_image_url')] ||
+                      getMediaThumbnailSource(file)) && (
                       <img
-                        loading='lazy'
+                        loading='eager'
                         decoding='async'
                         draggable={false}
-                        src={attachmentUpdatedMap[getAttachmentURLWithVersion(file.url + '_original_image_url')]}
+                        src={
+                          attachmentUpdatedMap[getAttachmentURLWithVersion(file.url + '_original_image_url')] ||
+                          getMediaThumbnailSource(file)
+                        }
                         alt={file.name || 'Attachment'}
                         onMouseDown={(e) => {
                           if (e.button === 2) {
                             e.stopPropagation()
                           }
                         }}
-                        style={{ position: 'relative', zIndex: 2, opacity: isItemLoading(file.id) ? 0 : 1 }}
+                        style={{ position: 'relative', zIndex: 2, opacity: 1 }}
                         onLoad={() => {
                           const fileId = file.id
                           if (fileId) {
@@ -892,26 +793,33 @@ const IconWrapper = styled.span<{ margin?: string; hideInMobile?: boolean; color
 const CarouselItem = styled.div`
   position: relative;
   display: flex;
+  width: calc(100% - 200px);
+  height: calc(100% - 80px);
   max-width: calc(100% - 200px);
+  max-height: calc(100vh - 140px);
+  align-items: center;
+  justify-content: center;
   z-index: 2;
 
   img,
   video {
-    min-width: 280px;
-    max-width: 100%;
-    margin: auto;
+    width: 100%;
+    height: 100%;
+    min-width: 0;
+    min-height: 0;
     object-fit: contain;
-    max-height: calc(100vh - 200px);
     @media (max-width: 480px) {
-      min-width: inherit;
+      width: 100%;
     }
   }
   @media (max-width: 480px) {
+    width: calc(100% - 100px);
+    height: calc(100% - 48px);
     max-width: calc(100% - 100px);
   }
 
   img {
-    min-width: inherit;
+    display: block;
   }
 `
 const UploadCont = styled.div`

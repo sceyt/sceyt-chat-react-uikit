@@ -89,9 +89,14 @@ const videoAttachment = {
   data: new Blob(['video'], { type: 'video/mp4' })
 }
 
-const renderAttachment = (messageState: Record<string, any> = {}) =>
+const renderAttachment = (messageState: Record<string, any> = {}, attachmentProps: Record<string, any> = {}) =>
   renderWithSceytProvider(
-    <Attachment attachment={videoAttachment as any} backgroundColor='#ffffff' videoAttachmentMaxWidth={420} />,
+    <Attachment
+      attachment={videoAttachment as any}
+      backgroundColor='#ffffff'
+      videoAttachmentMaxWidth={420}
+      {...attachmentProps}
+    />,
     {
       store: createMessageListStore({
         UserReducer: { connectionStatus: CONNECTION_STATUS.CONNECTED },
@@ -156,6 +161,19 @@ describe('video attachment preview and download states', () => {
 
     expect(mockGetAttachmentUrlFromCache).toHaveBeenNthCalledWith(1, 'https://cdn/video-thumb.jpg')
     expect(mockGetAttachmentUrlFromCache).toHaveBeenNthCalledWith(2, 'https://cdn/video.mp4_original_video_url')
+    expect(screen.queryByTestId('video-download-progress')).not.toBeInTheDocument()
+    expect(global.fetch).not.toHaveBeenCalled()
+  })
+
+  it('does not download video originals for media-grid tiles', async () => {
+    mockGetAttachmentUrlFromCache.mockResolvedValueOnce('blob:cached-thumb')
+    global.fetch = jest.fn()
+
+    renderAttachment({}, { isDetailsView: true })
+    await flushAttachmentEffects()
+
+    expect(mockGetAttachmentUrlFromCache).toHaveBeenCalledTimes(1)
+    expect(mockGetAttachmentUrlFromCache).toHaveBeenCalledWith('https://cdn/video-thumb.jpg')
     expect(screen.queryByTestId('video-download-progress')).not.toBeInTheDocument()
     expect(global.fetch).not.toHaveBeenCalled()
   })

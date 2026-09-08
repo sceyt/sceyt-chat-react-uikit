@@ -3,7 +3,7 @@ import styled, { keyframes } from 'styled-components'
 import { shallowEqual } from 'react-redux'
 import { useSelector, useDispatch } from 'store/hooks'
 // Store
-import { getAttachmentsAC, setAttachmentsAC } from '../../../../store/message/actions'
+import { getAttachmentsAC, setAttachmentsAC, setAttachmentsForPopupAC } from '../../../../store/message/actions'
 import { activeTabAttachmentsSelector, attachmentLoadingStateSelector } from '../../../../store/message/selector'
 // Helpers
 import { isJSON } from '../../../../helpers/message'
@@ -32,6 +32,10 @@ const Media = ({ channel }: IProps) => {
 
   const handleMediaItemClick = (file: IAttachment) => {
     if (file?.id) {
+      // The popup attachment list is shared across channels. Seed it with the
+      // clicked item before mounting the slider so stale items cannot render
+      // while the near-item query is in flight.
+      dispatch(setAttachmentsForPopupAC([file]))
       setMediaFile(file)
     }
   }
@@ -75,7 +79,7 @@ const Media = ({ channel }: IProps) => {
               </StickyMonthHeader>
               <ItemsGrid>
                 {group.items.map((file: IAttachment, index: number) => (
-                  <MediaItem key={`${file.id}_${index}`}>
+                  <MediaItem key={file.id || `${file.messageId}_${index}`}>
                     <Attachment
                       attachment={{
                         ...file,

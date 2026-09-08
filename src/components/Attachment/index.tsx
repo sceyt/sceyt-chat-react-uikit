@@ -580,12 +580,18 @@ const Attachment = ({
 
     let cancelled = false
     const loadVideoThumbAndOriginal = async () => {
-      // The thumbnail is cached separately and never controls the full-video
-      // spinner. VideoPreview downloads it on a miss.
+      // The details grid may contain dozens of videos. It must never download
+      // every original just to render their tiles; VideoPreview fetches only a
+      // small thumbnail on a cache miss. The original is fetched on demand by
+      // the slider after the user opens one item.
       const cachedThumb = await getAttachmentUrlFromCache(videoThumb).catch(() => false)
       if (cancelled) return
       if (typeof cachedThumb === 'string') {
         dispatch(setUpdateMessageAttachmentAC(videoThumb, cachedThumb))
+      }
+      if (isDetailsView) {
+        setIsCached(true)
+        return
       }
 
       // The full video controls downloadingFile. Check its browser cache before
@@ -614,6 +620,7 @@ const Attachment = ({
     attachment.url,
     attachment.metadata,
     attachment.attachmentUrl,
+    isDetailsView,
     originalVideoUrlFromMap,
     connectionStatus,
     dispatch
