@@ -7,7 +7,9 @@ import { navigateToMessage } from '../../helpers/messageListNavigator'
 import { THEME_COLORS } from '../../UIHelper/constants'
 import { useColor } from '../../hooks'
 import { ReactComponent as PinIcon } from '../../assets/svg/pin.svg'
+import { ReactComponent as LinkIcon } from '../../assets/svg/linkIcon.svg'
 import { attachmentTypes } from '../../helpers/constants'
+import { getReplyLinkPreviewImage } from '../../helpers/replyPreview'
 import Attachment from '../Attachment'
 
 const attachmentMetadata = (attachment: any) => {
@@ -35,6 +37,7 @@ const preview = (message: any) => {
   if (attachment.type === attachmentTypes.video) {
     return 'Video'
   }
+  if (attachment.type === attachmentTypes.link) return attachment.url || 'Link'
   return attachment.name || 'File'
 }
 
@@ -64,10 +67,13 @@ const PinnedMessagesBanner = ({ channelId }: { channelId: string }) => {
     [THEME_COLORS.SURFACE_1]: surface1,
     [THEME_COLORS.TEXT_PRIMARY]: textPrimary,
     [THEME_COLORS.TEXT_SECONDARY]: textSecondary,
-    [THEME_COLORS.ICON_PRIMARY]: iconPrimary
+    [THEME_COLORS.ICON_PRIMARY]: iconPrimary,
+    [THEME_COLORS.ACCENT]: accentColor,
+    [THEME_COLORS.BACKGROUND]: background
   } = useColor()
   const [activePinId, setActivePinId] = useState<string>()
   const [advanceAfterPage, setAdvanceAfterPage] = useState(false)
+  const [linkPreviewImageFailed, setLinkPreviewImageFailed] = useState(false)
   const markerRefs = useRef<Record<number, HTMLButtonElement | null>>({})
   const requestedNextTokenRef = useRef<string | undefined>()
   const selectedIndex = activePinId ? pins.findIndex((pin) => pin.id === activePinId) : -1
@@ -87,6 +93,9 @@ const PinnedMessagesBanner = ({ channelId }: { channelId: string }) => {
   useEffect(() => {
     dispatch(loadPinnedMessagesAC(channelId))
   }, [channelId, dispatch])
+  useEffect(() => {
+    setLinkPreviewImageFailed(false)
+  }, [active?.id])
 
   const count = pins.length
   if (!active) return null
@@ -97,6 +106,18 @@ const PinnedMessagesBanner = ({ channelId }: { channelId: string }) => {
     messageId: attachment.messageId || messageId,
     metadata: attachmentMetadata(attachment)
   }
+  const linkPreviewImage =
+    attachment?.type === attachmentTypes.link
+      ? getReplyLinkPreviewImage([
+          {
+            ...attachment,
+            metadata:
+              typeof attachment.metadata === 'string'
+                ? attachment.metadata
+                : JSON.stringify(attachmentMetadata(attachment))
+          }
+        ])
+      : null
   const markerFade: MarkerFade = count <= 3 ? 'none' : index <= 1 ? 'top' : index >= count - 2 ? 'bottom' : 'both'
   const loadNextPage = () => {
     if (!nextToken || requestedNextTokenRef.current === nextToken) return false
@@ -160,6 +181,15 @@ const PinnedMessagesBanner = ({ channelId }: { channelId: string }) => {
           />
         </PinnedAttachmentPreview>
       )}
+      {attachment?.type === attachmentTypes.link && (
+        <PinnedLinkPreview aria-hidden='true' svgColor={accentColor} fillColor={background}>
+          {linkPreviewImage && !linkPreviewImageFailed ? (
+            <img src={linkPreviewImage} alt='' onError={() => setLinkPreviewImageFailed(true)} />
+          ) : (
+            <LinkIcon />
+          )}
+        </PinnedLinkPreview>
+      )}
       <Copy key={active.id} textPrimary={textPrimary} textSecondary={textSecondary}>
         <strong>Pinned messages</strong>
         <span>{preview(active.message)}</span>
@@ -179,7 +209,7 @@ const Banner = styled.div<{ background: string }>`
   width: 100%;
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 8px;
   box-sizing: border-box;
   border: 0;
   padding: 0 8px;
@@ -194,7 +224,7 @@ const Banner = styled.div<{ background: string }>`
 const Markers = styled.div<{ compact: boolean; fade: MarkerFade }>`
   align-self: center;
   width: 2px;
-  height: 51px;
+  height: 52px;
   box-sizing: border-box;
   display: flex;
   /* The SDK returns newest first; reverse the rail so the newest pin starts at the bottom. */
@@ -227,6 +257,30 @@ const PinnedAttachmentPreview = styled.div`
 
   > div {
     margin-right: 0;
+  }
+`
+const PinnedLinkPreview = styled.div<{ svgColor: string; fillColor: string }>`
+  width: 40px;
+  height: 40px;
+  flex: 0 0 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  border-radius: 4px;
+
+  img {
+    width: 40px;
+    height: 40px;
+    display: block;
+    object-fit: cover;
+  }
+  svg {
+    color: ${(props) => props.svgColor};
+    rect {
+      fill: ${(props) => props.fillColor};
+      fill-opacity: 1;
+    }
   }
 `
 const slidePinnedPreview = keyframes`
