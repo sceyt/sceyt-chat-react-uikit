@@ -8,25 +8,44 @@ import { THEME_COLORS } from '../../UIHelper/constants'
 import { useColor } from '../../hooks'
 import { ReactComponent as PinIcon } from '../../assets/svg/pin.svg'
 import { attachmentTypes } from '../../helpers/constants'
+import Attachment from '../Attachment'
+
+const attachmentMetadata = (attachment: any) => {
+  if (!attachment?.metadata) return {}
+  if (typeof attachment.metadata !== 'string') return attachment.metadata
+
+  try {
+    return JSON.parse(attachment.metadata)
+  } catch (_) {
+    return {}
+  }
+}
 
 const preview = (message: any) => {
-  if (message?.body) return message.body
+  if (message?.pollDetails) return `Poll: ${message.pollDetails.name || message.body || 'Poll'}`
   const attachment = message?.attachments?.[0]
   if (!attachment) return message?.forwardingDetails ? 'Shared content' : 'Message'
+  const metadata = attachmentMetadata(attachment)
+  if (attachment.type === attachmentTypes.voice) {
+    const duration = metadata.duration || metadata.dur || attachment.duration
+    return `Voice${duration ? `: ${formatDuration(duration)}` : ''}`
+  }
+  if (message?.body) return message.body
   if (attachment.type === attachmentTypes.image) return 'Photo'
   if (attachment.type === attachmentTypes.video) {
-    const duration = attachment.metadata?.duration || attachment.metadata?.dur || attachment.duration
-    return `Video${duration ? `: ${formatDuration(duration)}` : ''}`
+    return 'Video'
   }
-  if (attachment.type === attachmentTypes.voice) return 'Voice message'
   return attachment.name || 'File'
 }
 
 const formatDuration = (duration: number | string) => {
   const seconds = Math.max(0, Math.round(Number(duration) || 0))
   const minutes = Math.floor(seconds / 60)
-  return `${minutes}:${String(seconds % 60).padStart(2, '0')}`
+  return `${String(minutes).padStart(2, '0')}:${String(seconds % 60).padStart(2, '0')}`
 }
+
+const hasAttachmentTile = (attachment: any) =>
+  [attachmentTypes.image, attachmentTypes.video, attachmentTypes.file].includes(attachment?.type)
 
 type MarkerFade = 'none' | 'top' | 'bottom' | 'both'
 
@@ -72,6 +91,12 @@ const PinnedMessagesBanner = ({ channelId }: { channelId: string }) => {
   const count = pins.length
   if (!active) return null
   const messageId = active.message?.id || active.message?.tid
+  const attachment = active.message?.attachments?.[0]
+  const attachmentForPreview = attachment && {
+    ...attachment,
+    messageId: attachment.messageId || messageId,
+    metadata: attachmentMetadata(attachment)
+  }
   const markerFade: MarkerFade = count <= 3 ? 'none' : index <= 1 ? 'top' : index >= count - 2 ? 'bottom' : 'both'
   const loadNextPage = () => {
     if (!nextToken || requestedNextTokenRef.current === nextToken) return false
@@ -124,6 +149,17 @@ const PinnedMessagesBanner = ({ channelId }: { channelId: string }) => {
           />
         ))}
       </Markers>
+      {hasAttachmentTile(attachmentForPreview) && (
+        <PinnedAttachmentPreview aria-hidden='true'>
+          <Attachment
+            attachment={attachmentForPreview}
+            isRepliedMessage
+            backgroundColor={surface1}
+            borderRadius='8px'
+            messageType={active.message?.type}
+          />
+        </PinnedAttachmentPreview>
+      )}
       <Copy key={active.id} textPrimary={textPrimary} textSecondary={textSecondary}>
         <strong>Pinned messages</strong>
         <span>{preview(active.message)}</span>
@@ -182,6 +218,16 @@ const Marker = styled.button<{ active: boolean; compact: boolean }>`
   border-radius: 2px;
   background: ${({ active }) => (active ? '#16B891' : '#C7CED8')};
   cursor: pointer;
+`
+const PinnedAttachmentPreview = styled.div`
+  width: 40px;
+  height: 40px;
+  flex: 0 0 40px;
+  overflow: hidden;
+
+  > div {
+    margin-right: 0;
+  }
 `
 const slidePinnedPreview = keyframes`
   from {
