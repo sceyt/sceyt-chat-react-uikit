@@ -168,8 +168,8 @@ const PinnedMessageIcon = styled.span<{ color: string }>`
   color: ${(props) => props.color};
 
   & > svg {
-    width: 15px;
-    height: 15px;
+    width: 14px;
+    height: 14px;
   }
 `
 

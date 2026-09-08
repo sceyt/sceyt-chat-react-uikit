@@ -187,6 +187,7 @@ export interface IMessage {
   mentionedUsers: IUser[]
   requestedMentionUserIds: string[] | null
   parentMessage: IMessage | null
+  parentMessageId?: string
   bodyAttributes: IBodyAttribute[] | []
   parentId?: string
   repliedInThread?: boolean

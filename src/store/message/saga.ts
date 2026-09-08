@@ -1568,7 +1568,7 @@ function* sendTextMessage(action: IAction): any {
     if (pendingMessage) {
       if (action.type !== RESEND_MESSAGE) {
         yield call(loadOGMetadataForLinkMessages, [pendingMessage], true)
-        yield call(updateMessage, action.type, pendingMessage, channel.id, true, message)
+        yield call(updateMessage, action.type, pendingMessage, channel.id, !message.skipAutoScroll, message)
       }
     }
     if (connectionState === CONNECTION_STATUS.CONNECTED) {

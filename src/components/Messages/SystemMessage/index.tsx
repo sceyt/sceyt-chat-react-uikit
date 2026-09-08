@@ -15,6 +15,7 @@ import { compareMessagesForList } from 'helpers/messagesHalper'
 import { removeVisibleMessageAC, scrollToNewMessageAC, setVisibleMessageAC } from 'store/message/actions'
 import { scrollToNewMessageSelector, unreadScrollToSelector } from 'store/message/selector'
 import { MESSAGE_TYPE } from 'types/enum'
+import { navigateToMessage } from 'helpers/messageListNavigator'
 
 interface ISystemMessageProps {
   channel: IChannel
@@ -60,6 +61,25 @@ const Message = ({
   const actorName = message.incoming
     ? makeUsername(message.user && contactsMap[message.user.id], message.user, getFromContacts)
     : 'You'
+  const parentMessageId =
+    message.parentMessage?.id || message.parentMessage?.tid || message.parentMessageId || message.parentId
+  const pinnedMessagePreview = useMemo(() => {
+    const parentMessage = message.parentMessage
+    if (!parentMessage) return ''
+    if (parentMessage.body?.trim()) return parentMessage.body.trim()
+
+    const attachment = parentMessage.attachments?.[0]
+    if (!attachment) return ''
+    if (attachment.type === 'image') return 'Photo'
+    if (attachment.type === 'video') return 'Video'
+    if (attachment.type === 'voice') return 'Voice message'
+    if (attachment.type === 'file') return attachment.name || 'File'
+    return attachment.name || attachment.type || 'Attachment'
+  }, [message.parentMessage])
+
+  const navigateToPinnedMessage = () => {
+    if (parentMessageId) navigateToMessage(parentMessageId)
+  }
 
   useEffect(() => {
     if (isVisible && !unreadScrollTo) {
@@ -108,10 +128,18 @@ const Message = ({
       backgroundColor={backgroundColor || overlayBackground}
       borderRadius={borderRadius}
     >
-      <span>
-        {message.body === 'PM' ? (
-          `@${actorName} pinned a message.`
-        ) : (
+      {message.body === 'PM' ? (
+        <PinnedSystemMessage
+          type='button'
+          onClick={navigateToPinnedMessage}
+          disabled={!parentMessageId}
+          aria-label={parentMessageId ? 'Go to pinned message' : undefined}
+        >
+          {`${actorName} pinned a message.`}
+          {pinnedMessagePreview && <PinnedMessagePreview>{pinnedMessagePreview}</PinnedMessagePreview>}
+        </PinnedSystemMessage>
+      ) : (
+        <span>
           <React.Fragment>
             {actorName}
             {message.body === 'CC'
@@ -161,8 +189,8 @@ const Message = ({
                               )}`
                           : ''}
           </React.Fragment>
-        )}
-      </span>
+        </span>
+      )}
     </Container>
   )
 }
@@ -171,6 +199,10 @@ export default React.memo(Message, (prevProps, nextProps) => {
   return (
     prevProps.message.deliveryStatus === nextProps.message.deliveryStatus &&
     prevProps.message.state === nextProps.message.state &&
+    prevProps.message.body === nextProps.message.body &&
+    prevProps.message.parentMessage === nextProps.message.parentMessage &&
+    prevProps.message.parentMessageId === nextProps.message.parentMessageId &&
+    prevProps.message.parentId === nextProps.message.parentId &&
     prevProps.message.userMarkers === nextProps.message.userMarkers &&
     prevProps.nextMessage === nextProps.nextMessage
   )
@@ -195,7 +227,8 @@ export const Container = styled.div<{
   text-align: center;
   z-index: 10;
   background: transparent;
-  span {
+  > span,
+  button {
     display: inline-block;
     max-width: 380px;
     font-style: normal;
@@ -213,4 +246,23 @@ export const Container = styled.div<{
     text-overflow: ellipsis;
     overflow: hidden;
   }
+`
+
+const PinnedSystemMessage = styled.button`
+  border: 0;
+  cursor: pointer;
+  font: inherit;
+
+  &:disabled {
+    cursor: default;
+  }
+`
+
+const PinnedMessagePreview = styled.strong`
+  display: block;
+  margin-top: 3px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 500;
 `

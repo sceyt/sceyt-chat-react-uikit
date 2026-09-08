@@ -47,21 +47,20 @@ const PinnedMessagesBanner = ({ channelId }: { channelId: string }) => {
     [THEME_COLORS.TEXT_SECONDARY]: textSecondary,
     [THEME_COLORS.ICON_PRIMARY]: iconPrimary
   } = useColor()
-  const [index, setIndex] = useState(0)
+  const [activePinId, setActivePinId] = useState<string>()
   const [advanceAfterPage, setAdvanceAfterPage] = useState(false)
   const markerRefs = useRef<Record<number, HTMLButtonElement | null>>({})
   const requestedNextTokenRef = useRef<string | undefined>()
+  const selectedIndex = activePinId ? pins.findIndex((pin) => pin.id === activePinId) : -1
+  const index = selectedIndex >= 0 ? selectedIndex : 0
   const active = pins[index]
 
   useEffect(() => {
-    setIndex((value) => Math.max(0, Math.min(value, pins.length - 1)))
-  }, [pins.length])
-  useEffect(() => {
     if (advanceAfterPage && index < pins.length - 1) {
-      setIndex((value) => value + 1)
+      setActivePinId(pins[index + 1].id)
       setAdvanceAfterPage(false)
     }
-  }, [advanceAfterPage, index, pins.length])
+  }, [advanceAfterPage, index, pins])
   useEffect(() => {
     const block = index > 0 && index < pins.length - 1 ? 'center' : 'nearest'
     markerRefs.current[index]?.scrollIntoView({ behavior: 'smooth', block })
@@ -84,13 +83,13 @@ const PinnedMessagesBanner = ({ channelId }: { channelId: string }) => {
   const showNext = () => {
     if (index < count - 1) {
       const nextIndex = index + 1
-      setIndex(nextIndex)
+      setActivePinId(pins[nextIndex].id)
       if (count - nextIndex - 1 <= 3) loadNextPage()
     } else if (nextToken) {
       setAdvanceAfterPage(true)
       loadNextPage()
     } else if (count > 1) {
-      setIndex(0)
+      setActivePinId(pins[0].id)
     }
   }
 
@@ -120,7 +119,7 @@ const PinnedMessagesBanner = ({ channelId }: { channelId: string }) => {
             }}
             active={pinIndex === index}
             compact={pins.length > 3}
-            onClick={() => setIndex(pinIndex)}
+            onClick={() => setActivePinId(pin.id)}
             aria-label={`Show pinned message ${pinIndex + 1}`}
           />
         ))}

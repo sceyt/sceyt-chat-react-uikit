@@ -14,6 +14,16 @@ describe('pinned message state', () => {
     expect(state.byChannel.c1).toHaveLength(1)
   })
 
+  it('places a newly pinned message at the beginning of the descending list', () => {
+    let state = PinnedReducer(
+      undefined,
+      setPinnedMessages({ channelId: 'c1', pins: [pin('older', 'm1'), pin('newer', 'm2')] })
+    )
+    state = PinnedReducer(state, upsertPinnedMessages({ channelId: 'c1', pins: [pin('latest', 'm3')] }))
+
+    expect(state.byChannel.c1.map((item) => item.id)).toEqual(['latest', 'older', 'newer'])
+  })
+
   it('removes every matching pin as soon as its source message is deleted', () => {
     let state = PinnedReducer(
       undefined,

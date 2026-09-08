@@ -31,7 +31,7 @@ import {
 import { PendingPinMutation, PinnedMessageRecord } from './reducers'
 
 const pinScopeShared = 0
-const SHARED_PIN_SYSTEM_MESSAGE = {
+const sharedPinSystemMessage = (parentMessageId: string) => ({
   body: 'PM',
   type: MESSAGE_TYPE.SYSTEM,
   attachments: [],
@@ -39,8 +39,10 @@ const SHARED_PIN_SYSTEM_MESSAGE = {
   metadata: {},
   mentionedUsers: [],
   displayCount: 0,
-  silent: true
-}
+  silent: true,
+  skipAutoScroll: true,
+  parentMessage: { id: parentMessageId }
+})
 
 const getChannel = (channelId: string) => getChannelFromMap(channelId) as any
 const normalizePins = (pins: any[] = []): PinnedMessageRecord[] =>
@@ -70,7 +72,7 @@ function* loadPinnedMessages({ payload }: any): any {
   const channel = getChannel(channelId)
   if (!channel?.createPinnedMessageListQueryBuilder) return
   try {
-    const builder = channel.createPinnedMessageListQueryBuilder().limit(5)
+    const builder = channel.createPinnedMessageListQueryBuilder().limit(10)
     builder.byDescendingOrder()
     if (nextToken && builder.setNextToken) {
       builder.setNextToken(nextToken)
@@ -100,7 +102,9 @@ function* executePin(mutation: PendingPinMutation, message?: any): any {
     const pins = normalizePins(event?.pins)
     if (pins.length) yield put(upsertPinnedMessagesAC(mutation.channelId, pins))
     if (mutation.pinType === pinScopeShared && event?.changed) {
-      yield put(sendTextMessageAC(SHARED_PIN_SYSTEM_MESSAGE, mutation.channelId, CONNECTION_STATUS.CONNECTED))
+      yield put(
+        sendTextMessageAC(sharedPinSystemMessage(mutation.messageId), mutation.channelId, CONNECTION_STATUS.CONNECTED)
+      )
     }
     const changedPins: PinnedMessageRecord[] = pins.length
       ? pins

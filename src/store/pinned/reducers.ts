@@ -53,9 +53,22 @@ const pinnedSlice = createSlice({
     },
     upsertPinnedMessages: (state, action: PayloadAction<{ channelId: string; pins: PinnedMessageRecord[] }>) => {
       const { channelId, pins } = action.payload
-      const byId = new Map((state.byChannel[channelId] || []).map((pin) => [pin.id, pin]))
+      const current = state.byChannel[channelId] || []
+      const existingIds = new Set(current.map((pin) => pin.id))
+      const byId = new Map(current.map((pin) => [pin.id, pin]))
       pins.forEach((pin) => byId.set(pin.id, { ...byId.get(pin.id), ...pin }))
-      state.byChannel[channelId] = Array.from(byId.values())
+
+      const prependedIds = new Set<string>()
+      const newPins = pins.filter((pin) => {
+        if (existingIds.has(pin.id) || prependedIds.has(pin.id)) return false
+        prependedIds.add(pin.id)
+        return true
+      })
+
+      state.byChannel[channelId] = [
+        ...newPins.map((pin) => byId.get(pin.id)!),
+        ...current.map((pin) => byId.get(pin.id)!)
+      ]
       state.loaded[channelId] = true
     },
     removePinnedMessages: (
