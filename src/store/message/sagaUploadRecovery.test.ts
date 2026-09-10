@@ -5,6 +5,7 @@ import {
   addMessageToMap,
   clearMessagesMap,
   deletePendingAttachment,
+  getMessageFromMap,
   getPendingMessagesFromMap,
   setPendingAttachment
 } from '../../helpers/messagesHalper'
@@ -18,10 +19,11 @@ import {
   makeUser,
   resetMessageListFixtureIds
 } from '../../testUtils/messageFixtures'
-import { resendMessageAC, updateAttachmentUploadingStateAC, updateMessageAC } from './actions'
+import { resendMessageAC, sendMessageAC, updateAttachmentUploadingStateAC, updateMessageAC } from './actions'
 import { RESEND_MESSAGE } from './constants'
 import { setCustomUploader, setSendAttachmentsAsSeparateMessages } from '../../helpers/customUploader'
 import { handleUploadAttachments, __messageSagaTestables, __resetMessageSagaTestState } from './saga'
+import { beginVideoPreparation, completeVideoPreparation } from '../../helpers/attachmentPreparation'
 
 const mockGetVideoFirstFrame = jest.fn()
 const mockGetVideoPreviewFrame = jest.fn()
@@ -382,6 +384,97 @@ describe('attachment upload recovery', () => {
     expect(getPendingMessagesFromMap(channel.id)[0]).toEqual(
       expect.objectContaining({ tid: 'network-error-msg-tid', state: MESSAGE_STATUS.FAILED })
     )
+  })
+
+  it('preserves an offline video source and sends it after reconnect', async () => {
+    const currentUser = makeUser({ id: 'current-user' })
+    const channel = makeUploaderChannel('channel-offline-video-reconnect')
+    const video = new File(['video-bytes'], 'offline-video.mp4', { type: 'video/mp4' })
+    const attachmentTid = 'offline-video-file-tid'
+
+    setActiveChannelId(channel.id)
+    setChannelInMap(channel)
+    // The compose background work is still running when Send is pressed.
+    // Offline sending must not wait on this promise before entering the
+    // reconnect queue.
+    beginVideoPreparation(attachmentTid, video)
+
+    await runMessageSaga(
+      __messageSagaTestables.sendMessage,
+      sendMessageAC(
+        {
+          body: 'offline video',
+          bodyAttributes: [],
+          attachments: [
+            {
+              tid: attachmentTid,
+              type: attachmentTypes.video,
+              name: video.name,
+              size: video.size,
+              data: video,
+              metadata: '{}',
+              upload: false
+            }
+          ],
+          mentionedUsers: [],
+          type: 'text',
+          metadata: {},
+          parentMessage: null,
+          repliedInThread: false
+        },
+        channel.id,
+        CONNECTION_STATUS.DISCONNECTED,
+        false
+      )
+    )
+
+    const [offlinePendingMessage] = getPendingMessagesFromMap(channel.id)
+    expect(offlinePendingMessage).toEqual(expect.objectContaining({ state: MESSAGE_STATUS.FAILED }))
+    expect(uploadCalls).toHaveLength(0)
+
+    // Retry the serialized pending message, as reconnect does after Redux has
+    // rendered it. The File must be restored from the per-attachment source map.
+    completeVideoPreparation(attachmentTid, {
+      file: video,
+      metadata: { tmb: 'local-thumb', szw: 1280, szh: 720, dur: 4 },
+      videoPreviewBlob: new Blob(['preview'], { type: 'image/jpeg' })
+    })
+    channel.sendMessage = jest.fn((outgoingMessage: any) =>
+      Promise.resolve({
+        ...makeServerResponse(offlinePendingMessage.tid, attachmentTid, currentUser),
+        attachments: [
+          {
+            ...outgoingMessage.attachments[0],
+            id: 'offline-video-server-attachment-id',
+            tid: attachmentTid,
+            // The reconnect event can arrive with only IDs and metadata.
+            // The saga must retain the local uploaded video fields.
+            type: undefined,
+            name: '',
+            url: ''
+          }
+        ]
+      })
+    )
+    // Channel maps intentionally keep a shallow snapshot; refresh it after
+    // replacing the transport mock to mirror an SDK reconnect.
+    setChannelInMap(channel)
+
+    await runMessageSaga(__messageSagaTestables.sendPendingMessages, CONNECTION_STATUS.CONNECTED)
+
+    expect(uploadCalls).toEqual(
+      expect.arrayContaining([expect.objectContaining({ type: attachmentTypes.video, url: video })])
+    )
+    expect(channel.sendMessage).toHaveBeenCalledTimes(1)
+    expect(getPendingMessagesFromMap(channel.id)).toHaveLength(0)
+    expect(getMessageFromMap(channel.id, offlinePendingMessage.tid!)?.attachments).toEqual([
+      expect.objectContaining({
+        type: attachmentTypes.video,
+        tid: attachmentTid,
+        name: video.name,
+        url: 'https://cdn.example/uploaded-1'
+      })
+    ])
   })
 
   it('stops auto-resending after the attempt budget and resumes after a manual retry', async () => {

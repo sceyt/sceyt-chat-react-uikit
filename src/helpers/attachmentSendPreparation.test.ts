@@ -1,5 +1,9 @@
 import { attachmentTypes } from './constants'
-import { mergePreparedAttachmentPatches, waitForImageAttachmentPreparation } from './attachmentSendPreparation'
+import {
+  getOutgoingAttachmentType,
+  mergePreparedAttachmentPatches,
+  waitForImageAttachmentPreparation
+} from './attachmentSendPreparation'
 
 describe('attachment send preparation', () => {
   it('waits for an image metadata patch before building the send attachment', async () => {
@@ -40,5 +44,23 @@ describe('attachment send preparation', () => {
     await expect(
       waitForImageAttachmentPreparation([{ tid: 'video-1', type: attachmentTypes.video }], preparations)
     ).resolves.toBeUndefined()
+  })
+
+  it('sends a generic file-picker video as a video while preserving its compose file-card type', () => {
+    expect(
+      getOutgoingAttachmentType({
+        type: attachmentTypes.file,
+        data: new File(['video'], 'recording.mov', { type: 'video/quicktime' })
+      })
+    ).toBe(attachmentTypes.video)
+  })
+
+  it('keeps non-video generic files as files', () => {
+    expect(
+      getOutgoingAttachmentType({
+        type: attachmentTypes.file,
+        data: new File(['document'], 'notes.pdf', { type: 'application/pdf' })
+      })
+    ).toBe(attachmentTypes.file)
   })
 })

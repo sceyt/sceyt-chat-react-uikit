@@ -89,6 +89,7 @@ import {
 } from '../../helpers/messagesHalper'
 import { registerBlobUrl, releaseBlobUrls } from '../../helpers/attachmentBlobUrls'
 import {
+  getOutgoingAttachmentType,
   mergePreparedAttachmentPatches,
   waitForImageAttachmentPreparation
 } from '../../helpers/attachmentSendPreparation'
@@ -837,7 +838,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
               cachedUrl: preparedAttachment.cachedUrl,
               upload: preparedAttachment.upload,
               metadata: preparedAttachment.metadata,
-              type: preparedAttachment.type,
+              type: getOutgoingAttachmentType(preparedAttachment),
               size: preparedAttachment.size,
               thumbnailState: preparedAttachment.thumbnailState
             }

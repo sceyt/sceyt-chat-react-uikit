@@ -206,12 +206,16 @@ const queuedPrefetchRequests = new Map<string, { fromMessageId: string; pages: n
 const prefetchCompletionWaiters = new Map<string, Array<() => void>>()
 const prefetchCancelVersions = new Map<string, number>()
 const ACTIVE_CHANNEL_RECONNECT_REFRESH_TIMEOUT_MS = 1500
+const VIDEO_PREPARATION_TIMEOUT_MS = 10_000
 
 const applyPreparedVideoAttachments = async (attachments: IAttachment[]) => {
   await Promise.all(
     attachments.map(async (attachment) => {
       if (!attachment.tid) return
-      const prepared = await waitForVideoPreparation(attachment.tid)
+      // Local remuxing lazily loads an FFmpeg worker. If that worker request was
+      // interrupted while offline, do not let a stale preparation promise block
+      // reconnect delivery forever; send the preserved original after 10 seconds.
+      const prepared = await waitForVideoPreparation(attachment.tid, VIDEO_PREPARATION_TIMEOUT_MS)
       if (prepared?.status === 'ready' && prepared.metadata) {
         attachment.url = prepared.file
         attachment.data = prepared.file
@@ -224,6 +228,16 @@ const applyPreparedVideoAttachments = async (attachments: IAttachment[]) => {
     })
   )
   return attachments
+}
+
+const getAttachmentSourceFile = (attachment: IAttachment): File | null => {
+  const source =
+    attachment.data instanceof Blob ? attachment.data : attachment.url instanceof Blob ? attachment.url : null
+  if (!source) return null
+
+  return source instanceof File
+    ? source
+    : new File([source], attachment.name || 'attachment', { type: source.type || 'application/octet-stream' })
 }
 
 const prepareAndUploadVideoPreview = async (attachment: IAttachment, messageType: string | null | undefined) => {
@@ -1044,13 +1058,21 @@ function* sendMessage(action: IAction): any {
       if (mediaAttachments && mediaAttachments.length) {
         for (let i = 0; i < mediaAttachments.length; i++) {
           let attachment = mediaAttachments[i]
-          if (customUploader && !attachment.cachedUrl && !(attachment.data instanceof Blob)) {
+          if (!attachment.cachedUrl && !(attachment.data instanceof Blob)) {
             // On resend the message may be a serialized copy whose File was lost —
             // recover the live File kept by tid so the upload gets real bytes.
             const pendingFile = getPendingAttachment(attachment.tid as string)?.file
             if (pendingFile instanceof Blob) {
               attachment = { ...attachment, data: pendingFile }
             }
+          }
+
+          // Keep a live source independently from the optimistic message. Message
+          // builders and Redux serialization can turn File instances into plain
+          // objects, but reconnect retries must still have the original bytes.
+          const sourceFile = getAttachmentSourceFile(attachment)
+          if (attachment.tid && sourceFile) {
+            setPendingAttachment(attachment.tid, { file: sourceFile, channelId: channel.id })
           }
 
           let uri
@@ -1224,11 +1246,14 @@ function* sendMessage(action: IAction): any {
               messageBuilder.setType(MESSAGE_TYPE.VIEW_ONCE)
             }
             const messageToSend = action.type === RESEND_MESSAGE ? action.payload.message : messageBuilder.create()
-            setPendingAttachment(messageAttachment.tid as string, {
-              ...messageAttachment.data,
-              messageTid: messageToSend.tid,
-              channelId: channel.id
-            })
+            const sourceFile = getAttachmentSourceFile(attachment)
+            if (messageAttachment.tid && sourceFile) {
+              setPendingAttachment(messageAttachment.tid, {
+                file: sourceFile,
+                messageTid: messageToSend.tid,
+                channelId: channel.id
+              })
+            }
             const messageForSend = {
               ...messageToSend,
               attachments: [messageAttachment],
@@ -1292,6 +1317,16 @@ function* sendMessage(action: IAction): any {
           }
 
           let messageToSend = action.type === RESEND_MESSAGE ? action.payload.message : messageBuilder.create()
+          attachmentsToSend.forEach((messageAttachment: IAttachment) => {
+            const sourceFile = getAttachmentSourceFile(messageAttachment)
+            if (messageAttachment.tid && sourceFile) {
+              setPendingAttachment(messageAttachment.tid, {
+                file: sourceFile,
+                messageTid: messageToSend.tid,
+                channelId: channel.id
+              })
+            }
+          })
           const pending = {
             ...messageToSend,
             attachments: message.attachments,
@@ -1324,22 +1359,21 @@ function* sendMessage(action: IAction): any {
         }
 
         try {
-          // The optimistic message is already visible at this point. Hold only the
-          // network handoff until a local video thumbnail is ready or preparation
-          // reports a real failure,
-          // then replace the attachment builder with the prepared file/metadata.
-          yield call(applyPreparedVideoAttachments, messageAttachment)
-          const pendingAttachments = messageAttachment.map((attachment: any) => ({
-            ...attachment,
-            data: attachment.data || attachment.url
-          }))
-          updateMessageOnMap(channel.id, {
-            messageId: messageToSend.tid!,
-            params: { attachments: pendingAttachments }
-          })
-          yield put(updateMessageAC(messageToSend.tid!, { attachments: pendingAttachments }))
-          const messageCopy = JSON.parse(JSON.stringify(messagesToSend[i]))
           if (connectionState === CONNECTION_STATUS.CONNECTED) {
+            // Do not wait for local video work while offline. The optimistic
+            // message must enter the reconnect queue immediately, retaining the
+            // preparation entry and source File for the retry that can upload.
+            yield call(applyPreparedVideoAttachments, messageAttachment)
+            const pendingAttachments = messageAttachment.map((attachment: any) => ({
+              ...attachment,
+              data: attachment.data || attachment.url
+            }))
+            updateMessageOnMap(channel.id, {
+              messageId: messageToSend.tid!,
+              params: { attachments: pendingAttachments }
+            })
+            yield put(updateMessageAC(messageToSend.tid!, { attachments: pendingAttachments }))
+            const messageCopy = JSON.parse(JSON.stringify(messagesToSend[i]))
             if (!customUploader) {
               for (let attachmentIndex = 0; attachmentIndex < messageAttachment.length; attachmentIndex++) {
                 if (messageAttachment[attachmentIndex].type === attachmentTypes.video) {
@@ -1407,6 +1441,9 @@ function* sendMessage(action: IAction): any {
               })
               attachmentsToUpdate = messageResponse.attachments.map((attachment: IAttachment) => {
                 const localAttachment = currentAttachmentsMap[attachment.tid!]
+                const optimisticAttachment = pendingMessages[i]?.attachments?.find(
+                  (pendingAttachment: IAttachment) => pendingAttachment.tid === attachment.tid
+                )
 
                 // Preserve local metadata (especially video_thumb) when the server
                 // response has not yet echoed it back.
@@ -1415,6 +1452,25 @@ function* sendMessage(action: IAction): any {
                     ...attachment
                   }
 
+                  // Some SDK reconnect echoes contain the attachment ID/tid but
+                  // omit the media fields (type/name/url). Keep the prepared
+                  // local values in that case so the active thread does not
+                  // render a video as a generic file until history reloads.
+                  const fallbackType = localAttachment.type || optimisticAttachment?.type
+                  if (!merged.type && fallbackType) {
+                    merged.type = fallbackType
+                  }
+                  const fallbackName = localAttachment.name || optimisticAttachment?.name
+                  if (!merged.name && fallbackName) {
+                    merged.name = fallbackName
+                  }
+                  if (!merged.url && localAttachment.url) {
+                    merged.url = localAttachment.url
+                  }
+                  const fallbackAttachmentUrl = localAttachment.attachmentUrl || optimisticAttachment?.attachmentUrl
+                  if (!merged.attachmentUrl && fallbackAttachmentUrl) {
+                    merged.attachmentUrl = fallbackAttachmentUrl
+                  }
                   if (!+merged.size && localAttachment.size) {
                     merged.size = localAttachment.size
                   }
@@ -1435,6 +1491,15 @@ function* sendMessage(action: IAction): any {
               attachments: attachmentsToUpdate,
               channelId: channel.id
             }
+            // Replace the optimistic attachment payload in the in-memory map
+            // before caching the confirmed message. addMessageToMap preserves an
+            // existing message's fields by design, so without this update the
+            // active thread can keep rendering the local file-card until a
+            // channel reload fetches the server's video attachment.
+            updateMessageOnMap(channel.id, {
+              messageId: messageToSend.tid as string,
+              params: messageUpdateData
+            })
             const activeChannelId = getActiveChannelId()
             if (activeChannelId === channel.id) {
               yield put(updateMessageAC(messageToSend.tid as string, messageUpdateData, true))
