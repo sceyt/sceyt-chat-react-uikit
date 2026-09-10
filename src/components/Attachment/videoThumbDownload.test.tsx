@@ -299,6 +299,19 @@ describe('video attachment preview and download states', () => {
     expect(screen.getByTestId('circular-progress')).toHaveAttribute('data-value', expect.stringMatching(/^53\./))
   })
 
+  it('shows the initial video progress ring and cancel control while preparing', async () => {
+    mockGetAttachmentUrlFromCache.mockResolvedValue(false)
+    renderAttachment({
+      attachmentsUploadingState: { 'video-attachment-tid': 'preparing' }
+    })
+
+    await flushAttachmentEffects()
+
+    expect(screen.getByTestId('video-download-progress')).toBeInTheDocument()
+    expect(screen.getByTestId('circular-progress')).toHaveAttribute('data-value', '3')
+    expect(screen.getByRole('button')).toBeInTheDocument()
+  })
+
   it('keeps the inline image thumbnail visible until the full image has loaded', () => {
     const imageAttachment = {
       ...videoAttachment,

@@ -1097,7 +1097,7 @@ const Attachment = ({
                   >
                     {isInUploadingState ? (
                       <CancelResumeWrapper onClick={handlePauseResumeUpload}>
-                        {attachmentCompilationState[attachment.tid!] === UPLOAD_STATE.UPLOADING ? (
+                        {attachmentCompilationState[attachment.tid!] === UPLOAD_STATE.UPLOADING || isPreparingVideo ? (
                           <CancelIcon />
                         ) : (
                           <UploadIcon />
