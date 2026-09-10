@@ -167,6 +167,7 @@ import {
   checkIsItSentAlready,
   getMessageLocalRef,
   deletePendingMessage as deletePendingMessageLocally,
+  isPendingMessageDeleted,
   ensureChannelCacheLoaded
 } from '../../helpers/messagesHalper'
 import { navigateToLatest } from '../../helpers/messageListNavigator'
@@ -207,6 +208,23 @@ const prefetchCompletionWaiters = new Map<string, Array<() => void>>()
 const prefetchCancelVersions = new Map<string, number>()
 const ACTIVE_CHANNEL_RECONNECT_REFRESH_TIMEOUT_MS = 1500
 const VIDEO_PREPARATION_TIMEOUT_MS = 10_000
+
+// `sendMessage` can receive an SDK id before the attachment upload has
+// finished. Such a message is still a local, cancellable send; deleting it
+// must not be routed through the normal remote-message delete mutation.
+const hasLivePendingAttachment = (message: IMessage) =>
+  Boolean(
+    message.tid &&
+      message.attachments?.some((attachment: IAttachment) =>
+        Boolean(attachment.tid && getPendingAttachment(attachment.tid)?.file)
+      )
+  )
+
+// Keep the SDK method invocation out of redux-saga's overloaded `call`
+// signatures. The SDK accepts the optional second argument at runtime, while
+// the UIkit's historical IChannel declaration only includes the id.
+const retractDeletedPendingMessage = (channel: IChannel, messageId: string) =>
+  (channel.deleteMessageById as any)(messageId, false)
 
 const applyPreparedVideoAttachments = async (attachments: IAttachment[]) => {
   await Promise.all(
@@ -1360,6 +1378,9 @@ function* sendMessage(action: IAction): any {
 
         try {
           if (connectionState === CONNECTION_STATUS.CONNECTED) {
+            if (messageToSend.tid && isPendingMessageDeleted(channel.id, messageToSend.tid)) {
+              continue
+            }
             // Do not wait for local video work while offline. The optimistic
             // message must enter the reconnect queue immediately, retaining the
             // preparation entry and source File for the retry that can upload.
@@ -1374,6 +1395,9 @@ function* sendMessage(action: IAction): any {
             })
             yield put(updateMessageAC(messageToSend.tid!, { attachments: pendingAttachments }))
             const messageCopy = JSON.parse(JSON.stringify(messagesToSend[i]))
+            if (messageToSend.tid && isPendingMessageDeleted(channel.id, messageToSend.tid)) {
+              continue
+            }
             if (!customUploader) {
               for (let attachmentIndex = 0; attachmentIndex < messageAttachment.length; attachmentIndex++) {
                 if (messageAttachment[attachmentIndex].type === attachmentTypes.video) {
@@ -1396,9 +1420,18 @@ function* sendMessage(action: IAction): any {
                 }
               }
             }
+            // Preparation and custom uploading are asynchronous. A delete can
+            // happen while either is in progress, so do not fall through to
+            // `channel.sendMessage` after either operation completes.
+            if (messageToSend.tid && isPendingMessageDeleted(channel.id, messageToSend.tid)) {
+              continue
+            }
             let attachmentsToSend = messageAttachment
             if (customUploader) {
               attachmentsToSend = yield call(handleUploadAttachments, messageAttachment || [], messageCopy, channel)
+            }
+            if (messageToSend.tid && isPendingMessageDeleted(channel.id, messageToSend.tid)) {
+              continue
             }
             let linkAttachmentToSend: IAttachment | null = null
             if (i === 0 && linkAttachment) {
@@ -1415,6 +1448,18 @@ function* sendMessage(action: IAction): any {
             }
 
             const messageResponse = yield call(channel.sendMessage, messageToSend)
+            if (messageToSend.tid && isPendingMessageDeleted(channel.id, messageToSend.tid)) {
+              // The network request won a race with local deletion. Remove the
+              // just-created remote message and never promote it back into the UI.
+              if (messageResponse?.id && typeof channel.deleteMessageById === 'function') {
+                try {
+                  yield call(retractDeletedPendingMessage, channel, messageResponse.id)
+                } catch (deleteError) {
+                  log.warn('Unable to retract a deleted pending message:', deleteError)
+                }
+              }
+              continue
+            }
             if (messageToSend.tid) {
               autoResendAttempts.delete(messageToSend.tid)
             }
@@ -1524,6 +1569,11 @@ function* sendMessage(action: IAction): any {
             throw new Error('Connection required to send message')
           }
         } catch (e) {
+          // A delete intentionally cancels the pending transfer. Do not turn
+          // that cancellation into a failed bubble or schedule a retry.
+          if (messageToSend.tid && isPendingMessageDeleted(channel.id, messageToSend.tid)) {
+            continue
+          }
           const isErrorResendable = isResendableError(e?.type)
           if (channel?.id && messageToSend?.tid) {
             log.error('Error on uploading attachment', messageToSend.tid, e)
@@ -1976,7 +2026,11 @@ function* deleteMessage(action: IAction): any {
       return
     }
 
-    if (!currentMessage.id && currentMessage.tid) {
+    // An attachment message can receive an id from an SDK event while its
+    // upload is still pending. It has not become a completed chat message yet,
+    // so deleting it must cancel the local send rather than issue a competing
+    // remote delete request.
+    if ((!currentMessage.id && currentMessage.tid) || hasLivePendingAttachment(currentMessage)) {
       yield call(deleteLocalPendingMessage, channelId, currentMessage)
       return
     }

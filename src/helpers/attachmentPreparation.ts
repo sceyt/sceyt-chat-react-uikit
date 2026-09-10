@@ -52,5 +52,12 @@ export const waitForVideoPreparation = async (tid: string, timeoutMs?: number): 
 }
 
 export const clearVideoPreparation = (tid: string) => {
+  const entry = preparations.get(tid)
+  // A send saga may already be awaiting this entry when the user removes the
+  // pending attachment. Resolve that waiter with the original file instead of
+  // leaving it blocked until its fallback timeout.
+  if (entry?.status === 'loading') {
+    entry.resolve({ file: entry.file, status: 'failed' })
+  }
   preparations.delete(tid)
 }

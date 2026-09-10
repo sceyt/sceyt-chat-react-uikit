@@ -3,6 +3,7 @@ import { checkArraysEqual } from '../index'
 import { MESSAGE_DELIVERY_STATUS, MESSAGE_STATUS } from '../constants'
 import { cancelUpload, getCustomUploader } from '../customUploader'
 import { releaseBlobUrls } from '../attachmentBlobUrls'
+import { clearVideoPreparation } from '../attachmentPreparation'
 import { handleVoteDetails } from '../message'
 import store from 'store'
 import { removeChannelMarkersAC, removePendingPollActionAC, setPendingPollActionsMapAC } from 'store/message/actions'
@@ -209,6 +210,7 @@ type PendingAttachment = {
 }
 
 const pendingAttachments: { [key: string]: PendingAttachment } = {}
+const deletedPendingMessageTids = new Set<string>()
 let messagesMap: messagesMap = {}
 let activeSegment: { startId: string; endId: string } | null = null
 let activeSegmentChannelId: string | null = null
@@ -1145,6 +1147,7 @@ export function clearMessagesMap() {
   messagesMap = {}
   loadedSegmentsMap = {}
   channelVisitOrder = []
+  deletedPendingMessageTids.clear()
   clearActiveSegment()
 }
 
@@ -1185,18 +1188,32 @@ export const setPendingAttachment = (attachmentId: string, data: PendingAttachme
   pendingAttachments[attachmentId] = { ...pendingAttachments[attachmentId], ...data }
 }
 
+const deletedPendingMessageKey = (channelId: string, messageTid: string) => `${channelId}:${messageTid}`
+
+export const markPendingMessageDeleted = (channelId: string, messageTid: string) => {
+  deletedPendingMessageTids.add(deletedPendingMessageKey(channelId, messageTid))
+}
+
+export const isPendingMessageDeleted = (channelId: string, messageTid: string) =>
+  deletedPendingMessageTids.has(deletedPendingMessageKey(channelId, messageTid))
+
 export const getPendingAttachment = (attachmentId: string) => pendingAttachments[attachmentId]
 
 export const deletePendingAttachment = (attachmentId: string) => delete pendingAttachments[attachmentId]
 
 export const deletePendingMessage = (channelId: string, message: IMessage) => {
+  const messageTid = message.tid || message.id
+  if (messageTid) {
+    markPendingMessageDeleted(channelId, messageTid)
+  }
   if (message.attachments && message.attachments.length) {
     const customUploader = getCustomUploader()
     message.attachments.forEach((att: IAttachment) => {
       if (customUploader) {
         cancelUpload(att.tid!)
-        deletePendingAttachment(att.tid!)
       }
+      deletePendingAttachment(att.tid!)
+      clearVideoPreparation(att.tid!)
       releaseBlobUrls([`compose_${att.tid}`])
     })
   }
