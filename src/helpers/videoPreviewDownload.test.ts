@@ -46,7 +46,10 @@ describe('downloadVideoThumb', () => {
 
     await expect(downloadVideoThumb('https://cdn/preview.jpg')).resolves.toBe('blob:preview')
 
-    expect(fetchMock).toHaveBeenCalledWith('https://cdn/preview.jpg')
+    expect(fetchMock).toHaveBeenCalledWith(
+      'https://cdn/preview.jpg',
+      expect.objectContaining({ signal: expect.anything() })
+    )
     fetchMock.mockRestore()
   })
 

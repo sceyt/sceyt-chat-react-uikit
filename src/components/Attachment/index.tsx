@@ -16,6 +16,7 @@ import {
 // Hooks
 import { useDidUpdate, useColor } from '../../hooks'
 import useProgressiveMediaSource from '../../hooks/basic/useProgressiveMediaSource'
+import { useMediaDownload } from '../../hooks/basic/useMediaDownload'
 // Assets
 import { ReactComponent as CancelIcon } from '../../assets/svg/cancel.svg'
 import { ReactComponent as FileIcon } from '../../assets/svg/fileIcon.svg'
@@ -55,6 +56,7 @@ import { updateMessageAsOpenedAC } from 'store/channel/actions'
 import { compressAndCacheImage, getVideoFirstFrame, readResponseBlobWithProgress } from 'helpers/getVideoFrame'
 import { ensurePlayableVideoBlob } from 'helpers/videoConversion'
 import { getVideoAttachmentCacheKeys, getVideoThumb, shouldExtractVideoFirstFrame } from 'helpers/videoPreview'
+import { cancelMediaDownload, requestMediaDownload } from '../../helpers/mediaDownloadCoordinator'
 
 interface AttachmentPops {
   attachment: IAttachment
@@ -171,10 +173,19 @@ const Attachment = ({
   // const [linkDescription, setLinkDescription] = useState('')
   // const [linkImage, setLinkImage] = useState('')
   const [downloadIsCancelled, setDownloadIsCancelled] = useState(false)
+  const [videoDownloadRetry, setVideoDownloadRetry] = useState(0)
+  const [imageDownloadRetry, setImageDownloadRetry] = useState(0)
+  const [isOriginalVideoRestarting, setIsOriginalVideoRestarting] = useState(false)
   const originalVideoDownloadStartedRef = useRef(false)
   const fileNameRef: any = useRef(null)
   const customDownloader = getCustomDownloader()
   const previewFileType = isPreview && attachment.data.type.split('/')[0]
+  const originalVideoDownloadKey =
+    attachment.type === attachmentTypes.video && attachment.url ? `original-video:${attachment.url}` : undefined
+  const originalImageDownloadKey =
+    attachment.type === attachmentTypes.image && attachment.url ? `original-image:${attachment.url}` : undefined
+  const sharedOriginalVideoDownload = useMediaDownload(originalVideoDownloadKey)
+  const sharedOriginalImageDownload = useMediaDownload(originalImageDownloadKey)
 
   const attachmentMetadata = useMemo(() => {
     return isJSON(attachment.metadata) ? JSON.parse(attachment.metadata) : attachment.metadata
@@ -212,6 +223,22 @@ const Attachment = ({
       attachmentCompilationState[attachment.tid!] === UPLOAD_STATE.UPLOADING ||
       attachmentCompilationState[attachment.tid!] === UPLOAD_STATE.PAUSED)
   const isPreparingVideo = attachmentCompilationState[attachment.tid!] === UPLOAD_STATE.PREPARING
+  const isSharedOriginalVideoDownloading = sharedOriginalVideoDownload.state === 'loading'
+  const isSharedOriginalVideoCancelled = sharedOriginalVideoDownload.state === 'cancelled'
+  const isVideoDownloading = downloadingFile || isSharedOriginalVideoDownloading
+  const isVideoDownloadActive = isVideoDownloading || isOriginalVideoRestarting
+  const videoProgress = isSharedOriginalVideoDownloading ? sharedOriginalVideoDownload.progress || 3 : progress
+  const videoSizeProgress = isSharedOriginalVideoDownloading
+    ? { loaded: sharedOriginalVideoDownload.loaded, total: sharedOriginalVideoDownload.total }
+    : sizeProgress
+  const isImageDownloading = downloadingFile || sharedOriginalImageDownload.state === 'loading'
+  const isSharedOriginalImageCancelled = sharedOriginalImageDownload.state === 'cancelled'
+  const imageProgress =
+    sharedOriginalImageDownload.state === 'loading' ? sharedOriginalImageDownload.progress || 3 : progress
+  const imageSizeProgress =
+    sharedOriginalImageDownload.state === 'loading'
+      ? { loaded: sharedOriginalImageDownload.loaded, total: sharedOriginalImageDownload.total }
+      : sizeProgress
   // const attachmentThumb = attachmentMetadata && attachmentMetadata.tmb
 
   let attachmentThumb: string | undefined = ''
@@ -242,31 +269,6 @@ const Attachment = ({
     pendingSource: pendingImageSource,
     markPreferredSourceLoaded
   } = useProgressiveMediaSource(preferredImageSource, fallbackImageSource)
-
-  useEffect(() => {
-    if (attachment.type !== attachmentTypes.image) return
-    log.info(
-      '[MEDIA_ISSUE] image thumbnail source',
-      JSON.stringify({
-        channelId: channelId || null,
-        attachmentId: attachment.id || attachment.tid || null,
-        attachmentUrl: attachment.url || null,
-        mapUrl: attachmentUrlFromMap || null,
-        propUrl: attachment.attachmentUrl || null,
-        localUrl: attachmentUrl || null,
-        renderedSource: attachmentUrlFromMap || attachment.attachmentUrl || attachmentUrl || attachmentThumb || null
-      })
-    )
-  }, [
-    attachment.id,
-    attachment.tid,
-    attachment.type,
-    attachment.url,
-    attachment.attachmentUrl,
-    attachmentUrlFromMap,
-    attachmentUrl,
-    channelId
-  ])
 
   const downloadImage = (url: string) => {
     const image = new Image(renderWidth / 2, renderHeight / 2)
@@ -566,10 +568,11 @@ const Attachment = ({
     if (typeof originalVideoUrlFromMap === 'string') {
       setAttachmentUrl(originalVideoUrlFromMap)
       setIsCached(true)
+      setDownloadIsCancelled(false)
+      setIsOriginalVideoRestarting(false)
       return
     }
     if (
-      !videoThumb ||
       attachment.attachmentUrl ||
       connectionStatus !== CONNECTION_STATUS.CONNECTED ||
       !attachment.id ||
@@ -580,19 +583,22 @@ const Attachment = ({
 
     let cancelled = false
     const loadVideoThumbAndOriginal = async () => {
-      // The details grid may contain dozens of videos. It must never download
-      // every original just to render their tiles; VideoPreview fetches only a
-      // small thumbnail on a cache miss. The original is fetched on demand by
-      // the slider after the user opens one item.
-      const cachedThumb = await getAttachmentUrlFromCache(videoThumb).catch(() => false)
-      if (cancelled) return
-      if (typeof cachedThumb === 'string') {
-        dispatch(setUpdateMessageAttachmentAC(videoThumb, cachedThumb))
+      if (videoThumb) {
+        const cachedThumb = await getAttachmentUrlFromCache(videoThumb).catch(() => false)
+        if (cancelled) return
+        if (typeof cachedThumb === 'string') {
+          dispatch(setUpdateMessageAttachmentAC(videoThumb, cachedThumb))
+        }
       }
-      if (isDetailsView) {
-        setIsCached(true)
-        return
-      }
+
+      // A Media-tab/Search grid can mount dozens of video attachments at
+      // once. It only needs the compact thumbnail; prefetching every full
+      // original fills the bounded original-blob LRU, evicts an entry, and
+      // causes the evicted tile to hydrate it again in a loop. The slider is
+      // responsible for requesting a full original when that item is opened.
+      // If a chat/slider transfer is already active, useMediaDownload above
+      // still exposes its shared progress in this tile.
+      if (isDetailsView) return
 
       // The full video controls downloadingFile. Check its browser cache before
       // starting the actual download, so a cached original never shows a spinner.
@@ -602,12 +608,33 @@ const Attachment = ({
         dispatch(setUpdateMessageAttachmentAC(originalVideoCacheKey, cachedOriginalVideo))
         setAttachmentUrl(cachedOriginalVideo)
         setIsCached(true)
+        setDownloadIsCancelled(false)
+        setIsOriginalVideoRestarting(false)
         return
       }
 
       setIsCached(false)
       originalVideoDownloadStartedRef.current = true
-      handleDownloadFile()
+      requestMediaDownload({
+        key: `original-video:${attachment.url}`,
+        url: attachment.url,
+        cacheKey: originalVideoCacheKey,
+        kind: 'original-video',
+        messageType,
+        size: Number(attachment.size) || 0
+      })
+        .then(({ objectUrl }) => {
+          if (cancelled) return
+          dispatch(setUpdateMessageAttachmentAC(originalVideoCacheKey, objectUrl))
+          setAttachmentUrl(objectUrl)
+          setIsCached(true)
+          setDownloadIsCancelled(false)
+          setIsOriginalVideoRestarting(false)
+        })
+        .catch((error) => {
+          setIsOriginalVideoRestarting(false)
+          if (!cancelled) log.error('Error downloading video attachment:', error)
+        })
     }
 
     loadVideoThumbAndOriginal()
@@ -623,8 +650,37 @@ const Attachment = ({
     isDetailsView,
     originalVideoUrlFromMap,
     connectionStatus,
-    dispatch
+    dispatch,
+    messageType,
+    attachment.size,
+    videoDownloadRetry
   ])
+
+  const handleResumeOriginalVideoDownload = (event: React.MouseEvent) => {
+    event.stopPropagation()
+    originalVideoDownloadStartedRef.current = false
+    setDownloadIsCancelled(false)
+    setIsOriginalVideoRestarting(true)
+    setVideoDownloadRetry((retry) => retry + 1)
+  }
+
+  const handleResumeOriginalImageDownload = (event: React.MouseEvent) => {
+    event.stopPropagation()
+    setDownloadIsCancelled(false)
+    setImageDownloadRetry((retry) => retry + 1)
+  }
+
+  const handleCancelOriginalVideoDownload = (event: React.MouseEvent) => {
+    event.stopPropagation()
+    if (isSharedOriginalVideoDownloading && originalVideoDownloadKey) {
+      cancelMediaDownload(originalVideoDownloadKey)
+      originalVideoDownloadStartedRef.current = false
+      setDownloadIsCancelled(true)
+      setIsOriginalVideoRestarting(false)
+      return
+    }
+    handleStopStartDownloadFile()
+  }
 
   useEffect(() => {
     if (
@@ -632,30 +688,14 @@ const Attachment = ({
       connectionStatus === CONNECTION_STATUS.CONNECTED &&
       attachment.id &&
       !attachmentUrlFromMap &&
-      !(attachment.type === attachmentTypes.video && getVideoThumb(attachment.metadata)) &&
+      attachment.type !== attachmentTypes.video &&
       !(attachment.type === attachmentTypes.file || attachment.type === attachmentTypes.link)
     ) {
       const requestAttachmentKey = attachmentKey
-      log.info(
-        '[MEDIA_ISSUE] image thumbnail load started',
-        JSON.stringify({
-          channelId: channelId || null,
-          attachmentId: attachment.id || attachment.tid || null,
-          url: attachment.url
-        })
-      )
       getAttachmentUrlFromCache(attachment.url)
         .then(async (cachedUrl: string | false) => {
           if (attachment.type === attachmentTypes.image && !isPreview) {
             if (cachedUrl) {
-              log.info(
-                '[MEDIA_ISSUE] image thumbnail cache resolved',
-                JSON.stringify({
-                  requestAttachmentKey,
-                  currentAttachmentKey: currentAttachmentKeyRef.current,
-                  cachedUrl
-                })
-              )
               // @ts-ignore
               // downloadImage(cachedUrl)
               setAttachmentUrl(cachedUrl)
@@ -663,69 +703,35 @@ const Attachment = ({
               setIsCached(true)
             } else {
               setIsCached(false)
-              setDownloadingFile(true)
-              if (customDownloader) {
-                customDownloader(
-                  attachment.url,
-                  false,
-                  (progress) => {
-                    const loadedRes = progress.loaded && progress.loaded / progress.total
-                    const uploadPercent = loadedRes && loadedRes * 100
-                    setSizeProgress({ loaded: progress.loaded || 0, total: progress.total || 0 })
-                    setProgress(uploadPercent)
-                  },
-                  messageType
-                ).then(async (url) => {
-                  const compressedUrl = await compressAndCacheImage(url, attachment.url, renderWidth, renderHeight)
-                  if (compressedUrl) {
-                    log.info(
-                      '[MEDIA_ISSUE] image thumbnail download resolved',
-                      JSON.stringify({
-                        requestAttachmentKey,
-                        currentAttachmentKey: currentAttachmentKeyRef.current,
-                        sourceUrl: url,
-                        cachedUrl: compressedUrl
-                      })
-                    )
-                    setAttachmentUrl(compressedUrl)
-                  }
-                  downloadImage(compressedUrl || url)
-                  dispatch(setUpdateMessageAttachmentAC(attachment.url, compressedUrl || url))
+              requestMediaDownload({
+                key: `original-image:${attachment.url}`,
+                url: attachment.url,
+                cacheKey: attachment.url,
+                cacheKeys: [attachment.url + '_original_image_url'],
+                kind: 'original-image',
+                messageType,
+                size: Number(attachment.size) || 0
+              })
+                .then(async ({ objectUrl }) => {
+                  if (requestAttachmentKey !== currentAttachmentKeyRef.current) return
+                  const compressedUrl = await compressAndCacheImage(
+                    objectUrl,
+                    attachment.url,
+                    renderWidth,
+                    renderHeight
+                  )
+                  if (requestAttachmentKey !== currentAttachmentKeyRef.current) return
+                  const displayedUrl = compressedUrl || objectUrl
+                  setAttachmentUrl(displayedUrl)
+                  dispatch(setUpdateMessageAttachmentAC(attachment.url, displayedUrl))
+                  dispatch(setUpdateMessageAttachmentAC(attachment.url + '_original_image_url', objectUrl))
                   setIsCached(true)
-                  setDownloadingFile(false)
-                  fetch(url).then(async (response) => {
-                    const blob = await response.blob()
-                    const originalImageUrl = attachment.url + '_original_image_url'
-                    setAttachmentToCache(
-                      originalImageUrl,
-                      new Response(blob, {
-                        headers: { 'Content-Type': 'image/jpeg' }
-                      })
-                    )
-                    const blobUrl = URL.createObjectURL(blob)
-                    dispatch(setUpdateMessageAttachmentAC(originalImageUrl, blobUrl))
-                  })
                 })
-              } else {
-                const compressedUrl = await compressAndCacheImage(
-                  attachment.url,
-                  attachment.url,
-                  renderWidth,
-                  renderHeight,
-                  undefined,
-                  ({ loaded, total }) => {
-                    setSizeProgress({ loaded, total })
-                    setProgress(Math.max(3, Math.min(100, (loaded / total) * 100)))
-                  },
-                  attachment.size
-                )
-                if (compressedUrl) {
-                  setAttachmentUrl(compressedUrl)
-                }
-                downloadImage(compressedUrl || attachment.url)
-                dispatch(setUpdateMessageAttachmentAC(attachment.url, compressedUrl || attachment.url))
-                setIsCached(true)
-              }
+                .catch((error) => {
+                  if (requestAttachmentKey === currentAttachmentKeyRef.current) {
+                    log.error('Error downloading image attachment:', error)
+                  }
+                })
             }
           } else {
             if (cachedUrl) {
@@ -734,10 +740,26 @@ const Attachment = ({
               setIsCached(true)
             } else {
               setIsCached(false)
-              if (attachment.type === attachmentTypes.voice) {
-                setAttachmentUrl('_')
-              }
-              handleDownloadFile()
+              const kind = attachment.type === attachmentTypes.voice ? 'voice' : 'file'
+              requestMediaDownload({
+                key: `${kind}:${attachment.url}`,
+                url: attachment.url,
+                cacheKey: attachment.url,
+                kind,
+                messageType,
+                size: Number(attachment.size) || 0
+              })
+                .then(({ objectUrl }) => {
+                  if (requestAttachmentKey !== currentAttachmentKeyRef.current) return
+                  setAttachmentUrl(objectUrl)
+                  dispatch(setUpdateMessageAttachmentAC(attachment.url, objectUrl))
+                  setIsCached(true)
+                })
+                .catch((error) => {
+                  if (requestAttachmentKey === currentAttachmentKeyRef.current) {
+                    log.error('Error downloading attachment:', error)
+                  }
+                })
             }
           }
         })
@@ -776,7 +798,7 @@ const Attachment = ({
           }
         })
     }
-  }, [])
+  }, [imageDownloadRetry])
 
   useDidUpdate(() => {
     if (connectionStatus === CONNECTION_STATUS.CONNECTED && isInUploadingState) {
@@ -852,7 +874,10 @@ const Attachment = ({
         <AttachmentImgCont
           draggable={false}
           onClick={() =>
-            handleMediaItemClick && !isInUploadingState && !downloadingFile && handleMediaItemClick(attachment)
+            handleMediaItemClick &&
+            !isInUploadingState &&
+            !isSharedOriginalImageCancelled &&
+            handleMediaItemClick(attachment)
           }
           isPreview={isPreview}
           ref={imageContRef}
@@ -902,6 +927,7 @@ const Attachment = ({
           {!isPreview &&
           !isRepliedMessage &&
           (isInUploadingState ||
+            isImageDownloading ||
             !(attachmentUrlFromMap || attachment.attachmentUrl || attachmentUrl || attachmentThumb)) ? (
             <UploadProgress
               backgroundImage={!attachmentUrlFromMap ? attachmentThumb : ''}
@@ -917,9 +943,8 @@ const Attachment = ({
               borderColor={borderColor}
             >
               {!isPreview &&
-                (isInUploadingState || downloadingFile) &&
-                sizeProgress &&
-                sizeProgress.loaded < sizeProgress.total && (
+                (isInUploadingState || isImageDownloading) &&
+                (isImageDownloading || (imageSizeProgress && imageSizeProgress.loaded < imageSizeProgress.total)) && (
                   <UploadPercent
                     isRepliedMessage={isRepliedMessage}
                     isDetailsView={isDetailsView}
@@ -935,19 +960,28 @@ const Attachment = ({
                       </CancelResumeWrapper>
                     ) : (
                       !isCached && (
-                        <CancelResumeWrapper onClick={handlePauseResumeDownload}>
+                        <CancelResumeWrapper
+                          onClick={(e: React.MouseEvent) => {
+                            e.stopPropagation()
+                            if (sharedOriginalImageDownload.state === 'loading' && originalImageDownloadKey) {
+                              cancelMediaDownload(originalImageDownloadKey)
+                            } else {
+                              handlePauseResumeDownload(e.nativeEvent)
+                            }
+                          }}
+                        >
                           {downloadIsCancelled ? <DownloadIcon /> : <CancelIcon />}
                         </CancelResumeWrapper>
                       )
                     )}
 
-                    {(!isCached || attachmentCompilationState[attachment.tid!] === UPLOAD_STATE.UPLOADING) && (
+                    {(isImageDownloading || attachmentCompilationState[attachment.tid!] === UPLOAD_STATE.UPLOADING) && (
                       <React.Fragment>
                         <ProgressWrapper>
                           <CircularProgressbar
                             minValue={0}
                             maxValue={100}
-                            value={progress}
+                            value={imageProgress}
                             backgroundPadding={3}
                             background={true}
                             text=''
@@ -981,9 +1015,9 @@ const Attachment = ({
                           />
                         </ProgressWrapper>
 
-                        {sizeProgress && (
+                        {imageSizeProgress && (
                           <SizeProgress color={textOnPrimary}>
-                            {bytesToSize(sizeProgress.loaded, 1)} / {bytesToSize(sizeProgress.total, 1)}
+                            {bytesToSize(imageSizeProgress.loaded, 1)} / {bytesToSize(imageSizeProgress.total, 1)}
                           </SizeProgress>
                         )}
                       </React.Fragment>
@@ -992,6 +1026,32 @@ const Attachment = ({
                 )}
             </UploadProgress>
           ) : null}
+          {isSharedOriginalImageCancelled && !isPreview && !isRepliedMessage && (
+            <UploadProgress
+              backgroundImage={!attachmentUrlFromMap ? attachmentThumb : ''}
+              isRepliedMessage={isRepliedMessage}
+              width={renderWidth}
+              height={renderHeight}
+              withBorder={!isPreview && !isDetailsView}
+              borderRadius={borderRadius}
+              backgroundColor={backgroundColor && backgroundColor !== 'inherit' ? backgroundColor : overlayBackground2}
+              isDetailsView={isDetailsView}
+              imageMinWidth={imageMinWidth}
+              withPrefix={withPrefix}
+              borderColor={borderColor}
+              zIndex={9}
+            >
+              <UploadPercent
+                isRepliedMessage={isRepliedMessage}
+                isDetailsView={isDetailsView}
+                backgroundColor={overlayBackground2}
+              >
+                <CancelResumeWrapper onClick={handleResumeOriginalImageDownload}>
+                  <DownloadIcon />
+                </CancelResumeWrapper>
+              </UploadPercent>
+            </UploadProgress>
+          )}
           {isPreview && (
             <RemoveChosenFile
               $backgroundColor={background}
@@ -1006,7 +1066,8 @@ const Attachment = ({
             <VideoCont
               onClick={() =>
                 handleMediaItemClick &&
-                !downloadingFile &&
+                !isVideoDownloadActive &&
+                !isSharedOriginalVideoCancelled &&
                 !isInUploadingState &&
                 (attachmentCompilationState[attachment.tid!]
                   ? attachmentCompilationState[attachment.tid!] !== UPLOAD_STATE.FAIL ||
@@ -1016,7 +1077,7 @@ const Attachment = ({
               }
               isDetailsView={isDetailsView}
             >
-              {(isInUploadingState || downloadingFile) && !isRepliedMessage && !isPreview ? (
+              {(isInUploadingState || isVideoDownloadActive) && !isRepliedMessage && !isPreview ? (
                 <UploadProgress
                   isDetailsView={isDetailsView}
                   isRepliedMessage={isRepliedMessage}
@@ -1043,19 +1104,19 @@ const Attachment = ({
                         )}
                       </CancelResumeWrapper>
                     ) : (
-                      <CancelResumeWrapper onClick={() => handleStopStartDownloadFile()}>
+                      <CancelResumeWrapper onClick={handleCancelOriginalVideoDownload}>
                         {downloadIsCancelled ? <DownloadIcon /> : <CancelIcon />}
                       </CancelResumeWrapper>
                     )}
                     {(isPreparingVideo ||
                       attachmentCompilationState[attachment.tid!] === UPLOAD_STATE.UPLOADING ||
-                      (downloadingFile && !downloadIsCancelled)) && (
+                      (isVideoDownloadActive && !downloadIsCancelled)) && (
                       <React.Fragment>
                         <ProgressWrapper>
                           <CircularProgressbar
                             minValue={0}
                             maxValue={100}
-                            value={isPreparingVideo ? 3 : progress}
+                            value={isPreparingVideo ? 3 : videoProgress}
                             backgroundPadding={3}
                             background={true}
                             text=''
@@ -1074,10 +1135,10 @@ const Attachment = ({
                             }}
                           />
                         </ProgressWrapper>
-                        {sizeProgress && !isRepliedMessage && (
+                        {videoSizeProgress && !isRepliedMessage && (
                           <SizeProgress color={textOnPrimary}>
-                            {bytesToSize(isPreparingVideo ? 0 : sizeProgress.loaded, 1)} /{' '}
-                            {bytesToSize(sizeProgress.total, 1)}
+                            {bytesToSize(isPreparingVideo ? 0 : videoSizeProgress.loaded, 1)} /{' '}
+                            {bytesToSize(videoSizeProgress.total, 1)}
                           </SizeProgress>
                         )}
                       </React.Fragment>
@@ -1085,6 +1146,30 @@ const Attachment = ({
                   </UploadPercent>
                 </UploadProgress>
               ) : null}
+              {isSharedOriginalVideoCancelled && !isRepliedMessage && !isPreview && (
+                <UploadProgress
+                  isDetailsView={isDetailsView}
+                  isRepliedMessage={isRepliedMessage}
+                  withPrefix={downloadedVideoPreviewImage ? false : withPrefix}
+                  backgroundImage={downloadedVideoPreviewImage || (!attachmentUrlFromMap ? attachmentThumb : '')}
+                  zIndex={9}
+                  borderColor={borderColor}
+                  withBorder={!isPreview && !isDetailsView}
+                  borderRadius={borderRadius}
+                  width={renderWidth}
+                  height={renderHeight}
+                >
+                  <UploadPercent
+                    isRepliedMessage={isRepliedMessage}
+                    isDetailsView={isDetailsView}
+                    backgroundColor={overlayBackground2}
+                  >
+                    <CancelResumeWrapper onClick={handleResumeOriginalVideoDownload}>
+                      <DownloadIcon />
+                    </CancelResumeWrapper>
+                  </UploadPercent>
+                </UploadProgress>
+              )}
               <VideoPreview
                 onlyVideoImage={onlyVideoImage}
                 width={
@@ -1101,7 +1186,7 @@ const Attachment = ({
                       ? '100%'
                       : `${renderHeight || videoAttachmentMaxHeight || 240}px`
                 }
-                downloading={downloadingFile}
+                downloading={isVideoDownloadActive || isSharedOriginalVideoCancelled}
                 file={attachment}
                 messageType={messageType}
                 src={attachmentUrlFromMap || attachment.attachmentUrl || attachmentUrl}

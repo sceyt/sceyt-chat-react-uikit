@@ -14,6 +14,7 @@ import Attachment from '../../../Attachment'
 import SliderPopup from '../../../../common/popups/sliderPopup'
 import { useColor } from '../../../../hooks'
 import { THEME_COLORS } from '../../../../UIHelper/constants'
+import log from 'loglevel'
 
 interface IProps {
   channel: IChannel
@@ -31,12 +32,25 @@ const Media = ({ channel }: IProps) => {
   const dispatch = useDispatch()
 
   const handleMediaItemClick = (file: IAttachment) => {
+    log.info(
+      '[MEDIA_IMAGE_SLIDER] media tab item clicked ' +
+        JSON.stringify({
+          channelId: channel.id,
+          fileId: file?.id || null,
+          type: file?.type || null,
+          resource: typeof file?.url === 'string' ? file.url.split(/[?#]/)[0] : null
+        })
+    )
     if (file?.id) {
       // The popup attachment list is shared across channels. Seed it with the
       // clicked item before mounting the slider so stale items cannot render
       // while the near-item query is in flight.
       dispatch(setAttachmentsForPopupAC([file]))
       setMediaFile(file)
+      log.info(
+        '[MEDIA_IMAGE_SLIDER] slider state requested ' +
+          JSON.stringify({ channelId: channel.id, fileId: file.id, type: file.type || null })
+      )
     }
   }
 

@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState, useCallback } from 'react'
+import React, { useEffect, useMemo, useState, useCallback, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { shallowEqual } from 'react-redux'
 import { useSelector, useDispatch } from 'store/hooks'
@@ -16,7 +16,6 @@ import { bytesToSize, downloadFile } from '../../../helpers'
 import { isJSON, makeUsername } from '../../../helpers/message'
 import { base64ToDataURL } from '../../../helpers/resizeImage'
 import { IAttachment, IChannel, IMedia, IMessage } from '../../../types'
-import { getCustomDownloader } from '../../../helpers/customUploader'
 import {
   attachmentForPopupLoadingStateSelector,
   attachmentsForPopupSelector,
@@ -46,12 +45,8 @@ import { connectionStatusSelector, contactsMapSelector } from '../../../store/us
 import { UploadingIcon } from '../../../UIHelper'
 import { getShowOnlyContactUsers } from '../../../helpers/contacts'
 import { getClient } from '../../client'
-import {
-  getAttachmentUrlFromCache,
-  getAttachmentURLWithVersion,
-  setAttachmentToCache
-} from '../../../helpers/attachmentsCache'
-import { releaseAllOriginalBlobUrls } from '../../../helpers/attachmentBlobUrls'
+import { getAttachmentUrlFromCache, getAttachmentURLWithVersion } from '../../../helpers/attachmentsCache'
+import { getRegisteredBlobUrl, pinOriginalBlobUrl, unpinOriginalBlobUrl } from '../../../helpers/attachmentBlobUrls'
 import VideoPlayer from '../../../components/VideoPlayer'
 import { CircularProgressbar } from 'react-circular-progressbar'
 import ForwardMessagePopup, { IForwardMessageNote } from '../forwardMessage'
@@ -60,6 +55,8 @@ import { getChannelFromMap } from '../../../helpers/channelHalper'
 import ConfirmPopup from '../delete'
 import { IAttachmentProperties } from '../../../components/Message/Message.types'
 import log from 'loglevel'
+import { requestMediaDownload } from '../../../helpers/mediaDownloadCoordinator'
+import { useMediaDownload } from '../../../hooks/basic/useMediaDownload'
 
 interface IProps {
   channel: IChannel
@@ -81,6 +78,14 @@ const getMediaThumbnailSource = (file: IMedia): string | undefined => {
   } catch {
     return undefined
   }
+}
+
+const sliderDiagnosticSource = (source?: string) => {
+  if (!source) return null
+  // Blob URLs are safe to expose in local diagnostics and must remain exact:
+  // their UUID tells us whether the slider reused an existing source or was
+  // handed a replacement. Remote URLs omit query/hash values.
+  return source.startsWith('blob:') ? source : source.split(/[?#]/)[0]
 }
 
 const SliderPopup: React.FC<IProps> = ({
@@ -131,9 +136,31 @@ const SliderPopup: React.FC<IProps> = ({
         : ''
   }, [currentFile?.type])
 
-  const customDownloader = getCustomDownloader()
+  const currentFileId = currentFile?.id
+  const currentFileUrl = currentFile?.url
+  const currentFileType = currentFile?.type
+  const currentFileSize = currentFile?.size
+  const currentAttachmentKey = currentFileUrl ? currentFileUrl + prefixUrl : undefined
+  const currentAttachmentUrlFromRegistry = currentAttachmentKey
+    ? getRegisteredBlobUrl(getAttachmentURLWithVersion(currentAttachmentKey))
+    : undefined
+  const currentAttachmentUrlFromRedux = currentAttachmentKey
+    ? attachmentUpdatedMap[getAttachmentURLWithVersion(currentAttachmentKey)]
+    : undefined
+  const currentAttachmentUrl = currentAttachmentUrlFromRedux || currentAttachmentUrlFromRegistry
+  const lastImageSourceDiagnosticRef = useRef<string | undefined>()
+  const currentResourceKind = currentFile?.type === 'video' ? 'original-video' : 'original-image'
+  const currentResourceKey = currentFile?.url ? `${currentResourceKind}:${currentFile.url}` : undefined
+  const sharedMediaDownload = useMediaDownload(currentResourceKey)
   const contactsMap = useSelector(contactsMapSelector)
   const attachmentsList = useSelector(attachmentsForPopupSelector, shallowEqual) || []
+  // The global popup list is populated in an effect. Render the tapped item
+  // immediately instead of briefly showing an empty/stale list while that
+  // effect and the near-attachments request run.
+  const popupAttachments = useMemo(() => {
+    const hasCurrentFile = !!currentFileId && attachmentsList.some((file: IMedia) => file.id === currentFileId)
+    return hasCurrentFile ? attachmentsList : [currentMediaFile]
+  }, [attachmentsList, currentFileId, currentMediaFile])
   const attachmentUserName = currentFile
     ? currentFile.user &&
       makeUsername(
@@ -142,25 +169,84 @@ const SliderPopup: React.FC<IProps> = ({
         getFromContacts && user.id !== currentFile.user.id
       )
     : ''
+
+  useEffect(() => {
+    if (currentFileType !== 'image' || !currentAttachmentKey) return
+
+    const state = {
+      channelId: channel.id,
+      fileId: currentFileId || null,
+      attachmentKey: currentAttachmentKey,
+      source: sliderDiagnosticSource(currentAttachmentUrl),
+      sourceFromRedux: sliderDiagnosticSource(currentAttachmentUrlFromRedux),
+      sourceFromRegistry: sliderDiagnosticSource(currentAttachmentUrlFromRegistry),
+      downloadState: sharedMediaDownload.state
+    }
+    const signature = JSON.stringify(state)
+    if (lastImageSourceDiagnosticRef.current === signature) return
+    lastImageSourceDiagnosticRef.current = signature
+    log.info('[MEDIA_IMAGE_SLIDER] image source state ' + signature)
+  }, [
+    channel.id,
+    currentAttachmentKey,
+    currentAttachmentUrl,
+    currentAttachmentUrlFromRedux,
+    currentAttachmentUrlFromRegistry,
+    currentFileId,
+    currentFileType,
+    sharedMediaDownload.state
+  ])
+
+  useEffect(() => {
+    if (currentFileType !== 'image') return
+    log.info(
+      '[MEDIA_IMAGE_SLIDER] slider mounted ' +
+        JSON.stringify({
+          channelId: channel.id,
+          fileId: currentFileId || null,
+          attachmentKey: currentAttachmentKey || null
+        })
+    )
+    return () => {
+      log.info(
+        '[MEDIA_IMAGE_SLIDER] slider unmounted ' +
+          JSON.stringify({
+            channelId: channel.id,
+            fileId: currentFileId || null,
+            attachmentKey: currentAttachmentKey || null
+          })
+      )
+    }
+  }, [channel.id, currentAttachmentKey, currentFileId, currentFileType])
+
   const handleClosePopup = () => {
+    if (currentFileType === 'image') {
+      log.info(
+        '[MEDIA_IMAGE_SLIDER] close requested ' +
+          JSON.stringify({
+            channelId: channel.id,
+            fileId: currentFileId || null,
+            attachmentKey: currentAttachmentKey || null
+          })
+      )
+    }
     setIsSliderOpen(false)
   }
 
+  const setDownloadedMedia = useCallback(
+    (attachmentKey: string, source: string) => dispatch(setUpdateMessageAttachmentAC(attachmentKey, source)),
+    [dispatch]
+  )
   useEffect(() => {
-    return () => {
-      // The slider is the only consumer of full-size originals — drop them on
-      // close so the biggest blobs don't stay pinned; they re-mint from the
-      // attachments cache on next open.
-      releaseAllOriginalBlobUrls()
-    }
-  }, [])
+    if (!currentAttachmentKey) return
 
-  const downloadImage = (src: string, setToDownloadedFiles?: boolean, type?: string) => {
-    if (setToDownloadedFiles && currentFile) {
-      const url = currentFile.url + (type === 'image' ? '_original_image_url' : '_original_video_url')
-      dispatch(setUpdateMessageAttachmentAC(url, src))
+    const versionedAttachmentKey = getAttachmentURLWithVersion(currentAttachmentKey)
+    pinOriginalBlobUrl(versionedAttachmentKey)
+
+    return () => {
+      unpinOriginalBlobUrl(versionedAttachmentKey)
     }
-  }
+  }, [currentAttachmentKey])
 
   const handleCompleteDownload = (attachmentId: string, failed?: boolean) => {
     if (failed) {
@@ -187,12 +273,26 @@ const SliderPopup: React.FC<IProps> = ({
     )
   }
 
-  const handleClicks = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
-    const target = e.target as HTMLElement
-    if (!target.closest('.custom_carousel_item') && !target.closest('.custom_carousel_arrow')) {
-      handleClosePopup()
-    }
-  }, [])
+  const handleClicks = useCallback(
+    (e: React.MouseEvent<HTMLDivElement>) => {
+      const target = e.target as HTMLElement
+      if (!target.closest('.custom_carousel_item') && !target.closest('.custom_carousel_arrow')) {
+        if (currentFileType === 'image') {
+          log.info(
+            '[MEDIA_IMAGE_SLIDER] outside click closing slider ' +
+              JSON.stringify({
+                channelId: channel.id,
+                fileId: currentFileId || null,
+                targetTag: target.tagName,
+                targetClass: typeof target.className === 'string' ? target.className : null
+              })
+          )
+        }
+        handleClosePopup()
+      }
+    },
+    [channel.id, currentFileId, currentFileType]
+  )
 
   const handleForwardMessage = useCallback(
     async (channelIds: string[], accompanyingMessage?: IForwardMessageNote) => {
@@ -285,78 +385,147 @@ const SliderPopup: React.FC<IProps> = ({
         videoElem.pause()
       }
     }
-    if (currentFile && currentFile.id) {
-      const attachmentKey = currentFile.url + prefixUrl
-      const attachmentKeyWithVersion = getAttachmentURLWithVersion(attachmentKey)
-      const hasAttachment = !!attachmentUpdatedMap[attachmentKeyWithVersion]
+  }, [currentFileId])
+
+  useEffect(() => {
+    let cancelled = false
+    if (currentFileId && currentFileUrl && currentAttachmentKey) {
+      const attachmentKey = currentAttachmentKey
+      const hasAttachment = !!currentAttachmentUrl
 
       // If attachment is already loaded, check if it's ready
       if (!hasAttachment) {
+        if (currentFileType === 'image') {
+          log.info(
+            '[MEDIA_IMAGE_SLIDER] cache lookup started ' +
+              JSON.stringify({ channelId: channel.id, fileId: currentFileId, attachmentKey })
+          )
+        }
         getAttachmentUrlFromCache(attachmentKey)
           .then((cachedUrl: string | false) => {
+            if (cancelled) return
             if (cachedUrl) {
-              if (currentFile.type === 'image') {
-                downloadImage(cachedUrl as string, true, 'image')
+              if (currentFileType === 'image') {
+                log.info(
+                  '[MEDIA_IMAGE_SLIDER] cache lookup hit ' +
+                    JSON.stringify({
+                      channelId: channel.id,
+                      fileId: currentFileId,
+                      attachmentKey,
+                      source: sliderDiagnosticSource(cachedUrl as string)
+                    })
+                )
+              }
+              if (currentFileType === 'image') {
+                setDownloadedMedia(attachmentKey, cachedUrl as string)
               } else {
                 dispatch(setUpdateMessageAttachmentAC(attachmentKey, cachedUrl))
-                setPlayedVideo(currentFile.id)
+                setPlayedVideo(currentFileId)
               }
             } else {
-              if (customDownloader) {
-                customDownloader(currentFile.url, false, () => {}, messageType)
-                  .then(async (url) => {
-                    try {
-                      const response = await fetch(url)
-                      setAttachmentToCache(attachmentKey, response)
-                      if (currentFile.type === 'image') {
-                        downloadImage(url, true, 'image')
-                      } else {
-                        dispatch(setUpdateMessageAttachmentAC(attachmentKey, url))
-                        setPlayedVideo(currentFile.id)
-                      }
-                    } catch (error) {
-                      log.error('Error fetching attachment:', error)
+              const kind = currentFileType === 'video' ? 'original-video' : 'original-image'
+              if (currentFileType === 'image') {
+                log.info(
+                  '[MEDIA_IMAGE_SLIDER] shared download requested ' +
+                    JSON.stringify({
+                      channelId: channel.id,
+                      fileId: currentFileId,
+                      attachmentKey,
+                      resource: currentFileUrl
+                    })
+                )
+              }
+              requestMediaDownload({
+                key: `${kind}:${currentFileUrl}`,
+                url: currentFileUrl,
+                cacheKey: attachmentKey,
+                kind,
+                messageType,
+                size: Number(currentFileSize) || 0
+              })
+                .then(({ objectUrl }) => {
+                  if (cancelled) return
+                  if (currentFileType === 'image') {
+                    log.info(
+                      '[MEDIA_IMAGE_SLIDER] shared download resolved ' +
+                        JSON.stringify({
+                          channelId: channel.id,
+                          fileId: currentFileId,
+                          attachmentKey,
+                          source: sliderDiagnosticSource(objectUrl)
+                        })
+                    )
+                    setDownloadedMedia(attachmentKey, objectUrl)
+                  } else {
+                    dispatch(setUpdateMessageAttachmentAC(attachmentKey, objectUrl))
+                    setPlayedVideo(currentFileId)
+                  }
+                })
+                .catch((error) => {
+                  if (!cancelled) {
+                    if (currentFileType === 'image') {
+                      log.error(
+                        '[MEDIA_IMAGE_SLIDER] shared download failed ' +
+                          JSON.stringify({
+                            channelId: channel.id,
+                            fileId: currentFileId,
+                            attachmentKey,
+                            errorName: error instanceof Error ? error.name : null,
+                            errorMessage: error instanceof Error ? error.message : String(error)
+                          })
+                      )
+                    } else {
+                      log.error('Failed to load slider media', error)
                     }
-                  })
-                  .catch((e) => {
-                    log.error('Failed to download attachment:', e)
-                  })
+                  }
+                })
+            }
+          })
+          .catch((error) => {
+            if (!cancelled) {
+              if (currentFileType === 'image') {
+                log.error(
+                  '[MEDIA_IMAGE_SLIDER] cache lookup failed ' +
+                    JSON.stringify({
+                      channelId: channel.id,
+                      fileId: currentFileId,
+                      attachmentKey,
+                      errorName: error instanceof Error ? error.name : null,
+                      errorMessage: error instanceof Error ? error.message : String(error)
+                    })
+                )
               } else {
-                if (currentFile.type === 'image') {
-                  downloadImage(currentFile.url as string, true, 'image')
-                } else {
-                  dispatch(setUpdateMessageAttachmentAC(attachmentKey, currentFile.url))
-                  setPlayedVideo(currentFile.id)
-                }
+                log.error('Failed to read cached slider media', error)
               }
             }
           })
-          .catch((e) => {
-            log.error('Error getting attachment from cache:', e)
-          })
       }
     }
+    return () => {
+      cancelled = true
+    }
   }, [
-    currentFile,
-    playedVideo,
-    attachmentUpdatedMap,
-    customDownloader,
-    messageType,
-    downloadImage,
+    channel.id,
+    currentAttachmentKey,
+    currentFileId,
+    currentFileSize,
+    currentFileType,
+    currentFileUrl,
     dispatch,
-    prefixUrl
+    messageType,
+    setDownloadedMedia
   ])
 
   useEffect(() => {
     if (currentFile && currentFile.id) {
-      const currentMedia = attachmentsList.find((att: IMedia) => att.id === currentFile.id)
+      const currentMedia = popupAttachments.find((att: IMedia) => att.id === currentFile.id)
       if (currentMedia) {
-        const indexOnList = attachmentsList.findIndex((item: IMedia) => item.id === currentFile.id)
-        setNextButtonDisabled(!attachmentsList[indexOnList + 1])
-        setPrevButtonDisabled(!attachmentsList[indexOnList - 1])
+        const indexOnList = popupAttachments.findIndex((item: IMedia) => item.id === currentFile.id)
+        setNextButtonDisabled(!popupAttachments[indexOnList + 1])
+        setPrevButtonDisabled(!popupAttachments[indexOnList - 1])
       }
     }
-  }, [attachmentsList])
+  }, [popupAttachments, currentFile])
 
   useEffect(() => {
     // Always replace the shared popup list before querying near the selected
@@ -368,14 +537,8 @@ const SliderPopup: React.FC<IProps> = ({
 
   const activeFileIndex = useMemo(() => {
     if (!currentFile?.id) return -1
-    const index = attachmentsList.findIndex((item: IMedia) => item.id === currentFile.id)
-    // eslint-disable-next-line no-console
-    console.log(
-      '[MEDIA_OPEN] 5.activeIndex ' +
-        JSON.stringify({ index, attId: currentFile.id, name: currentFile.name, listLen: attachmentsList.length })
-    )
-    return index
-  }, [attachmentsList, currentFile])
+    return popupAttachments.findIndex((item: IMedia) => item.id === currentFile.id)
+  }, [currentFile, popupAttachments])
 
   // Replace the selected item with the latest query result without changing
   // its identity. Carousel tracks the matching id via activeFileIndex.
@@ -409,7 +572,7 @@ const SliderPopup: React.FC<IProps> = ({
   }, [activeFileIndex, attachmentLoadingStateForPopup, attachmentsForPopupHasPrev, attachmentsList, dispatch])
 
   // Check if carousel is loading (attachments list is being fetched)
-  const isCarouselLoading = !attachmentsList.length || activeFileIndex < 0
+  const isCarouselLoading = !popupAttachments.length || activeFileIndex < 0
 
   // Helper function to check if a specific item is loading
   const isItemLoading = useCallback(
@@ -503,7 +666,7 @@ const SliderPopup: React.FC<IProps> = ({
             <UploadingIcon color={textOnPrimary} />
           </UploadCont>
         )}
-        {activeFileIndex >= 0 && attachmentsList && attachmentsList.length && (
+        {activeFileIndex >= 0 && popupAttachments.length > 0 && (
           <Carousel
             pagination={false}
             className='custom_carousel'
@@ -521,19 +684,10 @@ const SliderPopup: React.FC<IProps> = ({
                 setReadyToPlay(true)
                 clearTimeout(timeout)
               }, 400)
-              if (pageIndex >= 0 && pageIndex < attachmentsList.length) {
-                // eslint-disable-next-line no-console
-                console.log(
-                  '[MEDIA_OPEN] 7.carousel-change ' +
-                    JSON.stringify({
-                      pageIndex,
-                      attId: attachmentsList[pageIndex]?.id,
-                      name: attachmentsList[pageIndex]?.name
-                    })
-                )
-                setCurrentFile(attachmentsList[pageIndex])
-                setNextButtonDisabled(!attachmentsList[pageIndex + 1])
-                setPrevButtonDisabled(!attachmentsList[pageIndex - 1])
+              if (pageIndex >= 0 && pageIndex < popupAttachments.length) {
+                setCurrentFile(popupAttachments[pageIndex])
+                setNextButtonDisabled(!popupAttachments[pageIndex + 1])
+                setPrevButtonDisabled(!popupAttachments[pageIndex - 1])
               }
             }}
             renderArrow={({ type, onClick, isEdge }: RenderArrowProps) => {
@@ -562,7 +716,7 @@ const SliderPopup: React.FC<IProps> = ({
             }}
             isRTL={false}
           >
-            {attachmentsList.map((file: IMedia) => (
+            {popupAttachments.map((file: IMedia) => (
               <CarouselItem
                 className='custom_carousel_item'
                 key={file.id}
@@ -572,6 +726,24 @@ const SliderPopup: React.FC<IProps> = ({
                   e.stopPropagation()
                 }}
               >
+                {file.id === currentFile?.id && sharedMediaDownload.state === 'loading' && (
+                  <ItemLoadingCont data-testid='media-preview-download-progress'>
+                    <ProgressWrapper>
+                      <CircularProgressbar
+                        minValue={0}
+                        maxValue={100}
+                        value={sharedMediaDownload.progress || 3}
+                        background
+                        backgroundPadding={6}
+                        text=''
+                        styles={{
+                          background: { fill: `${overlayBackground2}66` },
+                          path: { stroke: textOnPrimary, strokeLinecap: 'butt', strokeWidth: '6px' }
+                        }}
+                      />
+                    </ProgressWrapper>
+                  </ItemLoadingCont>
+                )}
                 {isItemLoading(file.id) && file.type === 'image' && (
                   <ItemLoadingCont>
                     <UploadingIcon color={textOnPrimary} />
@@ -579,13 +751,15 @@ const SliderPopup: React.FC<IProps> = ({
                 )}
                 {file.type === 'image' ? (
                   <React.Fragment>
-                    {(attachmentUpdatedMap[getAttachmentURLWithVersion(file.url + '_original_image_url')] ||
+                    {((file.id === currentFile?.id ? currentAttachmentUrl : undefined) ||
+                      attachmentUpdatedMap[getAttachmentURLWithVersion(file.url + '_original_image_url')] ||
                       getMediaThumbnailSource(file)) && (
                       <img
                         loading='eager'
                         decoding='async'
                         draggable={false}
                         src={
+                          (file.id === currentFile?.id ? currentAttachmentUrl : undefined) ||
                           attachmentUpdatedMap[getAttachmentURLWithVersion(file.url + '_original_image_url')] ||
                           getMediaThumbnailSource(file)
                         }
@@ -601,11 +775,43 @@ const SliderPopup: React.FC<IProps> = ({
                           if (fileId) {
                             setItemsLoadedMap((prev) => ({ ...prev, [fileId]: true }))
                           }
+                          if (file.id === currentFile?.id) {
+                            log.info(
+                              '[MEDIA_IMAGE_SLIDER] active image loaded ' +
+                                JSON.stringify({
+                                  channelId: channel.id,
+                                  fileId: file.id,
+                                  source: sliderDiagnosticSource(
+                                    (file.id === currentFile?.id ? currentAttachmentUrl : undefined) ||
+                                      attachmentUpdatedMap[
+                                        getAttachmentURLWithVersion(file.url + '_original_image_url')
+                                      ] ||
+                                      getMediaThumbnailSource(file)
+                                  )
+                                })
+                            )
+                          }
                         }}
                         onError={() => {
                           const fileId = file.id
                           if (fileId) {
                             setItemsLoadedMap((prev) => ({ ...prev, [fileId]: false }))
+                          }
+                          if (file.id === currentFile?.id) {
+                            log.error(
+                              '[MEDIA_IMAGE_SLIDER] active image failed to render ' +
+                                JSON.stringify({
+                                  channelId: channel.id,
+                                  fileId: file.id,
+                                  source: sliderDiagnosticSource(
+                                    (file.id === currentFile?.id ? currentAttachmentUrl : undefined) ||
+                                      attachmentUpdatedMap[
+                                        getAttachmentURLWithVersion(file.url + '_original_image_url')
+                                      ] ||
+                                      getMediaThumbnailSource(file)
+                                  )
+                                })
+                            )
                           }
                         }}
                       />
@@ -613,17 +819,31 @@ const SliderPopup: React.FC<IProps> = ({
                   </React.Fragment>
                 ) : (
                   <React.Fragment>
-                    {attachmentUpdatedMap[getAttachmentURLWithVersion(file.url + '_original_video_url')] && (
+                    {file.id === currentFile?.id && currentAttachmentUrl && (
                       <VideoPlayer
                         readyToPlay={readyToPlay}
                         activeFileId={currentFile?.id || ''}
                         videoFileId={file.id || ''}
-                        src={attachmentUpdatedMap[getAttachmentURLWithVersion(file.url + '_original_video_url')]}
+                        src={currentAttachmentUrl}
+                        // A cached original can render immediately. Supplying a
+                        // poster in that case flashes the low-resolution frame
+                        // before the already-local video paints.
+                        poster={currentAttachmentUrl.startsWith('blob:') ? undefined : getMediaThumbnailSource(file)}
                         onMouseDown={(e: React.MouseEvent) => {
                           if (e.button === 2) {
                             e.stopPropagation()
                           }
                         }}
+                      />
+                    )}
+                    {file.id !== currentFile?.id && getMediaThumbnailSource(file) && (
+                      <img
+                        loading='lazy'
+                        decoding='async'
+                        draggable={false}
+                        src={getMediaThumbnailSource(file)}
+                        alt={file.name || 'Video attachment'}
+                        style={{ position: 'relative', zIndex: 1, opacity: 1 }}
                       />
                     )}
                   </React.Fragment>
