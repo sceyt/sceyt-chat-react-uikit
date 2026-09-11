@@ -370,6 +370,41 @@ describe('mediaDownloadCoordinator', () => {
     expect(download).not.toHaveBeenCalled()
   })
 
+  it('allows an immediate retry while a cancelled custom download is still settling', async () => {
+    let rejectFirstDownload: ((error: Error) => void) | undefined
+    const firstDownload = new Promise((_resolve, reject) => {
+      rejectFirstDownload = reject
+    })
+    const download = jest
+      .fn()
+      .mockReturnValueOnce(firstDownload)
+      .mockResolvedValueOnce({ Body: new Blob(['retried video'], { type: 'video/mp4' }) })
+    const cancelRequest = jest.fn()
+    setCustomUploader({ download, cancelRequest, upload: jest.fn() } as any)
+    const request = {
+      key: 'original-video:https://cdn/retry.mp4',
+      url: 'https://cdn/retry.mp4',
+      cacheKey: 'https://cdn/retry.mp4_original_video_url',
+      kind: 'original-video' as const
+    }
+
+    const first = requestMediaDownload(request)
+    await flushCoordinator()
+    cancelMediaDownload(request.key)
+
+    const retry = requestMediaDownload(request)
+    await flushCoordinator()
+    expect(download).toHaveBeenCalledTimes(2)
+
+    const cancelled = new Error('cancelled')
+    cancelled.name = 'AbortError'
+    rejectFirstDownload!(cancelled)
+
+    await expect(first).rejects.toMatchObject({ name: 'AbortError' })
+    await expect(retry).resolves.toMatchObject({ objectUrl: 'blob:shared-media' })
+    expect(getMediaDownloadSnapshot(request.key)).toMatchObject({ state: 'completed' })
+  })
+
   it('falls back to downloading after a cache read failure and retries after a failed transfer', async () => {
     mockGetAttachmentUrlFromCache.mockRejectedValue(new Error('Cache unavailable'))
     const download = jest

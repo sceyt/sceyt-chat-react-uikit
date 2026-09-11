@@ -227,6 +227,10 @@ const Attachment = ({
   const isPreparingVideo = attachmentCompilationState[attachment.tid!] === UPLOAD_STATE.PREPARING
   const isSharedOriginalVideoDownloading = sharedOriginalVideoDownload.state === 'loading'
   const isSharedOriginalVideoCancelled = sharedOriginalVideoDownload.state === 'cancelled'
+  // Keep the control responsive in the attachment that initiated cancellation;
+  // other mounted chat/media-tab tiles receive the shared cancelled snapshot.
+  const shouldShowVideoDownloadRetry =
+    !isOriginalVideoRestarting && (isSharedOriginalVideoCancelled || downloadIsCancelled)
   const isVideoDownloading = downloadingFile || isSharedOriginalVideoDownloading
   const isVideoDownloadActive = isVideoDownloading || isOriginalVideoRestarting
   const videoProgress = isSharedOriginalVideoDownloading ? sharedOriginalVideoDownload.progress || 3 : progress
@@ -600,7 +604,10 @@ const Attachment = ({
       // responsible for requesting a full original when that item is opened.
       // If a chat/slider transfer is already active, useMediaDownload above
       // still exposes its shared progress in this tile.
-      if (isDetailsView) return
+      // Initial Media-tab transfers are owned by its visible-tile observer.
+      // An explicit tap on the cancelled Download icon increments the retry
+      // value and intentionally starts a fresh shared transfer here.
+      if (isDetailsView && videoDownloadRetry === 0) return
 
       // The full video controls downloadingFile. Check its browser cache before
       // starting the actual download, so a cached original never shows a spinner.
@@ -675,10 +682,10 @@ const Attachment = ({
   const handleCancelOriginalVideoDownload = (event: React.MouseEvent) => {
     event.stopPropagation()
     if (isSharedOriginalVideoDownloading && originalVideoDownloadKey) {
-      cancelMediaDownload(originalVideoDownloadKey)
-      originalVideoDownloadStartedRef.current = false
       setDownloadIsCancelled(true)
       setIsOriginalVideoRestarting(false)
+      cancelMediaDownload(originalVideoDownloadKey)
+      originalVideoDownloadStartedRef.current = false
       return
     }
     handleStopStartDownloadFile()
@@ -1069,7 +1076,7 @@ const Attachment = ({
               onClick={() =>
                 handleMediaItemClick &&
                 !isVideoDownloadActive &&
-                !isSharedOriginalVideoCancelled &&
+                !shouldShowVideoDownloadRetry &&
                 !isInUploadingState &&
                 (attachmentCompilationState[attachment.tid!]
                   ? attachmentCompilationState[attachment.tid!] !== UPLOAD_STATE.FAIL ||
@@ -1106,7 +1113,10 @@ const Attachment = ({
                         )}
                       </CancelResumeWrapper>
                     ) : (
-                      <CancelResumeWrapper onClick={handleCancelOriginalVideoDownload}>
+                      <CancelResumeWrapper
+                        onClick={handleCancelOriginalVideoDownload}
+                        aria-label='Cancel video download'
+                      >
                         {downloadIsCancelled ? <DownloadIcon /> : <CancelIcon />}
                       </CancelResumeWrapper>
                     )}
@@ -1148,7 +1158,7 @@ const Attachment = ({
                   </UploadPercent>
                 </UploadProgress>
               ) : null}
-              {isSharedOriginalVideoCancelled && !isRepliedMessage && !isPreview && (
+              {shouldShowVideoDownloadRetry && !isRepliedMessage && !isPreview && (
                 <UploadProgress
                   isDetailsView={isDetailsView}
                   isRepliedMessage={isRepliedMessage}
@@ -1166,7 +1176,7 @@ const Attachment = ({
                     isDetailsView={isDetailsView}
                     backgroundColor={overlayBackground2}
                   >
-                    <CancelResumeWrapper onClick={handleResumeOriginalVideoDownload}>
+                    <CancelResumeWrapper onClick={handleResumeOriginalVideoDownload} aria-label='Download video'>
                       <DownloadIcon />
                     </CancelResumeWrapper>
                   </UploadPercent>
@@ -1188,7 +1198,7 @@ const Attachment = ({
                       ? '100%'
                       : `${renderHeight || videoAttachmentMaxHeight || 240}px`
                 }
-                downloading={isVideoDownloadActive || isSharedOriginalVideoCancelled}
+                downloading={isVideoDownloadActive || shouldShowVideoDownloadRetry}
                 file={attachment}
                 messageType={messageType}
                 src={attachmentUrlFromMap || attachment.attachmentUrl || attachmentUrl}

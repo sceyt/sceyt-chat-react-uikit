@@ -5,7 +5,11 @@ import { attachmentTypes } from '../../helpers/constants'
 import { getAttachmentUrlFromCache, setAttachmentToCache } from '../../helpers/attachmentsCache'
 import { CONNECTION_STATUS } from '../../store/user/constants'
 import { createMessageListStore, renderWithSceytProvider } from '../../testUtils/messageListHarness'
-import { resetMediaDownloadCoordinatorForTests } from '../../helpers/mediaDownloadCoordinator'
+import {
+  cancelMediaDownload,
+  requestMediaDownload,
+  resetMediaDownloadCoordinatorForTests
+} from '../../helpers/mediaDownloadCoordinator'
 
 jest.mock('../../hooks', () => {
   const { THEME_COLORS } = require('../../UIHelper/constants')
@@ -33,7 +37,11 @@ jest.mock('../../UIHelper', () => ({
   AttachmentIconCont: ({ children }: any) => <div>{children}</div>,
   UploadProgress: ({ children }: any) => <div data-testid='video-download-progress'>{children}</div>,
   UploadPercent: ({ children }: any) => <div>{children}</div>,
-  CancelResumeWrapper: ({ children }: any) => <button type='button'>{children}</button>
+  CancelResumeWrapper: ({ children, onClick, ...props }: any) => (
+    <button type='button' onClick={onClick} {...props}>
+      {children}
+    </button>
+  )
 }))
 
 jest.mock('react-circular-progressbar', () => ({
@@ -181,6 +189,46 @@ describe('video attachment preview and download states', () => {
     expect(mockGetAttachmentUrlFromCache).toHaveBeenCalledTimes(1)
     expect(mockGetAttachmentUrlFromCache).toHaveBeenCalledWith('https://cdn/video-thumb.jpg')
     expect(global.fetch).not.toHaveBeenCalled()
+  })
+
+  it('shows the retry control and restarts a cancelled media-grid video download', async () => {
+    mockGetAttachmentUrlFromCache.mockResolvedValue(false)
+    global.fetch = jest.fn(
+      (_url, options) =>
+        new Promise((_resolve, reject) => {
+          options.signal.addEventListener('abort', () => {
+            const error = new Error('cancelled')
+            error.name = 'AbortError'
+            reject(error)
+          })
+        })
+    ) as any
+    const resourceKey = 'original-video:https://cdn/video.mp4'
+    const first = requestMediaDownload({
+      key: resourceKey,
+      url: videoAttachment.url,
+      cacheKey: `${videoAttachment.url}_original_video_url`,
+      kind: 'original-video'
+    })
+    await flushAttachmentEffects()
+    cancelMediaDownload(resourceKey)
+    await expect(first).rejects.toMatchObject({ name: 'AbortError' })
+
+    renderAttachment({}, { isDetailsView: true })
+    await flushAttachmentEffects()
+
+    // The cancelled shared state renders a Download control, not a stale
+    // progress ring. Its click increments the explicit Media-tab retry.
+    expect(screen.getByLabelText('Download video')).toBeInTheDocument()
+    fireEvent.click(screen.getByLabelText('Download video'))
+    expect(screen.getByTestId('video-download-progress')).toBeInTheDocument()
+    await act(async () => {
+      await new Promise<void>((resolve) => setTimeout(resolve, 0))
+      await new Promise<void>((resolve) => setTimeout(resolve, 0))
+    })
+
+    expect(global.fetch).toHaveBeenCalledTimes(2)
+    expect(screen.getByTestId('video-download-progress')).toBeInTheDocument()
   })
 
   it('joins the chat-thread and media-grid views to one original-video download', async () => {

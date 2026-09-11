@@ -37,6 +37,7 @@ export interface MediaDownloadResult {
 }
 
 interface MediaDownloadJob {
+  version: number
   snapshot: MediaDownloadSnapshot
   promise: Promise<MediaDownloadResult>
   abortController?: AbortController
@@ -49,6 +50,7 @@ const idleSnapshot: MediaDownloadSnapshot = { state: 'idle', loaded: 0, total: 0
 const jobs = new Map<string, MediaDownloadJob>()
 const snapshots = new Map<string, MediaDownloadSnapshot>()
 const listeners = new Map<string, Set<() => void>>()
+const jobVersions = new Map<string, number>()
 
 const notify = (key: string) => {
   listeners.get(key)?.forEach((listener) => listener())
@@ -59,6 +61,13 @@ const setSnapshot = (key: string, snapshot: MediaDownloadSnapshot) => {
   const job = jobs.get(key)
   if (job) job.snapshot = snapshot
   notify(key)
+}
+
+const setJobSnapshot = (key: string, job: MediaDownloadJob, snapshot: MediaDownloadSnapshot) => {
+  // An older cancelled request can finish after a retry has already started.
+  // Its late progress/failure must not replace the retry's current state.
+  if (jobVersions.get(key) !== job.version) return
+  setSnapshot(key, snapshot)
 }
 
 const normalizeProgress = (progress: any, fallbackTotal: number = 0) => {
@@ -115,7 +124,7 @@ const download = async (request: MediaDownloadRequest, job: MediaDownloadJob): P
       return
     }
     const normalized = normalizeProgress(progress, request.size)
-    setSnapshot(request.key, { state: 'loading', ...normalized })
+    setJobSnapshot(request.key, job, { state: 'loading', ...normalized })
   }
   const customDownloader = request.downloader || getCustomDownloader()
 
@@ -191,12 +200,14 @@ export const requestMediaDownload = (request: MediaDownloadRequest): Promise<Med
   }
 
   const job: MediaDownloadJob = {
+    version: (jobVersions.get(request.key) || 0) + 1,
     snapshot: { state: 'loading', loaded: 0, total: request.size || 0, progress: 0 },
     promise: undefined as any,
     cacheKeys: new Set([request.cacheKey, ...(request.cacheKeys || [])])
   }
+  jobVersions.set(request.key, job.version)
   jobs.set(request.key, job)
-  setSnapshot(request.key, job.snapshot)
+  setJobSnapshot(request.key, job, job.snapshot)
 
   const promise = Promise.resolve()
     .then(async () => {
@@ -209,7 +220,11 @@ export const requestMediaDownload = (request: MediaDownloadRequest): Promise<Med
       return download(request, job)
     })
     .then((result) => {
-      setSnapshot(request.key, {
+      // A downloader may resolve after its request was cancelled (notably
+      // custom downloader implementations without AbortController support).
+      // Never let that late completion replace the visible cancelled state.
+      throwIfCancelled(job)
+      setJobSnapshot(request.key, job, {
         state: 'completed',
         loaded: result.blob.size,
         total: result.blob.size,
@@ -219,11 +234,20 @@ export const requestMediaDownload = (request: MediaDownloadRequest): Promise<Med
     })
     .catch((error) => {
       const cancelled = error?.name === 'AbortError'
-      setSnapshot(request.key, { state: cancelled ? 'cancelled' : 'failed', loaded: 0, total: 0, progress: 0 })
+      setJobSnapshot(request.key, job, {
+        state: cancelled ? 'cancelled' : 'failed',
+        loaded: 0,
+        total: 0,
+        progress: 0
+      })
       throw error
     })
     .finally(() => {
-      jobs.delete(request.key)
+      // A cancelled key can be retried immediately. Do not remove that newer
+      // job when the old, cancelled promise settles later.
+      if (jobs.get(request.key) === job) {
+        jobs.delete(request.key)
+      }
     })
 
   job.promise = promise
@@ -235,6 +259,12 @@ export const cancelMediaDownload = (key: string) => {
   if (!job) return
 
   job.cancelled = true
+  // Update every chat/media-tab/slider subscriber synchronously so the
+  // cancel control becomes a Download icon immediately. Releasing the key
+  // here allows that icon to start a brand-new transfer without waiting for a
+  // slow native or custom downloader to reject.
+  jobs.delete(key)
+  setSnapshot(key, { state: 'cancelled', loaded: 0, total: 0, progress: 0 })
   if (job.abortController) job.abortController.abort()
   if (job.customRequest) getCustomUploader()?.cancelRequest(job.customRequest)
 }
@@ -256,4 +286,5 @@ export const resetMediaDownloadCoordinatorForTests = () => {
   jobs.clear()
   snapshots.clear()
   listeners.clear()
+  jobVersions.clear()
 }
