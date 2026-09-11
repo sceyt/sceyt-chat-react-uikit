@@ -1,13 +1,15 @@
 // Central registry for attachment blob object URLs.
 // Keys are the versioned keys stored in MessageReducer.attachmentUpdatedMap
 // (rawUrl + ATTACHMENT_VERSION). Registering every shared object URL here keeps
-// the number of pinned blobs bounded: the registry is an LRU with separate caps
-// for regular entries (thumbnails, compressed images, video frames) and
-// full-size originals, and it revokes URLs on eviction. Consumers re-mint from
-// the Cache Storage on a missing key, so eviction is always safe.
+// session resources bounded through LRU eviction and revokes URLs on eviction.
+// Consumers re-mint from Cache Storage on a missing key.
 
 export const BLOB_URL_CACHE_MAX = 300
-export const ORIGINALS_CACHE_MAX = 6
+// Originals must stay available for the active browser session just like other
+// attachment URLs. A tiny original-only limit made a channel with more than
+// six videos evict/recreate the same URLs in a loop. The shared, bounded LRU
+// still caps the session at 300 entries and revokes URLs on eventual eviction.
+export const ORIGINALS_CACHE_MAX = BLOB_URL_CACHE_MAX
 // Revocation is deferred so components mid-render can finish painting the old
 // URL and swap to their missing-key fallback on the next render.
 const REVOKE_DELAY_MS = 2000
@@ -17,6 +19,7 @@ const isOriginalKey = (key: string) => key.includes('_original_image_url') || ke
 // Insertion order doubles as LRU order: reads re-insert the key.
 const blobUrls = new Map<string, string>()
 const originalBlobUrls = new Map<string, string>()
+const pinnedOriginalKeys = new Set<string>()
 const pendingCreates = new Map<string, Promise<string>>()
 
 let evictListener: ((keys: string[]) => void) | null = null
@@ -31,11 +34,25 @@ const notifyEvicted = (keys: string[]) => {
   }
 }
 
+const isBlobUrlStillRegistered = (url: string) => {
+  for (const registeredUrl of blobUrls.values()) {
+    if (registeredUrl === url) return true
+  }
+  for (const registeredUrl of originalBlobUrls.values()) {
+    if (registeredUrl === url) return true
+  }
+  return false
+}
+
 const deferRevoke = (url: string) => {
   if (!url || !url.startsWith('blob:')) {
     return
   }
   setTimeout(() => {
+    // One blob can be published under a compact/display key and an
+    // original-media key. Replacing the compact version must not invalidate
+    // the still-live original URL used by the slider.
+    if (isBlobUrlStillRegistered(url)) return
     try {
       URL.revokeObjectURL(url)
     } catch (e) {
@@ -50,7 +67,10 @@ const capFor = (key: string) => (isOriginalKey(key) ? ORIGINALS_CACHE_MAX : BLOB
 const evictOverflow = (map: Map<string, string>, cap: number) => {
   const evicted: string[] = []
   while (map.size > cap) {
-    const oldestKey = map.keys().next().value as string
+    const oldestKey = Array.from(map.keys()).find((key) => map !== originalBlobUrls || !pinnedOriginalKeys.has(key))
+    // A visible slider may pin an original while background media keeps
+    // filling the cache. Keep it alive until that view releases it.
+    if (!oldestKey) break
     deferRevoke(map.get(oldestKey)!)
     map.delete(oldestKey)
     evicted.push(oldestKey)
@@ -74,12 +94,34 @@ export const registerBlobUrl = (versionedKey: string, objectUrl: string) => {
   }
   const map = mapFor(versionedKey)
   const existing = map.get(versionedKey)
+  // Redux can publish the same attachment URL repeatedly while message/media
+  // views reconcile. Re-registering it is harmless, but must remain a true
+  // no-op and must not revoke the live URL.
+  if (existing === objectUrl) {
+    return
+  }
   if (existing && existing !== objectUrl) {
     deferRevoke(existing)
   }
   map.delete(versionedKey)
   map.set(versionedKey, objectUrl)
   evictOverflow(map, capFor(versionedKey))
+}
+
+export const pinOriginalBlobUrl = (versionedKey: string) => {
+  if (!isOriginalKey(versionedKey)) return
+
+  pinnedOriginalKeys.add(versionedKey)
+  const url = originalBlobUrls.get(versionedKey)
+  if (url !== undefined) {
+    originalBlobUrls.delete(versionedKey)
+    originalBlobUrls.set(versionedKey, url)
+  }
+}
+
+export const unpinOriginalBlobUrl = (versionedKey: string) => {
+  pinnedOriginalKeys.delete(versionedKey)
+  evictOverflow(originalBlobUrls, ORIGINALS_CACHE_MAX)
 }
 
 export const getOrCreateBlobUrl = async (versionedKey: string, makeBlob: () => Promise<Blob>): Promise<string> => {
@@ -110,6 +152,7 @@ export const releaseBlobUrls = (versionedKeys: string[]) => {
     const url = map.get(key)
     if (url !== undefined) {
       map.delete(key)
+      pinnedOriginalKeys.delete(key)
       deferRevoke(url)
       released.push(key)
     }
@@ -117,12 +160,12 @@ export const releaseBlobUrls = (versionedKeys: string[]) => {
   notifyEvicted(released)
 }
 
-// Full-size originals are only rendered by the media slider — release them all
-// when it closes; they re-mint from the attachments cache on next open.
+// Explicit cleanup for full-size originals, for example during app teardown.
 export const releaseAllOriginalBlobUrls = () => {
   const keys = Array.from(originalBlobUrls.keys())
   originalBlobUrls.forEach(deferRevoke)
   originalBlobUrls.clear()
+  pinnedOriginalKeys.clear()
   notifyEvicted(keys)
 }
 
@@ -132,5 +175,6 @@ export const releaseAllBlobUrls = () => {
   originalBlobUrls.forEach(deferRevoke)
   blobUrls.clear()
   originalBlobUrls.clear()
+  pinnedOriginalKeys.clear()
   notifyEvicted(allKeys)
 }

@@ -5,6 +5,7 @@ import { attachmentTypes } from '../../helpers/constants'
 import { getAttachmentUrlFromCache, setAttachmentToCache } from '../../helpers/attachmentsCache'
 import { CONNECTION_STATUS } from '../../store/user/constants'
 import { createMessageListStore, renderWithSceytProvider } from '../../testUtils/messageListHarness'
+import { resetMediaDownloadCoordinatorForTests } from '../../helpers/mediaDownloadCoordinator'
 
 jest.mock('../../hooks', () => {
   const { THEME_COLORS } = require('../../UIHelper/constants')
@@ -89,9 +90,14 @@ const videoAttachment = {
   data: new Blob(['video'], { type: 'video/mp4' })
 }
 
-const renderAttachment = (messageState: Record<string, any> = {}) =>
+const renderAttachment = (messageState: Record<string, any> = {}, attachmentProps: Record<string, any> = {}) =>
   renderWithSceytProvider(
-    <Attachment attachment={videoAttachment as any} backgroundColor='#ffffff' videoAttachmentMaxWidth={420} />,
+    <Attachment
+      attachment={videoAttachment as any}
+      backgroundColor='#ffffff'
+      videoAttachmentMaxWidth={420}
+      {...attachmentProps}
+    />,
     {
       store: createMessageListStore({
         UserReducer: { connectionStatus: CONNECTION_STATUS.CONNECTED },
@@ -124,6 +130,7 @@ describe('video attachment preview and download states', () => {
 
   beforeEach(() => {
     jest.clearAllMocks()
+    resetMediaDownloadCoordinatorForTests()
     mockSetAttachmentToCache.mockResolvedValue(undefined)
   })
 
@@ -142,7 +149,10 @@ describe('video attachment preview and download states', () => {
 
     expect(mockGetAttachmentUrlFromCache).toHaveBeenNthCalledWith(1, 'https://cdn/video-thumb.jpg')
     expect(mockGetAttachmentUrlFromCache).toHaveBeenNthCalledWith(2, 'https://cdn/video.mp4_original_video_url')
-    expect(global.fetch).toHaveBeenCalledWith('https://cdn/video.mp4')
+    expect(global.fetch).toHaveBeenCalledWith(
+      'https://cdn/video.mp4',
+      expect.objectContaining({ signal: expect.anything() })
+    )
   })
 
   it('does not show the full-video progress UI or fetch the video when the original is cached', async () => {
@@ -158,6 +168,45 @@ describe('video attachment preview and download states', () => {
     expect(mockGetAttachmentUrlFromCache).toHaveBeenNthCalledWith(2, 'https://cdn/video.mp4_original_video_url')
     expect(screen.queryByTestId('video-download-progress')).not.toBeInTheDocument()
     expect(global.fetch).not.toHaveBeenCalled()
+  })
+
+  it('does not prefetch a full original for a media-grid video', async () => {
+    mockGetAttachmentUrlFromCache.mockResolvedValueOnce('blob:cached-thumb')
+    global.fetch = jest.fn(() => new Promise(() => undefined)) as any
+
+    renderAttachment({}, { isDetailsView: true })
+    await flushAttachmentEffects()
+
+    expect(screen.queryByTestId('video-download-progress')).not.toBeInTheDocument()
+    expect(mockGetAttachmentUrlFromCache).toHaveBeenCalledTimes(1)
+    expect(mockGetAttachmentUrlFromCache).toHaveBeenCalledWith('https://cdn/video-thumb.jpg')
+    expect(global.fetch).not.toHaveBeenCalled()
+  })
+
+  it('joins the chat-thread and media-grid views to one original-video download', async () => {
+    mockGetAttachmentUrlFromCache.mockResolvedValue(false)
+    global.fetch = jest.fn(() => new Promise(() => undefined)) as any
+
+    renderWithSceytProvider(
+      <React.Fragment>
+        <Attachment attachment={videoAttachment as any} backgroundColor='#ffffff' videoAttachmentMaxWidth={420} />
+        <Attachment
+          attachment={videoAttachment as any}
+          backgroundColor='#ffffff'
+          videoAttachmentMaxWidth={420}
+          isDetailsView
+        />
+      </React.Fragment>,
+      {
+        store: createMessageListStore({
+          UserReducer: { connectionStatus: CONNECTION_STATUS.CONNECTED }
+        })
+      }
+    )
+    await flushAttachmentEffects()
+
+    expect(global.fetch).toHaveBeenCalledTimes(1)
+    expect(screen.getAllByTestId('video-download-progress')).toHaveLength(2)
   })
 
   it('does not download a default-uploaded video when its sender source is already registered', async () => {
@@ -187,8 +236,53 @@ describe('video attachment preview and download states', () => {
     expect(screen.getByTestId('video-download-progress')).toBeInTheDocument()
 
     expect(global.fetch).toHaveBeenCalledTimes(1)
-    expect(global.fetch).toHaveBeenCalledWith('https://cdn/video.mp4')
+    expect(global.fetch).toHaveBeenCalledWith(
+      'https://cdn/video.mp4',
+      expect.objectContaining({ signal: expect.anything() })
+    )
     expect(global.fetch).not.toHaveBeenCalledWith('https://cdn/video-thumb.jpg')
+  })
+
+  it('starts the original-video download when legacy metadata provides only an inline tmb preview', async () => {
+    const inlineThumbnailVideo = {
+      ...videoAttachment,
+      id: 'inline-thumbnail-video-id',
+      url: 'https://cdn/inline-thumbnail-video.mp4',
+      metadata: JSON.stringify({ szw: 1080, szh: 1920, dur: 46, tmb: 'inline-video-thumbnail' })
+    }
+    mockGetAttachmentUrlFromCache.mockResolvedValueOnce(false)
+    global.fetch = jest.fn(() => new Promise(() => undefined)) as any
+
+    renderAttachment({}, { attachment: inlineThumbnailVideo })
+    await flushAttachmentEffects()
+
+    expect(screen.getByTestId('video-download-progress')).toBeInTheDocument()
+    expect(mockGetAttachmentUrlFromCache).toHaveBeenCalledTimes(2)
+    expect(mockGetAttachmentUrlFromCache).toHaveBeenCalledWith(
+      'https://cdn/inline-thumbnail-video.mp4_original_video_url'
+    )
+    expect(global.fetch).toHaveBeenCalledWith(
+      'https://cdn/inline-thumbnail-video.mp4',
+      expect.objectContaining({ signal: expect.anything() })
+    )
+  })
+
+  it('does not prefetch a media-grid video without preview metadata', async () => {
+    const noPreviewVideo = {
+      ...videoAttachment,
+      id: 'no-preview-video-id',
+      url: 'https://cdn/no-preview-video.mp4',
+      metadata: JSON.stringify({ szw: 1080, szh: 1920, dur: 46 })
+    }
+    mockGetAttachmentUrlFromCache.mockResolvedValueOnce(false)
+    global.fetch = jest.fn(() => new Promise(() => undefined)) as any
+
+    renderAttachment({}, { attachment: noPreviewVideo, isDetailsView: true })
+    await flushAttachmentEffects()
+
+    expect(screen.queryByTestId('video-download-progress')).not.toBeInTheDocument()
+    expect(mockGetAttachmentUrlFromCache).not.toHaveBeenCalled()
+    expect(global.fetch).not.toHaveBeenCalled()
   })
 
   it('converts default SDK progress fractions to the circular-progress percentage', async () => {
@@ -203,6 +297,19 @@ describe('video attachment preview and download states', () => {
     await flushAttachmentEffects()
 
     expect(screen.getByTestId('circular-progress')).toHaveAttribute('data-value', expect.stringMatching(/^53\./))
+  })
+
+  it('shows the initial video progress ring and cancel control while preparing', async () => {
+    mockGetAttachmentUrlFromCache.mockResolvedValue(false)
+    renderAttachment({
+      attachmentsUploadingState: { 'video-attachment-tid': 'preparing' }
+    })
+
+    await flushAttachmentEffects()
+
+    expect(screen.getByTestId('video-download-progress')).toBeInTheDocument()
+    expect(screen.getByTestId('circular-progress')).toHaveAttribute('data-value', '3')
+    expect(screen.getByRole('button')).toBeInTheDocument()
   })
 
   it('keeps the inline image thumbnail visible until the full image has loaded', () => {
@@ -227,5 +334,40 @@ describe('video attachment preview and download states', () => {
     expect(Array.from(container.querySelectorAll('img')).map((image) => image.getAttribute('src'))).toEqual(
       expect.arrayContaining([`data:image/jpeg;base64,${'a'.repeat(80)}`, 'blob:full-image'])
     )
+  })
+
+  it('opens an image in the slider while its first original download is in progress', async () => {
+    const handleMediaItemClick = jest.fn()
+    const imageAttachment = {
+      ...videoAttachment,
+      id: 'downloading-image-id',
+      tid: 'downloading-image-tid',
+      type: attachmentTypes.image,
+      url: 'https://cdn/downloading-image.jpg',
+      attachmentUrl: '',
+      metadata: JSON.stringify({ szw: 1280, szh: 720, tmb: 'a'.repeat(80) })
+    }
+    mockGetAttachmentUrlFromCache.mockResolvedValue(false)
+    global.fetch = jest.fn(() => new Promise(() => undefined)) as any
+
+    // The thumbnail remains tappable while the full image uses the shared
+    // download coordinator. The slider can therefore join and show progress.
+    const { container: clickableContainer } = renderWithSceytProvider(
+      <Attachment
+        attachment={imageAttachment as any}
+        backgroundColor='#ffffff'
+        imageAttachmentMaxWidth={420}
+        handleMediaItemClick={handleMediaItemClick}
+      />,
+      {
+        store: createMessageListStore({
+          UserReducer: { connectionStatus: CONNECTION_STATUS.CONNECTED }
+        })
+      }
+    )
+    await flushAttachmentEffects()
+
+    fireEvent.click(clickableContainer.querySelector('img')!)
+    expect(handleMediaItemClick).toHaveBeenCalledWith(expect.objectContaining({ id: 'downloading-image-id' }))
   })
 })

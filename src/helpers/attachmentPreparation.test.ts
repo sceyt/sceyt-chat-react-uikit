@@ -50,4 +50,14 @@ describe('video attachment preparation', () => {
     expect(prepared?.file).toBe(file)
     expect(prepared?.status).toBe('failed')
   })
+
+  it('unblocks an in-flight waiter when the attachment is removed', async () => {
+    const file = makeFile('removed.mp4')
+    beginVideoPreparation('removed', file)
+
+    const waiting = waitForVideoPreparation('removed')
+    clearVideoPreparation('removed')
+
+    await expect(waiting).resolves.toEqual(expect.objectContaining({ file, status: 'failed' }))
+  })
 })

@@ -319,7 +319,8 @@ const VideoPreview = memo(
     prev.width === next.width &&
     prev.height === next.height &&
     prev.borderRadius === next.borderRadius &&
-    prev.isRepliedMessage === next.isRepliedMessage
+    prev.isRepliedMessage === next.isRepliedMessage &&
+    prev.isDetailsView === next.isDetailsView
 )
 
 export default VideoPreview

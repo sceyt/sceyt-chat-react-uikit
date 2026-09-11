@@ -761,11 +761,6 @@ const MessageList: React.FC<MessagesProps> = ({
   }, [channel.id])
 
   const handleMediaItemClickStable = useCallback((attachment: IAttachment) => {
-    // eslint-disable-next-line no-console
-    console.log(
-      '[MEDIA_OPEN] 3.setMediaFile ' +
-        JSON.stringify({ attId: attachment?.id, name: attachment?.name, skipped: !attachment?.id })
-    )
     if (attachment?.id) setMediaFile(attachment)
   }, [])
 

@@ -167,6 +167,7 @@ import {
   checkIsItSentAlready,
   getMessageLocalRef,
   deletePendingMessage as deletePendingMessageLocally,
+  isPendingMessageDeleted,
   ensureChannelCacheLoaded
 } from '../../helpers/messagesHalper'
 import { navigateToLatest } from '../../helpers/messageListNavigator'
@@ -206,12 +207,33 @@ const queuedPrefetchRequests = new Map<string, { fromMessageId: string; pages: n
 const prefetchCompletionWaiters = new Map<string, Array<() => void>>()
 const prefetchCancelVersions = new Map<string, number>()
 const ACTIVE_CHANNEL_RECONNECT_REFRESH_TIMEOUT_MS = 1500
+const VIDEO_PREPARATION_TIMEOUT_MS = 10_000
+
+// `sendMessage` can receive an SDK id before the attachment upload has
+// finished. Such a message is still a local, cancellable send; deleting it
+// must not be routed through the normal remote-message delete mutation.
+const hasLivePendingAttachment = (message: IMessage) =>
+  Boolean(
+    message.tid &&
+      message.attachments?.some((attachment: IAttachment) =>
+        Boolean(attachment.tid && getPendingAttachment(attachment.tid)?.file)
+      )
+  )
+
+// Keep the SDK method invocation out of redux-saga's overloaded `call`
+// signatures. The SDK accepts the optional second argument at runtime, while
+// the UIkit's historical IChannel declaration only includes the id.
+const retractDeletedPendingMessage = (channel: IChannel, messageId: string) =>
+  (channel.deleteMessageById as any)(messageId, false)
 
 const applyPreparedVideoAttachments = async (attachments: IAttachment[]) => {
   await Promise.all(
     attachments.map(async (attachment) => {
       if (!attachment.tid) return
-      const prepared = await waitForVideoPreparation(attachment.tid)
+      // Local remuxing lazily loads an FFmpeg worker. If that worker request was
+      // interrupted while offline, do not let a stale preparation promise block
+      // reconnect delivery forever; send the preserved original after 10 seconds.
+      const prepared = await waitForVideoPreparation(attachment.tid, VIDEO_PREPARATION_TIMEOUT_MS)
       if (prepared?.status === 'ready' && prepared.metadata) {
         attachment.url = prepared.file
         attachment.data = prepared.file
@@ -224,6 +246,16 @@ const applyPreparedVideoAttachments = async (attachments: IAttachment[]) => {
     })
   )
   return attachments
+}
+
+const getAttachmentSourceFile = (attachment: IAttachment): File | null => {
+  const source =
+    attachment.data instanceof Blob ? attachment.data : attachment.url instanceof Blob ? attachment.url : null
+  if (!source) return null
+
+  return source instanceof File
+    ? source
+    : new File([source], attachment.name || 'attachment', { type: source.type || 'application/octet-stream' })
 }
 
 const prepareAndUploadVideoPreview = async (attachment: IAttachment, messageType: string | null | undefined) => {
@@ -1044,13 +1076,21 @@ function* sendMessage(action: IAction): any {
       if (mediaAttachments && mediaAttachments.length) {
         for (let i = 0; i < mediaAttachments.length; i++) {
           let attachment = mediaAttachments[i]
-          if (customUploader && !attachment.cachedUrl && !(attachment.data instanceof Blob)) {
+          if (!attachment.cachedUrl && !(attachment.data instanceof Blob)) {
             // On resend the message may be a serialized copy whose File was lost —
             // recover the live File kept by tid so the upload gets real bytes.
             const pendingFile = getPendingAttachment(attachment.tid as string)?.file
             if (pendingFile instanceof Blob) {
               attachment = { ...attachment, data: pendingFile }
             }
+          }
+
+          // Keep a live source independently from the optimistic message. Message
+          // builders and Redux serialization can turn File instances into plain
+          // objects, but reconnect retries must still have the original bytes.
+          const sourceFile = getAttachmentSourceFile(attachment)
+          if (attachment.tid && sourceFile) {
+            setPendingAttachment(attachment.tid, { file: sourceFile, channelId: channel.id })
           }
 
           let uri
@@ -1224,11 +1264,14 @@ function* sendMessage(action: IAction): any {
               messageBuilder.setType(MESSAGE_TYPE.VIEW_ONCE)
             }
             const messageToSend = action.type === RESEND_MESSAGE ? action.payload.message : messageBuilder.create()
-            setPendingAttachment(messageAttachment.tid as string, {
-              ...messageAttachment.data,
-              messageTid: messageToSend.tid,
-              channelId: channel.id
-            })
+            const sourceFile = getAttachmentSourceFile(attachment)
+            if (messageAttachment.tid && sourceFile) {
+              setPendingAttachment(messageAttachment.tid, {
+                file: sourceFile,
+                messageTid: messageToSend.tid,
+                channelId: channel.id
+              })
+            }
             const messageForSend = {
               ...messageToSend,
               attachments: [messageAttachment],
@@ -1292,6 +1335,16 @@ function* sendMessage(action: IAction): any {
           }
 
           let messageToSend = action.type === RESEND_MESSAGE ? action.payload.message : messageBuilder.create()
+          attachmentsToSend.forEach((messageAttachment: IAttachment) => {
+            const sourceFile = getAttachmentSourceFile(messageAttachment)
+            if (messageAttachment.tid && sourceFile) {
+              setPendingAttachment(messageAttachment.tid, {
+                file: sourceFile,
+                messageTid: messageToSend.tid,
+                channelId: channel.id
+              })
+            }
+          })
           const pending = {
             ...messageToSend,
             attachments: message.attachments,
@@ -1324,22 +1377,27 @@ function* sendMessage(action: IAction): any {
         }
 
         try {
-          // The optimistic message is already visible at this point. Hold only the
-          // network handoff until a local video thumbnail is ready or preparation
-          // reports a real failure,
-          // then replace the attachment builder with the prepared file/metadata.
-          yield call(applyPreparedVideoAttachments, messageAttachment)
-          const pendingAttachments = messageAttachment.map((attachment: any) => ({
-            ...attachment,
-            data: attachment.data || attachment.url
-          }))
-          updateMessageOnMap(channel.id, {
-            messageId: messageToSend.tid!,
-            params: { attachments: pendingAttachments }
-          })
-          yield put(updateMessageAC(messageToSend.tid!, { attachments: pendingAttachments }))
-          const messageCopy = JSON.parse(JSON.stringify(messagesToSend[i]))
           if (connectionState === CONNECTION_STATUS.CONNECTED) {
+            if (messageToSend.tid && isPendingMessageDeleted(channel.id, messageToSend.tid)) {
+              continue
+            }
+            // Do not wait for local video work while offline. The optimistic
+            // message must enter the reconnect queue immediately, retaining the
+            // preparation entry and source File for the retry that can upload.
+            yield call(applyPreparedVideoAttachments, messageAttachment)
+            const pendingAttachments = messageAttachment.map((attachment: any) => ({
+              ...attachment,
+              data: attachment.data || attachment.url
+            }))
+            updateMessageOnMap(channel.id, {
+              messageId: messageToSend.tid!,
+              params: { attachments: pendingAttachments }
+            })
+            yield put(updateMessageAC(messageToSend.tid!, { attachments: pendingAttachments }))
+            const messageCopy = JSON.parse(JSON.stringify(messagesToSend[i]))
+            if (messageToSend.tid && isPendingMessageDeleted(channel.id, messageToSend.tid)) {
+              continue
+            }
             if (!customUploader) {
               for (let attachmentIndex = 0; attachmentIndex < messageAttachment.length; attachmentIndex++) {
                 if (messageAttachment[attachmentIndex].type === attachmentTypes.video) {
@@ -1362,9 +1420,18 @@ function* sendMessage(action: IAction): any {
                 }
               }
             }
+            // Preparation and custom uploading are asynchronous. A delete can
+            // happen while either is in progress, so do not fall through to
+            // `channel.sendMessage` after either operation completes.
+            if (messageToSend.tid && isPendingMessageDeleted(channel.id, messageToSend.tid)) {
+              continue
+            }
             let attachmentsToSend = messageAttachment
             if (customUploader) {
               attachmentsToSend = yield call(handleUploadAttachments, messageAttachment || [], messageCopy, channel)
+            }
+            if (messageToSend.tid && isPendingMessageDeleted(channel.id, messageToSend.tid)) {
+              continue
             }
             let linkAttachmentToSend: IAttachment | null = null
             if (i === 0 && linkAttachment) {
@@ -1381,6 +1448,18 @@ function* sendMessage(action: IAction): any {
             }
 
             const messageResponse = yield call(channel.sendMessage, messageToSend)
+            if (messageToSend.tid && isPendingMessageDeleted(channel.id, messageToSend.tid)) {
+              // The network request won a race with local deletion. Remove the
+              // just-created remote message and never promote it back into the UI.
+              if (messageResponse?.id && typeof channel.deleteMessageById === 'function') {
+                try {
+                  yield call(retractDeletedPendingMessage, channel, messageResponse.id)
+                } catch (deleteError) {
+                  log.warn('Unable to retract a deleted pending message:', deleteError)
+                }
+              }
+              continue
+            }
             if (messageToSend.tid) {
               autoResendAttempts.delete(messageToSend.tid)
             }
@@ -1407,6 +1486,9 @@ function* sendMessage(action: IAction): any {
               })
               attachmentsToUpdate = messageResponse.attachments.map((attachment: IAttachment) => {
                 const localAttachment = currentAttachmentsMap[attachment.tid!]
+                const optimisticAttachment = pendingMessages[i]?.attachments?.find(
+                  (pendingAttachment: IAttachment) => pendingAttachment.tid === attachment.tid
+                )
 
                 // Preserve local metadata (especially video_thumb) when the server
                 // response has not yet echoed it back.
@@ -1415,6 +1497,25 @@ function* sendMessage(action: IAction): any {
                     ...attachment
                   }
 
+                  // Some SDK reconnect echoes contain the attachment ID/tid but
+                  // omit the media fields (type/name/url). Keep the prepared
+                  // local values in that case so the active thread does not
+                  // render a video as a generic file until history reloads.
+                  const fallbackType = localAttachment.type || optimisticAttachment?.type
+                  if (!merged.type && fallbackType) {
+                    merged.type = fallbackType
+                  }
+                  const fallbackName = localAttachment.name || optimisticAttachment?.name
+                  if (!merged.name && fallbackName) {
+                    merged.name = fallbackName
+                  }
+                  if (!merged.url && localAttachment.url) {
+                    merged.url = localAttachment.url
+                  }
+                  const fallbackAttachmentUrl = localAttachment.attachmentUrl || optimisticAttachment?.attachmentUrl
+                  if (!merged.attachmentUrl && fallbackAttachmentUrl) {
+                    merged.attachmentUrl = fallbackAttachmentUrl
+                  }
                   if (!+merged.size && localAttachment.size) {
                     merged.size = localAttachment.size
                   }
@@ -1435,6 +1536,15 @@ function* sendMessage(action: IAction): any {
               attachments: attachmentsToUpdate,
               channelId: channel.id
             }
+            // Replace the optimistic attachment payload in the in-memory map
+            // before caching the confirmed message. addMessageToMap preserves an
+            // existing message's fields by design, so without this update the
+            // active thread can keep rendering the local file-card until a
+            // channel reload fetches the server's video attachment.
+            updateMessageOnMap(channel.id, {
+              messageId: messageToSend.tid as string,
+              params: messageUpdateData
+            })
             const activeChannelId = getActiveChannelId()
             if (activeChannelId === channel.id) {
               yield put(updateMessageAC(messageToSend.tid as string, messageUpdateData, true))
@@ -1459,6 +1569,11 @@ function* sendMessage(action: IAction): any {
             throw new Error('Connection required to send message')
           }
         } catch (e) {
+          // A delete intentionally cancels the pending transfer. Do not turn
+          // that cancellation into a failed bubble or schedule a retry.
+          if (messageToSend.tid && isPendingMessageDeleted(channel.id, messageToSend.tid)) {
+            continue
+          }
           const isErrorResendable = isResendableError(e?.type)
           if (channel?.id && messageToSend?.tid) {
             log.error('Error on uploading attachment', messageToSend.tid, e)
@@ -1911,7 +2026,11 @@ function* deleteMessage(action: IAction): any {
       return
     }
 
-    if (!currentMessage.id && currentMessage.tid) {
+    // An attachment message can receive an id from an SDK event while its
+    // upload is still pending. It has not become a completed chat message yet,
+    // so deleting it must cancel the local send rather than issue a competing
+    // remote delete request.
+    if ((!currentMessage.id && currentMessage.tid) || hasLivePendingAttachment(currentMessage)) {
       yield call(deleteLocalPendingMessage, channelId, currentMessage)
       return
     }
@@ -3734,18 +3853,6 @@ function* getMessageAttachments(action: IAction): any {
     )
     if (forPopup) {
       query.AttachmentByTypeQueryForPopup = AttachmentByTypeQuery
-      // eslint-disable-next-line no-console
-      console.log(
-        '[MEDIA_OPEN] 8.saga-forPopup ' +
-          JSON.stringify({
-            requestedAttId: attachmentId,
-            direction,
-            returned: attachments.length,
-            containsRequested: attachments.some((a: IAttachment) => a.id === attachmentId),
-            firstId: attachments[0]?.id,
-            lastId: attachments[attachments.length - 1]?.id
-          })
-      )
       yield put(setAttachmentsForPopupAC(JSON.parse(JSON.stringify(attachments))))
       const attachmentIndex = attachments.findIndex((attachment: IAttachment) => attachment.id === attachmentId)
       let hasPrev = false

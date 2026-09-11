@@ -37,9 +37,8 @@ export const setAttachmentToCache = async (attachmentUrl: string, attachmentResp
 
         const request = new Request(cacheKey)
         await cache.put(request, attachmentResponse)
-        log.info('Cache success')
       } catch (e) {
-        log.info('Error on cache attachment ... ', e)
+        log.error('Error on cache attachment ... ', e)
         // Try to delete using the same key format
         const deleteCacheKey =
           attachmentURLVersion?.startsWith('http://') || attachmentURLVersion?.startsWith('https://')
@@ -52,7 +51,6 @@ export const setAttachmentToCache = async (attachmentUrl: string, attachmentResp
           // Ignore delete errors
         }
       }
-      removeAttachmentFromCache(attachmentUrl)
     })
   } else {
     log.error('Cache is not available')

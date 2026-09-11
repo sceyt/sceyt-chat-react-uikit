@@ -1,5 +1,5 @@
-import { getAttachmentUrlFromCache, getAttachmentURLWithVersion, setAttachmentToCache } from './attachmentsCache'
-import { registerBlobUrl } from './attachmentBlobUrls'
+import { getAttachmentUrlFromCache } from './attachmentsCache'
+import { requestMediaDownload } from './mediaDownloadCoordinator'
 
 export const parseAttachmentMetadata = (metadata: any): Record<string, any> => {
   if (!metadata) return {}
@@ -42,59 +42,29 @@ export const getVideoAttachmentCacheKeys = (videoUrl: string, metadata: any) => 
   originalVideo: `${videoUrl}_original_video_url`
 })
 
-type PreviewDownloader = (
-  uri: string,
-  download: boolean,
-  progressCallback: (progress: any) => void,
-  messageType: string | null | undefined
-) => Promise<any>
-
-const getVideoThumbBlob = async (
-  videoThumb: string,
-  downloader?: PreviewDownloader,
-  messageType?: string | null
-): Promise<Blob> => {
-  if (downloader) {
-    const result = await downloader(videoThumb, true, () => undefined, messageType)
-    const body = result?.Body || result
-    if (body instanceof Blob) return body
-    throw new Error('Video preview downloader did not return a Blob')
-  }
-
-  const response = await fetch(videoThumb)
-  if (!response.ok) {
-    throw new Error(`Unable to download video preview (${response.status})`)
-  }
-  return response.blob()
-}
-
 /**
  * Downloads a video preview through the same downloader and Cache Storage path
  * as attachments. The returned object URL is safe to use as an img source.
  */
 export const downloadVideoThumb = async (
   videoThumb: string,
-  downloader?: PreviewDownloader,
+  downloader?: any,
   messageType?: string | null
 ): Promise<string> => {
   const cachedUrl = await getAttachmentUrlFromCache(videoThumb).catch(() => false)
   if (typeof cachedUrl === 'string') return cachedUrl
 
-  const blob = await getVideoThumbBlob(videoThumb, downloader, messageType)
-  try {
-    await setAttachmentToCache(
-      videoThumb,
-      new Response(blob, { headers: { 'Content-Type': blob.type || 'image/jpeg' } })
-    )
-  } catch {
-    // Cache Storage is an optimization; the downloaded thumbnail remains
-    // renderable when Cache Storage is unavailable or evicted mid-download.
-  }
-
-  const cachedPreviewUrl = await getAttachmentUrlFromCache(videoThumb).catch(() => false)
-  if (typeof cachedPreviewUrl === 'string') return cachedPreviewUrl
-
-  const objectUrl = URL.createObjectURL(blob)
-  registerBlobUrl(getAttachmentURLWithVersion(videoThumb), objectUrl)
+  const { objectUrl } = await requestMediaDownload({
+    key: `video-thumbnail:${videoThumb}`,
+    url: videoThumb,
+    cacheKey: videoThumb,
+    kind: 'video-thumbnail',
+    messageType,
+    downloader,
+    customDownload: true,
+    // This helper already checked the preview cache above. Avoid consuming a
+    // second cache lookup before the downloader has produced the thumbnail.
+    skipCacheLookup: true
+  })
   return objectUrl
 }

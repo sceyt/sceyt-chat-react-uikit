@@ -4,7 +4,9 @@ import { setClient } from '../../common/client'
 import {
   addMessageToMap,
   clearMessagesMap,
+  deletePendingMessage,
   deletePendingAttachment,
+  getMessageFromMap,
   getPendingMessagesFromMap,
   setPendingAttachment
 } from '../../helpers/messagesHalper'
@@ -18,10 +20,17 @@ import {
   makeUser,
   resetMessageListFixtureIds
 } from '../../testUtils/messageFixtures'
-import { resendMessageAC, updateAttachmentUploadingStateAC, updateMessageAC } from './actions'
+import {
+  deleteMessageAC,
+  resendMessageAC,
+  sendMessageAC,
+  updateAttachmentUploadingStateAC,
+  updateMessageAC
+} from './actions'
 import { RESEND_MESSAGE } from './constants'
 import { setCustomUploader, setSendAttachmentsAsSeparateMessages } from '../../helpers/customUploader'
 import { handleUploadAttachments, __messageSagaTestables, __resetMessageSagaTestState } from './saga'
+import { beginVideoPreparation, completeVideoPreparation } from '../../helpers/attachmentPreparation'
 
 const mockGetVideoFirstFrame = jest.fn()
 const mockGetVideoPreviewFrame = jest.fn()
@@ -382,6 +391,268 @@ describe('attachment upload recovery', () => {
     expect(getPendingMessagesFromMap(channel.id)[0]).toEqual(
       expect.objectContaining({ tid: 'network-error-msg-tid', state: MESSAGE_STATUS.FAILED })
     )
+  })
+
+  it('does not start an upload for a pending attachment deleted before its send work resumes', async () => {
+    const currentUser = makeUser({ id: 'current-user' })
+    const channel = makeUploaderChannel('channel-deleted-pending-attachment')
+    const liveFile = makeLiveFile()
+    const pendingMessage = makePendingMessage({
+      channelId: channel.id,
+      tid: 'deleted-pending-message-tid',
+      body: 'delete before upload',
+      user: currentUser,
+      state: MESSAGE_STATUS.FAILED,
+      attachments: [makeAttachment('deleted-pending-file-tid', liveFile)]
+    })
+
+    setActiveChannelId(channel.id)
+    setChannelInMap(channel)
+    addMessageToMap(channel.id, pendingMessage)
+
+    // This mirrors deleting a pending bubble while its video preparation or
+    // upload callback is still queued.
+    deletePendingMessage(channel.id, pendingMessage)
+
+    await runMessageSaga(__messageSagaTestables.sendMessage, {
+      type: RESEND_MESSAGE,
+      payload: {
+        message: pendingMessage,
+        connectionState: CONNECTION_STATUS.CONNECTED,
+        channelId: channel.id,
+        sendAttachmentsAsSeparateMessage: false
+      }
+    })
+
+    expect(uploadCalls).toHaveLength(0)
+    expect(channel.sendMessage).not.toHaveBeenCalled()
+    expect(getMessageFromMap(channel.id, pendingMessage.tid!)).toBeNull()
+  })
+
+  it('cancels a still-uploading attachment locally even after the SDK assigns an id', async () => {
+    const currentUser = makeUser({ id: 'current-user' })
+    const channel = makeUploaderChannel('channel-delete-sdk-pending-attachment')
+    const liveFile = makeLiveFile()
+    const pendingMessage = makePendingMessage({
+      id: 'sdk-pending-message-id',
+      channelId: channel.id,
+      tid: 'sdk-pending-message-tid',
+      body: 'delete before attachment upload completes',
+      user: currentUser,
+      attachments: [makeAttachment('sdk-pending-file-tid', liveFile)]
+    })
+
+    setActiveChannelId(channel.id)
+    setChannelInMap(channel)
+    setPendingAttachment('sdk-pending-file-tid', {
+      file: liveFile,
+      messageTid: pendingMessage.tid,
+      channelId: channel.id
+    })
+    addMessageToMap(channel.id, pendingMessage)
+
+    await runMessageSaga(
+      __messageSagaTestables.deleteMessage,
+      deleteMessageAC(channel.id, pendingMessage.id!, 'forEveryone')
+    )
+
+    expect(channel.deleteMessageById).not.toHaveBeenCalled()
+    expect(getMessageFromMap(channel.id, pendingMessage.id!)).toBeNull()
+  })
+
+  it('does not call channel.sendMessage when deletion cancels a custom upload in progress', async () => {
+    const currentUser = makeUser({ id: 'current-user' })
+    const channel = makeUploaderChannel('channel-delete-during-custom-upload')
+    const liveFile = makeLiveFile()
+    const pendingMessage = makePendingMessage({
+      channelId: channel.id,
+      tid: 'delete-during-custom-upload-message-tid',
+      body: 'delete during custom upload',
+      user: currentUser,
+      state: MESSAGE_STATUS.FAILED,
+      attachments: [makeAttachment('delete-during-custom-upload-file-tid', liveFile)]
+    })
+    uploadBehavior = (_attachment, uploadTask) => {
+      uploadTask.cancel = () => uploadTask.failure(new Error('Upload cancelled by user'))
+    }
+
+    setActiveChannelId(channel.id)
+    setChannelInMap(channel)
+    addMessageToMap(channel.id, pendingMessage)
+
+    const task = runSaga(
+      {
+        dispatch: jest.fn(),
+        getState: () => mockStoreState
+      },
+      __messageSagaTestables.sendMessage,
+      {
+        type: RESEND_MESSAGE,
+        payload: {
+          message: pendingMessage,
+          connectionState: CONNECTION_STATUS.CONNECTED,
+          channelId: channel.id,
+          sendAttachmentsAsSeparateMessage: false
+        }
+      }
+    )
+
+    for (let attempt = 0; attempt < 20 && uploadCalls.length === 0; attempt++) {
+      await Promise.resolve()
+    }
+    expect(uploadCalls).toHaveLength(1)
+
+    deletePendingMessage(channel.id, pendingMessage)
+    await task.toPromise()
+
+    expect(channel.sendMessage).not.toHaveBeenCalled()
+    expect(channel.deleteMessageById).not.toHaveBeenCalled()
+    expect(getMessageFromMap(channel.id, pendingMessage.tid!)).toBeNull()
+  })
+
+  it('retracts a response that wins the race with pending-message deletion', async () => {
+    const currentUser = makeUser({ id: 'current-user' })
+    const channel = makeUploaderChannel('channel-deleted-pending-race')
+    const liveFile = makeLiveFile()
+    const pendingMessage = makePendingMessage({
+      channelId: channel.id,
+      tid: 'deleted-pending-race-message-tid',
+      body: 'delete during upload',
+      user: currentUser,
+      attachments: [makeAttachment('deleted-pending-race-file-tid', liveFile)]
+    })
+    let resolveSend!: (value: any) => void
+    channel.sendMessage = jest.fn(
+      () =>
+        new Promise((resolve) => {
+          resolveSend = resolve
+        })
+    )
+
+    setActiveChannelId(channel.id)
+    setChannelInMap(channel)
+    addMessageToMap(channel.id, pendingMessage)
+
+    const dispatched: any[] = []
+    const task = runSaga(
+      {
+        dispatch: (effect: any) => dispatched.push(effect),
+        getState: () => mockStoreState
+      },
+      __messageSagaTestables.sendMessage,
+      {
+        type: RESEND_MESSAGE,
+        payload: {
+          message: pendingMessage,
+          connectionState: CONNECTION_STATUS.CONNECTED,
+          channelId: channel.id,
+          sendAttachmentsAsSeparateMessage: false
+        }
+      }
+    )
+
+    for (let attempt = 0; attempt < 20 && !channel.sendMessage.mock.calls.length; attempt++) {
+      await Promise.resolve()
+    }
+    expect(channel.sendMessage).toHaveBeenCalledTimes(1)
+
+    deletePendingMessage(channel.id, pendingMessage)
+    resolveSend(makeServerResponse(pendingMessage.tid!, 'deleted-pending-race-file-tid', currentUser))
+    await task.toPromise()
+
+    expect(channel.deleteMessageById).toHaveBeenCalledWith('srv-1', false)
+    expect(getMessageFromMap(channel.id, pendingMessage.tid!)).toBeNull()
+  })
+
+  it('preserves an offline video source and sends it after reconnect', async () => {
+    const currentUser = makeUser({ id: 'current-user' })
+    const channel = makeUploaderChannel('channel-offline-video-reconnect')
+    const video = new File(['video-bytes'], 'offline-video.mp4', { type: 'video/mp4' })
+    const attachmentTid = 'offline-video-file-tid'
+
+    setActiveChannelId(channel.id)
+    setChannelInMap(channel)
+    // The compose background work is still running when Send is pressed.
+    // Offline sending must not wait on this promise before entering the
+    // reconnect queue.
+    beginVideoPreparation(attachmentTid, video)
+
+    await runMessageSaga(
+      __messageSagaTestables.sendMessage,
+      sendMessageAC(
+        {
+          body: 'offline video',
+          bodyAttributes: [],
+          attachments: [
+            {
+              tid: attachmentTid,
+              type: attachmentTypes.video,
+              name: video.name,
+              size: video.size,
+              data: video,
+              metadata: '{}',
+              upload: false
+            }
+          ],
+          mentionedUsers: [],
+          type: 'text',
+          metadata: {},
+          parentMessage: null,
+          repliedInThread: false
+        },
+        channel.id,
+        CONNECTION_STATUS.DISCONNECTED,
+        false
+      )
+    )
+
+    const [offlinePendingMessage] = getPendingMessagesFromMap(channel.id)
+    expect(offlinePendingMessage).toEqual(expect.objectContaining({ state: MESSAGE_STATUS.FAILED }))
+    expect(uploadCalls).toHaveLength(0)
+
+    // Retry the serialized pending message, as reconnect does after Redux has
+    // rendered it. The File must be restored from the per-attachment source map.
+    completeVideoPreparation(attachmentTid, {
+      file: video,
+      metadata: { tmb: 'local-thumb', szw: 1280, szh: 720, dur: 4 },
+      videoPreviewBlob: new Blob(['preview'], { type: 'image/jpeg' })
+    })
+    channel.sendMessage = jest.fn((outgoingMessage: any) =>
+      Promise.resolve({
+        ...makeServerResponse(offlinePendingMessage.tid, attachmentTid, currentUser),
+        attachments: [
+          {
+            ...outgoingMessage.attachments[0],
+            id: 'offline-video-server-attachment-id',
+            tid: attachmentTid,
+            // The reconnect event can arrive with only IDs and metadata.
+            // The saga must retain the local uploaded video fields.
+            type: undefined,
+            name: '',
+            url: ''
+          }
+        ]
+      })
+    )
+    // Channel maps intentionally keep a shallow snapshot; refresh it after
+    // replacing the transport mock to mirror an SDK reconnect.
+    setChannelInMap(channel)
+
+    await runMessageSaga(__messageSagaTestables.sendPendingMessages, CONNECTION_STATUS.CONNECTED)
+
+    expect(uploadCalls).toEqual(
+      expect.arrayContaining([expect.objectContaining({ type: attachmentTypes.video, url: video })])
+    )
+    expect(channel.sendMessage).toHaveBeenCalledTimes(1)
+    expect(getPendingMessagesFromMap(channel.id)).toHaveLength(0)
+    expect(getMessageFromMap(channel.id, offlinePendingMessage.tid!)?.attachments).toEqual([
+      expect.objectContaining({
+        type: attachmentTypes.video,
+        tid: attachmentTid,
+        name: video.name,
+        url: 'https://cdn.example/uploaded-1'
+      })
+    ])
   })
 
   it('stops auto-resending after the attempt budget and resumes after a manual retry', async () => {

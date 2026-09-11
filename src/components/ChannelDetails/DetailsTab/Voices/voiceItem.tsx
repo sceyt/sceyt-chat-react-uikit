@@ -11,12 +11,13 @@ import { useColor, useDidUpdate } from '../../../../hooks'
 import { ReactComponent as VoicePlayIcon } from '../../../../assets/svg/voicePreview.svg'
 import { ReactComponent as VoicePauseIcon } from '../../../../assets/svg/voicePreviewPause.svg'
 // Helpers
-import { getCustomDownloader } from '../../../../helpers/customUploader'
 import { formatAudioVideoTime, formatChannelDetailsDate } from '../../../../helpers'
 import { makeUsername } from '../../../../helpers/message'
 import { getShowOnlyContactUsers } from '../../../../helpers/contacts'
 import { THEME_COLORS } from '../../../../UIHelper/constants'
 import { IAttachment } from '../../../../types'
+import { requestMediaDownload } from '../../../../helpers/mediaDownloadCoordinator'
+import { getAttachmentUrlFromCache } from '../../../../helpers/attachmentsCache'
 
 interface IProps {
   file: IAttachment
@@ -54,7 +55,6 @@ const VoiceItem = ({
   const [fileUrl, setFileUrl] = useState('')
   const [audioIsPlaying, setAudioIsPlaying] = useState<any>(false)
   const [currentTime, setCurrentTime] = useState('')
-  const customDownloader = getCustomDownloader()
   const contactsMap = useSelector(contactsMapSelector)
   const user = useSelector(userSelector)
   const audioRef = useRef<HTMLAudioElement>()
@@ -99,18 +99,36 @@ const VoiceItem = ({
     }
   }, [playingAudioId])
   useEffect(() => {
-    if (customDownloader) {
-      customDownloader(file.url, false, () => {}, messageType).then((url) => {
-        setFileUrl(url)
+    let cancelled = false
+    getAttachmentUrlFromCache(file.url)
+      .catch(() => false)
+      .then((cachedUrl) => {
+        if (cancelled) return undefined
+        if (typeof cachedUrl === 'string') {
+          setFileUrl(cachedUrl)
+          return undefined
+        }
+        return requestMediaDownload({
+          key: `voice:${file.url}`,
+          url: file.url,
+          cacheKey: file.url,
+          kind: 'voice',
+          messageType,
+          size: Number(file.size) || 0
+        })
       })
-    } else {
-      setFileUrl(file.url)
-    }
+      .then((result) => {
+        if (!cancelled && result) setFileUrl(result.objectUrl)
+      })
+      .catch(() => {
+        if (!cancelled) setFileUrl(file.url)
+      })
 
     return () => {
+      cancelled = true
       clearInterval(intervalRef.current)
     }
-  }, [])
+  }, [file.url, file.size, messageType])
 
   return (
     <FileItem

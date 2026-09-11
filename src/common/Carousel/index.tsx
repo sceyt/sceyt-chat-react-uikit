@@ -45,7 +45,7 @@ const Carousel: React.FC<CarouselProps> = ({
   const currentIndexRef = useRef<number>(initialActiveIndex)
 
   // Reset internal navigation flag when component remounts (key changes)
-  useEffect(() => {
+  useLayoutEffect(() => {
     isInternalNavigationRef.current = false
     setCurrentIndex(initialActiveIndex)
     currentIndexRef.current = initialActiveIndex
