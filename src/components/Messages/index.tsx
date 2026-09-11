@@ -110,6 +110,8 @@ interface MessagesProps {
   reportIcon?: JSX.Element
   retractVoteIcon?: JSX.Element
   endVoteIcon?: JSX.Element
+  /** Replaces the default pin icon in the pinned-messages banner. */
+  pinnedMessageIcon?: JSX.Element
   openFrequentlyUsedReactions?: boolean
   fixEmojiCategoriesTitleOnTop?: boolean
   emojisCategoryIconsPosition?: 'top' | 'bottom'
@@ -263,6 +265,7 @@ const MessagesContainer: React.FC<MessagesProps> = ({
   reportIcon,
   retractVoteIcon,
   endVoteIcon,
+  pinnedMessageIcon,
   reactionIconOrder,
   openFrequentlyUsedReactions,
   fixEmojiCategoriesTitleOnTop,
@@ -419,6 +422,7 @@ const MessagesContainer: React.FC<MessagesProps> = ({
         reportIcon={reportIcon}
         retractVoteIcon={retractVoteIcon}
         endVoteIcon={endVoteIcon}
+        pinnedMessageIcon={pinnedMessageIcon}
         reactionIconOrder={reactionIconOrder}
         openFrequentlyUsedReactions={openFrequentlyUsedReactions}
         fixEmojiCategoriesTitleOnTop={fixEmojiCategoriesTitleOnTop}

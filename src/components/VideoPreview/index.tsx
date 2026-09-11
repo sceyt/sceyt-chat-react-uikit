@@ -367,7 +367,7 @@ const VideoPlayButton = styled.div<{ showOnHover?: boolean }>`
   visibility: ${(props) => props.showOnHover && 'hidden'};
 `
 
-const Component = styled.div<{
+export const Component = styled.div<{
   isPreview?: boolean
   isRepliedMessage?: boolean
   isDetailsView?: boolean

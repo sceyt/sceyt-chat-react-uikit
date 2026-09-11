@@ -79,6 +79,7 @@ interface AttachmentPops {
   // eslint-disable-next-line no-unused-vars
   closeMessageActions?: (state: boolean) => void
   fileAttachmentWidth?: number
+  fileSvgSize?: number
   imageAttachmentMaxWidth?: number
   imageAttachmentMaxHeight?: number
   videoAttachmentMaxWidth?: number
@@ -108,6 +109,7 @@ const Attachment = ({
   imageMinWidth,
   closeMessageActions,
   fileAttachmentWidth,
+  fileSvgSize,
   imageAttachmentMaxWidth,
   imageAttachmentMaxHeight,
   videoAttachmentMaxWidth,
@@ -1258,6 +1260,7 @@ const Attachment = ({
           border={selectedFileAttachmentsBoxBorder || (theme === THEME.DARK ? 'none' : '')}
           width={fileAttachmentWidth}
           borderColor={borderColor}
+          fileSvgSize={fileSvgSize}
         >
           {(attachment as any).thumbnailState === 'loading' ? (
             <FileThumbnailSkeleton color={overlayBackground2} />
@@ -1420,7 +1423,7 @@ const DownloadImage = styled.div<any>`
     width: 16px;
   }
 `
-const AttachmentImgCont = styled.div<{
+export const AttachmentImgCont = styled.div<{
   isPreview: boolean
   backgroundColor?: string
   ref?: any
@@ -1482,7 +1485,7 @@ const AttachmentImgCont = styled.div<{
   `}
 `
 
-const FileThumbnail = styled.img<any>`
+export const FileThumbnail = styled.img<any>`
   min-width: 40px;
   max-width: 40px;
   height: 40px;
@@ -1495,7 +1498,7 @@ const fileThumbnailShimmer = keyframes`
   100% { background-position: 120px 0; }
 `
 
-const FileThumbnailSkeleton = styled.div<{ color: string }>`
+export const FileThumbnailSkeleton = styled.div<{ color: string }>`
   min-width: 40px;
   max-width: 40px;
   height: 40px;
@@ -1562,6 +1565,7 @@ export const AttachmentFile = styled.div<{
   border?: string
   width?: number
   borderColor: string
+  fileSvgSize?: number
 }>`
   display: flex;
   position: relative;
@@ -1597,8 +1601,8 @@ export const AttachmentFile = styled.div<{
   `}
 
   & > ${AttachmentIconCont} svg {
-    width: 40px;
-    height: 40px;
+    width: ${(props) => (props.fileSvgSize ? `${props.fileSvgSize}px` : '40px')};
+    height: ${(props) => (props.fileSvgSize ? `${props.fileSvgSize}px` : '40px')};
   }
 `
 

@@ -72,7 +72,7 @@ function* loadPinnedMessages({ payload }: any): any {
   const channel = getChannel(channelId)
   if (!channel?.createPinnedMessageListQueryBuilder) return
   try {
-    const builder = channel.createPinnedMessageListQueryBuilder().limit(10)
+    const builder = channel.createPinnedMessageListQueryBuilder().limit(5)
     builder.byDescendingOrder()
     if (nextToken && builder.setNextToken) {
       builder.setNextToken(nextToken)
@@ -180,10 +180,12 @@ function* updateLoadedMessagesPinState(
 
     const stillPinned = forcedPinnedState ?? channelPins.some((candidate) => sourceMessageId(candidate) === messageId)
     const pinnedTill = pin.message?.pinDetails?.pinnedTill || pin.pinTill || undefined
+    const pinType = pin.message?.pinDetails?.pinType ?? pin.pinType
     const params = {
       pinDetails: {
         pinned: stillPinned,
-        ...(stillPinned && pinnedTill ? { pinnedTill } : {})
+        ...(stillPinned && pinnedTill ? { pinnedTill } : {}),
+        ...(stillPinned && pinType !== undefined ? { pinType } : {})
       }
     }
 

@@ -160,6 +160,8 @@ export interface IPollDetails {
 export interface IPinDetails {
   pinned: boolean
   pinnedTill?: Date
+  /** `SHARED` (0) or `PERSONAL` (1), supplied by `Message.pin_details`. */
+  pinType?: number
 }
 
 export interface IMessage {

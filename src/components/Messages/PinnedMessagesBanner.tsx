@@ -10,7 +10,9 @@ import { ReactComponent as PinIcon } from '../../assets/svg/pin.svg'
 import { ReactComponent as LinkIcon } from '../../assets/svg/linkIcon.svg'
 import { attachmentTypes } from '../../helpers/constants'
 import { getReplyLinkPreviewImage } from '../../helpers/replyPreview'
-import Attachment from '../Attachment'
+import Attachment, { AttachmentImg, AttachmentImgCont, FileThumbnail, FileThumbnailSkeleton } from '../Attachment'
+import { AttachmentIconCont } from 'UIHelper'
+import { Component } from 'components/VideoPreview'
 
 const attachmentMetadata = (attachment: any) => {
   if (!attachment?.metadata) return {}
@@ -26,7 +28,7 @@ const attachmentMetadata = (attachment: any) => {
 const preview = (message: any) => {
   if (message?.pollDetails) return `Poll: ${message.pollDetails.name || message.body || 'Poll'}`
   const attachment = message?.attachments?.[0]
-  if (!attachment) return message?.forwardingDetails ? 'Shared content' : 'Message'
+  if (!attachment) return message?.body || (message?.forwardingDetails ? 'Shared content' : 'Message')
   const metadata = attachmentMetadata(attachment)
   if (attachment.type === attachmentTypes.voice) {
     const duration = metadata.duration || metadata.dur || attachment.duration
@@ -50,6 +52,18 @@ const formatDuration = (duration: number | string) => {
 const hasAttachmentTile = (attachment: any) =>
   [attachmentTypes.image, attachmentTypes.video, attachmentTypes.file].includes(attachment?.type)
 
+const getLinkPreviewImage = (attachment: any) => {
+  if (attachment?.type !== attachmentTypes.link) return null
+
+  return getReplyLinkPreviewImage([
+    {
+      ...attachment,
+      metadata:
+        typeof attachment.metadata === 'string' ? attachment.metadata : JSON.stringify(attachmentMetadata(attachment))
+    }
+  ])
+}
+
 type MarkerFade = 'none' | 'top' | 'bottom' | 'both'
 
 const markerMask = (fade: MarkerFade) => {
@@ -59,14 +73,13 @@ const markerMask = (fade: MarkerFade) => {
   return 'none'
 }
 
-const PinnedMessagesBanner = ({ channelId }: { channelId: string }) => {
+const PinnedMessagesBanner = ({ channelId, pinIcon }: { channelId: string; pinIcon?: JSX.Element }) => {
   const dispatch = useDispatch()
   const pins = useSelector(pinnedMessagesSelector(channelId))
   const nextToken = useSelector(pinnedMessagesCursorSelector(channelId))
   const {
     [THEME_COLORS.SURFACE_1]: surface1,
     [THEME_COLORS.TEXT_PRIMARY]: textPrimary,
-    [THEME_COLORS.TEXT_SECONDARY]: textSecondary,
     [THEME_COLORS.ICON_PRIMARY]: iconPrimary,
     [THEME_COLORS.ACCENT]: accentColor,
     [THEME_COLORS.BACKGROUND]: background
@@ -76,6 +89,7 @@ const PinnedMessagesBanner = ({ channelId }: { channelId: string }) => {
   const [linkPreviewImageFailed, setLinkPreviewImageFailed] = useState(false)
   const markerRefs = useRef<Record<number, HTMLButtonElement | null>>({})
   const requestedNextTokenRef = useRef<string | undefined>()
+  const preloadedLinkImagesRef = useRef(new Set<string>())
   const selectedIndex = activePinId ? pins.findIndex((pin) => pin.id === activePinId) : -1
   const index = selectedIndex >= 0 ? selectedIndex : 0
   const active = pins[index]
@@ -94,6 +108,25 @@ const PinnedMessagesBanner = ({ channelId }: { channelId: string }) => {
     dispatch(loadPinnedMessagesAC(channelId))
   }, [channelId, dispatch])
   useEffect(() => {
+    preloadedLinkImagesRef.current.clear()
+  }, [channelId])
+  useEffect(() => {
+    if (typeof Image === 'undefined') return
+
+    pins
+      .slice(index, index + 4)
+      .map((pin) => pin.message?.attachments?.find((item: any) => item.type === attachmentTypes.link))
+      .map(getLinkPreviewImage)
+      .filter((url): url is string => !!url)
+      .forEach((url) => {
+        if (preloadedLinkImagesRef.current.has(url)) return
+        preloadedLinkImagesRef.current.add(url)
+
+        const image = new Image()
+        image.src = url
+      })
+  }, [index, pins])
+  useEffect(() => {
     setLinkPreviewImageFailed(false)
   }, [active?.id])
 
@@ -106,18 +139,8 @@ const PinnedMessagesBanner = ({ channelId }: { channelId: string }) => {
     messageId: attachment.messageId || messageId,
     metadata: attachmentMetadata(attachment)
   }
-  const linkPreviewImage =
-    attachment?.type === attachmentTypes.link
-      ? getReplyLinkPreviewImage([
-          {
-            ...attachment,
-            metadata:
-              typeof attachment.metadata === 'string'
-                ? attachment.metadata
-                : JSON.stringify(attachmentMetadata(attachment))
-          }
-        ])
-      : null
+  const linkPreviewImage = getLinkPreviewImage(attachment)
+  const hasLeadingPreview = hasAttachmentTile(attachmentForPreview) || attachment?.type === attachmentTypes.link
   const markerFade: MarkerFade = count <= 3 ? 'none' : index <= 1 ? 'top' : index >= count - 2 ? 'bottom' : 'both'
   const loadNextPage = () => {
     if (!nextToken || requestedNextTokenRef.current === nextToken) return false
@@ -170,33 +193,42 @@ const PinnedMessagesBanner = ({ channelId }: { channelId: string }) => {
           />
         ))}
       </Markers>
-      {hasAttachmentTile(attachmentForPreview) && (
-        <PinnedAttachmentPreview aria-hidden='true'>
-          <Attachment
-            attachment={attachmentForPreview}
-            isRepliedMessage
-            backgroundColor={surface1}
-            borderRadius='8px'
-            messageType={active.message?.type}
-          />
-        </PinnedAttachmentPreview>
-      )}
-      {attachment?.type === attachmentTypes.link && (
-        <PinnedLinkPreview aria-hidden='true' svgColor={accentColor} fillColor={background}>
-          {linkPreviewImage && !linkPreviewImageFailed ? (
-            <img src={linkPreviewImage} alt='' onError={() => setLinkPreviewImageFailed(true)} />
-          ) : (
-            <LinkIcon />
-          )}
-        </PinnedLinkPreview>
-      )}
-      <Copy key={active.id} textPrimary={textPrimary} textSecondary={textSecondary}>
+      <PinnedPreviewSlot visible={hasLeadingPreview}>
+        {hasAttachmentTile(attachmentForPreview) && (
+          <PinnedAttachmentPreview key={active.id} aria-hidden='true'>
+            <Attachment
+              attachment={attachmentForPreview}
+              isRepliedMessage
+              backgroundColor={surface1}
+              borderRadius='8px'
+              messageType={active.message?.type}
+              selectedFileAttachmentsBoxBorder='none'
+              fileAttachmentWidth={32}
+              imageAttachmentMaxWidth={32}
+              imageAttachmentMaxHeight={32}
+              fileSvgSize={32}
+            />
+          </PinnedAttachmentPreview>
+        )}
+        {attachment?.type === attachmentTypes.link && (
+          <PinnedLinkPreview key={active.id} aria-hidden='true' svgColor={accentColor} fillColor={background}>
+            {linkPreviewImage && !linkPreviewImageFailed ? (
+              <img src={linkPreviewImage} alt='' onError={() => setLinkPreviewImageFailed(true)} />
+            ) : (
+              <LinkIcon />
+            )}
+          </PinnedLinkPreview>
+        )}
+      </PinnedPreviewSlot>
+      <Copy textPrimary={textPrimary}>
         <strong>Pinned messages</strong>
-        <span>{preview(active.message)}</span>
+        <PinnedCopyPreview key={active.id} textPrimary={textPrimary}>
+          {preview(active.message)}
+        </PinnedCopyPreview>
       </Copy>
       <Controls onClick={(event: React.MouseEvent<HTMLDivElement>) => event.stopPropagation()} svgColor={iconPrimary}>
         <button aria-label='Go to pinned message' onClick={navigate}>
-          <PinIcon />
+          {pinIcon || <PinIcon />}
         </button>
       </Controls>
     </Banner>
@@ -249,40 +281,6 @@ const Marker = styled.button<{ active: boolean; compact: boolean }>`
   background: ${({ active }) => (active ? '#16B891' : '#C7CED8')};
   cursor: pointer;
 `
-const PinnedAttachmentPreview = styled.div`
-  width: 40px;
-  height: 40px;
-  flex: 0 0 40px;
-  overflow: hidden;
-
-  > div {
-    margin-right: 0;
-  }
-`
-const PinnedLinkPreview = styled.div<{ svgColor: string; fillColor: string }>`
-  width: 40px;
-  height: 40px;
-  flex: 0 0 40px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  overflow: hidden;
-  border-radius: 4px;
-
-  img {
-    width: 40px;
-    height: 40px;
-    display: block;
-    object-fit: cover;
-  }
-  svg {
-    color: ${(props) => props.svgColor};
-    rect {
-      fill: ${(props) => props.fillColor};
-      fill-opacity: 1;
-    }
-  }
-`
 const slidePinnedPreview = keyframes`
   from {
     opacity: 0;
@@ -293,11 +291,98 @@ const slidePinnedPreview = keyframes`
     transform: translateY(0);
   }
 `
-const Copy = styled.div<{ textPrimary: string; textSecondary: string }>`
+const PinnedPreviewSlot = styled.div<{ visible: boolean }>`
+  width: ${({ visible }) => (visible ? '32px' : '0')};
+  flex: 0 0 ${({ visible }) => (visible ? '32px' : '0')};
+  margin-left: ${({ visible }) => (visible ? '0' : '-8px')};
+  overflow: hidden;
+  transition:
+    width 180ms ease-out,
+    flex-basis 180ms ease-out,
+    margin-left 180ms ease-out;
+`
+const PinnedAttachmentPreview = styled.div`
+  width: 32px;
+  height: 32px;
+  flex: 0 0 32px;
+  overflow: hidden;
+  animation: ${slidePinnedPreview} 180ms ease-out;
+
+  > div {
+    margin-right: 0;
+  }
+
+  & ${AttachmentIconCont} {
+    width: 32px;
+    height: 32px;
+  }
+
+  & ${AttachmentImgCont} {
+    min-width: 32px;
+    max-width: 32px;
+    height: 32px;
+  }
+
+  & ${AttachmentImg} {
+    width: 32px;
+    height: 32px;
+  }
+
+  & ${FileThumbnail} {
+    min-width: 32px;
+    max-width: 32px;
+    height: 32px;
+  }
+
+  & ${FileThumbnailSkeleton} {
+    min-width: 32px;
+    max-width: 32px;
+    height: 32px;
+  }
+
+  & ${Component} {
+    width: 32px;
+    height: 32px;
+    min-height: 32px;
+    min-width: 32px;
+    img {
+      width: 32px;
+      height: 32px;
+    }
+  }
+`
+const PinnedLinkPreview = styled.div<{ svgColor: string; fillColor: string }>`
+  width: 32px;
+  height: 32px;
+  flex: 0 0 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  border-radius: 8px;
+  animation: ${slidePinnedPreview} 180ms ease-out;
+
+  img {
+    width: 32px;
+    height: 32px;
+    display: block;
+    object-fit: cover;
+  }
+  svg {
+    color: ${(props) => props.svgColor};
+    transform: scale(0.8);
+    min-width: 40px;
+    rect {
+      fill: ${(props) => props.fillColor};
+      fill-opacity: 1;
+    }
+  }
+`
+const Copy = styled.div<{ textPrimary: string }>`
   min-width: 0;
   flex: 1;
   display: grid;
-  animation: ${slidePinnedPreview} 180ms ease-out;
+  gap: 2px;
   strong {
     color: ${({ textPrimary }) => textPrimary};
     font-family: Inter;
@@ -306,17 +391,18 @@ const Copy = styled.div<{ textPrimary: string; textSecondary: string }>`
     line-height: 16px;
     letter-spacing: -0.2px;
   }
-  span {
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    color: ${({ textSecondary }) => textSecondary};
-    font-family: Inter;
-    font-weight: 400;
-    font-size: 13px;
-    line-height: 16px;
-    letter-spacing: -0.1px;
-  }
+`
+const PinnedCopyPreview = styled.span<{ textPrimary: string }>`
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: ${({ textPrimary }) => textPrimary};
+  font-family: Inter;
+  font-weight: 400;
+  font-size: 13px;
+  line-height: 16px;
+  letter-spacing: -0.1px;
+  animation: ${slidePinnedPreview} 180ms ease-out;
 `
 const Controls = styled.div<{ svgColor: string }>`
   display: flex;

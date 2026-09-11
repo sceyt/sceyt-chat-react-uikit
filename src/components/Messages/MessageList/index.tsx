@@ -174,6 +174,8 @@ interface MessagesProps {
   reportIcon?: JSX.Element
   retractVoteIcon?: JSX.Element
   endVoteIcon?: JSX.Element
+  /** Replaces the default pin icon in the pinned-messages banner. */
+  pinnedMessageIcon?: JSX.Element
   messageStatusSize?: string
   messageStatusColor?: string
   messageReadStatusColor?: string
@@ -324,6 +326,7 @@ const MessageList: React.FC<MessagesProps> = ({
   selectIcon,
   retractVoteIcon,
   endVoteIcon,
+  pinnedMessageIcon,
   allowEditDeleteIncomingMessage = true,
   starIcon,
   staredIcon,
@@ -1008,7 +1011,7 @@ const MessageList: React.FC<MessagesProps> = ({
       )}
       <React.Fragment>
         {/* {!hideMessages && ( */}
-        {channel?.id && <PinnedMessagesBanner channelId={channel.id} />}
+        {channel?.id && <PinnedMessagesBanner channelId={channel.id} pinIcon={pinnedMessageIcon} />}
         <ScrollViewport>
           {isJumpingToItem && (
             <JumpOverlay>
