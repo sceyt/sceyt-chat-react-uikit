@@ -354,6 +354,31 @@ describe('mediaDownloadCoordinator', () => {
     expect(cancelRequest).toHaveBeenCalledWith(pendingRequest)
   })
 
+  it('keeps the Download state when a custom downloader reports DOWNLOAD_CANCELLED as a normal Error', async () => {
+    let rejectDownload: ((error: Error) => void) | undefined
+    const pendingRequest = new Promise((_resolve, reject) => {
+      rejectDownload = reject
+    })
+    setCustomUploader({
+      download: jest.fn(() => pendingRequest),
+      cancelRequest: jest.fn(() => rejectDownload!(new Error('DOWNLOAD_CANCELLED'))),
+      upload: jest.fn()
+    } as any)
+    const key = 'original-video:https://cdn/custom-cancelled.mp4'
+    const download = requestMediaDownload({
+      key,
+      url: 'https://cdn/custom-cancelled.mp4',
+      cacheKey: 'https://cdn/custom-cancelled.mp4_original_video_url',
+      kind: 'original-video'
+    })
+    await flushCoordinator()
+
+    cancelMediaDownload(key)
+
+    await expect(download).rejects.toThrow('DOWNLOAD_CANCELLED')
+    expect(getMediaDownloadSnapshot(key)).toMatchObject({ state: 'cancelled' })
+  })
+
   it('cancels before a downloader starts', async () => {
     const download = jest.fn()
     setCustomUploader({ download, cancelRequest: jest.fn(), upload: jest.fn() } as any)

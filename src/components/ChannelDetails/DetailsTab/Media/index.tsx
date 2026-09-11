@@ -14,7 +14,7 @@ import { activeTabAttachmentsSelector, attachmentLoadingStateSelector } from '..
 import { isJSON } from '../../../../helpers/message'
 import { channelDetailsTabs, LOADING_STATE } from '../../../../helpers/constants'
 import { getVideoAttachmentCacheKeys } from '../../../../helpers/videoPreview'
-import { requestMediaDownload } from '../../../../helpers/mediaDownloadCoordinator'
+import { getMediaDownloadSnapshot, requestMediaDownload } from '../../../../helpers/mediaDownloadCoordinator'
 import { IAttachment, IChannel } from '../../../../types'
 // Components
 import Attachment from '../../../Attachment'
@@ -56,6 +56,9 @@ const MediaTile = ({ file, background, onOpen }: IMediaTileProps) => {
 
     const startDownload = () => {
       if (downloadStartedRef.current) return
+      // A cancel is global for this attachment. Opening the Media tab later
+      // must retain its Download control rather than silently restarting it.
+      if (getMediaDownloadSnapshot(`original-video:${file.url}`).state === 'cancelled') return
       downloadStartedRef.current = true
       const { originalVideo } = getVideoAttachmentCacheKeys(file.url!, file.metadata)
       startMediaVideoDownload(file)

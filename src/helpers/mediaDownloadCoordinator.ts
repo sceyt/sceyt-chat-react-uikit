@@ -233,7 +233,11 @@ export const requestMediaDownload = (request: MediaDownloadRequest): Promise<Med
       return result
     })
     .catch((error) => {
-      const cancelled = error?.name === 'AbortError'
+      // Custom downloaders do not consistently preserve AbortError. WAAFI's
+      // AWS downloader, for example, reports Error('DOWNLOAD_CANCELLED')
+      // after its AbortController fires. The local cancellation intent is the
+      // authoritative signal, so its UI state must remain cancelled.
+      const cancelled = job.cancelled || error?.name === 'AbortError'
       setJobSnapshot(request.key, job, {
         state: cancelled ? 'cancelled' : 'failed',
         loaded: 0,

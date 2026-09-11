@@ -11,6 +11,8 @@ import {
   resetMediaDownloadCoordinatorForTests
 } from '../../helpers/mediaDownloadCoordinator'
 
+let mockCustomUploader: any
+
 jest.mock('../../hooks', () => {
   const { THEME_COLORS } = require('../../UIHelper/constants')
 
@@ -70,8 +72,8 @@ jest.mock('../../helpers/attachmentsCache', () => ({
 }))
 
 jest.mock('../../helpers/customUploader', () => ({
-  getCustomDownloader: () => undefined,
-  getCustomUploader: () => undefined
+  getCustomDownloader: () => mockCustomUploader?.download,
+  getCustomUploader: () => mockCustomUploader
 }))
 
 jest.mock('../../helpers/videoConversion', () => ({
@@ -139,6 +141,7 @@ describe('video attachment preview and download states', () => {
   beforeEach(() => {
     jest.clearAllMocks()
     resetMediaDownloadCoordinatorForTests()
+    mockCustomUploader = undefined
     mockSetAttachmentToCache.mockResolvedValue(undefined)
   })
 
@@ -255,6 +258,186 @@ describe('video attachment preview and download states', () => {
 
     expect(global.fetch).toHaveBeenCalledTimes(1)
     expect(screen.getAllByTestId('video-download-progress')).toHaveLength(2)
+  })
+
+  it.each([
+    ['message list', 0, 1],
+    ['Media tab', 1, 0]
+  ])(
+    'synchronizes video cancellation from the %s to every matching attachment',
+    async (_source, cancelIndex, retryIndex) => {
+      mockGetAttachmentUrlFromCache.mockResolvedValue(false)
+      global.fetch = jest.fn(
+        (_url, options) =>
+          new Promise((_resolve, reject) => {
+            options.signal.addEventListener('abort', () => {
+              const error = new Error('cancelled')
+              error.name = 'AbortError'
+              reject(error)
+            })
+          })
+      ) as any
+
+      renderWithSceytProvider(
+        <React.Fragment>
+          <Attachment attachment={videoAttachment as any} backgroundColor='#ffffff' videoAttachmentMaxWidth={420} />
+          <Attachment
+            attachment={videoAttachment as any}
+            backgroundColor='#ffffff'
+            videoAttachmentMaxWidth={420}
+            isDetailsView
+          />
+        </React.Fragment>,
+        {
+          store: createMessageListStore({
+            UserReducer: { connectionStatus: CONNECTION_STATUS.CONNECTED }
+          })
+        }
+      )
+      await flushAttachmentEffects()
+
+      fireEvent.click(screen.getAllByLabelText('Cancel video download')[cancelIndex])
+      expect(screen.getAllByLabelText('Download video')).toHaveLength(2)
+
+      fireEvent.click(screen.getAllByLabelText('Download video')[retryIndex])
+      expect(screen.getAllByLabelText('Cancel video download')).toHaveLength(2)
+      expect(screen.getAllByTestId('video-download-progress')).toHaveLength(2)
+    }
+  )
+
+  it('keeps chat and Media-tab progress synchronized across repeated video cancel/retry cycles', async () => {
+    mockGetAttachmentUrlFromCache.mockResolvedValue(false)
+    global.fetch = jest.fn(
+      (_url, options) =>
+        new Promise((_resolve, reject) => {
+          options.signal.addEventListener('abort', () => {
+            const error = new Error('cancelled')
+            error.name = 'AbortError'
+            reject(error)
+          })
+        })
+    ) as any
+
+    renderWithSceytProvider(
+      <React.Fragment>
+        <Attachment attachment={videoAttachment as any} backgroundColor='#ffffff' videoAttachmentMaxWidth={420} />
+        <Attachment
+          attachment={videoAttachment as any}
+          backgroundColor='#ffffff'
+          videoAttachmentMaxWidth={420}
+          isDetailsView
+        />
+      </React.Fragment>,
+      {
+        store: createMessageListStore({
+          UserReducer: { connectionStatus: CONNECTION_STATUS.CONNECTED }
+        })
+      }
+    )
+    await flushAttachmentEffects()
+
+    for (let cycle = 0; cycle < 2; cycle += 1) {
+      fireEvent.click(screen.getAllByLabelText('Cancel video download')[0])
+      expect(screen.getAllByLabelText('Download video')).toHaveLength(2)
+
+      fireEvent.click(screen.getAllByLabelText('Download video')[0])
+      expect(screen.getAllByLabelText('Cancel video download')).toHaveLength(2)
+      expect(screen.getAllByTestId('video-download-progress')).toHaveLength(2)
+      await act(async () => {
+        await Promise.resolve()
+      })
+    }
+  })
+
+  it('does not automatically restart a cancelled retry without another Download tap', async () => {
+    mockGetAttachmentUrlFromCache.mockResolvedValue(false)
+    global.fetch = jest.fn(
+      (_url, options) =>
+        new Promise((_resolve, reject) => {
+          options.signal.addEventListener('abort', () => {
+            const error = new Error('cancelled')
+            error.name = 'AbortError'
+            reject(error)
+          })
+        })
+    ) as any
+
+    renderWithSceytProvider(
+      <React.Fragment>
+        <Attachment attachment={videoAttachment as any} backgroundColor='#ffffff' videoAttachmentMaxWidth={420} />
+        <Attachment
+          attachment={videoAttachment as any}
+          backgroundColor='#ffffff'
+          videoAttachmentMaxWidth={420}
+          isDetailsView
+        />
+      </React.Fragment>,
+      {
+        store: createMessageListStore({
+          UserReducer: { connectionStatus: CONNECTION_STATUS.CONNECTED }
+        })
+      }
+    )
+    await flushAttachmentEffects()
+
+    fireEvent.click(screen.getAllByLabelText('Cancel video download')[0])
+    await flushAttachmentEffects()
+    fireEvent.click(screen.getAllByLabelText('Download video')[0])
+    await flushAttachmentEffects()
+    expect(global.fetch).toHaveBeenCalledTimes(2)
+
+    fireEvent.click(screen.getAllByLabelText('Cancel video download')[0])
+    await flushAttachmentEffects()
+
+    expect(screen.getAllByLabelText('Download video')).toHaveLength(2)
+    expect(global.fetch).toHaveBeenCalledTimes(2)
+  })
+
+  it('keeps both views in progress on every retry when a custom downloader reports generic cancellation errors', async () => {
+    mockGetAttachmentUrlFromCache.mockResolvedValue(false)
+    const pendingRequests: Array<{ reject: (error: Error) => void }> = []
+    const download = jest.fn(
+      () =>
+        new Promise((_resolve, reject) => {
+          pendingRequests.push({ reject })
+        })
+    )
+    const cancelRequest = jest.fn((request) => {
+      const requestIndex = download.mock.results.findIndex((result) => result.value === request)
+      pendingRequests[requestIndex]?.reject(new Error('DOWNLOAD_CANCELLED'))
+    })
+    mockCustomUploader = { download, cancelRequest }
+
+    renderWithSceytProvider(
+      <React.Fragment>
+        <Attachment attachment={videoAttachment as any} backgroundColor='#ffffff' videoAttachmentMaxWidth={420} />
+        <Attachment
+          attachment={videoAttachment as any}
+          backgroundColor='#ffffff'
+          videoAttachmentMaxWidth={420}
+          isDetailsView
+        />
+      </React.Fragment>,
+      {
+        store: createMessageListStore({
+          UserReducer: { connectionStatus: CONNECTION_STATUS.CONNECTED }
+        })
+      }
+    )
+    await flushAttachmentEffects()
+
+    for (let cycle = 0; cycle < 2; cycle += 1) {
+      fireEvent.click(screen.getAllByLabelText('Cancel video download')[0])
+      expect(screen.getAllByLabelText('Download video')).toHaveLength(2)
+
+      fireEvent.click(screen.getAllByLabelText('Download video')[0])
+      expect(screen.getAllByLabelText('Cancel video download')).toHaveLength(2)
+      expect(screen.getAllByTestId('video-download-progress')).toHaveLength(2)
+      await flushAttachmentEffects()
+    }
+
+    expect(download).toHaveBeenCalledTimes(3)
+    expect(cancelRequest).toHaveBeenCalledTimes(2)
   })
 
   it('does not download a default-uploaded video when its sender source is already registered', async () => {
@@ -384,7 +567,7 @@ describe('video attachment preview and download states', () => {
     )
   })
 
-  it('opens an image in the slider while its first original download is in progress', async () => {
+  it('does not open an image in the slider while its original download is in progress', async () => {
     const handleMediaItemClick = jest.fn()
     const imageAttachment = {
       ...videoAttachment,
@@ -398,8 +581,6 @@ describe('video attachment preview and download states', () => {
     mockGetAttachmentUrlFromCache.mockResolvedValue(false)
     global.fetch = jest.fn(() => new Promise(() => undefined)) as any
 
-    // The thumbnail remains tappable while the full image uses the shared
-    // download coordinator. The slider can therefore join and show progress.
     const { container: clickableContainer } = renderWithSceytProvider(
       <Attachment
         attachment={imageAttachment as any}
@@ -416,6 +597,60 @@ describe('video attachment preview and download states', () => {
     await flushAttachmentEffects()
 
     fireEvent.click(clickableContainer.querySelector('img')!)
-    expect(handleMediaItemClick).toHaveBeenCalledWith(expect.objectContaining({ id: 'downloading-image-id' }))
+    expect(handleMediaItemClick).not.toHaveBeenCalled()
+  })
+
+  it('shows Download immediately after cancelling an image and retries without opening the slider', async () => {
+    const handleMediaItemClick = jest.fn()
+    const imageAttachment = {
+      ...videoAttachment,
+      id: 'cancelled-image-id',
+      tid: 'cancelled-image-tid',
+      type: attachmentTypes.image,
+      url: 'https://cdn/cancelled-image.jpg',
+      attachmentUrl: '',
+      metadata: JSON.stringify({ szw: 1280, szh: 720, tmb: 'a'.repeat(80) })
+    }
+    mockGetAttachmentUrlFromCache.mockResolvedValue(false)
+    global.fetch = jest.fn(
+      (_url, options) =>
+        new Promise((_resolve, reject) => {
+          options.signal.addEventListener('abort', () => {
+            const error = new Error('cancelled')
+            error.name = 'AbortError'
+            reject(error)
+          })
+        })
+    ) as any
+
+    const { container } = renderWithSceytProvider(
+      <Attachment
+        attachment={imageAttachment as any}
+        backgroundColor='#ffffff'
+        imageAttachmentMaxWidth={420}
+        handleMediaItemClick={handleMediaItemClick}
+      />,
+      {
+        store: createMessageListStore({
+          UserReducer: { connectionStatus: CONNECTION_STATUS.CONNECTED }
+        })
+      }
+    )
+    await flushAttachmentEffects()
+
+    fireEvent.click(screen.getByLabelText('Cancel image download'))
+    expect(screen.getByLabelText('Download image')).toBeInTheDocument()
+
+    fireEvent.click(container.querySelector('img')!)
+    expect(handleMediaItemClick).not.toHaveBeenCalled()
+
+    fireEvent.click(screen.getByLabelText('Download image'))
+    expect(screen.getByLabelText('Cancel image download')).toBeInTheDocument()
+    await act(async () => {
+      await new Promise<void>((resolve) => setTimeout(resolve, 0))
+      await new Promise<void>((resolve) => setTimeout(resolve, 0))
+    })
+
+    expect(global.fetch).toHaveBeenCalledTimes(2)
   })
 })
