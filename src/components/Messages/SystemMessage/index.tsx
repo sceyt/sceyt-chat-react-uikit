@@ -252,6 +252,7 @@ const PinnedSystemMessage = styled.button`
   border: 0;
   cursor: pointer;
   font: inherit;
+  white-space: nowrap;
 
   &:disabled {
     cursor: default;
@@ -259,10 +260,6 @@ const PinnedSystemMessage = styled.button`
 `
 
 const PinnedMessagePreview = styled.strong`
-  display: block;
-  margin-top: 3px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  margin-left: 4px;
   font-weight: 500;
 `

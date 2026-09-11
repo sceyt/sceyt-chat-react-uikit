@@ -86,7 +86,7 @@ const MessageStatusAndTime = ({
       ) : (
         ''
       )}
-      {message?.pinDetails?.pinned && (
+      {message?.state !== MESSAGE_STATUS.DELETE && message?.pinDetails?.pinned && (
         <PinnedMessageIcon
           color={messageTimeColor || (withAttachment && !fileAttachment ? messageTimeColorOnAttachment : textSecondary)}
           aria-label='Pinned message'
