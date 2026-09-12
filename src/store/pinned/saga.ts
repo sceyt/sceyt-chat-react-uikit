@@ -15,6 +15,7 @@ import {
   restorePinnedMutations
 } from '../../helpers/messagesIdb'
 import { setNotification } from '../../helpers/notifications'
+import { getPinnedMessagePreview } from '../../helpers/pinnedMessage'
 import {
   APPLY_PINNED_MESSAGES_EVENT,
   LOAD_PINNED_MESSAGES,
@@ -290,7 +291,12 @@ function* applyPinnedMessagesEvent({ payload }: any): any {
     Notification.permission === 'granted'
   ) {
     const name = event.actor?.firstName || event.actor?.username || actorId
-    setNotification(`@${name} pinned a message`, event.actor, channel)
+    const pinnedMessagePreview = getPinnedMessagePreview(pins[0]?.message)
+    setNotification(
+      pinnedMessagePreview ? `@${name} pinned "${pinnedMessagePreview}".` : `@${name} pinned a message.`,
+      event.actor,
+      channel
+    )
   }
 }
 

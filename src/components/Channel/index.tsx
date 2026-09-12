@@ -42,6 +42,7 @@ import { IChannel, IContact, IMessage, IUser } from '../../types'
 import { MessageStatusIcon, MessageTextFormat } from '../../messageUtils'
 import { useColor } from '../../hooks'
 import { MESSAGE_TYPE } from '../../types/enum'
+import { getPinnedMessagePreview, isPinnedMessageDeleted } from '../../helpers/pinnedMessage'
 
 interface IChannelProps {
   channel: IChannel
@@ -205,26 +206,15 @@ const ChannelMessageText = ({
           'Message was deleted.'
         ) : lastMessage.type === MESSAGE_TYPE.SYSTEM ? (
           lastMessage.body === 'PM' ? (
-            <React.Fragment>
-              {`${systemMessageActor} pinned a message.`}
-              {lastMessage.parentMessage && (
-                <React.Fragment>
-                  {' '}
-                  {lastMessage.parentMessage.body
-                    ? MessageTextFormat({
-                        text: lastMessage.parentMessage.body,
-                        message: lastMessage.parentMessage,
-                        contactsMap,
-                        getFromContacts,
-                        isLastMessage: true,
-                        accentColor,
-                        textSecondary,
-                        unsupportedMessage: isMessageUnsupported(lastMessage.parentMessage)
-                      })
-                    : LastMessageAttachments({ lastMessage: lastMessage.parentMessage })}
-                </React.Fragment>
-              )}
-            </React.Fragment>
+            (() => {
+              const pinnedMessagePreview = getPinnedMessagePreview(lastMessage.parentMessage)
+              const pinnedMessageDeleted = isPinnedMessageDeleted(lastMessage.parentMessage)
+              return pinnedMessagePreview
+                ? `${systemMessageActor} pinned ${
+                    pinnedMessageDeleted ? pinnedMessagePreview : `"${pinnedMessagePreview}"`
+                  }${pinnedMessageDeleted ? '' : '.'}`
+                : `${systemMessageActor} pinned a message.`
+            })()
           ) : (
             `${systemMessageActor} ${
               lastMessage.body === 'CC'

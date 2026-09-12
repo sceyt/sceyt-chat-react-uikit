@@ -1,7 +1,7 @@
 import React from 'react'
 import { act, screen } from '@testing-library/react'
 import Channel from './index'
-import { attachmentTypes, DEFAULT_CHANNEL_TYPE } from '../../helpers/constants'
+import { attachmentTypes, DEFAULT_CHANNEL_TYPE, MESSAGE_STATUS } from '../../helpers/constants'
 import { MESSAGE_TYPE } from '../../types/enum'
 import { setClient } from '../../common/client'
 import { updateChannelDataAC } from '../../store/channel/actions'
@@ -145,7 +145,7 @@ describe('Channel pinned system-message preview', () => {
   it('uses the pinned parent body instead of the PM system payload', () => {
     renderPinnedSystemMessage(makeMessage({ id: 'pinned-parent', body: 'Important pinned message' }))
 
-    expect(screen.getByText(/Remote pinned a message\. Important pinned message/)).toBeInTheDocument()
+    expect(screen.getByText('Remote pinned "Important pinned message".')).toBeInTheDocument()
     expect(screen.queryByText('PM')).not.toBeInTheDocument()
   })
 
@@ -154,7 +154,15 @@ describe('Channel pinned system-message preview', () => {
     parentMessage.body = ''
     renderPinnedSystemMessage(parentMessage)
 
-    expect(screen.getByText(/Remote pinned a message\.[\s\S]*Photo/)).toBeInTheDocument()
+    expect(screen.getByText('Remote pinned "Photo".')).toBeInTheDocument()
+  })
+
+  it('uses an unquoted deleted-message label for a deleted pinned source', () => {
+    const parentMessage = makeMessage({ id: 'deleted-pinned-parent', body: 'No longer available' })
+    parentMessage.state = MESSAGE_STATUS.DELETE
+    renderPinnedSystemMessage(parentMessage)
+
+    expect(screen.getByText('Remote pinned Deleted message')).toBeInTheDocument()
   })
 })
 

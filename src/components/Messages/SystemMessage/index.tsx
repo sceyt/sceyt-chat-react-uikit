@@ -16,6 +16,7 @@ import { removeVisibleMessageAC, scrollToNewMessageAC, setVisibleMessageAC } fro
 import { scrollToNewMessageSelector, unreadScrollToSelector } from 'store/message/selector'
 import { MESSAGE_TYPE } from 'types/enum'
 import { navigateToMessage } from 'helpers/messageListNavigator'
+import { getPinnedMessagePreview, isPinnedMessageDeleted } from 'helpers/pinnedMessage'
 
 interface ISystemMessageProps {
   channel: IChannel
@@ -64,18 +65,9 @@ const Message = ({
   const parentMessageId =
     message.parentMessage?.id || message.parentMessage?.tid || message.parentMessageId || message.parentId
   const pinnedMessagePreview = useMemo(() => {
-    const parentMessage = message.parentMessage
-    if (!parentMessage) return ''
-    if (parentMessage.body?.trim()) return parentMessage.body.trim()
-
-    const attachment = parentMessage.attachments?.[0]
-    if (!attachment) return ''
-    if (attachment.type === 'image') return 'Photo'
-    if (attachment.type === 'video') return 'Video'
-    if (attachment.type === 'voice') return 'Voice message'
-    if (attachment.type === 'file') return attachment.name || 'File'
-    return attachment.name || attachment.type || 'Attachment'
+    return getPinnedMessagePreview(message.parentMessage)
   }, [message.parentMessage])
+  const pinnedMessageDeleted = isPinnedMessageDeleted(message.parentMessage)
 
   const navigateToPinnedMessage = () => {
     if (parentMessageId) navigateToMessage(parentMessageId)
@@ -135,8 +127,17 @@ const Message = ({
           disabled={!parentMessageId}
           aria-label={parentMessageId ? 'Go to pinned message' : undefined}
         >
-          {`${actorName} pinned a message.`}
-          {pinnedMessagePreview && <PinnedMessagePreview>{pinnedMessagePreview}</PinnedMessagePreview>}
+          {pinnedMessagePreview ? (
+            <React.Fragment>
+              {`${actorName} pinned `}
+              <PinnedMessagePreview>
+                {pinnedMessageDeleted ? pinnedMessagePreview : `"${pinnedMessagePreview}"`}
+              </PinnedMessagePreview>
+              {!pinnedMessageDeleted && '.'}
+            </React.Fragment>
+          ) : (
+            `${actorName} pinned a message.`
+          )}
         </PinnedSystemMessage>
       ) : (
         <span>
@@ -260,6 +261,5 @@ const PinnedSystemMessage = styled.button`
 `
 
 const PinnedMessagePreview = styled.strong`
-  margin-left: 4px;
   font-weight: 500;
 `

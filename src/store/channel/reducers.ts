@@ -4,6 +4,7 @@ import { DEFAULT_CHANNEL_TYPE, MESSAGE_STATUS } from '../../helpers/constants'
 import { getClient } from '../../common/client'
 import { setUserToMap } from '../../helpers/userHelper'
 import { sortChannelByLastMessage } from '../../helpers/channelHalper'
+import { updateMessage } from '../message/reducers'
 
 export interface IChannelState {
   channelsLoadingState: number | null
@@ -98,6 +99,34 @@ const initialState: IChannelState = {
   mutualChannels: [],
   mutualChannelsHasNext: false,
   mutualChannelsLoadingState: null
+}
+
+const syncLastMessageParentSnapshot = (channel: IChannel, messageId: string, params: Partial<IMessage>): IChannel => {
+  const lastMessage = channel.lastMessage
+  const parentMessage = lastMessage?.parentMessage
+  if (!parentMessage || (parentMessage.id !== messageId && parentMessage.tid !== messageId)) return channel
+
+  const nextParentMessage =
+    params.state === MESSAGE_STATUS.DELETE
+      ? {
+          ...params,
+          id: params.id || parentMessage.id,
+          tid: params.tid || parentMessage.tid
+        }
+      : {
+          ...parentMessage,
+          ...params,
+          id: params.id || parentMessage.id,
+          tid: params.tid || parentMessage.tid
+        }
+
+  return {
+    ...channel,
+    lastMessage: {
+      ...lastMessage,
+      parentMessage: nextParentMessage as IMessage
+    }
+  }
 }
 
 const channelSlice = createSlice({
@@ -566,6 +595,26 @@ const channelSlice = createSlice({
   extraReducers: (builder) => {
     builder.addCase('DESTROY_SESSION', (state) => {
       return { ...initialState, channelListWidth: state.channelListWidth }
+    })
+    builder.addCase(updateMessage, (state, action) => {
+      const { messageId, params } = action.payload
+      const sync = (channel: IChannel) => syncLastMessageParentSnapshot(channel, messageId, params)
+
+      state.channels = state.channels.map(sync)
+      state.channelsForForward = state.channelsForForward.map(sync)
+      state.searchedChannels = {
+        chats_groups: state.searchedChannels.chats_groups.map(sync),
+        channels: state.searchedChannels.channels.map(sync),
+        contacts: state.searchedChannels.contacts
+      }
+      state.searchedChannelsForForward = {
+        chats_groups: state.searchedChannelsForForward.chats_groups.map(sync),
+        channels: state.searchedChannelsForForward.channels.map(sync),
+        contacts: state.searchedChannelsForForward.contacts
+      }
+
+      const activeChannel = state.activeChannel as IChannel
+      if (activeChannel?.id) state.activeChannel = sync(activeChannel)
     })
   }
 })
