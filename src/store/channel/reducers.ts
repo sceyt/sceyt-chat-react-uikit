@@ -600,17 +600,23 @@ const channelSlice = createSlice({
       const { messageId, params } = action.payload
       const sync = (channel: IChannel) => syncLastMessageParentSnapshot(channel, messageId, params)
 
-      state.channels = state.channels.map(sync)
-      state.channelsForForward = state.channelsForForward.map(sync)
-      state.searchedChannels = {
-        chats_groups: state.searchedChannels.chats_groups.map(sync),
-        channels: state.searchedChannels.channels.map(sync),
-        contacts: state.searchedChannels.contacts
+      state.channels = (state.channels || []).map(sync)
+      if (state.channelsForForward) {
+        state.channelsForForward = state.channelsForForward.map(sync)
       }
-      state.searchedChannelsForForward = {
-        chats_groups: state.searchedChannelsForForward.chats_groups.map(sync),
-        channels: state.searchedChannelsForForward.channels.map(sync),
-        contacts: state.searchedChannelsForForward.contacts
+      if (state.searchedChannels) {
+        state.searchedChannels = {
+          chats_groups: (state.searchedChannels.chats_groups || []).map(sync),
+          channels: (state.searchedChannels.channels || []).map(sync),
+          contacts: state.searchedChannels.contacts || []
+        }
+      }
+      if (state.searchedChannelsForForward) {
+        state.searchedChannelsForForward = {
+          chats_groups: (state.searchedChannelsForForward.chats_groups || []).map(sync),
+          channels: (state.searchedChannelsForForward.channels || []).map(sync),
+          contacts: state.searchedChannelsForForward.contacts || []
+        }
       }
 
       const activeChannel = state.activeChannel as IChannel
