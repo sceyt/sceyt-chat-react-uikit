@@ -73,7 +73,15 @@ const markerMask = (fade: MarkerFade) => {
   return 'none'
 }
 
-const PinnedMessagesBanner = ({ channelId, pinIcon }: { channelId: string; pinIcon?: JSX.Element }) => {
+const PinnedMessagesBanner = ({
+  channelId,
+  pinIcon,
+  onOpenList
+}: {
+  channelId: string
+  pinIcon?: JSX.Element
+  onOpenList?: () => void
+}) => {
   const dispatch = useDispatch()
   const pins = useSelector(pinnedMessagesSelector(channelId))
   const nextToken = useSelector(pinnedMessagesCursorSelector(channelId))
@@ -105,7 +113,7 @@ const PinnedMessagesBanner = ({ channelId, pinIcon }: { channelId: string; pinIc
     markerRefs.current[index]?.scrollIntoView({ behavior: 'smooth', block })
   }, [index, pins.length])
   useEffect(() => {
-    dispatch(loadPinnedMessagesAC(channelId))
+    dispatch(loadPinnedMessagesAC(channelId, undefined, true, 10))
   }, [channelId, dispatch])
   useEffect(() => {
     preloadedLinkImagesRef.current.clear()
@@ -146,14 +154,14 @@ const PinnedMessagesBanner = ({ channelId, pinIcon }: { channelId: string; pinIc
     if (!nextToken || requestedNextTokenRef.current === nextToken) return false
 
     requestedNextTokenRef.current = nextToken
-    dispatch(loadPinnedMessagesAC(channelId, nextToken, false))
+    dispatch(loadPinnedMessagesAC(channelId, nextToken, false, 10))
     return true
   }
   const showNext = () => {
     if (index < count - 1) {
       const nextIndex = index + 1
       setActivePinId(pins[nextIndex].id)
-      if (count - nextIndex - 1 <= 3) loadNextPage()
+      if (count - nextIndex - 1 <= 10) loadNextPage()
     } else if (nextToken) {
       setAdvanceAfterPage(true)
       loadNextPage()
@@ -226,8 +234,12 @@ const PinnedMessagesBanner = ({ channelId, pinIcon }: { channelId: string; pinIc
           {preview(active.message)}
         </PinnedCopyPreview>
       </Copy>
-      <Controls onClick={(event: React.MouseEvent<HTMLDivElement>) => event.stopPropagation()} svgColor={iconPrimary}>
-        <button aria-label='Go to pinned message' onClick={navigate}>
+      <Controls
+        onClick={(event: React.MouseEvent<HTMLDivElement>) => event.stopPropagation()}
+        svgColor={iconPrimary}
+        hoverBG={background}
+      >
+        <button aria-label='View pinned messages' onClick={onOpenList}>
           {pinIcon || <PinIcon />}
         </button>
       </Controls>
@@ -404,7 +416,7 @@ const PinnedCopyPreview = styled.span<{ textPrimary: string }>`
   letter-spacing: -0.1px;
   animation: ${slidePinnedPreview} 180ms ease-out;
 `
-const Controls = styled.div<{ svgColor: string }>`
+const Controls = styled.div<{ svgColor: string; hoverBG: string }>`
   display: flex;
   align-items: center;
   gap: 12px;
@@ -412,10 +424,11 @@ const Controls = styled.div<{ svgColor: string }>`
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    min-width: 24px;
-    min-height: 24px;
-    padding: 0;
+    min-width: 32px;
+    min-height: 32px;
+    padding: 4px;
     border: 0;
+    border-radius: 50%;
     background: transparent;
     color: inherit;
     cursor: pointer;
@@ -423,6 +436,10 @@ const Controls = styled.div<{ svgColor: string }>`
     line-height: 20px;
     svg {
       color: ${(props) => props.svgColor};
+    }
+
+    &:hover {
+      background: ${(props) => props.hoverBG};
     }
   }
 `

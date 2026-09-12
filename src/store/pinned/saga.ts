@@ -10,6 +10,7 @@ import {
   persistPinMutation,
   persistPinnedMessages,
   removePersistedPinMutation,
+  removePersistedPinsForChannel,
   restorePinnedMessages,
   restorePinnedMutations
 } from '../../helpers/messagesIdb'
@@ -28,9 +29,14 @@ import {
   setPinnedMessagesAC,
   upsertPinnedMessagesAC
 } from './actions'
-import { PendingPinMutation, PinnedMessageRecord } from './reducers'
+import { clearPinnedMessages, PendingPinMutation, PinnedMessageRecord } from './reducers'
 
 const pinScopeShared = 0
+
+// A server page alone cannot prove that a cached pin was removed: it might
+// simply be on a later page. Keep the current refresh sequence until its last
+// cursor arrives, then use the complete server result as the cache authority.
+const serverPinRefreshes = new Map<string, Map<string, PinnedMessageRecord>>()
 const sharedPinSystemMessage = (parentMessageId: string) => ({
   body: 'PM',
   type: MESSAGE_TYPE.SYSTEM,
@@ -57,12 +63,15 @@ const sourceMessageId = (pin: PinnedMessageRecord) => pin.message?.id || pin.mes
 
 function* persistChannelPins(channelId: string): any {
   const state = yield select((store: any) => store.PinnedReducer)
-  yield call(persistPinnedMessages, channelId, state.byChannel[channelId] || [], state.cursors[channelId])
+  const pins = state.byChannel[channelId] || []
+  const nextToken = state.cursors[channelId]
+  yield call(persistPinnedMessages, channelId, pins, nextToken)
 }
 
 function* loadPinnedMessages({ payload }: any): any {
-  const { channelId, nextToken, restoreCache } = payload
-  if (restoreCache) {
+  const { channelId, nextToken, restoreCache, limit = 20, reconcileAll = false } = payload
+  const cacheAlreadyRestored = yield select((store: any) => !!store.PinnedReducer?.loaded?.[channelId])
+  if (restoreCache && !cacheAlreadyRestored) {
     const cached = yield call(restorePinnedMessages, channelId)
     if (cached) {
       yield put(setPinnedMessagesAC(channelId, cached.pins || [], cached.nextToken))
@@ -72,7 +81,7 @@ function* loadPinnedMessages({ payload }: any): any {
   const channel = getChannel(channelId)
   if (!channel?.createPinnedMessageListQueryBuilder) return
   try {
-    const builder = channel.createPinnedMessageListQueryBuilder().limit(5)
+    const builder = channel.createPinnedMessageListQueryBuilder().limit(limit)
     builder.byDescendingOrder()
     if (nextToken && builder.setNextToken) {
       builder.setNextToken(nextToken)
@@ -80,11 +89,49 @@ function* loadPinnedMessages({ payload }: any): any {
     const query = yield call([builder, builder.build])
     const response = yield call([query, query.loadNext])
     const pins = normalizePins(response.pins)
-    yield put(setPinnedMessagesAC(channelId, pins, query.nextToken, !!nextToken))
-    yield call(updateLoadedMessagesPinState, channelId, pins)
+    const previousPins: PinnedMessageRecord[] = yield select(
+      (store: any) => store.PinnedReducer?.byChannel?.[channelId] || []
+    )
+    const isFirstPage = !nextToken
+    const serverHasMore = !!query.nextToken
+    // Only an explicit list reconciliation owns the complete-server accumulator.
+    // Banner pagination may intentionally stop after one page, so it must never
+    // make cached older pins look deleted just because it has not fetched them.
+    let refreshPins = reconcileAll ? serverPinRefreshes.get(channelId) : undefined
+    if (isFirstPage && reconcileAll) {
+      refreshPins = new Map<string, PinnedMessageRecord>()
+      serverPinRefreshes.set(channelId, refreshPins)
+    }
+    pins.forEach((pin) => refreshPins?.set(pin.id, pin))
+    const fullServerPins = reconcileAll && !serverHasMore && refreshPins ? Array.from(refreshPins.values()) : null
+    // A cursor means the server only returned the newest slice, so retain any
+    // cached older pages until they are fetched. Without a cursor this is the
+    // complete server list and must replace cache entries that no longer exist.
+    const mergeCachedPins = isFirstPage && serverHasMore
+    const pinsToApply = fullServerPins || pins
+    const staleCachedPins = fullServerPins
+      ? previousPins.filter((cachedPin) => !fullServerPins.some((serverPin) => serverPin.id === cachedPin.id))
+      : []
+    yield put(
+      setPinnedMessagesAC(
+        channelId,
+        pinsToApply,
+        query.nextToken,
+        fullServerPins ? false : !isFirstPage,
+        fullServerPins ? false : mergeCachedPins
+      )
+    )
+    yield call(updateLoadedMessagesPinState, channelId, [...pins, ...staleCachedPins])
     yield call(persistChannelPins, channelId)
-  } catch (error) {
-    console.log(error)
+    if (fullServerPins) {
+      serverPinRefreshes.delete(channelId)
+    }
+    if (reconcileAll && serverHasMore) {
+      yield call(loadPinnedMessages, {
+        payload: { channelId, nextToken: query.nextToken, restoreCache: false, limit, reconcileAll: true }
+      })
+    }
+  } catch (_) {
     // Cached pins remain visible until the next reconnect.
   }
 }
@@ -200,9 +247,10 @@ function* updateLoadedMessagesPinState(
 
 function* applyPinnedMessagesEvent({ payload }: any): any {
   const { channel, event } = payload
-  const channelId = channel?.id
-  if (!channelId || !event) return
+  const channelId = channel?.id || event?.channelId
+  if (!event) return
   const pins = normalizePins(event.pins)
+  if (!channelId) return
   if (event.operation === 0) {
     yield put(upsertPinnedMessagesAC(channelId, pins))
   } else if (event.operation === 1) {
@@ -217,6 +265,10 @@ function* applyPinnedMessagesEvent({ payload }: any): any {
   }
   yield call(updateLoadedMessagesPinState, channelId, pins)
   yield call(persistChannelPins, channelId)
+  // The realtime event updates the UI immediately. Refresh the first server
+  // page as well so a remote unpin always reconciles the durable cache, even
+  // when an older SDK/server event does not include every removed pin.
+  yield call(loadPinnedMessages, { payload: { channelId, restoreCache: false, limit: 10 } })
 
   const actorId = event.actor?.id
   const client = getClient() as any
@@ -237,6 +289,8 @@ function* applyPinnedMessagesEvent({ payload }: any): any {
 
 function* resendPendingPinMutations(): any {
   const pinnedState = yield select((store: any) => store.PinnedReducer)
+  const activeChannelId = getActiveChannelId()
+  const pinnedMessagesListOpen = yield select((store: any) => !!store.MessageReducer?.pinnedMessagesListOpen)
   const inMemory = Object.values(pinnedState.pendingMutations || {})
   const persisted = yield call(restorePinnedMutations)
   const byId = new Map<string, PendingPinMutation>()
@@ -248,12 +302,21 @@ function* resendPendingPinMutations(): any {
       // Leave the durable mutation in place for another reconnect.
     }
   }
-  const channelIds = new Set<string>([...Object.keys(pinnedState.byChannel || {}), getActiveChannelId()])
+  const channelIds = new Set<string>([...Object.keys(pinnedState.byChannel || {}), activeChannelId])
   for (const channelId of channelIds) {
     if (channelId) {
-      yield call(loadPinnedMessages, { payload: { channelId, restoreCache: false } })
+      const reconcileAll = channelId === activeChannelId && pinnedMessagesListOpen
+      yield call(loadPinnedMessages, {
+        payload: { channelId, restoreCache: false, limit: reconcileAll ? 30 : 10, reconcileAll }
+      })
     }
   }
+}
+
+function* clearChannelPinnedMessages({ payload }: ReturnType<typeof clearPinnedMessages>): any {
+  const { channelId } = payload
+  serverPinRefreshes.delete(channelId)
+  yield call(removePersistedPinsForChannel, channelId)
 }
 
 export default function* PinnedMessagesSaga() {
@@ -262,4 +325,5 @@ export default function* PinnedMessagesSaga() {
   yield takeEvery(UNPIN_MESSAGE, unpinMessage)
   yield takeEvery(APPLY_PINNED_MESSAGES_EVENT, applyPinnedMessagesEvent)
   yield takeEvery(RESEND_PENDING_PIN_MUTATIONS, resendPendingPinMutations)
+  yield takeEvery(clearPinnedMessages.type, clearChannelPinnedMessages)
 }

@@ -41,7 +41,7 @@ export default FloatingScrollButton
 const Button = styled.button<{ show: boolean; bottomOffset: number; backgroundColor: string; stackedAbove: boolean }>`
   position: absolute;
   right: 16px;
-  bottom: ${(props) => props.bottomOffset + 45 + (props.stackedAbove ? 60 : 0)}px;
+  bottom: ${(props) => props.bottomOffset + 25 + (props.stackedAbove ? 60 : 0)}px;
   display: flex;
   align-items: center;
   justify-content: center;

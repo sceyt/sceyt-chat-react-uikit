@@ -48,6 +48,7 @@ import {
 import {
   messageForReplySelector,
   messageToEditSelector,
+  pinnedMessagesListOpenSelector,
   selectedMessagesMapSelector
 } from '../../store/message/selector'
 import {
@@ -392,6 +393,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
     [THEME_COLORS.TOOLTIP_BACKGROUND]: tooltipBackground,
     [THEME_COLORS.BORDER]: borderColor
   } = useColor()
+  const pinnedMessagesListOpen = useSelector(pinnedMessagesListOpenSelector)
 
   const dispatch = useDispatch()
   const ChatClient = getClient()
@@ -1949,7 +1951,13 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
   }, [showLinkPreview])
 
   return (
-    <SendMessageWrapper ref={sendMessageWrapperRef} backgroundColor={backgroundColor || background}>
+    <SendMessageWrapper
+      ref={sendMessageWrapperRef}
+      backgroundColor={backgroundColor || background}
+      // Keep the composer space empty while browsing pins, but reveal it when
+      // a pinned-message action starts an edit, reply, or multi-select workflow.
+      $hidden={pinnedMessagesListOpen && !messageToEdit && !messageForReply && !selectedMessagesMap?.size}
+    >
       <Container
         margin={margin}
         padding={padding}
@@ -2605,7 +2613,9 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
   )
 }
 
-const SendMessageWrapper = styled.div<{ backgroundColor: string }>`
+const SendMessageWrapper = styled.div<{ backgroundColor: string; $hidden?: boolean }>`
+  visibility: ${(props) => (props.$hidden ? 'hidden' : 'visible')};
+  pointer-events: ${(props) => (props.$hidden ? 'none' : 'auto')};
   background-color: ${(props) => props.backgroundColor};
   position: relative;
   z-index: 10;

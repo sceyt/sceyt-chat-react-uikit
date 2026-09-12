@@ -159,6 +159,16 @@ const ChannelMessageText = ({
   unsupportedMessage?: boolean
 }) => {
   const isViewOnce = lastMessage?.type === MESSAGE_TYPE.VIEW_ONCE && lastMessage?.viewOnce
+  const systemMessageActor = lastMessage.user
+    ? lastMessage.user.id === user.id
+      ? 'You'
+      : makeUsername(
+          lastMessage.user && contactsMap && contactsMap[lastMessage.user.id],
+          lastMessage.user,
+          getFromContacts,
+          true
+        )
+    : ''
   const audioRecording = useMemo(() => {
     return getAudioRecordingFromMap(channel.id)
   }, [channel.id, draftMessageText])
@@ -194,43 +204,35 @@ const ChannelMessageText = ({
         ) : lastMessage.state === MESSAGE_STATUS.DELETE ? (
           'Message was deleted.'
         ) : lastMessage.type === MESSAGE_TYPE.SYSTEM ? (
-          `${
-            lastMessage.user &&
-            (lastMessage.user.id === user.id
-              ? 'You '
-              : makeUsername(
-                  lastMessage.user && contactsMap && contactsMap[lastMessage.user.id],
-                  lastMessage.user,
-                  getFromContacts,
-                  true
-                ))
-          } ${
-            lastMessage.body === 'CC'
-              ? 'created this channel'
-              : lastMessage.body === 'CG'
-                ? 'created this group'
-                : lastMessage.body === 'AM'
-                  ? ` added ${
-                      lastMessageMetas &&
-                      lastMessageMetas.m &&
-                      lastMessageMetas.m
-                        .slice(0, 5)
-                        .map((mem: string) =>
-                          mem === user.id
-                            ? ' You'
-                            : ` ${systemMessageUserName(
-                                mem,
-                                contactsMap && contactsMap[mem],
-                                lastMessage.mentionedUsers
-                              )}`
-                        )
-                    } ${
-                      lastMessageMetas && lastMessageMetas.m && lastMessageMetas.m.length > 5
-                        ? `and ${lastMessageMetas.m.length - 5} more`
-                        : ''
-                    }`
-                  : lastMessage.body === 'RM'
-                    ? ` removed ${
+          lastMessage.body === 'PM' ? (
+            <React.Fragment>
+              {`${systemMessageActor} pinned a message.`}
+              {lastMessage.parentMessage && (
+                <React.Fragment>
+                  {' '}
+                  {lastMessage.parentMessage.body
+                    ? MessageTextFormat({
+                        text: lastMessage.parentMessage.body,
+                        message: lastMessage.parentMessage,
+                        contactsMap,
+                        getFromContacts,
+                        isLastMessage: true,
+                        accentColor,
+                        textSecondary,
+                        unsupportedMessage: isMessageUnsupported(lastMessage.parentMessage)
+                      })
+                    : LastMessageAttachments({ lastMessage: lastMessage.parentMessage })}
+                </React.Fragment>
+              )}
+            </React.Fragment>
+          ) : (
+            `${systemMessageActor} ${
+              lastMessage.body === 'CC'
+                ? 'created this channel'
+                : lastMessage.body === 'CG'
+                  ? 'created this group'
+                  : lastMessage.body === 'AM'
+                    ? ` added ${
                         lastMessageMetas &&
                         lastMessageMetas.m &&
                         lastMessageMetas.m
@@ -249,18 +251,39 @@ const ChannelMessageText = ({
                           ? `and ${lastMessageMetas.m.length - 5} more`
                           : ''
                       }`
-                    : lastMessage.body === 'LG'
-                      ? 'Left this group'
-                      : lastMessage.body === 'JL'
-                        ? 'joined via invite link'
-                        : lastMessage.body === 'ADM'
-                          ? !Number(lastMessageMetas?.autoDeletePeriod)
-                            ? 'disabled disappearing messages'
-                            : `set the disappearing messages timer to ${formatDisappearingMessageTime(
-                                lastMessageMetas?.autoDeletePeriod ? Number(lastMessageMetas.autoDeletePeriod) : null
-                              )}`
-                          : ''
-          }`
+                    : lastMessage.body === 'RM'
+                      ? ` removed ${
+                          lastMessageMetas &&
+                          lastMessageMetas.m &&
+                          lastMessageMetas.m
+                            .slice(0, 5)
+                            .map((mem: string) =>
+                              mem === user.id
+                                ? ' You'
+                                : ` ${systemMessageUserName(
+                                    mem,
+                                    contactsMap && contactsMap[mem],
+                                    lastMessage.mentionedUsers
+                                  )}`
+                            )
+                        } ${
+                          lastMessageMetas && lastMessageMetas.m && lastMessageMetas.m.length > 5
+                            ? `and ${lastMessageMetas.m.length - 5} more`
+                            : ''
+                        }`
+                      : lastMessage.body === 'LG'
+                        ? 'Left this group'
+                        : lastMessage.body === 'JL'
+                          ? 'joined via invite link'
+                          : lastMessage.body === 'ADM'
+                            ? !Number(lastMessageMetas?.autoDeletePeriod)
+                              ? 'disabled disappearing messages'
+                              : `set the disappearing messages timer to ${formatDisappearingMessageTime(
+                                  lastMessageMetas?.autoDeletePeriod ? Number(lastMessageMetas.autoDeletePeriod) : null
+                                )}`
+                            : ''
+            }`
+          )
         ) : (
           <React.Fragment>
             <LastMessageDescription poll={lastMessage?.pollDetails && lastMessage?.type === MESSAGE_TYPE.POLL}>

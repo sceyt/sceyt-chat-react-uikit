@@ -2,6 +2,7 @@ import React from 'react'
 import { act, screen } from '@testing-library/react'
 import Channel from './index'
 import { attachmentTypes, DEFAULT_CHANNEL_TYPE } from '../../helpers/constants'
+import { MESSAGE_TYPE } from '../../types/enum'
 import { setClient } from '../../common/client'
 import { updateChannelDataAC } from '../../store/channel/actions'
 import { useSelector } from '../../store/hooks'
@@ -114,6 +115,46 @@ describe('Channel unread badge', () => {
     })
 
     expect(screen.queryByText('99+')).not.toBeInTheDocument()
+  })
+})
+
+describe('Channel pinned system-message preview', () => {
+  beforeEach(() => {
+    resetMessageListFixtureIds()
+    setClient({ user: makeUser({ id: 'current-user', firstName: 'Current' }) })
+  })
+
+  const renderPinnedSystemMessage = (parentMessage: any) => {
+    const channelId = 'channel-row-pinned-system-message'
+    const remoteUser = makeUser({ id: 'remote-user', firstName: 'Remote' })
+    const pinMessage = makeMessage({
+      id: 'pin-system-message',
+      channelId,
+      body: 'PM',
+      type: MESSAGE_TYPE.SYSTEM,
+      incoming: true,
+      user: remoteUser,
+      parentMessage
+    })
+    const channel = makeChannel({ id: channelId, type: DEFAULT_CHANNEL_TYPE.DIRECT, lastMessage: pinMessage })
+    const store = createMessageListStore({ ChannelReducer: { channels: [channel] } })
+
+    return renderWithSceytProvider(<ConnectedChannel channelId={channelId} />, { store })
+  }
+
+  it('uses the pinned parent body instead of the PM system payload', () => {
+    renderPinnedSystemMessage(makeMessage({ id: 'pinned-parent', body: 'Important pinned message' }))
+
+    expect(screen.getByText(/Remote pinned a message\. Important pinned message/)).toBeInTheDocument()
+    expect(screen.queryByText('PM')).not.toBeInTheDocument()
+  })
+
+  it('uses the pinned parent attachment label when it has no body', () => {
+    const parentMessage = makeMessage({ id: 'pinned-parent-image', attachments: [{ type: attachmentTypes.image }] })
+    parentMessage.body = ''
+    renderPinnedSystemMessage(parentMessage)
+
+    expect(screen.getByText(/Remote pinned a message\.[\s\S]*Photo/)).toBeInTheDocument()
   })
 })
 

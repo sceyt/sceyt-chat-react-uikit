@@ -161,7 +161,7 @@ export interface UseChatControllerParams {
   tabIsActive?: boolean
 }
 
-const formatMessageDateLabel = (message: IMessage) => {
+export const formatMessageDateLabel = (message: IMessage) => {
   const current = new Date(message.createdAt)
   const now = new Date()
   const isToday =

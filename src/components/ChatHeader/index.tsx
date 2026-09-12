@@ -9,6 +9,8 @@ import {
   messageSearchIsOpenSelector
 } from '../../store/channel/selector'
 import { contactsMapSelector } from '../../store/user/selector'
+import { requestPinnedMessagesListCloseAC } from '../../store/message/actions'
+import { pinnedMessagesListOpenSelector } from '../../store/message/selector'
 import { shallowEqual } from 'react-redux'
 import { useSelector, useDispatch } from 'store/hooks'
 // Assets
@@ -102,6 +104,7 @@ export default function ChatHeader({
   const channelListHidden = useSelector(channelListHiddenSelector)
   const channelDetailsIsOpen = useSelector(channelInfoIsOpenSelector, shallowEqual)
   const messageSearchIsOpen = useSelector(messageSearchIsOpenSelector, shallowEqual)
+  const pinnedMessagesListOpen = useSelector(pinnedMessagesListOpenSelector)
   const isDirectChannel = activeChannel.type === DEFAULT_CHANNEL_TYPE.DIRECT
   const isSelfChannel =
     isDirectChannel &&
@@ -154,6 +157,10 @@ export default function ChatHeader({
     mobileBackButtonClicked && mobileBackButtonClicked()
   }
 
+  const handleClosePinnedMessages = () => {
+    dispatch(requestPinnedMessagesListCloseAC())
+  }
+
   /* const channelDetailsOpen = false
 
    useEffect(() => {
@@ -169,96 +176,120 @@ export default function ChatHeader({
   return (
     <Container backgroundColor={backgroundColor} borderBottom={borderBottom} borderColor={border}>
       {/* {LefSideCustomActions && <LefSideCustomActions />} */}
-      <MobileButtonWrapper onClick={handleBackToChannels}>
-        {MobileBackButton || (
-          <MobileBackButtonWrapper onClick={handleBackToChannels} hoverBackground={backgroundHovered}>
-            <WrapArrowLeftIcon color={iconPrimary} />
-          </MobileBackButtonWrapper>
-        )}
-      </MobileButtonWrapper>
-
-      {activeChannel.isLinkedChannel && (
-        <BackButtonWrapper onClick={handleSwitchChannel} hoverBackground={backgroundHovered} order={backButtonOrder}>
-          <WrapArrowLeftIcon color={iconPrimary} />
-        </BackButtonWrapper>
-      )}
-      <ChannelInfo
-        onClick={channelDetailsOnOpen}
-        clickable={!channelListHidden && showChannelDetails}
-        order={channelInfoOrder}
-      >
-        <AvatarWrapper>
-          {(activeChannel.subject || (isDirectChannel && (directChannelUser || isSelfChannel))) && (
-            <Avatar
-              borderRadius={avatarBorderRadius}
-              name={
-                activeChannel.subject ||
-                (isDirectChannel && directChannelUser
-                  ? directChannelUser.firstName || directChannelUser.id
-                  : isSelfChannel
-                    ? showPhoneNumber
-                      ? `+${user.id} (You)`
-                      : 'Me'
-                    : '')
-              }
-              image={
-                activeChannel.avatarUrl ||
-                (isDirectChannel && directChannelUser
-                  ? directChannelUser.avatarUrl
-                  : isSelfChannel
-                    ? user.avatarUrl
-                    : '')
-              }
-              size={avatarSize || 36}
-              textSize={avatarTextSize || 13}
-              setDefaultAvatar={isDirectChannel}
-            />
-          )}
-          {/* {isDirectChannel && directChannelUser.presence.state === PRESENCE_STATUS.ONLINE && <UserStatus />} */}
-        </AvatarWrapper>
-        <ChannelName>
-          <SectionHeader
-            color={titleColor || textPrimary}
-            fontSize={titleFontSize}
-            uppercase={directChannelUser && hideUserPresence && hideUserPresence(directChannelUser)}
-            lineHeight={titleLineHeight}
+      {pinnedMessagesListOpen ? (
+        <PinnedMessagesHeader>
+          <PinnedMessagesBackButton
+            type='button'
+            onClick={handleClosePinnedMessages}
+            aria-label='Back to conversation'
+            hoverBackground={backgroundHovered}
           >
-            {activeChannel.subject ||
-              (isDirectChannel && directChannelUser
-                ? makeUsername(contactsMap[directChannelUser.id], directChannelUser, getFromContacts)
-                : isSelfChannel
-                  ? showPhoneNumber
-                    ? `+${user.id} (You)`
-                    : 'Me'
-                  : '')}
+            <WrapArrowLeftIcon color={iconPrimary} />
+          </PinnedMessagesBackButton>
+          <SectionHeader color={titleColor || textPrimary} fontSize={titleFontSize} lineHeight={titleLineHeight}>
+            Pinned messages
           </SectionHeader>
-          {showMemberInfo &&
-            !isSelfChannel &&
-            (isDirectChannel && directChannelUser ? (
-              <SubTitle
-                fontSize={memberInfoFontSize}
-                lineHeight={memberInfoLineHeight}
-                color={memberInfoTextColor || textSecondary}
+        </PinnedMessagesHeader>
+      ) : (
+        <React.Fragment>
+          <MobileButtonWrapper onClick={handleBackToChannels}>
+            {MobileBackButton || (
+              <MobileBackButtonWrapper onClick={handleBackToChannels} hoverBackground={backgroundHovered}>
+                <WrapArrowLeftIcon color={iconPrimary} />
+              </MobileBackButtonWrapper>
+            )}
+          </MobileButtonWrapper>
+
+          {activeChannel.isLinkedChannel && (
+            <BackButtonWrapper
+              onClick={handleSwitchChannel}
+              hoverBackground={backgroundHovered}
+              order={backButtonOrder}
+            >
+              <WrapArrowLeftIcon color={iconPrimary} />
+            </BackButtonWrapper>
+          )}
+          <ChannelInfo
+            onClick={channelDetailsOnOpen}
+            clickable={!channelListHidden && showChannelDetails}
+            order={channelInfoOrder}
+          >
+            <AvatarWrapper>
+              {(activeChannel.subject || (isDirectChannel && (directChannelUser || isSelfChannel))) && (
+                <Avatar
+                  borderRadius={avatarBorderRadius}
+                  name={
+                    activeChannel.subject ||
+                    (isDirectChannel && directChannelUser
+                      ? directChannelUser.firstName || directChannelUser.id
+                      : isSelfChannel
+                        ? showPhoneNumber
+                          ? `+${user.id} (You)`
+                          : 'Me'
+                        : '')
+                  }
+                  image={
+                    activeChannel.avatarUrl ||
+                    (isDirectChannel && directChannelUser
+                      ? directChannelUser.avatarUrl
+                      : isSelfChannel
+                        ? user.avatarUrl
+                        : '')
+                  }
+                  size={avatarSize || 36}
+                  textSize={avatarTextSize || 13}
+                  setDefaultAvatar={isDirectChannel}
+                />
+              )}
+              {/* {isDirectChannel && directChannelUser.presence.state === PRESENCE_STATUS.ONLINE && <UserStatus />} */}
+            </AvatarWrapper>
+            <ChannelName>
+              <SectionHeader
+                color={titleColor || textPrimary}
+                fontSize={titleFontSize}
+                uppercase={directChannelUser && hideUserPresence && hideUserPresence(directChannelUser)}
+                lineHeight={titleLineHeight}
               >
-                {hideUserPresence && hideUserPresence(directChannelUser)
-                  ? ''
-                  : directChannelUser.presence &&
-                    (directChannelUser.presence.state === USER_PRESENCE_STATUS.ONLINE
-                      ? 'Online'
-                      : directChannelUser.presence.lastActiveAt &&
-                        userLastActiveDateFormat(directChannelUser.presence.lastActiveAt))}
-              </SubTitle>
-            ) : (
-              <SubTitle
-                fontSize={memberInfoFontSize}
-                lineHeight={memberInfoLineHeight}
-                color={memberInfoTextColor || textSecondary}
-              >
-                {!activeChannel.subject && !isDirectChannel ? '' : `${activeChannel.memberCount} ${displayMemberText} `}
-              </SubTitle>
-            ))}
-        </ChannelName>
-      </ChannelInfo>
+                {activeChannel.subject ||
+                  (isDirectChannel && directChannelUser
+                    ? makeUsername(contactsMap[directChannelUser.id], directChannelUser, getFromContacts)
+                    : isSelfChannel
+                      ? showPhoneNumber
+                        ? `+${user.id} (You)`
+                        : 'Me'
+                      : '')}
+              </SectionHeader>
+              {showMemberInfo &&
+                !isSelfChannel &&
+                (isDirectChannel && directChannelUser ? (
+                  <SubTitle
+                    fontSize={memberInfoFontSize}
+                    lineHeight={memberInfoLineHeight}
+                    color={memberInfoTextColor || textSecondary}
+                  >
+                    {hideUserPresence && hideUserPresence(directChannelUser)
+                      ? ''
+                      : directChannelUser.presence &&
+                        (directChannelUser.presence.state === USER_PRESENCE_STATUS.ONLINE
+                          ? 'Online'
+                          : directChannelUser.presence.lastActiveAt &&
+                            userLastActiveDateFormat(directChannelUser.presence.lastActiveAt))}
+                  </SubTitle>
+                ) : (
+                  <SubTitle
+                    fontSize={memberInfoFontSize}
+                    lineHeight={memberInfoLineHeight}
+                    color={memberInfoTextColor || textSecondary}
+                  >
+                    {!activeChannel.subject && !isDirectChannel
+                      ? ''
+                      : `${activeChannel.memberCount} ${displayMemberText} `}
+                  </SubTitle>
+                ))}
+            </ChannelName>
+          </ChannelInfo>
+        </React.Fragment>
+      )}
       {CustomActions && <CustomActionsWrapper order={customActionsOrder}>{CustomActions}</CustomActionsWrapper>}
       {!channelListHidden && showChannelDetails && (
         <ChanelInfo
@@ -319,6 +350,37 @@ const ChannelName = styled.div`
     white-space: nowrap;
     text-overflow: ellipsis;
     overflow: hidden;
+  }
+`
+
+const PinnedMessagesHeader = styled.div`
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  margin-right: auto;
+
+  & > ${SectionHeader} {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+`
+
+const PinnedMessagesBackButton = styled.button<{ hoverBackground: string }>`
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  margin: 0 12px 0 0;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  cursor: pointer;
+
+  &:hover {
+    background: ${({ hoverBackground }) => hoverBackground};
   }
 `
 

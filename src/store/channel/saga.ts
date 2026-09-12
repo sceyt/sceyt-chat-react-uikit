@@ -1,4 +1,5 @@
 import { put, takeLatest, call, takeEvery } from 'redux-saga/effects'
+import { clearPinnedMessagesAC } from '../pinned/actions'
 import { v4 as uuidv4 } from 'uuid'
 import {
   addChannelAC,
@@ -1946,6 +1947,7 @@ function* clearHistory(action: IAction): any {
     const activeChannelId = yield call(getActiveChannelId)
     if (channel) {
       yield call(channel.deleteAllMessages)
+      yield put(clearPinnedMessagesAC(channelId))
       yield put(clearMessagesAC())
       removeMessagesFromMap(channelId)
       yield put(removeChannelMarkersAC(channelId))
@@ -1982,6 +1984,7 @@ function* deleteAllMessages(action: IAction): any {
     const activeChannelId = yield call(getActiveChannelId)
     if (channel) {
       yield call(channel.deleteAllMessages, true)
+      yield put(clearPinnedMessagesAC(channelId))
       removeMessagesFromMap(channelId)
       yield put(removeChannelMarkersAC(channelId))
       if (channelId === activeChannelId) {

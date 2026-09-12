@@ -77,6 +77,8 @@ import {
   clearActivePaginationIntent,
   setAttachmentsLoadingState,
   setSendMessageInputHeight,
+  setPinnedMessagesListOpen,
+  requestPinnedMessagesListClose,
   setMessageForReply,
   uploadAttachmentCompilation,
   setReactionsList,
@@ -620,6 +622,14 @@ export function resumeAttachmentUploadingAC(attachmentId: string) {
 
 export function setSendMessageInputHeightAC(height: number) {
   return setSendMessageInputHeight({ height })
+}
+
+export function setPinnedMessagesListOpenAC(isOpen: boolean) {
+  return setPinnedMessagesListOpen({ isOpen })
+}
+
+export function requestPinnedMessagesListCloseAC() {
+  return requestPinnedMessagesListClose()
 }
 
 export function setMessageMenuOpenedAC(messageId: string) {

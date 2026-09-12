@@ -1,4 +1,12 @@
-import PinnedReducer, { removePinnedMessages, setPinnedMessages, upsertPinnedMessages } from './reducers'
+import PinnedReducer, {
+  clearPinnedMessages,
+  removePinnedMessages,
+  setPendingPinMutation,
+  setPinnedMessages,
+  upsertPinnedMessages
+} from './reducers'
+import { updateMessage } from '../message/reducers'
+import { MESSAGE_STATUS } from '../../helpers/constants'
 
 const pin = (id: string, messageId: string, pinType = 0) => ({
   id,
@@ -45,5 +53,80 @@ describe('pinned message state', () => {
     state = PinnedReducer(state, setPinnedMessages({ channelId: 'c1', pins: [pin('p2', 'm2')], append: true }))
 
     expect(state.byChannel.c1.map((item) => item.id)).toEqual(['p1', 'p2'])
+  })
+
+  it('merges the newest server page into cached pins without dropping cached older pages', () => {
+    let state = PinnedReducer(
+      undefined,
+      setPinnedMessages({ channelId: 'c1', pins: [pin('cached-new', 'm3'), pin('cached-old', 'm1')] })
+    )
+    state = PinnedReducer(
+      state,
+      setPinnedMessages({
+        channelId: 'c1',
+        pins: [pin('server-new', 'm4'), pin('cached-new', 'm3')],
+        nextToken: 'cursor-2',
+        merge: true
+      })
+    )
+
+    expect(state.byChannel.c1.map((item) => item.id)).toEqual(['server-new', 'cached-new', 'cached-old'])
+    expect(state.cursors.c1).toBe('cursor-2')
+  })
+
+  it('replaces cached pins when the server response has no next cursor', () => {
+    let state = PinnedReducer(
+      undefined,
+      setPinnedMessages({ channelId: 'c1', pins: [pin('cached-stale', 'm1'), pin('cached-current', 'm2')] })
+    )
+    state = PinnedReducer(
+      state,
+      setPinnedMessages({ channelId: 'c1', pins: [pin('server-current', 'm3')], nextToken: undefined })
+    )
+
+    expect(state.byChannel.c1.map((item) => item.id)).toEqual(['server-current'])
+    expect(state.cursors.c1).toBeUndefined()
+  })
+
+  it('updates a pinned source snapshot when the message is updated', () => {
+    let state = PinnedReducer(undefined, setPinnedMessages({ channelId: 'c1', pins: [pin('p1', 'm1')] }))
+    state = PinnedReducer(state, updateMessage({ messageId: 'm1', params: { body: 'Edited pinned text' } as any }))
+
+    expect(state.byChannel.c1[0].message.body).toBe('Edited pinned text')
+  })
+
+  it('removes a pin immediately when its source message is deleted by an update event', () => {
+    let state = PinnedReducer(undefined, setPinnedMessages({ channelId: 'c1', pins: [pin('p1', 'm1')] }))
+    state = PinnedReducer(state, updateMessage({ messageId: 'm1', params: { state: MESSAGE_STATUS.DELETE } as any }))
+
+    expect(state.byChannel.c1).toEqual([])
+  })
+
+  it('clears only the selected channel pins, cursors, and queued mutations', () => {
+    let state = PinnedReducer(
+      undefined,
+      setPinnedMessages({ channelId: 'c1', pins: [pin('p1', 'm1')], nextToken: 'next' })
+    )
+    state = PinnedReducer(state, setPinnedMessages({ channelId: 'c2', pins: [pin('p2', 'm2')] }))
+    state = PinnedReducer(
+      state,
+      setPendingPinMutation({
+        mutation: { id: 'c1-mutation', channelId: 'c1', operation: 'PIN', messageId: 'm1', queuedAt: 1 }
+      })
+    )
+    state = PinnedReducer(
+      state,
+      setPendingPinMutation({
+        mutation: { id: 'c2-mutation', channelId: 'c2', operation: 'PIN', messageId: 'm2', queuedAt: 1 }
+      })
+    )
+
+    state = PinnedReducer(state, clearPinnedMessages({ channelId: 'c1' }))
+
+    expect(state.byChannel.c1).toBeUndefined()
+    expect(state.cursors.c1).toBeUndefined()
+    expect(state.pendingMutations['c1-mutation']).toBeUndefined()
+    expect(state.byChannel.c2).toHaveLength(1)
+    expect(state.pendingMutations['c2-mutation']).toBeDefined()
   })
 })

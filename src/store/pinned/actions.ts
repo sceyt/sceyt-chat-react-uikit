@@ -8,6 +8,7 @@ import {
 import {
   PendingPinMutation,
   PinnedMessageRecord,
+  clearPinnedMessages,
   removePendingPinMutation,
   removePinnedMessages,
   setPendingPinMutation,
@@ -15,9 +16,15 @@ import {
   upsertPinnedMessages
 } from './reducers'
 
-export const loadPinnedMessagesAC = (channelId: string, nextToken?: string, restoreCache = true) => ({
+export const loadPinnedMessagesAC = (
+  channelId: string,
+  nextToken?: string,
+  restoreCache = true,
+  limit = 20,
+  reconcileAll = false
+) => ({
   type: LOAD_PINNED_MESSAGES,
-  payload: { channelId, nextToken, restoreCache }
+  payload: { channelId, nextToken, restoreCache, limit, reconcileAll }
 })
 export const pinMessageAC = (channelId: string, message: any, pinType: number) => ({
   type: PIN_MESSAGE,
@@ -36,11 +43,13 @@ export const setPinnedMessagesAC = (
   channelId: string,
   pins: PinnedMessageRecord[],
   nextToken?: string,
-  append?: boolean
-) => setPinnedMessages({ channelId, pins, nextToken, append })
+  append?: boolean,
+  merge?: boolean
+) => setPinnedMessages({ channelId, pins, nextToken, append, merge })
 export const upsertPinnedMessagesAC = (channelId: string, pins: PinnedMessageRecord[]) =>
   upsertPinnedMessages({ channelId, pins })
 export const removePinnedMessagesAC = (channelId: string, pinIds?: string[], messageIds?: string[], pinType?: number) =>
   removePinnedMessages({ channelId, pinIds, messageIds, pinType })
+export const clearPinnedMessagesAC = (channelId: string) => clearPinnedMessages({ channelId })
 export const setPendingPinMutationAC = (mutation: PendingPinMutation) => setPendingPinMutation({ mutation })
 export const removePendingPinMutationAC = (id: string) => removePendingPinMutation({ id })

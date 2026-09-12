@@ -817,7 +817,9 @@ const DropdownRoot = styled.div<{
   left: ${(p) => (p.fixedLeft !== undefined ? `${p.fixedLeft}px` : 'auto')};
   right: ${(p) => (p.fixedRight !== undefined ? `${p.fixedRight}px` : 'auto')};
   transform: ${(p) => (p.transformY !== 0 ? `translateY(${p.transformY}px)` : 'none')};
-  z-index: 15;
+  // The pinned-messages overlay is a local stacking context at 20. Keep this
+  // portal popup above it while remaining below full-screen modal containers.
+  z-index: 21;
   background: ${({ backgroundColor }) => backgroundColor};
   box-shadow: 0px 0px 24px 0px #11153929;
   border-radius: 16px;

@@ -60,7 +60,12 @@ import {
 } from '../message/actions'
 import { CONNECTION_EVENT_TYPES, CONNECTION_STATUS } from '../user/constants'
 import { getContactsAC, setConnectionStatusAC } from '../user/actions'
-import { applyPinnedMessagesEventAC, removePinnedMessagesAC, resendPendingPinMutationsAC } from '../pinned/actions'
+import {
+  applyPinnedMessagesEventAC,
+  clearPinnedMessagesAC,
+  removePinnedMessagesAC,
+  resendPendingPinMutationsAC
+} from '../pinned/actions'
 import {
   addMessageToMap,
   appendMessageToLatestSegment,
@@ -461,22 +466,19 @@ export function* handleDeleteMessageEvent(args: { channel: IChannel; deletedMess
 
 export function* handleEditMessageEvent(args: { channel: IChannel; message: IMessage }): any {
   const { channel, message } = args
-  const activeChannelId = yield call(getActiveChannelId)
   const channelExists = checkChannelExists(channel.id)
 
-  if (channel.id === activeChannelId) {
-    yield put(
-      updateMessageAC(message.id, {
-        body: message.body,
-        state: message.state,
-        attachments: message.attachments,
-        bodyAttributes: message.bodyAttributes,
-        mentionedUsers: message.mentionedUsers,
-        updatedAt: message.updatedAt,
-        ...(message.pinDetails ? { pinDetails: message.pinDetails } : {})
-      })
-    )
-  }
+  yield put(
+    updateMessageAC(message.id, {
+      body: message.body,
+      state: message.state,
+      attachments: message.attachments,
+      bodyAttributes: message.bodyAttributes,
+      mentionedUsers: message.mentionedUsers,
+      updatedAt: message.updatedAt,
+      ...(message.pinDetails ? { pinDetails: message.pinDetails } : {})
+    })
+  )
   if (channelExists) {
     if (channel.lastMessage.id === message.id) {
       yield put(updateChannelLastMessageAC(message, channel))
@@ -500,9 +502,7 @@ export function* handleReactionAddedEvent(
   const isSelf = user.id === SceytChatClient.user.id
   const activeChannelId = yield call(getActiveChannelId)
 
-  if (channel.id === activeChannelId) {
-    yield put(addReactionToMessageAC(message, reaction, isSelf))
-  }
+  yield put(addReactionToMessageAC(message, reaction, isSelf))
   if (message.user.id === SceytChatClient.user.id) {
     if (!isSelf && Notification.permission === 'granted') {
       if (document.visibilityState !== 'visible' || channel.id !== activeChannelId) {
@@ -1529,6 +1529,7 @@ export default function* watchForEvents(): any {
             yield put(clearMessagesAC())
             removeAllMessages()
           }
+          yield put(clearPinnedMessagesAC(channel.id))
           removeMessagesFromMap(channel.id)
           yield put(removeChannelMarkersAC(channel.id))
           if (channelExist) {

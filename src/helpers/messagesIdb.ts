@@ -271,12 +271,14 @@ export const persistPinnedMessages = async (channelId: string, pins: any[], next
   const db = await openDb()
   if (!db) return
   try {
-    db.transaction(PINS_STORE, 'readwrite').objectStore(PINS_STORE).put({
-      channelId,
-      pins: toStructuredCloneSafeValue(pins),
-      nextToken,
-      savedAt: Date.now()
-    } as PersistedPinnedMessages)
+    db.transaction(PINS_STORE, 'readwrite')
+      .objectStore(PINS_STORE)
+      .put({
+        channelId,
+        pins: toStructuredCloneSafeValue(pins),
+        nextToken,
+        savedAt: Date.now()
+      } as PersistedPinnedMessages)
   } catch (e) {
     log.info('messagesIdb: failed to persist pins', e)
   }
@@ -287,12 +289,37 @@ export const restorePinnedMessages = async (channelId: string): Promise<Persiste
   const db = await openDb()
   if (!db) return null
   try {
-    return (await requestToPromise<PersistedPinnedMessages | undefined>(
-      db.transaction(PINS_STORE, 'readonly').objectStore(PINS_STORE).get(channelId)
-    )) || null
+    return (
+      (await requestToPromise<PersistedPinnedMessages | undefined>(
+        db.transaction(PINS_STORE, 'readonly').objectStore(PINS_STORE).get(channelId)
+      )) || null
+    )
   } catch (e) {
     log.info('messagesIdb: failed to restore pins', e)
     return null
+  }
+}
+
+export const removePersistedPinsForChannel = async (channelId: string): Promise<void> => {
+  if (!channelId) return
+  const db = await openDb()
+  if (!db) return
+  try {
+    db.transaction(PINS_STORE, 'readwrite').objectStore(PINS_STORE).delete(channelId)
+
+    const mutations = await requestToPromise<PersistedPinMutation[]>(
+      db
+        .transaction(PIN_MUTATIONS_STORE, 'readonly')
+        .objectStore(PIN_MUTATIONS_STORE)
+        .index('channelId')
+        .getAll(channelId)
+    )
+    if (!mutations.length) return
+
+    const mutationsStore = db.transaction(PIN_MUTATIONS_STORE, 'readwrite').objectStore(PIN_MUTATIONS_STORE)
+    mutations.forEach((mutation) => mutationsStore.delete(mutation.id))
+  } catch (e) {
+    log.info('messagesIdb: failed to remove channel pins', e)
   }
 }
 

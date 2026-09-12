@@ -16,6 +16,30 @@ jest.mock('store', () => ({
   dispatch: jest.fn()
 }))
 
+// The UMD build of ffmpeg.wasm resolves webpack's publicPath as soon as it is
+// imported. Jest's jsdom environment intentionally has no script URL for that
+// resolution, so importing a component that merely references audio support
+// would otherwise fail before the test can install its own component mocks.
+// Conversion behavior belongs to its focused tests; UI suites only need a
+// harmless in-memory implementation.
+jest.mock('@ffmpeg/ffmpeg', () => ({
+  FFmpeg: jest.fn().mockImplementation(() => ({
+    load: jest.fn().mockResolvedValue(undefined),
+    terminate: jest.fn(),
+    deleteFile: jest.fn().mockResolvedValue(undefined),
+    writeFile: jest.fn().mockResolvedValue(undefined),
+    exec: jest.fn().mockResolvedValue(undefined),
+    readFile: jest.fn().mockResolvedValue(new Uint8Array()),
+    on: jest.fn(),
+    off: jest.fn()
+  }))
+}))
+
+jest.mock('@ffmpeg/util', () => ({
+  fetchFile: jest.fn().mockResolvedValue(new Uint8Array()),
+  toBlobURL: jest.fn().mockImplementation((url: string) => Promise.resolve(url))
+}))
+
 export type RectInput = {
   top?: number
   left?: number

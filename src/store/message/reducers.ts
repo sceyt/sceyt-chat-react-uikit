@@ -37,6 +37,17 @@ export type PendingMessageMutation =
       originalMessage: IMessage
       queuedAt: number
     }
+
+export type VisibleMessageEntry = {
+  id?: string
+  localRef: string
+  sortKey: string
+}
+
+export type VisibleMessagesMap = {
+  [key: string]: VisibleMessageEntry
+}
+
 export interface IMessageStore {
   loadingPrevMessagesState: number | null
   loadingNextMessagesState: number | null
@@ -69,6 +80,8 @@ export interface IMessageStore {
     isIncomingMessage: boolean
   }
   showScrollToNewMessageButton: boolean
+  pinnedMessagesListOpen: boolean
+  pinnedMessagesListCloseRequested: boolean
   sendMessageInputHeight: number
   attachmentsUploadingState: { [key: string]: any }
   scrollToMentionedMessage: boolean | null
@@ -104,16 +117,6 @@ export interface IMessageStore {
   visibleMessagesMap: VisibleMessagesMap
 }
 
-export type VisibleMessageEntry = {
-  id?: string
-  localRef: string
-  sortKey: string
-}
-
-export type VisibleMessagesMap = {
-  [key: string]: VisibleMessageEntry
-}
-
 const initialState: IMessageStore = {
   loadingPrevMessagesState: null,
   loadingNextMessagesState: null,
@@ -140,6 +143,8 @@ const initialState: IMessageStore = {
     isIncomingMessage: false
   },
   showScrollToNewMessageButton: false,
+  pinnedMessagesListOpen: false,
+  pinnedMessagesListCloseRequested: false,
   sendMessageInputHeight: 0,
   messageForReply: null,
   attachmentsUploadingState: {},
@@ -659,6 +664,17 @@ const messageSlice = createSlice({
       state.sendMessageInputHeight = action.payload.height
     },
 
+    setPinnedMessagesListOpen: (state, action: PayloadAction<{ isOpen: boolean }>) => {
+      state.pinnedMessagesListOpen = action.payload.isOpen
+      state.pinnedMessagesListCloseRequested = false
+    },
+
+    requestPinnedMessagesListClose: (state) => {
+      if (state.pinnedMessagesListOpen) {
+        state.pinnedMessagesListCloseRequested = true
+      }
+    },
+
     setMessageForReply: (state, action: PayloadAction<{ message: IMessage | null }>) => {
       state.messageForReply = action.payload.message
     },
@@ -1028,6 +1044,8 @@ export const {
   clearActivePaginationIntent,
   setAttachmentsLoadingState,
   setSendMessageInputHeight,
+  setPinnedMessagesListOpen,
+  requestPinnedMessagesListClose,
   setMessageForReply,
   uploadAttachmentCompilation,
   removeAttachmentUploadingState,

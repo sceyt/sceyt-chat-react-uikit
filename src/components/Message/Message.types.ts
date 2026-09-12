@@ -106,6 +106,8 @@ export interface IMessageProps {
   queueReadMarker?: (channelId: string, messageId?: string) => void
   queueDeliveredMarker?: (channelId: string, messageId?: string) => void
   disableAutoReadTracking?: boolean
+  /** The message is rendered inside the pinned-messages overlay, not #scrollableDiv. */
+  isPinnedMessagesList?: boolean
   handleScrollToRepliedMessage: (msgId: string) => void
   handleMediaItemClick?: (attachment: IAttachment) => void
   unreadMessageId: string

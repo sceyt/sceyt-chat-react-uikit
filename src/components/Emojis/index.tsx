@@ -72,7 +72,8 @@ function EmojisPopup({
     [THEME_COLORS.BACKGROUND_SECTIONS]: backgroundSections,
     [THEME_COLORS.BACKGROUND_HOVERED]: backgroundHovered,
     [THEME_COLORS.BORDER]: border,
-    [THEME_COLORS.ICON_PRIMARY]: iconPrimary
+    [THEME_COLORS.ICON_PRIMARY]: iconPrimary,
+    [THEME_COLORS.SURFACE_2]: scrollbarThumbColor
   } = useColor()
 
   const [rendered, setRendered] = useState<any>(false)
@@ -161,7 +162,7 @@ function EmojisPopup({
           {getEmojisCategoryTitle(activeCollection)}
         </EmojiHeader>
       )}
-      <EmojiSection ref={emojiContainerRef} onScroll={handleEmojiListScroll}>
+      <EmojiSection ref={emojiContainerRef} onScroll={handleEmojiListScroll} scrollbarThumbColor={scrollbarThumbColor}>
         <AllEmojis>
           {EMOJIS.map((emojiBigCollection, bigColIndex) => {
             const mainCollectionKey = emojiBigCollection.key
@@ -269,9 +270,29 @@ const EmojiHeader = styled.div<{ color: string; padding?: string }>`
   display: flex;
   padding: ${(props) => props.padding || '6px 18px'};
 `
-const EmojiSection = styled.div`
+const EmojiSection = styled.div<{ scrollbarThumbColor: string }>`
   height: 180px;
   overflow-x: hidden;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: ${(props) => props.scrollbarThumbColor} transparent;
+
+  &::-webkit-scrollbar {
+    width: 6px;
+  }
+
+  &::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  &::-webkit-scrollbar-thumb {
+    background: ${(props) => props.scrollbarThumbColor};
+    border-radius: 6px;
+  }
+
+  &::-webkit-scrollbar-thumb:hover {
+    background: ${(props) => props.scrollbarThumbColor};
+  }
 
   & ::selection {
     color: inherit;

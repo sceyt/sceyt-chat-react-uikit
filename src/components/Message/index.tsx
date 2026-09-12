@@ -214,7 +214,8 @@ const Message = ({
   showInfoMessageProps = {},
   collapsedLinesLimit,
   createChatOnAvatarTap = true,
-  ifLatestAndHasNotPreview
+  ifLatestAndHasNotPreview,
+  isPinnedMessagesList = false
 }: IMessageProps) => {
   const isTabActive = tabIsActiveRef?.current ?? tabIsActive
   const getComparableUserId = (messageUser?: IUser | null) => (messageUser?.id ? String(messageUser.id) : 'deleted')
@@ -372,7 +373,7 @@ const Message = ({
   const handleToggleInfoMessagePopupOpen = useCallback(() => {
     setInfoPopupOpen((prev) => !prev)
     setMessageActionsShow(false)
-  }, [])
+  }, [channel.id, isPinnedMessagesList, message.id, message.tid, setInfoPopupOpen, setMessageActionsShow])
 
   const handleTogglePinMessagePopup = useCallback(() => {
     setPinPopupOpen((prev) => !prev)
@@ -702,10 +703,31 @@ const Message = ({
   }, [dispatch, message])
 
   useEffect(() => {
-    if (!isVisible && infoPopupOpen) {
+    if (!isPinnedMessagesList && !isVisible && infoPopupOpen) {
       setInfoPopupOpen(false)
     }
-  }, [isVisible, infoPopupOpen])
+  }, [channel.id, infoPopupOpen, isPinnedMessagesList, isVisible, message.id, message.tid, setInfoPopupOpen])
+
+  // Pinned messages live in their own scrolling overlay. Close the Info popup
+  // once that overlay (or the regular chat list) moves far enough that the
+  // popup could look detached. Tiny trackpad/mouse-wheel jitter should not
+  // dismiss it.
+  useEffect(() => {
+    if (!infoPopupOpen) return undefined
+
+    const scrollContainer = document.getElementById(isPinnedMessagesList ? 'pinnedScrollableDiv' : 'scrollableDiv')
+    if (!scrollContainer) return undefined
+
+    const initialScrollTop = scrollContainer.scrollTop
+    const dismissThreshold = 40
+    const handleScroll = () => {
+      if (Math.abs(scrollContainer.scrollTop - initialScrollTop) >= dismissThreshold) {
+        setInfoPopupOpen(false)
+      }
+    }
+    scrollContainer.addEventListener('scroll', handleScroll, { passive: true })
+    return () => scrollContainer.removeEventListener('scroll', handleScroll)
+  }, [infoPopupOpen, isPinnedMessagesList, setInfoPopupOpen])
 
   useDidUpdate(() => {
     if (connectionStatus === CONNECTION_STATUS.CONNECTED) {
