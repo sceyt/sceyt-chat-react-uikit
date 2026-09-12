@@ -13,6 +13,7 @@ import { getReplyLinkPreviewImage } from '../../helpers/replyPreview'
 import Attachment, { AttachmentImg, AttachmentImgCont, FileThumbnail, FileThumbnailSkeleton } from '../Attachment'
 import { AttachmentIconCont } from 'UIHelper'
 import { Component } from 'components/VideoPreview'
+import { isPinnedMessageDeleted } from 'helpers/pinnedMessage'
 
 const attachmentMetadata = (attachment: any) => {
   if (!attachment?.metadata) return {}
@@ -26,6 +27,7 @@ const attachmentMetadata = (attachment: any) => {
 }
 
 const preview = (message: any) => {
+  if (isPinnedMessageDeleted(message)) return 'Deleted Message'
   if (message?.pollDetails) return `Poll: ${message.pollDetails.name || message.body || 'Poll'}`
   const attachment = message?.attachments?.[0]
   if (!attachment) return message?.body || (message?.forwardingDetails ? 'Shared content' : 'Message')
@@ -148,7 +150,9 @@ const PinnedMessagesBanner = ({
     metadata: attachmentMetadata(attachment)
   }
   const linkPreviewImage = getLinkPreviewImage(attachment)
-  const hasLeadingPreview = hasAttachmentTile(attachmentForPreview) || attachment?.type === attachmentTypes.link
+  const sourceMessageDeleted = isPinnedMessageDeleted(active.message)
+  const hasLeadingPreview =
+    !sourceMessageDeleted && (hasAttachmentTile(attachmentForPreview) || attachment?.type === attachmentTypes.link)
   const markerFade: MarkerFade = count <= 3 ? 'none' : index <= 1 ? 'top' : index >= count - 2 ? 'bottom' : 'both'
   const loadNextPage = () => {
     if (!nextToken || requestedNextTokenRef.current === nextToken) return false
