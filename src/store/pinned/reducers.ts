@@ -22,6 +22,7 @@ export type PendingPinMutation = {
   channelId: string
   operation: 'PIN' | 'UNPIN'
   messageId: string
+  message?: any
   pinType?: number
   queuedAt: number
 }

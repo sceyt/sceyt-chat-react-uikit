@@ -37,7 +37,7 @@ const pinScopeShared = 0
 // simply be on a later page. Keep the current refresh sequence until its last
 // cursor arrives, then use the complete server result as the cache authority.
 const serverPinRefreshes = new Map<string, Map<string, PinnedMessageRecord>>()
-const sharedPinSystemMessage = (parentMessageId: string) => ({
+const sharedPinSystemMessage = (parentMessage: any) => ({
   body: 'PM',
   type: MESSAGE_TYPE.SYSTEM,
   attachments: [],
@@ -47,7 +47,7 @@ const sharedPinSystemMessage = (parentMessageId: string) => ({
   displayCount: 0,
   silent: true,
   skipAutoScroll: true,
-  parentMessage: { id: parentMessageId }
+  parentMessage
 })
 
 const getChannel = (channelId: string) => getChannelFromMap(channelId) as any
@@ -149,8 +149,14 @@ function* executePin(mutation: PendingPinMutation, message?: any): any {
     const pins = normalizePins(event?.pins)
     if (pins.length) yield put(upsertPinnedMessagesAC(mutation.channelId, pins))
     if (mutation.pinType === pinScopeShared && event?.changed) {
+      const sourceMessage =
+        pins.find((pin) => sourceMessageId(pin) === mutation.messageId)?.message || message || mutation.message
       yield put(
-        sendTextMessageAC(sharedPinSystemMessage(mutation.messageId), mutation.channelId, CONNECTION_STATUS.CONNECTED)
+        sendTextMessageAC(
+          sharedPinSystemMessage(sourceMessage || { id: mutation.messageId }),
+          mutation.channelId,
+          CONNECTION_STATUS.CONNECTED
+        )
       )
     }
     const changedPins: PinnedMessageRecord[] = pins.length
@@ -178,6 +184,7 @@ function* pinMessage({ payload }: any): any {
     channelId: payload.channelId,
     operation: 'PIN',
     messageId: payload.message.id || payload.message.tid,
+    message: payload.message,
     pinType: payload.pinType,
     queuedAt: Date.now()
   }
