@@ -169,7 +169,7 @@ const Files = ({
                         color={filePreviewSizeColor || textSecondary}
                       >
                         {file.size
-                          ? `${bytesToSize(file.size)} • ${formatChannelDetailsDate(file.createdAt)}`
+                          ? `${bytesToSize(file.size, 1)} • ${formatChannelDetailsDate(file.createdAt)}`
                           : formatChannelDetailsDate(file.createdAt)}
                       </FileSizeAndDate>
                     </div>

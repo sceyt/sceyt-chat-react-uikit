@@ -1521,7 +1521,7 @@ const Attachment = ({
                 {(isInUploadingState || downloadingFile) && sizeProgress
                   ? `${bytesToSize(sizeProgress.loaded, 1)} • ${bytesToSize(sizeProgress.total, 1)}`
                   : ((attachment.data && attachment.data.size) || attachment.size) &&
-                    bytesToSize(isPreview ? attachment.data.size : +attachment.size)}
+                    bytesToSize(isPreview ? attachment.data.size : +attachment.size, 1)}
               </AttachmentSize>
             </AttachmentFileInfo>
           )}

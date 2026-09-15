@@ -10,7 +10,7 @@ export const urlRegex =
   // eslint-disable-next-line max-len
   /(https?:\/\/(?:www\.|(?!www))[a-zA-Z0-9][a-zA-Z0-9-]+[a-zA-Z0-9]\.[^\s]{2,}|www\.[a-zA-Z0-9][a-zA-Z0-9-]+[a-zA-Z0-9]\.[^\s]{2,}|https?:\/\/(?:www\.|(?!www))[a-zA-Z0-9]+\.[^\s]{2,}|www\.[a-zA-Z0-9]+\.[^\s]{2,})/gi
 
-export const bytesToSize = (bytes: number, decimals = 2) => {
+export const bytesToSize = (bytes: number, decimals = 1) => {
   if (bytes === 0) return '0 Bytes'
   const k = 1000
   const dm = decimals < 0 ? 0 : decimals
