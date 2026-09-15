@@ -684,6 +684,12 @@ const Message = ({
   )
 
   useEffect(() => {
+    // Pinned messages are rendered in an overlay. They must not update the
+    // active chat's visibility map: when the overlay closes its rows unmount
+    // and would otherwise remove the real latest message from that map,
+    // causing the scroll-to-bottom control to appear incorrectly.
+    if (isPinnedMessagesList) return
+
     if (isVisible) {
       if (setLastVisibleMessageId) {
         setLastVisibleMessageId(message)
@@ -710,14 +716,17 @@ const Message = ({
     scrollToNewMessage.scrollToBottom,
     dispatch,
     message,
-    isTabActive
+    isTabActive,
+    isPinnedMessagesList
   ])
 
   useEffect(() => {
+    if (isPinnedMessagesList) return undefined
+
     return () => {
       dispatch(removeVisibleMessageAC(message))
     }
-  }, [dispatch, message])
+  }, [dispatch, isPinnedMessagesList, message])
 
   useEffect(() => {
     if (!isPinnedMessagesList && !isVisible && infoPopupOpen) {

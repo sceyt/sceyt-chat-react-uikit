@@ -298,6 +298,41 @@ describe('Message', () => {
     expect(queueReadMarker).not.toHaveBeenCalled()
   })
 
+  it('does not add pinned-list rows to the active chat visibility map', () => {
+    const channelId = 'channel-pinned-list-visibility'
+    const pinnedMessage = makeMessage({
+      id: '1604',
+      channelId,
+      body: 'pinned overlay message',
+      incoming: true
+    })
+    const channel = makeChannel({ id: channelId, lastMessage: pinnedMessage })
+    const store = createMessageListStore({
+      ChannelReducer: { activeChannel: channel },
+      MessageReducer: { unreadScrollTo: false }
+    })
+
+    const { unmount } = renderWithSceytProvider(
+      <Message
+        message={pinnedMessage}
+        channel={channel}
+        stopScrolling={() => undefined}
+        handleScrollToRepliedMessage={() => undefined}
+        prevMessage={undefined as any}
+        nextMessage={undefined as any}
+        isThreadMessage={false}
+        isPinnedMessagesList
+      />,
+      { store }
+    )
+
+    expect(store.getState().MessageReducer.visibleMessagesMap[pinnedMessage.id!]).toBeUndefined()
+
+    unmount()
+
+    expect(store.getState().MessageReducer.visibleMessagesMap[pinnedMessage.id!]).toBeUndefined()
+  })
+
   it('does not queue read markers when browser tab is inactive', () => {
     const channelId = 'channel-message-read-tab-inactive'
     const queueReadMarker = jest.fn()
