@@ -92,7 +92,7 @@ import { registerBlobUrl, releaseBlobUrls } from '../../helpers/attachmentBlobUr
 import {
   getOutgoingAttachmentType,
   mergePreparedAttachmentPatches,
-  waitForImageAttachmentPreparation
+  waitForMediaAttachmentPreparation
 } from '../../helpers/attachmentSendPreparation'
 import { attachmentTypes, DEFAULT_CHANNEL_TYPE, MESSAGE_DELIVERY_STATUS, USER_STATE } from '../../helpers/constants'
 import { hideUserPresence } from '../../helpers/userHelper'
@@ -824,7 +824,11 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
           dispatch(sendTextMessageAC(messageToSend, activeChannel.id, connectionStatus))
         }
         if (attachments.length) {
-          await waitForImageAttachmentPreparation(attachments, attachmentPreparationPromisesRef.current)
+          // Do not add an optimistic media message to the thread until its
+          // dimensions and preview metadata are ready. Otherwise a video can
+          // first render at its fallback height and briefly overlap the
+          // timestamp above it before the preview patch triggers a reflow.
+          await waitForMediaAttachmentPreparation(attachments, attachmentPreparationPromisesRef.current)
           const sendAsSeparateMessage = getSendAttachmentsAsSeparateMessages()
           messageToSend.attachments = mergePreparedAttachmentPatches(
             attachments,
@@ -1430,7 +1434,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
         }
       }, 0)
     )
-    if (fileType === 'image') {
+    if (fileType === 'image' || fileType === 'video') {
       attachmentPreparationPromisesRef.current.set(tid, preparationPromise)
     }
   }

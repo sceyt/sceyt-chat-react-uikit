@@ -2,7 +2,7 @@ import { attachmentTypes } from './constants'
 import {
   getOutgoingAttachmentType,
   mergePreparedAttachmentPatches,
-  waitForImageAttachmentPreparation
+  waitForMediaAttachmentPreparation
 } from './attachmentSendPreparation'
 
 describe('attachment send preparation', () => {
@@ -23,7 +23,7 @@ describe('attachment send preparation', () => {
     )
 
     let resolved = false
-    const waitForPreparation = waitForImageAttachmentPreparation(attachments, preparations).then(() => {
+    const waitForPreparation = waitForMediaAttachmentPreparation(attachments, preparations).then(() => {
       resolved = true
     })
 
@@ -38,12 +38,60 @@ describe('attachment send preparation', () => {
     ])
   })
 
-  it('does not wait for video preparation before sending', async () => {
-    const preparations = new Map<string, Promise<void>>([['video-1', new Promise<void>(() => undefined)]])
+  it('waits for video preparation before sending', async () => {
+    let finishPreparation!: () => void
+    const preparations = new Map<string, Promise<void>>()
+    preparations.set(
+      'video-1',
+      new Promise<void>((resolve) => {
+        finishPreparation = resolve
+      })
+    )
 
-    await expect(
-      waitForImageAttachmentPreparation([{ tid: 'video-1', type: attachmentTypes.video }], preparations)
-    ).resolves.toBeUndefined()
+    let resolved = false
+    const waitForPreparation = waitForMediaAttachmentPreparation(
+      [{ tid: 'video-1', type: attachmentTypes.video }],
+      preparations
+    ).then(() => {
+      resolved = true
+    })
+
+    await Promise.resolve()
+    expect(resolved).toBe(false)
+
+    finishPreparation()
+    await expect(waitForPreparation).resolves.toBeUndefined()
+  })
+
+  it('waits for a generic-picker video whose outgoing type is video', async () => {
+    let finishPreparation!: () => void
+    const preparations = new Map<string, Promise<void>>()
+    preparations.set(
+      'video-1',
+      new Promise<void>((resolve) => {
+        finishPreparation = resolve
+      })
+    )
+
+    let resolved = false
+    const waitForPreparation = waitForMediaAttachmentPreparation(
+      [
+        {
+          tid: 'video-1',
+          type: attachmentTypes.file,
+          data: new File(['video'], 'recording.mov', { type: 'video/quicktime' })
+        }
+      ],
+      preparations
+    ).then(() => {
+      resolved = true
+    })
+
+    await Promise.resolve()
+    expect(resolved).toBe(false)
+
+    finishPreparation()
+    await expect(waitForPreparation).resolves.toBeUndefined()
   })
 
   it('sends a generic file-picker video as a video while preserving its compose file-card type', () => {

@@ -2,13 +2,16 @@ import { attachmentTypes } from './constants'
 
 type Attachment = { tid?: string; type?: string; [key: string]: any }
 
-export const waitForImageAttachmentPreparation = async (
+export const waitForMediaAttachmentPreparation = async (
   attachments: Attachment[],
   preparations: Map<string, Promise<void>>
 ) => {
   await Promise.all(
     attachments
-      .filter((attachment) => attachment.type === attachmentTypes.image)
+      .filter(
+        (attachment) =>
+          attachment.type === attachmentTypes.image || getOutgoingAttachmentType(attachment) === attachmentTypes.video
+      )
       .map((attachment) => (attachment.tid ? preparations.get(attachment.tid) : undefined))
   )
 }
