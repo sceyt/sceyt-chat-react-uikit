@@ -90,6 +90,8 @@ interface IChannelListProps {
   searchInputBorderRadius?: string
   searchChannelsPadding?: string
   getSelectedChannel?: (channel: IChannel) => void
+  /** Called whenever the raw channel-search input changes, including clear. */
+  onSearchValueChange?: (value: string) => void
   filter?: { channelType?: string }
   limit?: number
   sort?: 'byLastMessage' | 'byCreationDate'
@@ -209,6 +211,7 @@ const ChannelList: React.FC<IChannelListProps> = ({
   List,
   ListItem,
   getSelectedChannel,
+  onSearchValueChange,
   Profile,
   CreateChannel,
   ChannelsTitle,
@@ -333,11 +336,14 @@ const ChannelList: React.FC<IChannelListProps> = ({
   }
 
   const handleSearchValueChange = (e: any) => {
-    setSearchValue(e.target.value)
+    const value = e.target.value
+    setSearchValue(value)
+    onSearchValueChange?.(value)
   }
 
   const getMyChannels = () => {
     setSearchValue('')
+    onSearchValueChange?.('')
   }
 
   const handleOpenProfile = () => {

@@ -5,7 +5,11 @@ import { IChannel, IMessage, IUser } from 'types'
 import { getMessageAC, sendTextMessageAC } from 'store/message/actions'
 import { blockUserAC, unblockUserAC } from 'store/user/actions'
 
-export const createOrGetDirectChannel = async (user?: any, callback?: (channel: IChannel) => void) => {
+export const createOrGetDirectChannel = async (
+  user?: any,
+  callback?: (channel: IChannel) => void,
+  dontCreateIfNotExists = false
+) => {
   if (user) {
     store.dispatch(
       createChannelAC(
@@ -19,7 +23,7 @@ export const createOrGetDirectChannel = async (user?: any, callback?: (channel: 
             }
           ]
         },
-        false,
+        dontCreateIfNotExists,
         callback
       )
     )
