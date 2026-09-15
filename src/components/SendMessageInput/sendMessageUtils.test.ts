@@ -1,4 +1,5 @@
 import {
+  getClipboardFiles,
   getMediaAttachmentValidationError,
   hasSendableTextOrPoll,
   isDefaultSupportedMediaMimeType
@@ -40,6 +41,30 @@ describe('isDefaultSupportedMediaMimeType', () => {
       expect(isDefaultSupportedMediaMimeType(mimeType)).toBe(false)
     }
   )
+})
+
+describe('getClipboardFiles', () => {
+  it('uses files supplied directly by the clipboard', () => {
+    const file = new File(['image'], 'photo.png', { type: 'image/png' })
+
+    expect(getClipboardFiles({ files: [file], items: [] } as any)).toEqual([file])
+  })
+
+  it('falls back to file clipboard items when the clipboard file list is empty', () => {
+    const file = new File(['spreadsheet'], 'report.xlsx', {
+      type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    })
+
+    expect(
+      getClipboardFiles({
+        files: [],
+        items: [
+          { kind: 'string', getAsFile: jest.fn() },
+          { kind: 'file', getAsFile: () => file }
+        ]
+      } as any)
+    ).toEqual([file])
+  })
 })
 
 describe('getMediaAttachmentValidationError', () => {

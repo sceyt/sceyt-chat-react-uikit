@@ -20,6 +20,19 @@ const DEFAULT_MEDIA_MIME_TYPES = new Set([
 export const isDefaultSupportedMediaMimeType = (mimeType: string) =>
   DEFAULT_MEDIA_MIME_TYPES.has(mimeType.toLowerCase())
 
+export const getClipboardFiles = (clipboardData: Pick<DataTransfer, 'files' | 'items'>): File[] => {
+  const files = Array.from(clipboardData.files || [])
+
+  if (files.length) {
+    return files
+  }
+
+  return Array.from(clipboardData.items || [])
+    .filter((item) => item.kind === 'file')
+    .map((item) => item.getAsFile())
+    .filter((file): file is File => file !== null)
+}
+
 type MediaAttachmentValidationOptions = {
   allowedExtensions?: string[]
   sizeLimitKb?: number

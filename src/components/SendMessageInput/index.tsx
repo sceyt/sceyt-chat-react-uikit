@@ -146,7 +146,7 @@ import RecordingAnimation from './RecordingAnimation'
 import CreatePollPopup from './Poll/CreatePollPopup'
 import { MESSAGE_TYPE } from 'types/enum'
 import { getMembersAC } from 'store/member/actions'
-import { getMediaAttachmentValidationError, hasSendableTextOrPoll } from './sendMessageUtils'
+import { getClipboardFiles, getMediaAttachmentValidationError, hasSendableTextOrPoll } from './sendMessageUtils'
 
 function AutoFocusPlugin({ messageForReply }: any) {
   const [editor] = useLexicalComposerContext()
@@ -217,6 +217,7 @@ function onError(error: any) {
 
 let prevActiveChannelId: any
 let attachmentsUpdate: any = []
+const UNSUPPORTED_PASTED_FILE_MESSAGE = 'This file format is not supported.'
 
 export interface SendMessageProps {
   draggedAttachments?: boolean
@@ -1141,9 +1142,9 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
     }
     const os = detectOS()
     if (!(os === 'Windows' && browser === 'Firefox')) {
-      if (e.clipboardData.files && e.clipboardData.files.length > 0) {
+      const fileList = getClipboardFiles(e.clipboardData)
+      if (fileList.length > 0) {
         e.preventDefault()
-        const fileList: File[] = Object.values(e.clipboardData.files)
         const remainingSlots = MAX_ATTACHMENTS - attachments.length
 
         if (remainingSlots <= 0) {
@@ -1164,11 +1165,19 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
         }
 
         filesToProcess.forEach(async (file: any) => {
-          const validationError = validateMediaAttachment(file)
-          if (!validationError) {
+          const mediaValidationError = validateMediaAttachment(file)
+          const canAddAsMedia = showChooseMediaAttachment && !mediaValidationError
+
+          // Match the attachment picker: supported media is added as media, while every
+          // other file (including spreadsheets and documents) is added as a file card.
+          if (canAddAsMedia) {
             await handleAddAttachmentWithViewOnceCheck(file, true)
+          } else if (showChooseFileAttachment) {
+            await handleAddAttachmentWithViewOnceCheck(file, false)
           } else {
-            showFileUploadError(validationError)
+            showFileUploadError(
+              mediaValidationError || allowedMediaExtensionsErrorMessage || UNSUPPORTED_PASTED_FILE_MESSAGE
+            )
           }
         })
       } else {
