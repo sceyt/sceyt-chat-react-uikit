@@ -60,6 +60,7 @@ import { IForwardMessageNote } from 'common/popups/forwardMessage'
 import usePermissions from '../../hooks/usePermissions'
 import { pinnedMessagesSelector } from '../../store/pinned/selector'
 import { pinMessageAC, unpinMessageAC } from '../../store/pinned/actions'
+import { getClient } from 'common/client'
 
 // Constants
 const MESSAGE_ACTIONS_HOVER_DELAY = 450
@@ -69,6 +70,7 @@ const MESSAGE_ACTIONS_HOVER_DELAY = 450
 const MESSAGE_ACTIONS_FLIP_THRESHOLD = 110
 const MAX_SELECTED_MESSAGES = 30
 const EMOJI_POPUP_THRESHOLD = 300
+const PIN_TYPE_PERSONAL = 1
 // Set when any message's media is clicked (the slider is opening). Pending
 // hover timers check it so an actions bar can't pop open behind the slider.
 let lastMediaItemClickTime = 0
@@ -276,6 +278,13 @@ const Message = ({
   )
   const isPinned = !!message.pinDetails?.pinned || !!pinnedMessage
   const canPinForAll = checkActionPermission('pinMessage')
+  const user = getClient().user
+  const isSelfChannel =
+    channel?.type === DEFAULT_CHANNEL_TYPE.DIRECT &&
+    channel?.memberCount === 1 &&
+    channel?.members?.length > 0 &&
+    channel?.members[0].id === user?.id
+
   const messageItemRef = useRef<HTMLDivElement>(null)
   const isVisible = useOnScreen(messageItemRef)
   // Whether the actions bar should open under the bubble (no room above).
@@ -318,6 +327,7 @@ const Message = ({
   const renderAvatar =
     (!!prevMessageUserID || ifLatestAndHasNotPreview) &&
     (prevMessageUserID !== messageUserID || firstMessageInInterval) &&
+    !(isPinnedMessagesList && channel.type === DEFAULT_CHANNEL_TYPE.DIRECT) &&
     !(channel.type === DEFAULT_CHANNEL_TYPE.DIRECT && !showSenderNameOnDirectChannel) &&
     !(!message.incoming && !showOwnAvatar)
 
@@ -376,9 +386,16 @@ const Message = ({
   }, [channel.id, isPinnedMessagesList, message.id, message.tid, setInfoPopupOpen, setMessageActionsShow])
 
   const handleTogglePinMessagePopup = useCallback(() => {
+    // A self chat has no other participant, therefore pin scope is not a
+    // meaningful choice. Pin it for the current user immediately.
+    if (isSelfChannel) {
+      dispatch(pinMessageAC(channel.id, message, PIN_TYPE_PERSONAL))
+      setMessageActionsShow(false)
+      return
+    }
     setPinPopupOpen((prev) => !prev)
     setMessageActionsShow(false)
-  }, [setPinPopupOpen, setMessageActionsShow])
+  }, [channel.id, dispatch, isSelfChannel, message, setMessageActionsShow, setPinPopupOpen])
 
   const handlePinMessage = useCallback(
     (scope: number) => {
@@ -882,6 +899,7 @@ const Message = ({
         messageWidthPercent={messageWidthPercent}
         rtl={ownMessageOnRightSide && !message.incoming}
         withAvatar={
+          !(isPinnedMessagesList && channel.type === DEFAULT_CHANNEL_TYPE.DIRECT) &&
           !(channel.type === DEFAULT_CHANNEL_TYPE.DIRECT && !showSenderNameOnDirectChannel) &&
           !(!message.incoming && !showOwnAvatar)
         }
