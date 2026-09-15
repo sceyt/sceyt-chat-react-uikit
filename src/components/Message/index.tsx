@@ -20,6 +20,7 @@ import {
   setMessageForReplyAC,
   setMessageMenuOpenedAC,
   setMessageToEditAC,
+  requestPinnedMessagesListCloseAC,
   retractPollVoteAC,
   setReactionsListAC
 } from 'store/message/actions'
@@ -60,6 +61,7 @@ import { IForwardMessageNote } from 'common/popups/forwardMessage'
 import usePermissions from '../../hooks/usePermissions'
 import { pinnedMessagesSelector } from '../../store/pinned/selector'
 import { pinMessageAC, unpinMessageAC } from '../../store/pinned/actions'
+import { navigateToMessage } from '../../helpers/messageListNavigator'
 import { getClient } from 'common/client'
 
 // Constants
@@ -336,10 +338,19 @@ const Message = ({
   const isSelectedMessage = selectedMessagesMap && selectedMessagesMap.get(message.id || message.tid!)
   const tooManySelected = selectedMessagesMap && selectedMessagesMap.size >= MAX_SELECTED_MESSAGES
 
+  const openPinnedMessageInConversation = useCallback(() => {
+    if (!isPinnedMessagesList) return
+
+    const messageId = message.id || message.tid
+    if (messageId) navigateToMessage(messageId)
+    dispatch(requestPinnedMessagesListCloseAC())
+  }, [dispatch, isPinnedMessagesList, message.id, message.tid])
+
   const toggleEditMode = useCallback(() => {
+    openPinnedMessageInConversation()
     dispatch(setMessageToEditAC(message))
     setMessageActionsShow(false)
-  }, [dispatch, message])
+  }, [dispatch, message, openPinnedMessageInConversation])
 
   const handleRetractVote = useCallback(() => {
     if (message?.pollDetails?.id) {
@@ -414,6 +425,7 @@ const Message = ({
 
   const handleReplyMessage = useCallback(
     (threadReply?: boolean) => {
+      openPinnedMessageInConversation()
       if (threadReply) {
         // dispatch(setMessageForThreadReply(message));
       } else {
@@ -421,7 +433,7 @@ const Message = ({
       }
       setMessageActionsShow(false)
     },
-    [dispatch, message]
+    [dispatch, message, openPinnedMessageInConversation]
   )
 
   const handleToggleReportPopupOpen = useCallback(() => {

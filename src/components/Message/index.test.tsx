@@ -1,5 +1,5 @@
 import React from 'react'
-import { screen } from '@testing-library/react'
+import { fireEvent, screen } from '@testing-library/react'
 import Message from './index'
 import { DEFAULT_CHANNEL_TYPE, MESSAGE_DELIVERY_STATUS } from '../../helpers/constants'
 import { CONNECTION_STATUS } from '../../store/user/constants'
@@ -37,7 +37,21 @@ jest.mock('../Avatar', () => ({
 
 jest.mock('./MessageBody', () => ({
   __esModule: true,
-  default: ({ message }: { message: { body?: string } }) => <div data-testid='message-body'>{message.body}</div>
+  default: ({
+    message,
+    toggleEditMode,
+    handleReplyMessage
+  }: {
+    message: { body?: string }
+    toggleEditMode?: () => void
+    handleReplyMessage?: () => void
+  }) => (
+    <>
+      <div data-testid='message-body'>{message.body}</div>
+      <button data-testid='edit-message-action' onClick={() => toggleEditMode?.()} type='button' />
+      <button data-testid='reply-message-action' onClick={() => handleReplyMessage?.()} type='button' />
+    </>
+  )
 }))
 
 jest.mock('./MessageSelection', () => ({
@@ -60,9 +74,15 @@ jest.mock('./MessagePopups', () => ({
   default: () => null
 }))
 
+jest.mock('../../helpers/messageListNavigator', () => ({
+  navigateToMessage: jest.fn()
+}))
+const { navigateToMessage: mockNavigateToMessage } = require('../../helpers/messageListNavigator')
+
 describe('Message', () => {
   beforeEach(() => {
     resetMessageListFixtureIds()
+    mockNavigateToMessage.mockReset()
   })
 
   it('does not repeat the avatar for later unread messages from the same user', () => {
@@ -331,6 +351,41 @@ describe('Message', () => {
     unmount()
 
     expect(store.getState().MessageReducer.visibleMessagesMap[pinnedMessage.id!]).toBeUndefined()
+  })
+
+  it('opens the conversation before applying edit and reply from the pinned list', () => {
+    const channelId = 'channel-pinned-list-actions'
+    const pinnedMessage = makeMessage({ id: '1605', channelId, body: 'pinned action message' })
+    const channel = makeChannel({ id: channelId, lastMessage: pinnedMessage })
+    const store = createMessageListStore({
+      ChannelReducer: { activeChannel: channel },
+      MessageReducer: { unreadScrollTo: false, pinnedMessagesListOpen: true }
+    })
+
+    renderWithSceytProvider(
+      <Message
+        message={pinnedMessage}
+        channel={channel}
+        stopScrolling={() => undefined}
+        handleScrollToRepliedMessage={() => undefined}
+        prevMessage={undefined as any}
+        nextMessage={undefined as any}
+        isThreadMessage={false}
+        isPinnedMessagesList
+      />,
+      { store }
+    )
+
+    fireEvent.click(screen.getByTestId('edit-message-action'))
+
+    expect(mockNavigateToMessage).toHaveBeenCalledWith(pinnedMessage.id)
+    expect(store.getState().MessageReducer.pinnedMessagesListCloseRequested).toBe(true)
+    expect(store.getState().MessageReducer.messageToEdit).toEqual(pinnedMessage)
+
+    fireEvent.click(screen.getByTestId('reply-message-action'))
+
+    expect(mockNavigateToMessage).toHaveBeenLastCalledWith(pinnedMessage.id)
+    expect(store.getState().MessageReducer.messageForReply).toEqual(pinnedMessage)
   })
 
   it('does not queue read markers when browser tab is inactive', () => {
