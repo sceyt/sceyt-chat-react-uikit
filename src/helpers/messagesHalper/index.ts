@@ -1,6 +1,6 @@
 import { IAttachment, IMarker, IMessage, IPollVote, IReaction } from '../../types'
 import { checkArraysEqual } from '../index'
-import { MESSAGE_DELIVERY_STATUS, MESSAGE_STATUS } from '../constants'
+import { attachmentTypes, MESSAGE_DELIVERY_STATUS, MESSAGE_STATUS } from '../constants'
 import { cancelUpload, getCustomUploader } from '../customUploader'
 import { releaseBlobUrls } from '../attachmentBlobUrls'
 import { clearVideoPreparation } from '../attachmentPreparation'
@@ -1339,13 +1339,19 @@ export const hydrateDraftMessages = async (): Promise<void> => {
               lastModified: attachment.lastModified || Date.now()
             })
           : data
+      const canRestorePreviewUrl =
+        attachment.type === attachmentTypes.image ||
+        attachment.type === attachmentTypes.video ||
+        attachment.type === attachmentTypes.voice
       return {
         ...attachment,
         data: restoredData,
+        // Generic files use the file-card icon. Recreating an object URL for
+        // them makes Attachment treat the file as a thumbnail after reload.
         attachmentUrl:
-          restoredData instanceof Blob && typeof URL !== 'undefined'
+          canRestorePreviewUrl && restoredData instanceof Blob && typeof URL !== 'undefined'
             ? URL.createObjectURL(restoredData)
-            : attachment.attachmentUrl
+            : undefined
       }
     })
     draftMessagesMap[channelId] = { ...draft, attachments }

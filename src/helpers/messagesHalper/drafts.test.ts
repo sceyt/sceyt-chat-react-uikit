@@ -184,6 +184,32 @@ describe('persistent drafts', () => {
     expect(createObjectURL).toHaveBeenCalled()
   })
 
+  it('restores a generic file draft without an image preview URL', async () => {
+    const createObjectURL = jest.fn(() => 'blob:restored-document')
+    Object.defineProperty(URL, 'createObjectURL', { configurable: true, value: createObjectURL })
+    const persistedBlob = new Blob(['document-bytes'], { type: 'application/pdf' })
+    ;(restoreDrafts as jest.Mock).mockResolvedValue([
+      {
+        channelId: 'draft-channel',
+        draft: {
+          text: '',
+          mentionedUsers: [],
+          attachments: [
+            { data: persistedBlob, name: 'report.pdf', type: 'file', attachmentUrl: 'blob:expired-document-preview' }
+          ]
+        }
+      }
+    ])
+
+    await hydrateDraftMessages()
+
+    const restoredAttachment = getDraftMessageFromMap('draft-channel')?.attachments?.[0]
+    expect(restoredAttachment.data).toBeInstanceOf(File)
+    expect(restoredAttachment.data.name).toBe('report.pdf')
+    expect(restoredAttachment.attachmentUrl).toBeUndefined()
+    expect(createObjectURL).not.toHaveBeenCalled()
+  })
+
   it('hydrates every attachment while preserving its metadata and file bytes', async () => {
     const createObjectURL = jest.fn((blob: Blob) => `blob:${blob.type}:${blob.size}`)
     Object.defineProperty(URL, 'createObjectURL', { configurable: true, value: createObjectURL })

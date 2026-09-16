@@ -1,4 +1,4 @@
-import React, { FC, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import React, { FC, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { shallowEqual } from 'react-redux'
 import { useSelector, useDispatch } from 'store/hooks'
 import { v4 as uuidv4 } from 'uuid'
@@ -147,6 +147,7 @@ import CreatePollPopup from './Poll/CreatePollPopup'
 import { MESSAGE_TYPE } from 'types/enum'
 import { getMembersAC } from 'store/member/actions'
 import { getClipboardFiles, getMediaAttachmentValidationError, hasSendableTextOrPoll } from './sendMessageUtils'
+import { getDraftHandoff } from './draftOwnership'
 
 function AutoFocusPlugin({ messageForReply }: any) {
   const [editor] = useLexicalComposerContext()
@@ -215,9 +216,9 @@ function onError(error: any) {
   log.error(error)
 }
 
-let prevActiveChannelId: any
 let attachmentsUpdate: any = []
 const UNSUPPORTED_PASTED_FILE_MESSAGE = 'This file format is not supported.'
+const useComposerLayoutEffect = CAN_USE_DOM ? useLayoutEffect : useEffect
 
 export interface SendMessageProps {
   draggedAttachments?: boolean
@@ -477,6 +478,10 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
   const [uploadErrorMessage, setUploadErrorMessage] = useState('')
   const [viewOnce, setViewOnce] = useState(false)
   const [draftsHydrated, setDraftsHydrated] = useState(areDraftMessagesHydrated())
+  // The compose state lives in this component while drafts are keyed by
+  // channel. Keep the owner alongside the local state so a channel switch
+  // cannot persist the previous channel's values under the new channel ID.
+  const [composerChannelId, setComposerChannelId] = useState(activeChannel.id || '')
 
   const typingOrRecordingIndicator = useSelector(typingOrRecordingIndicatorArraySelector(activeChannel.id))
   const contactsMap = useSelector(contactsMapSelector)
@@ -515,8 +520,55 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
 
   useEffect(() => subscribeToDraftMessages(() => setDraftsHydrated(areDraftMessagesHydrated())), [])
 
+  useComposerLayoutEffect(() => {
+    const nextChannelId = activeChannel.id || ''
+    if (composerChannelId === nextChannelId) {
+      return
+    }
+
+    // Persist the final local value for the channel being left. This also
+    // covers a quick navigation before React has run the normal draft effect.
+    if (draftsHydrated) {
+      const handoff = getDraftHandoff({
+        channelId: composerChannelId,
+        nextChannelId,
+        text: messageText,
+        mentionedUsers,
+        messageForReply,
+        editorState: realEditorState,
+        bodyAttributes: messageBodyAttributes,
+        attachments,
+        viewOnce
+      })
+      if (handoff) {
+        setDraftMessageToMap(handoff.channelId, handoff.draft, { persist: handoff.persist })
+      }
+    }
+
+    // Reset the previous channel's values before the new channel is painted.
+    // The draft restore effect below then fills these values only from the
+    // destination channel's entry.
+    restoringDraftRef.current = false
+    restoredDraftChannelIdRef.current = null
+    isNavigatingChannelRef.current = !!messageForReply
+    setComposerChannelId(nextChannelId)
+    setMessageText('')
+    setEditMessageText('')
+    setRestoredEditMessage(null)
+    setMessageBodyAttributes([])
+    setMentionedUsers([])
+    setAttachments([])
+    setViewOnce(false)
+    setSendMessageIsActive(false)
+    setShouldClearEditor({ clear: true })
+    attachmentsUpdate = []
+    clearTimeout(typingTimout)
+    dispatch(setMessageForReplyAC(null))
+    dispatch(setMessageToEditAC(null))
+  }, [activeChannel.id, composerChannelId])
+
   useEffect(() => {
-    if (!draftsHydrated || !activeChannel.id) {
+    if (!draftsHydrated || !activeChannel.id || composerChannelId !== activeChannel.id) {
       return
     }
     const draftMessage = getDraftMessageFromMap(activeChannel.id)
@@ -547,7 +599,43 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
     if (draftMessage.messageForReply) dispatch(setMessageForReplyAC(draftMessage.messageForReply))
     setShouldClearEditor({ clear: true, draftMessage })
     restoredDraftChannelIdRef.current = activeChannel.id
-  }, [draftsHydrated, activeChannel.id])
+  }, [draftsHydrated, activeChannel.id, composerChannelId])
+
+  const setComposerMessageText = useCallback(
+    (text: string) => {
+      if (composerChannelId === activeChannel.id) {
+        setMessageText(text)
+      }
+    },
+    [activeChannel.id, composerChannelId]
+  )
+
+  const setComposerEditMessageText = useCallback(
+    (text: string) => {
+      if (composerChannelId === activeChannel.id) {
+        setEditMessageText(text)
+      }
+    },
+    [activeChannel.id, composerChannelId]
+  )
+
+  const setComposerMessageBodyAttributes = useCallback(
+    (attributes: any) => {
+      if (composerChannelId === activeChannel.id) {
+        setMessageBodyAttributes(attributes)
+      }
+    },
+    [activeChannel.id, composerChannelId]
+  )
+
+  const setComposerMentionedUsers = useCallback(
+    (users: any) => {
+      if (composerChannelId === activeChannel.id) {
+        setMentionedUsers(users)
+      }
+    },
+    [activeChannel.id, composerChannelId]
+  )
 
   useEffect(() => {
     setReplyLinkPreviewImageFailed(false)
@@ -1278,7 +1366,9 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
   }
 
   const handleSetMentionMember = (mentionMember: any) => {
-    setMentionedUsers((prevState: any[]) => [...prevState, mentionMember])
+    if (composerChannelId === activeChannel.id) {
+      setMentionedUsers((prevState: any[]) => [...prevState, mentionMember])
+    }
   }
 
   // Compose preview URLs are tracked in the blob-URL registry under a
@@ -1567,55 +1657,6 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
   }, [isSmallWidthViewport])
 
   useEffect(() => {
-    if (prevActiveChannelId && activeChannel.id && prevActiveChannelId !== activeChannel.id) {
-      setMessageText('')
-      if (messageForReply) {
-        isNavigatingChannelRef.current = true
-        handleCloseReply(true)
-      }
-      setAttachments([])
-      attachmentsUpdate = []
-      handleCloseEditMode(!!messageToEdit)
-      clearTimeout(typingTimout)
-
-      const draftMessage = getDraftMessageFromMap(activeChannel.id)
-      if (draftMessage) {
-        restoringDraftRef.current = true
-        if (draftMessage.messageToEdit) {
-          const restoredText = draftMessage.editMessageText ?? draftMessage.messageToEdit.body ?? ''
-          const restoredEdit = {
-            ...draftMessage.messageToEdit,
-            body: restoredText,
-            bodyAttributes: draftMessage.editBodyAttributes ?? draftMessage.messageToEdit.bodyAttributes,
-            mentionedUsers: draftMessage.mentionedUsers ?? draftMessage.messageToEdit.mentionedUsers
-          }
-          setEditMessageText(restoredText)
-          setMessageBodyAttributes(restoredEdit.bodyAttributes || [])
-          setMentionedUsers(restoredEdit.mentionedUsers || [])
-          setRestoredEditMessage(restoredEdit)
-          dispatch(setMessageToEditAC(draftMessage.messageToEdit))
-          restoredDraftChannelIdRef.current = activeChannel.id
-        }
-        if (!draftMessage.messageToEdit) {
-          if (draftMessage.messageForReply) {
-            dispatch(setMessageForReplyAC(draftMessage.messageForReply))
-          }
-          setMessageText(draftMessage.text)
-          setMentionedUsers(draftMessage.mentionedUsers)
-          setAttachments(draftMessage.attachments || [])
-          setViewOnce(!!draftMessage.viewOnce)
-          restoredDraftChannelIdRef.current = activeChannel.id
-          setShouldClearEditor({ clear: true, draftMessage })
-        }
-      } else {
-        setMentionedUsers([])
-        setShouldClearEditor({ clear: true, draftMessage })
-      }
-    }
-    if (activeChannel.id) {
-      prevActiveChannelId = activeChannel.id
-    }
-
     if (
       activeChannel.id &&
       membersHasNext === undefined &&
@@ -1629,6 +1670,9 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
     // The parent hydrates IndexedDB asynchronously. Until this input has seen
     // that result, an empty local editor must not delete a restored draft.
     if (!draftsHydrated) {
+      return
+    }
+    if (!activeChannel.id || composerChannelId !== activeChannel.id) {
       return
     }
     if (restoringDraftRef.current) {
@@ -1751,11 +1795,13 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
     messageBodyAttributes,
     messageToEdit,
     viewOnce,
-    draftsHydrated
+    draftsHydrated,
+    activeChannel.id,
+    composerChannelId
   ])
 
   useDidUpdate(() => {
-    if (!messageToEdit && mentionedUsers && mentionedUsers.length) {
+    if (composerChannelId === activeChannel.id && !messageToEdit && mentionedUsers && mentionedUsers.length) {
       setDraftMessageToMap(
         activeChannel.id,
         {
@@ -1769,7 +1815,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
         { persist: !!(messageText.trim() || attachments.length) }
       )
     }
-  }, [mentionedUsers])
+  }, [mentionedUsers, activeChannel.id, composerChannelId])
 
   useDidUpdate(() => {
     if (handleAttachmentSelected) {
@@ -1824,6 +1870,9 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
   })
 
   useDidUpdate(() => {
+    if (composerChannelId !== activeChannel.id) {
+      return
+    }
     const persistedReply = draftMessagesMap[activeChannel.id]?.messageForReply
     if (isNavigatingChannelRef.current) {
       isNavigatingChannelRef.current = false
@@ -1854,7 +1903,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
     if (messageContRef && messageContRef.current) {
       dispatch(setSendMessageInputHeightAC(messageContRef.current.getBoundingClientRect().height))
     }
-  }, [messageForReply])
+  }, [messageForReply, activeChannel.id, composerChannelId])
 
   useDidUpdate(() => {
     if (messageToEdit) {
@@ -1887,7 +1936,6 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
       if (inputHeightTimeout) {
         clearTimeout(inputHeightTimeout)
       }
-      prevActiveChannelId = undefined
       document.removeEventListener('mousedown', handleClick)
 
       if (messageContRef && messageContRef.current) {
@@ -2515,12 +2563,12 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
                             draftMessage={restoredEditMessage?.id === messageToEdit?.id ? restoredEditMessage : null}
                             contactsMap={contactsMap}
                             getFromContacts={getFromContacts}
-                            setMentionedMember={setMentionedUsers}
+                            setMentionedMember={setComposerMentionedUsers}
                           />
                           <FormatMessagePlugin
                             editorState={realEditorState}
-                            setMessageBodyAttributes={setMessageBodyAttributes}
-                            setMessageText={messageToEdit ? setEditMessageText : setMessageText}
+                            setMessageBodyAttributes={setComposerMessageBodyAttributes}
+                            setMessageText={messageToEdit ? setComposerEditMessageText : setComposerMessageText}
                             messageToEdit={messageToEdit}
                             activeChannelMembers={activeChannelMembers}
                             contactsMap={contactsMap}
