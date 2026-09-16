@@ -1835,6 +1835,17 @@ function* updateChannel(action: IAction): any {
       avatarUrl,
       metadata: isJSON(metadata) ? JSON.parse(metadata) : metadata
     })
+    yield put(
+      updateSearchedChannelDataAC(
+        channelId,
+        {
+          subject,
+          avatarUrl,
+          metadata: isJSON(metadata) ? JSON.parse(metadata) : metadata
+        },
+        getChannelGroupName(channel)
+      )
+    )
     const onUpdateChannel = getOnUpdateChannel()
     if (onUpdateChannel) {
       const fields = []
@@ -2326,6 +2337,7 @@ export default function* ChannelsSaga() {
 }
 
 export const __channelSagaTestables = {
+  updateChannel,
   leaveChannel,
   markMessagesRead,
   markChannelAsRead,

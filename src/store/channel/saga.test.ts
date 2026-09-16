@@ -19,6 +19,7 @@ import {
   leaveChannelAC,
   resendPendingChannelReadsAC,
   setChannelsAC,
+  updateChannelAC,
   updateChannelDataAC,
   updateSearchedChannelDataAC
 } from './actions'
@@ -378,6 +379,44 @@ describe('channel saga read markers', () => {
       })
     )
     expect(getChannelFromMap(channel.id).lastDisplayedMessageId).toBe('205')
+  })
+})
+
+describe('channel saga updates', () => {
+  beforeEach(() => {
+    jest.clearAllMocks()
+    destroyChannelsMap()
+    setClient({ user: { id: 'current-user' } })
+  })
+
+  it('synchronizes a renamed group with active chat-search results', async () => {
+    const channel = makeChannel({
+      id: 'searched-group',
+      subject: 'Previous group name'
+    })
+    ;(channel as any).update = jest.fn(async () => ({
+      subject: 'Updated group name',
+      avatarUrl: channel.avatarUrl,
+      metadata: channel.metadata
+    }))
+    setChannelInMap(channel)
+
+    const dispatched = await runChannelSaga(
+      __channelSagaTestables.updateChannel,
+      updateChannelAC(channel.id, { subject: 'Updated group name' })
+    )
+
+    expect(dispatched).toContainEqual(
+      updateSearchedChannelDataAC(
+        channel.id,
+        {
+          subject: 'Updated group name',
+          avatarUrl: channel.avatarUrl,
+          metadata: channel.metadata
+        },
+        'chats_groups'
+      )
+    )
   })
 })
 
