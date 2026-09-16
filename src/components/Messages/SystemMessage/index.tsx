@@ -65,8 +65,8 @@ const Message = ({
   const parentMessageId =
     message.parentMessage?.id || message.parentMessage?.tid || message.parentMessageId || message.parentId
   const pinnedMessagePreview = useMemo(() => {
-    return getPinnedMessagePreview(message.parentMessage)
-  }, [message.parentMessage])
+    return getPinnedMessagePreview(message.parentMessage, contactsMap, getFromContacts)
+  }, [contactsMap, getFromContacts, message.parentMessage])
   const pinnedMessageDeleted = isPinnedMessageDeleted(message.parentMessage)
 
   const navigateToPinnedMessage = () => {

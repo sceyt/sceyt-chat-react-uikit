@@ -13,7 +13,9 @@ import { getReplyLinkPreviewImage } from '../../helpers/replyPreview'
 import Attachment, { AttachmentImg, AttachmentImgCont, FileThumbnail, FileThumbnailSkeleton } from '../Attachment'
 import { AttachmentIconCont } from 'UIHelper'
 import { Component } from 'components/VideoPreview'
-import { isPinnedMessageDeleted } from 'helpers/pinnedMessage'
+import { getPinnedMessageBody, isPinnedMessageDeleted } from 'helpers/pinnedMessage'
+import { contactsMapSelector } from '../../store/user/selector'
+import { getShowOnlyContactUsers } from '../../helpers/contacts'
 
 const attachmentMetadata = (attachment: any) => {
   if (!attachment?.metadata) return {}
@@ -26,17 +28,21 @@ const attachmentMetadata = (attachment: any) => {
   }
 }
 
-const preview = (message: any) => {
+const preview = (message: any, contactsMap: Record<string, any>, getFromContacts: boolean) => {
   if (isPinnedMessageDeleted(message)) return 'Deleted Message'
   if (message?.pollDetails) return `Poll: ${message.pollDetails.name || message.body || 'Poll'}`
   const attachment = message?.attachments?.[0]
-  if (!attachment) return message?.body || (message?.forwardingDetails ? 'Shared content' : 'Message')
+  if (!attachment)
+    return (
+      getPinnedMessageBody(message, contactsMap, getFromContacts) ||
+      (message?.forwardingDetails ? 'Shared content' : 'Message')
+    )
   const metadata = attachmentMetadata(attachment)
   if (attachment.type === attachmentTypes.voice) {
     const duration = metadata.duration || metadata.dur || attachment.duration
     return `Voice${duration ? `: ${formatDuration(duration)}` : ''}`
   }
-  if (message?.body) return message.body
+  if (message?.body) return getPinnedMessageBody(message, contactsMap, getFromContacts)
   if (attachment.type === attachmentTypes.image) return 'Photo'
   if (attachment.type === attachmentTypes.video) {
     return 'Video'
@@ -87,6 +93,8 @@ const PinnedMessagesBanner = ({
   const dispatch = useDispatch()
   const pins = useSelector(pinnedMessagesSelector(channelId))
   const nextToken = useSelector(pinnedMessagesCursorSelector(channelId))
+  const contactsMap = useSelector(contactsMapSelector)
+  const getFromContacts = getShowOnlyContactUsers()
   const {
     [THEME_COLORS.SURFACE_1]: surface1,
     [THEME_COLORS.TEXT_PRIMARY]: textPrimary,
@@ -235,7 +243,7 @@ const PinnedMessagesBanner = ({
       <Copy textPrimary={textPrimary}>
         <strong>Pinned messages</strong>
         <PinnedCopyPreview key={active.id} textPrimary={textPrimary}>
-          {preview(active.message)}
+          {preview(active.message, contactsMap, getFromContacts)}
         </PinnedCopyPreview>
       </Copy>
       <Controls
