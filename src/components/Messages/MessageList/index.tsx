@@ -50,7 +50,7 @@ import {
   IListItemStyles,
   OGMetadataProps
 } from '../../../types'
-import { DEFAULT_CHANNEL_TYPE, LOADING_STATE, MESSAGE_DELIVERY_STATUS } from '../../../helpers/constants'
+import { LOADING_STATE, MESSAGE_DELIVERY_STATUS } from '../../../helpers/constants'
 // Components
 import MessageDivider from '../../MessageDivider'
 import SliderPopup from '../../../common/popups/sliderPopup'
@@ -1191,10 +1191,9 @@ const MessageList: React.FC<MessagesProps> = ({
               isUnreadMessage: false,
               nextMessageStartsUnreadSection: false,
               isHighlighted: false,
-              // Pinned messages are independent entries, not one chronological
-              // message group. Force the sender/avatar block for each group
-              // message; direct conversations remain avatar-free in Message.
-              ifLatestAndHasNotPreview: channel.type !== DEFAULT_CHANNEL_TYPE.DIRECT,
+              // Start the list with an avatar, then keep the normal
+              // consecutive-sender grouping used by the chat timeline.
+              ifLatestAndHasNotPreview: index === 0,
               registerInMessagesIndex: false,
               isPinnedMessagesList: true
             })

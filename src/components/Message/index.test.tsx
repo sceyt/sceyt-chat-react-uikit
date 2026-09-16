@@ -143,6 +143,62 @@ describe('Message', () => {
     expect(screen.getByText('second-unread')).toBeInTheDocument()
   })
 
+  it('keeps same-sender pinned messages grouped across different days', () => {
+    const channelId = 'channel-pinned-avatar-grouping'
+    const remoteUser = makeUser({ id: 'remote-user-pinned', firstName: 'Waffi' })
+    const firstPinnedMessage = makeMessage({
+      id: '1503',
+      channelId,
+      body: 'first pinned',
+      incoming: true,
+      user: remoteUser,
+      createdAt: new Date('2026-04-01T12:00:00.000Z')
+    })
+    const secondPinnedMessage = makeMessage({
+      id: '1504',
+      channelId,
+      body: 'second pinned',
+      incoming: true,
+      user: remoteUser,
+      createdAt: new Date('2026-04-02T12:00:00.000Z')
+    })
+    const channel = makeChannel({
+      id: channelId,
+      type: DEFAULT_CHANNEL_TYPE.GROUP,
+      lastMessage: secondPinnedMessage
+    })
+    const store = createMessageListStore({ ChannelReducer: { activeChannel: channel } })
+
+    renderWithSceytProvider(
+      <>
+        <Message
+          message={firstPinnedMessage}
+          channel={channel}
+          stopScrolling={() => undefined}
+          handleScrollToRepliedMessage={() => undefined}
+          prevMessage={undefined as any}
+          nextMessage={secondPinnedMessage}
+          isThreadMessage={false}
+          isPinnedMessagesList
+          ifLatestAndHasNotPreview
+        />
+        <Message
+          message={secondPinnedMessage}
+          channel={channel}
+          stopScrolling={() => undefined}
+          handleScrollToRepliedMessage={() => undefined}
+          prevMessage={firstPinnedMessage}
+          nextMessage={undefined as any}
+          isThreadMessage={false}
+          isPinnedMessagesList
+        />
+      </>,
+      { store }
+    )
+
+    expect(screen.getAllByTestId('avatar')).toHaveLength(1)
+  })
+
   it('keeps same-user grouping when neighboring messages use different id shapes for the same user', () => {
     const channelId = 'channel-message-mixed-user-id-shapes'
     const readMessage = makeMessage({

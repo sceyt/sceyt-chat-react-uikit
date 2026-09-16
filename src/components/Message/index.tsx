@@ -303,10 +303,11 @@ const Message = ({
   const firstMessageInInterval = useMemo(
     () =>
       ifLatestAndHasNotPreview ||
-      !(prevMessage && current.diff(moment(prevMessage.createdAt).startOf('day'), 'days') === 0) ||
+      (!isPinnedMessagesList &&
+        !(prevMessage && current.diff(moment(prevMessage.createdAt).startOf('day'), 'days') === 0)) ||
       prevMessage?.type === MESSAGE_TYPE.SYSTEM ||
-      unreadMessageId === prevMessage.id,
-    [prevMessage, unreadMessageId, ifLatestAndHasNotPreview]
+      unreadMessageId === prevMessage?.id,
+    [prevMessage, unreadMessageId, ifLatestAndHasNotPreview, isPinnedMessagesList]
   )
 
   const nextMessageUserID = nextMessage ? getComparableUserId(nextMessage.user) : null
@@ -850,8 +851,11 @@ const Message = ({
     if (!nextMessage || nextMessage.type === MESSAGE_TYPE.SYSTEM) {
       spacingBottom = ''
     } else if (nextMessageStartsUnreadSection) {
-      spacingBottom = differentUserMessageSpacing || '16px'
-    } else if (nextMessageUserID && (nextMessageUserID !== messageUserID || nextMessageFirstInInterval)) {
+      spacingBottom = isPinnedMessagesList ? '0' : differentUserMessageSpacing || '16px'
+    } else if (
+      nextMessageUserID &&
+      (nextMessageUserID !== messageUserID || (nextMessageFirstInInterval && !isPinnedMessagesList))
+    ) {
       spacingBottom = differentUserMessageSpacing || '16px'
     }
     spacingTop = sameUserMessageSpacing || '6px'
@@ -860,7 +864,13 @@ const Message = ({
     if (spacingBottom && reactionsMargin)
       return { bottom: `calc(${spacingBottom} + ${reactionsMargin})`, top: spacingTop }
     return { bottom: reactionsMargin || spacingBottom, top: spacingTop }
-  }, [nextMessageUserID, messageUserID, nextMessageFirstInInterval, message.reactionTotals?.length])
+  }, [
+    nextMessageUserID,
+    isPinnedMessagesList,
+    messageUserID,
+    nextMessageFirstInInterval,
+    message.reactionTotals?.length
+  ])
 
   return (
     <MessageItem
