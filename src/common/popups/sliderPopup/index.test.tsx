@@ -1,5 +1,5 @@
 import React from 'react'
-import { act, screen } from '@testing-library/react'
+import { act, fireEvent, screen } from '@testing-library/react'
 import SliderPopup from './index'
 import { createMessageListStore, renderWithSceytProvider } from '../../../testUtils/messageListHarness'
 import { setAttachmentsForPopupAC } from '../../../store/message/actions'
@@ -85,6 +85,14 @@ const anotherVideo = {
   messageId: 'message-2',
   url: 'https://cdn/another.mp4',
   name: 'another.mp4'
+}
+
+const selectedImage = {
+  ...selectedVideo,
+  id: 'selected-image',
+  url: 'https://cdn/selected.jpg',
+  name: 'selected.jpg',
+  type: 'image'
 }
 
 const renderSlider = (messageState: Record<string, any> = {}) => {
@@ -183,5 +191,50 @@ describe('SliderPopup cached media', () => {
 
     expect(screen.getAllByTestId('slider-video-player')).toHaveLength(1)
     expect(screen.getByAltText(anotherVideo.name)).toBeInTheDocument()
+  })
+
+  it('closes an image preview when its carousel item background is clicked', () => {
+    const setIsSliderOpen = jest.fn()
+    const cacheKey = `${selectedImage.url}_original_image_url_1_0_2`
+    const store = createMessageListStore({
+      UserReducer: { connectionStatus: 'connected' },
+      MessageReducer: { attachmentUpdatedMap: { [cacheKey]: 'blob:cached-image' } }
+    })
+
+    renderWithSceytProvider(
+      <SliderPopup
+        channel={{ id: 'channel-1', type: 'group' } as any}
+        currentMediaFile={selectedImage as any}
+        setIsSliderOpen={setIsSliderOpen}
+      />,
+      { store }
+    )
+
+    const image = screen.getByAltText(selectedImage.name)
+    fireEvent.click(image.parentElement!)
+
+    expect(setIsSliderOpen).toHaveBeenCalledWith(false)
+  })
+
+  it('keeps an image preview open when the image itself is clicked', () => {
+    const setIsSliderOpen = jest.fn()
+    const cacheKey = `${selectedImage.url}_original_image_url_1_0_2`
+    const store = createMessageListStore({
+      UserReducer: { connectionStatus: 'connected' },
+      MessageReducer: { attachmentUpdatedMap: { [cacheKey]: 'blob:cached-image' } }
+    })
+
+    renderWithSceytProvider(
+      <SliderPopup
+        channel={{ id: 'channel-1', type: 'group' } as any}
+        currentMediaFile={selectedImage as any}
+        setIsSliderOpen={setIsSliderOpen}
+      />,
+      { store }
+    )
+
+    fireEvent.click(screen.getByAltText(selectedImage.name))
+
+    expect(setIsSliderOpen).not.toHaveBeenCalled()
   })
 })

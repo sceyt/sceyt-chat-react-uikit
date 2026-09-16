@@ -276,7 +276,10 @@ const SliderPopup: React.FC<IProps> = ({
   const handleClicks = useCallback(
     (e: React.MouseEvent<HTMLDivElement>) => {
       const target = e.target as HTMLElement
-      if (!target.closest('.custom_carousel_item') && !target.closest('.custom_carousel_arrow')) {
+      // Carousel items reserve a large central area to keep media centered.
+      // That area can be much larger than the image itself, so it must not be
+      // treated as media when deciding whether this is a backdrop click.
+      if (!target.closest('.slider-preview-media, .custom_video_player, .custom_carousel_arrow')) {
         if (currentFileType === 'image') {
           log.info(
             '[MEDIA_IMAGE_SLIDER] outside click closing slider ' +
@@ -755,6 +758,7 @@ const SliderPopup: React.FC<IProps> = ({
                       attachmentUpdatedMap[getAttachmentURLWithVersion(file.url + '_original_image_url')] ||
                       getMediaThumbnailSource(file)) && (
                       <img
+                        className='slider-preview-media'
                         loading='eager'
                         decoding='async'
                         draggable={false}
@@ -1023,7 +1027,6 @@ const CarouselItem = styled.div`
 
   img,
   video {
-    width: 100%;
     height: 100%;
     min-width: 0;
     min-height: 0;
