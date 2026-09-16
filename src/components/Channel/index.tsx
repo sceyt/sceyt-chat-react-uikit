@@ -429,7 +429,10 @@ const Channel: React.FC<IChannelProps> = ({
             setDraftMessageText(draftText)
             setDraftMessage({
               mentionedUsers: channelDraftMessage.mentionedUsers,
-              body: channelDraftMessage.text,
+              // Lexical can leave whitespace in an otherwise attachment-only
+              // composer. Keep real text untouched, but normalize that empty
+              // editor value so the existing attachment preview is used.
+              body: channelDraftMessage.text?.trim() ? channelDraftMessage.text : '',
               bodyAttributes: channelDraftMessage.bodyAttributes,
               attachments: channelDraftMessage.attachments,
               viewOnce: channelDraftMessage.viewOnce,
@@ -438,7 +441,16 @@ const Channel: React.FC<IChannelProps> = ({
           }
         } else if (draftAudioRecording) {
           setDraftMessageText('Voice')
-          setDraftMessage(undefined)
+          setDraftMessage({
+            body: '',
+            attachments: [
+              {
+                type: attachmentTypes.voice,
+                data: draftAudioRecording.file,
+                attachmentUrl: draftAudioRecording.objectUrl
+              }
+            ]
+          })
         }
       } else if (draftMessageText) {
         setDraftMessageText(undefined)

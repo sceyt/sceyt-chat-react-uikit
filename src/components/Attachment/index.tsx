@@ -1837,6 +1837,5 @@ export const AttachmentImg = styled.img<{
 const VideoCont = styled.div<{ isDetailsView?: boolean }>`
   position: relative;
   cursor: pointer;
-  width: 100%;
   height: ${(props) => props.isDetailsView && '100%'};
 `

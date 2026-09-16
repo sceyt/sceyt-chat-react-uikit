@@ -15,7 +15,12 @@ import {
   renderWithSceytProvider,
   resetMessageListFixtureIds
 } from '../../testUtils/messageListHarness'
-import { removeDraftMessageFromMap, setDraftMessageToMap } from '../../helpers/messagesHalper'
+import {
+  removeAudioRecordingFromMap,
+  removeDraftMessageFromMap,
+  setAudioRecordingToMap,
+  setDraftMessageToMap
+} from '../../helpers/messagesHalper'
 
 jest.mock('../../hooks', () => ({
   useColor: () => {
@@ -178,6 +183,7 @@ describe('Channel draft preview', () => {
 
   afterEach(() => {
     removeDraftMessageFromMap(channelId)
+    removeAudioRecordingFromMap(channelId)
   })
 
   const renderOwnLastMessageChannel = (channelOverrides: Partial<IChannel> = {}) => {
@@ -273,6 +279,33 @@ describe('Channel draft preview', () => {
     expect(screen.getByText('Draft')).toBeInTheDocument()
     expect(screen.getByText('Photo')).toBeInTheDocument()
     expect(screen.queryByTestId('message-status-icon')).not.toBeInTheDocument()
+  })
+
+  it('renders the attachment label when an attachment-only draft contains editor whitespace', () => {
+    setDraftMessageToMap(channelId, {
+      text: ' ',
+      mentionedUsers: [],
+      attachments: [{ type: attachmentTypes.file, data: new File(['file'], 'report.pdf', { type: 'application/pdf' }) }]
+    })
+
+    renderOwnLastMessageChannel()
+
+    expect(screen.getByText('Draft')).toBeInTheDocument()
+    expect(screen.getByText('choseFile.svg')).toBeInTheDocument()
+    expect(screen.getByText('File')).toBeInTheDocument()
+  })
+
+  it('renders a voice icon and label for an audio recording draft', () => {
+    setAudioRecordingToMap(channelId, {
+      file: new File(['audio'], 'record.mp3', { type: 'audio/mpeg' }),
+      objectUrl: 'blob:recording-preview'
+    })
+
+    renderOwnLastMessageChannel()
+
+    expect(screen.getByText('Draft')).toBeInTheDocument()
+    expect(screen.getByText('voiceIcon.svg')).toBeInTheDocument()
+    expect(screen.getByText('Voice')).toBeInTheDocument()
   })
 
   it.each([
