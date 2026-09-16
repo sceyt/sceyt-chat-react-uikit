@@ -6,6 +6,8 @@ import AudioRecord from './index'
 
 const mockDispatch = jest.fn()
 const mockRecorderStart = jest.fn()
+const mockRecorderStop = jest.fn()
+const mockGetMp3 = jest.fn()
 
 jest.mock('store/hooks', () => ({
   useDispatch: () => mockDispatch
@@ -35,7 +37,13 @@ describe('AudioRecord microphone permission', () => {
   beforeEach(() => {
     mockDispatch.mockClear()
     mockRecorderStart.mockReset()
-    ;(MicRecorder as unknown as jest.Mock).mockImplementation(() => ({ start: mockRecorderStart }))
+    mockRecorderStop.mockReset()
+    mockGetMp3.mockReset()
+    ;(MicRecorder as unknown as jest.Mock).mockImplementation(() => ({
+      start: mockRecorderStart,
+      stop: mockRecorderStop,
+      activeStream: {}
+    }))
   })
 
   it('shows a permission warning and does not publish recording when microphone access is denied', async () => {
@@ -72,5 +80,48 @@ describe('AudioRecord microphone permission', () => {
     expect(screen.getByText('Microphone Permission Denied')).toBeTruthy()
     expect(mockRecorderStart).toHaveBeenCalledTimes(1)
     expect(mockDispatch).not.toHaveBeenCalled()
+  })
+
+  it('stops and sends a recording only once when Send is tapped repeatedly', async () => {
+    mockRecorderStart.mockResolvedValue(undefined)
+    mockGetMp3.mockReturnValue(new Promise(() => undefined))
+    mockRecorderStop.mockReturnValue({ getMp3: mockGetMp3 })
+
+    const { container } = render(
+      <AudioRecord
+        sendRecordedFile={jest.fn()}
+        setShowRecording={jest.fn()}
+        showRecording={false}
+        isSelfChannel={false}
+        channelId='channel-1'
+        showViewOnceToggle={false}
+        viewOnce={false}
+        setViewOnce={jest.fn()}
+        ViewOnceSelectedSVGIcon={null}
+        ViewOnceNotSelectedSVGIcon={null}
+      />
+    )
+
+    await act(async () => {
+      await Promise.resolve()
+    })
+
+    const recordButton = container.querySelector('svg')!.parentElement!
+    fireEvent.click(recordButton)
+
+    await act(async () => {
+      await Promise.resolve()
+    })
+
+    fireEvent.click(recordButton)
+    fireEvent.click(recordButton)
+    fireEvent.click(recordButton)
+
+    await act(async () => {
+      await Promise.resolve()
+    })
+
+    expect(mockRecorderStop).toHaveBeenCalledTimes(1)
+    expect(mockGetMp3).toHaveBeenCalledTimes(1)
   })
 })

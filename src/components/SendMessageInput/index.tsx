@@ -1,4 +1,4 @@
-import React, { FC, useEffect, useMemo, useRef, useState } from 'react'
+import React, { FC, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { shallowEqual } from 'react-redux'
 import { useSelector, useDispatch } from 'store/hooks'
 import { v4 as uuidv4 } from 'uuid'
@@ -433,6 +433,14 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
 
   // Voice recording
   const [showRecording, setShowRecording] = useState<boolean>(false)
+  // Audio drafts are stored outside Redux. Incrementing this local revision
+  // makes their removal observable to this component, so the text editor is
+  // rendered again immediately after a returned recording is cleared.
+  const [, setAudioRecordingRevision] = useState(0)
+  const handleShowRecording = useCallback((start: boolean) => {
+    setShowRecording(start)
+    setAudioRecordingRevision((revision) => revision + 1)
+  }, [])
   const [checkActionPermission] = usePermissions(activeChannel.userRole)
   const [listenerIsAdded, setListenerIsAdded] = useState(false)
   const [messageText, setMessageText] = useState('')
@@ -2603,7 +2611,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
                     >
                       <AudioRecord
                         sendRecordedFile={sendRecordedFile}
-                        setShowRecording={setShowRecording}
+                        setShowRecording={handleShowRecording}
                         showRecording={showRecording}
                         channelId={activeChannel.id}
                         maxRecordingDuration={audioRecordingMaxDuration}

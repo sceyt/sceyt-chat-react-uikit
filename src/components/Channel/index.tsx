@@ -170,9 +170,6 @@ const ChannelMessageText = ({
           true
         )
     : ''
-  const audioRecording = useMemo(() => {
-    return getAudioRecordingFromMap(channel.id)
-  }, [channel.id, draftMessageText])
 
   return (
     <MessageTextContainer>
@@ -187,7 +184,6 @@ const ChannelMessageText = ({
         (draftMessageText ? (
           <DraftMessageText color={textSecondary}>
             {!lastMessage.body && lastMessage.attachments?.length ? LastMessageAttachments({ lastMessage }) : null}
-            {audioRecording && <VoiceIcon />}
             {(!lastMessage.attachments?.length || lastMessage.body) &&
               MessageTextFormat({
                 // Attachment-only drafts already get their label from
