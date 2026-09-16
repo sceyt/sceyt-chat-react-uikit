@@ -2,16 +2,16 @@ import { attachmentTypes } from './constants'
 
 type Attachment = { tid?: string; type?: string; [key: string]: any }
 
+const isVideoAttachment = (attachment: Attachment) =>
+  attachment.type === attachmentTypes.video || attachment.data?.type?.startsWith('video/')
+
 export const waitForMediaAttachmentPreparation = async (
   attachments: Attachment[],
   preparations: Map<string, Promise<void>>
 ) => {
   await Promise.all(
     attachments
-      .filter(
-        (attachment) =>
-          attachment.type === attachmentTypes.image || getOutgoingAttachmentType(attachment) === attachmentTypes.video
-      )
+      .filter((attachment) => attachment.type === attachmentTypes.image || isVideoAttachment(attachment))
       .map((attachment) => (attachment.tid ? preparations.get(attachment.tid) : undefined))
   )
 }
@@ -19,10 +19,6 @@ export const waitForMediaAttachmentPreparation = async (
 export const mergePreparedAttachmentPatches = (attachments: Attachment[], patches: Map<string, Partial<Attachment>>) =>
   attachments.map((attachment) => ({ ...attachment, ...(attachment.tid ? patches.get(attachment.tid) : undefined) }))
 
-// Generic picker videos deliberately use a file-card in the composer while
-// their thumbnail is prepared. Once sent, they must be message videos so the
-// thread renders playback controls immediately instead of retaining that card.
-export const getOutgoingAttachmentType = (attachment: Attachment) =>
-  attachment.type === attachmentTypes.file && attachment.data?.type?.startsWith('video/')
-    ? attachmentTypes.video
-    : attachment.type
+// Preserve the picker choice. A video picked through the generic File option
+// must remain a file attachment in the outgoing message.
+export const getOutgoingAttachmentType = (attachment: Attachment) => attachment.type

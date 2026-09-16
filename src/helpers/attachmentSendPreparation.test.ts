@@ -63,7 +63,7 @@ describe('attachment send preparation', () => {
     await expect(waitForPreparation).resolves.toBeUndefined()
   })
 
-  it('waits for a generic-picker video whose outgoing type is video', async () => {
+  it('waits for a generic-picker video before sending it as a file', async () => {
     let finishPreparation!: () => void
     const preparations = new Map<string, Promise<void>>()
     preparations.set(
@@ -94,13 +94,13 @@ describe('attachment send preparation', () => {
     await expect(waitForPreparation).resolves.toBeUndefined()
   })
 
-  it('sends a generic file-picker video as a video while preserving its compose file-card type', () => {
+  it('keeps a generic file-picker video as a file', () => {
     expect(
       getOutgoingAttachmentType({
         type: attachmentTypes.file,
         data: new File(['video'], 'recording.mov', { type: 'video/quicktime' })
       })
-    ).toBe(attachmentTypes.video)
+    ).toBe(attachmentTypes.file)
   })
 
   it('keeps non-video generic files as files', () => {

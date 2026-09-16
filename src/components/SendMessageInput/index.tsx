@@ -1401,11 +1401,11 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
     // background thumbnail is ready, AttachmentFile renders it like an ordinary
     // document preview rather than switching the composer to an inline video tile.
     const type =
-      fileType === 'video' && (!customUploader || isMediaAttachment)
-        ? 'video'
+      isMediaAttachment && fileType === 'video'
+        ? attachmentTypes.video
         : isMediaAttachment && fileType === 'image'
-          ? 'image'
-          : 'file'
+          ? attachmentTypes.image
+          : attachmentTypes.file
     const attachment: any = {
       data: file,
       // Keep this separately from File.name. IndexedDB implementations may restore
