@@ -20,7 +20,6 @@ import {
   setMessageForReplyAC,
   setMessageMenuOpenedAC,
   setMessageToEditAC,
-  requestPinnedMessagesListCloseAC,
   retractPollVoteAC,
   setReactionsListAC
 } from 'store/message/actions'
@@ -61,7 +60,6 @@ import { IForwardMessageNote } from 'common/popups/forwardMessage'
 import usePermissions from '../../hooks/usePermissions'
 import { pinnedMessagesSelector } from '../../store/pinned/selector'
 import { pinMessageAC, unpinMessageAC } from '../../store/pinned/actions'
-import { navigateToMessage } from '../../helpers/messageListNavigator'
 import { getClient } from 'common/client'
 
 // Constants
@@ -338,19 +336,10 @@ const Message = ({
   const isSelectedMessage = selectedMessagesMap && selectedMessagesMap.get(message.id || message.tid!)
   const tooManySelected = selectedMessagesMap && selectedMessagesMap.size >= MAX_SELECTED_MESSAGES
 
-  const openPinnedMessageInConversation = useCallback(() => {
-    if (!isPinnedMessagesList) return
-
-    const messageId = message.id || message.tid
-    if (messageId) navigateToMessage(messageId)
-    dispatch(requestPinnedMessagesListCloseAC())
-  }, [dispatch, isPinnedMessagesList, message.id, message.tid])
-
   const toggleEditMode = useCallback(() => {
-    openPinnedMessageInConversation()
     dispatch(setMessageToEditAC(message))
     setMessageActionsShow(false)
-  }, [dispatch, message, openPinnedMessageInConversation])
+  }, [dispatch, message])
 
   const handleRetractVote = useCallback(() => {
     if (message?.pollDetails?.id) {
@@ -425,7 +414,6 @@ const Message = ({
 
   const handleReplyMessage = useCallback(
     (threadReply?: boolean) => {
-      openPinnedMessageInConversation()
       if (threadReply) {
         // dispatch(setMessageForThreadReply(message));
       } else {
@@ -433,7 +421,7 @@ const Message = ({
       }
       setMessageActionsShow(false)
     },
-    [dispatch, message, openPinnedMessageInConversation]
+    [dispatch, message]
   )
 
   const handleToggleReportPopupOpen = useCallback(() => {
@@ -790,15 +778,14 @@ const Message = ({
     }
   }, [openedMessageMenuId])
 
-  // The reactions details popup is anchored to fixed coordinates captured at
-  // open time — close it when the chat scrolls so it doesn't hang detached
-  // from its message. (Scroll events don't bubble, so scrolling inside the
-  // popup's own list doesn't trigger this.)
+  // The reaction-details popup is anchored to fixed coordinates captured at
+  // open time. Close it when its owning chat or pinned-message list scrolls
+  // so it cannot hang detached from the message.
   useEffect(() => {
     if (!reactionsPopupOpen) {
       return undefined
     }
-    const scrollContainer = document.getElementById('scrollableDiv')
+    const scrollContainer = document.getElementById(isPinnedMessagesList ? 'pinnedScrollableDiv' : 'scrollableDiv')
     if (!scrollContainer) {
       return undefined
     }
@@ -809,7 +796,7 @@ const Message = ({
     return () => {
       scrollContainer.removeEventListener('scroll', handleChatScroll)
     }
-  }, [reactionsPopupOpen])
+  }, [isPinnedMessagesList, reactionsPopupOpen])
 
   useEffect(() => {
     document.addEventListener('mousedown', handleClick)
@@ -937,6 +924,7 @@ const Message = ({
             ifLatestAndHasNotPreview={ifLatestAndHasNotPreview}
             channel={channel}
             message={message}
+            isPinnedMessagesList={isPinnedMessagesList}
             prevMessage={prevMessage}
             nextMessage={nextMessage}
             unreadMessageId={unreadMessageId}
@@ -1169,6 +1157,7 @@ const Message = ({
             reactionsContainerPadding={reactionsContainerPadding}
             reactionsDetailsPopupBorderRadius={reactionsDetailsPopupBorderRadius}
             reactionsDetailsPopupHeaderItemsStyle={reactionsDetailsPopupHeaderItemsStyle}
+            popupZIndex={isPinnedMessagesList ? 30 : undefined}
             onToggleReactionsPopup={handleToggleReactionsPopup}
             onReactionAddDelete={handleReactionAddDelete}
             onOpenUserProfile={handleOpenUserProfile}

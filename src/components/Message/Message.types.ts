@@ -89,6 +89,7 @@ interface ICustomMessageItem {
   isThreadMessage?: boolean
   handleOpenUserProfile: (user: IUser) => void
   unsupportedMessage: boolean
+  isPinnedMessagesList?: boolean
   onInviteLinkClick?: (key: string) => void
   ifLatestAndHasNotPreview: boolean
 }

@@ -31,6 +31,7 @@ interface MessageReactionsProps {
   reactionsContainerPadding?: string
   reactionsDetailsPopupBorderRadius?: string
   reactionsDetailsPopupHeaderItemsStyle?: 'bubbles' | 'inline'
+  popupZIndex?: number
   onToggleReactionsPopup: () => void
   onReactionAddDelete: (selectedEmoji: string) => void
   onOpenUserProfile: (user?: any) => void
@@ -64,6 +65,7 @@ const MessageReactions: React.FC<MessageReactionsProps> = ({
   reactionsContainerPadding,
   reactionsDetailsPopupBorderRadius,
   reactionsDetailsPopupHeaderItemsStyle,
+  popupZIndex,
   onToggleReactionsPopup,
   onReactionAddDelete,
   onOpenUserProfile
@@ -93,6 +95,7 @@ const MessageReactions: React.FC<MessageReactionsProps> = ({
           handleAddDeleteEmoji={onReactionAddDelete}
           reactionsDetailsPopupBorderRadius={reactionsDetailsPopupBorderRadius}
           reactionsDetailsPopupHeaderItemsStyle={reactionsDetailsPopupHeaderItemsStyle}
+          popupZIndex={popupZIndex}
         />
       )}
       <ReactionsContainer

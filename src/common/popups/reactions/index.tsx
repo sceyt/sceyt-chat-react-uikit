@@ -40,6 +40,7 @@ interface IReactionsPopupProps {
   rtlDirection?: boolean
   reactionsDetailsPopupBorderRadius?: string
   reactionsDetailsPopupHeaderItemsStyle?: 'bubbles' | 'inline'
+  popupZIndex?: number
   openUserProfile: (user: IUser) => void
 }
 let reactionsPrevLength: any = 0
@@ -54,6 +55,7 @@ export default function ReactionsPopup({
   reactionTotals,
   reactionsDetailsPopupBorderRadius,
   reactionsDetailsPopupHeaderItemsStyle,
+  popupZIndex = 12,
   rtlDirection,
   openUserProfile
 }: IReactionsPopupProps): React.ReactElement {
@@ -176,9 +178,9 @@ export default function ReactionsPopup({
       bottom,
       left,
       right,
-      zIndex: 12
+      zIndex: popupZIndex
     }
-  }, [popupVerticalPosition, anchorTop, anchorBottom, horizontalPositions, rtlDirection])
+  }, [popupVerticalPosition, anchorTop, anchorBottom, horizontalPositions, popupZIndex, rtlDirection])
 
   return createPortal(
     <Container
