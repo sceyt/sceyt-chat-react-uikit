@@ -54,7 +54,7 @@ export const getMediaAttachmentValidationError = (
   const extension = file.name.split('.').pop()?.toLowerCase()
 
   if (!extension || !supportedExtensions.includes(extension)) {
-    return invalidTypeMessage ?? `Invalid file type. Allowed extensions are: ${supportedExtensions.join(', ')}.`
+    return invalidTypeMessage ?? `Invalid file type.`
   }
 
   return null
