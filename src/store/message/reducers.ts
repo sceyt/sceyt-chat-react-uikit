@@ -671,6 +671,10 @@ const messageSlice = createSlice({
 
     requestPinnedMessagesListClose: (state) => {
       if (state.pinnedMessagesListOpen) {
+        // Restore the surrounding chat immediately. The locally mounted pinned
+        // list receives the close request and remains only long enough to play
+        // its exit animation.
+        state.pinnedMessagesListOpen = false
         state.pinnedMessagesListCloseRequested = true
       }
     },

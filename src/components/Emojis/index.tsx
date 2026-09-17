@@ -13,6 +13,8 @@ import { THEME_COLORS } from '../../UIHelper/constants'
 import EMOJIS from './emojis'
 import { getEmojisCategoryTitle } from '../../helpers'
 import { useColor } from '../../hooks'
+import { themeSelector } from 'store/theme/selector'
+import { useSelector } from 'store/hooks'
 
 interface EmojiCollectionProps {
   iconColor: string
@@ -73,8 +75,10 @@ function EmojisPopup({
     [THEME_COLORS.BACKGROUND_HOVERED]: backgroundHovered,
     [THEME_COLORS.BORDER]: border,
     [THEME_COLORS.ICON_PRIMARY]: iconPrimary,
-    [THEME_COLORS.SURFACE_2]: scrollbarThumbColor
+    [THEME_COLORS.SURFACE_2]: scrollbarThumbColor,
+    [THEME_COLORS.BACKGROUND]: background
   } = useColor()
+  const theme = useSelector(themeSelector)
 
   const [rendered, setRendered] = useState<any>(false)
   const [activeCollection, setActiveCollection] = useState('People')
@@ -162,7 +166,11 @@ function EmojisPopup({
           {getEmojisCategoryTitle(activeCollection)}
         </EmojiHeader>
       )}
-      <EmojiSection ref={emojiContainerRef} onScroll={handleEmojiListScroll} scrollbarThumbColor={scrollbarThumbColor}>
+      <EmojiSection
+        ref={emojiContainerRef}
+        onScroll={handleEmojiListScroll}
+        scrollbarThumbColor={theme === 'dark' ? background : scrollbarThumbColor}
+      >
         <AllEmojis>
           {EMOJIS.map((emojiBigCollection, bigColIndex) => {
             const mainCollectionKey = emojiBigCollection.key

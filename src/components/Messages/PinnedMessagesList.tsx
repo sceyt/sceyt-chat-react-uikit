@@ -130,10 +130,7 @@ const PinnedMessagesList = ({
     const rowBounds = event.currentTarget.getBoundingClientRect()
     const contentBounds = messageContent.getBoundingClientRect()
     const messageItem = event.currentTarget.querySelector('.message_item') as HTMLElement | null
-    const reactionContainerId = `${message.id}_reactions_container`
-    const reactionContainer = Array.from(event.currentTarget.querySelectorAll<HTMLElement>('[id]')).find(
-      (element) => element.id === reactionContainerId
-    )
+    const reactionContainer = event.currentTarget.querySelector<HTMLElement>('[data-reactions-container]')
     const itemMarginBottom = messageItem ? Number.parseFloat(window.getComputedStyle(messageItem).marginBottom) || 0 : 0
     // Reactions extend the message item's height below the bubble. Keep the
     // navigation control aligned with the bubble by accounting for their

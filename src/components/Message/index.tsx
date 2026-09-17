@@ -491,7 +491,7 @@ const Message = ({
   }, [message, contactsMap])
 
   const handleToggleReactionsPopup = useCallback(() => {
-    const reactionsContainer = document.getElementById(`${message.id}_reactions_container`)
+    const reactionsContainer = messageItemRef.current?.querySelector<HTMLElement>('[data-reactions-container]')
     const reactionsContPos = reactionsContainer?.getBoundingClientRect()
     const bottomPos = messageItemRef.current?.getBoundingClientRect().bottom
     const offsetBottom = bottomPos ? window.innerHeight - bottomPos : 0
@@ -504,7 +504,7 @@ const Message = ({
     setReactionsAnchorBottom(reactionsContPos ? reactionsContPos.bottom : 0)
     dispatch(setReactionsListAC([], false))
     setReactionsPopupOpen((prev) => !prev)
-  }, [dispatch, message.id])
+  }, [dispatch, message.id, message.tid])
 
   const handleMouseEnter = useCallback(() => {
     if (message.state !== MESSAGE_STATUS.DELETE && !selectionIsActive && !infoPopupOpen) {

@@ -1,5 +1,5 @@
 import React from 'react'
-import { screen } from '@testing-library/react'
+import { fireEvent, screen } from '@testing-library/react'
 import Message from './index'
 import { DEFAULT_CHANNEL_TYPE, MESSAGE_DELIVERY_STATUS } from '../../helpers/constants'
 import { CONNECTION_STATUS } from '../../store/user/constants'
@@ -47,8 +47,36 @@ jest.mock('./MessageSelection', () => ({
 
 jest.mock('./MessageReactions', () => ({
   __esModule: true,
-  default: ({ popupZIndex }: { popupZIndex?: number }) => (
-    <div data-testid='message-reactions' data-popup-z-index={popupZIndex} />
+  default: ({
+    message,
+    popupZIndex,
+    reactionsPopupOpen,
+    reactionsPopupPosition,
+    reactionsPopupHorizontalPosition,
+    reactionsAnchorTop,
+    reactionsAnchorBottom,
+    onToggleReactionsPopup
+  }: any) => (
+    <div
+      id={`${message.id || message.tid}_reactions_container`}
+      data-reactions-container
+      data-testid='message-reactions'
+      data-popup-z-index={popupZIndex}
+    >
+      <button type='button' data-testid='message-reactions-toggle' onClick={onToggleReactionsPopup}>
+        Open reactions
+      </button>
+      {reactionsPopupOpen && (
+        <div
+          data-testid='reactions-popup'
+          data-bottom={reactionsPopupPosition}
+          data-left={reactionsPopupHorizontalPosition.left}
+          data-right={reactionsPopupHorizontalPosition.right}
+          data-anchor-top={reactionsAnchorTop}
+          data-anchor-bottom={reactionsAnchorBottom}
+        />
+      )}
+    </div>
   )
 }))
 
@@ -420,6 +448,100 @@ describe('Message', () => {
     )
 
     expect(screen.getByTestId('message-reactions')).toHaveAttribute('data-popup-z-index', '30')
+  })
+
+  it('opens pinned-list reaction details at the reaction bar coordinates', () => {
+    const channelId = 'channel-pinned-list-reaction-position'
+    const pinnedMessage = makeMessage({
+      id: '1606',
+      channelId,
+      body: 'pinned reaction position message',
+      reactionTotals: [{ key: '👍', count: 1, score: 1 }]
+    })
+    const channel = makeChannel({ id: channelId, lastMessage: pinnedMessage })
+    const store = createMessageListStore({
+      ChannelReducer: { activeChannel: channel },
+      MessageReducer: { unreadScrollTo: false }
+    })
+    const innerHeight = window.innerHeight
+    const staleReactionContainer = document.createElement('div')
+    staleReactionContainer.id = `${pinnedMessage.id}_reactions_container`
+    Object.defineProperty(staleReactionContainer, 'getBoundingClientRect', {
+      configurable: true,
+      value: () =>
+        ({
+          top: -200,
+          bottom: -176,
+          left: 12,
+          right: 44,
+          width: 32,
+          height: 24,
+          x: 12,
+          y: -200,
+          toJSON: () => ({})
+        }) as DOMRect
+    })
+    document.body.appendChild(staleReactionContainer)
+    Object.defineProperty(window, 'innerHeight', { configurable: true, value: 900 })
+
+    try {
+      renderWithSceytProvider(
+        <Message
+          message={pinnedMessage}
+          channel={channel}
+          stopScrolling={() => undefined}
+          handleScrollToRepliedMessage={() => undefined}
+          prevMessage={undefined as any}
+          nextMessage={undefined as any}
+          isThreadMessage={false}
+          isPinnedMessagesList
+        />,
+        { store }
+      )
+
+      Object.defineProperty(screen.getByTestId('message-reactions'), 'getBoundingClientRect', {
+        configurable: true,
+        value: () =>
+          ({
+            top: 420,
+            bottom: 444,
+            left: 120,
+            right: 208,
+            width: 88,
+            height: 24,
+            x: 120,
+            y: 420,
+            toJSON: () => ({})
+          }) as DOMRect
+      })
+      Object.defineProperty(document.querySelector('.message_item'), 'getBoundingClientRect', {
+        configurable: true,
+        value: () =>
+          ({
+            top: 360,
+            bottom: 460,
+            left: 80,
+            right: 400,
+            width: 320,
+            height: 100,
+            x: 80,
+            y: 360,
+            toJSON: () => ({})
+          }) as DOMRect
+      })
+
+      fireEvent.click(screen.getByTestId('message-reactions-toggle'))
+
+      const popup = screen.getByTestId('reactions-popup')
+      expect(popup).toHaveAttribute('data-bottom', '440')
+      expect(popup).toHaveAttribute('data-left', '120')
+      expect(popup).toHaveAttribute('data-right', `${window.innerWidth - 208}`)
+      expect(popup).toHaveAttribute('data-anchor-top', '420')
+      expect(popup).toHaveAttribute('data-anchor-bottom', '444')
+    } finally {
+      staleReactionContainer.remove()
+      Object.defineProperty(window, 'innerHeight', { configurable: true, value: innerHeight })
+    }
   })
 
   it('does not queue read markers when browser tab is inactive', () => {

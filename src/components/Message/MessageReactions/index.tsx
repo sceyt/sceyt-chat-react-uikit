@@ -70,6 +70,8 @@ const MessageReactions: React.FC<MessageReactionsProps> = ({
   onReactionAddDelete,
   onOpenUserProfile
 }) => {
+  const messageId = message.id || message.tid
+
   // Enable height transition only after the first paint so the initial render
   // jumps instantly to the correct height without animating.
   const enableTransitionRef = React.useCallback((el: HTMLDivElement | null) => {
@@ -89,7 +91,7 @@ const MessageReactions: React.FC<MessageReactionsProps> = ({
           anchorTop={reactionsAnchorTop}
           anchorBottom={reactionsAnchorBottom}
           reactionTotals={message.reactionTotals || []}
-          messageId={message.id}
+          messageId={messageId as string}
           handleReactionsPopupClose={onToggleReactionsPopup}
           rtlDirection={rtlDirection}
           handleAddDeleteEmoji={onReactionAddDelete}
@@ -100,7 +102,8 @@ const MessageReactions: React.FC<MessageReactionsProps> = ({
       )}
       <ReactionsContainer
         ref={enableTransitionRef}
-        id={`${message.id}_reactions_container`}
+        id={`${messageId}_reactions_container`}
+        data-reactions-container
         border={reactionsContainerBorder}
         boxShadow={reactionsContainerBoxShadow}
         borderRadius={reactionsContainerBorderRadius}

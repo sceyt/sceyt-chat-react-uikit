@@ -2,11 +2,13 @@ import React from 'react'
 import { act, fireEvent, screen } from '@testing-library/react'
 import { setClient } from '../../common/client'
 import { setActiveChannelAC } from '../../store/channel/actions'
+import { addSelectedMessageAC, setPinnedMessagesListOpenAC } from '../../store/message/actions'
 import { SEND_MESSAGE } from '../../store/message/constants'
 import { attachmentTypes } from '../../helpers/constants'
 import {
   createMessageListStore,
   makeChannel,
+  makeMessage,
   makeUser,
   renderWithSceytProvider
 } from '../../testUtils/messageListHarness'
@@ -162,6 +164,22 @@ describe('SendMessageInput draft ownership', () => {
 
     expect(mockDrafts['user-a']?.text).toBe('Draft for User A')
     expect(mockDrafts['user-b']).toBeUndefined()
+  })
+
+  it('keeps Forward and Delete visible when a pinned-list message is selected', () => {
+    const channel = makeChannel({ id: 'pinned-selection-channel' })
+    const message = makeMessage({ id: 'pinned-selection-message', channelId: channel.id, body: 'Selected pin' })
+    const store = createMessageListStore({ ChannelReducer: { activeChannel: channel } })
+
+    renderWithSceytProvider(<SendMessageInput />, { store })
+
+    act(() => {
+      store.dispatch(setPinnedMessagesListOpenAC(true))
+      store.dispatch(addSelectedMessageAC(message))
+    })
+
+    expect(screen.getByText('Forward')).toBeVisible()
+    expect(screen.getByText('Delete')).toBeVisible()
   })
 })
 

@@ -2025,7 +2025,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
       backgroundColor={backgroundColor || background}
       // Keep the composer area as reserved empty space while browsing pins.
       // Edit/reply state is preserved and becomes visible again when the list closes.
-      $hidden={pinnedMessagesListOpen}
+      $hidden={pinnedMessagesListOpen && !(selectedMessagesMap && selectedMessagesMap.size > 0)}
     >
       <Container
         margin={margin}

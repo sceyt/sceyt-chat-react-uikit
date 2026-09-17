@@ -14,6 +14,8 @@ import { getEmojisCategoryTitle } from '../../../helpers'
 import EMOJIS from '../../Emojis/emojis'
 import { useColor } from '../../../hooks'
 import log from 'loglevel'
+import { themeSelector } from 'store/theme/selector'
+import { useSelector } from 'store/hooks'
 
 interface EmojiCollectionProps {
   activeCollection: boolean
@@ -74,8 +76,10 @@ function EmojisPopup({
     [THEME_COLORS.TEXT_SECONDARY]: textSecondary,
     [THEME_COLORS.TEXT_FOOTNOTE]: textFootnote,
     [THEME_COLORS.BORDER]: border,
-    [THEME_COLORS.SURFACE_2]: scrollbarThumbColor
+    [THEME_COLORS.SURFACE_2]: scrollbarThumbColor,
+    [THEME_COLORS.BACKGROUND]: background
   } = useColor()
+  const theme = useSelector(themeSelector)
 
   let richTextEditor: any
   try {
@@ -145,6 +149,7 @@ function EmojisPopup({
     }, 300)
   }, [])
 
+  console.log(theme, theme === 'dark' ? background : scrollbarThumbColor)
   return (
     <Container
       backgroundColor={backgroundSections}
@@ -178,7 +183,11 @@ function EmojisPopup({
           {getEmojisCategoryTitle(activeCollection)}
         </EmojiHeader>
       )}
-      <EmojiSection ref={emojiContainerRef} onScroll={handleEmojiListScroll} scrollbarThumbColor={scrollbarThumbColor}>
+      <EmojiSection
+        ref={emojiContainerRef}
+        onScroll={handleEmojiListScroll}
+        scrollbarThumbColor={theme === 'dark' ? background : scrollbarThumbColor}
+      >
         <AllEmojis>
           {EMOJIS.map((emojiBigCollection, bigColIndex) => {
             const mainCollectionKey = emojiBigCollection.key

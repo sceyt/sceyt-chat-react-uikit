@@ -11,6 +11,8 @@ import MessageReducer, {
   setMessageMarkers,
   removeChannelMarkers,
   setOGMetadata,
+  setPinnedMessagesListOpen,
+  requestPinnedMessagesListClose,
   OG_METADATA_MAX
 } from './reducers'
 import { addReactionToMessageAC, deleteReactionFromMessageAC } from './actions'
@@ -552,6 +554,16 @@ describe('message pending ordering', () => {
     )
 
     expect(deepHistoryState.activeChannelMessages.some((message) => message.body === 'pending-tail')).toBe(false)
+  })
+})
+
+describe('pinned messages list close', () => {
+  it('restores chat UI state immediately while retaining the overlay close request', () => {
+    const openState = MessageReducer(undefined, setPinnedMessagesListOpen({ isOpen: true }))
+    const closingState = MessageReducer(openState, requestPinnedMessagesListClose())
+
+    expect(closingState.pinnedMessagesListOpen).toBe(false)
+    expect(closingState.pinnedMessagesListCloseRequested).toBe(true)
   })
 })
 
