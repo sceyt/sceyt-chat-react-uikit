@@ -122,15 +122,15 @@ const PinnedMessagesList = ({
     setIsClosing(true)
   }
 
-  const positionNavigationControl = (message: IMessage, event: React.MouseEvent<HTMLDivElement>) => {
+  const positionNavigationControl = (message: IMessage, event: HTMLDivElement | Element) => {
     const messageId = message.id || message.tid
-    const messageContent = event.currentTarget.querySelector('.messageContent') as HTMLElement | null
+    const messageContent = event.querySelector('.messageContent') as HTMLElement | null
     if (!messageId || !messageContent) return
 
-    const rowBounds = event.currentTarget.getBoundingClientRect()
+    const rowBounds = event.getBoundingClientRect()
     const contentBounds = messageContent.getBoundingClientRect()
-    const messageItem = event.currentTarget.querySelector('.message_item') as HTMLElement | null
-    const reactionContainer = event.currentTarget.querySelector<HTMLElement>('[data-reactions-container]')
+    const messageItem = event.querySelector('.message_item') as HTMLElement | null
+    const reactionContainer = event.querySelector<HTMLElement>('[data-reactions-container]')
     const itemMarginBottom = messageItem ? Number.parseFloat(window.getComputedStyle(messageItem).marginBottom) || 0 : 0
     // Reactions extend the message item's height below the bubble. Keep the
     // navigation control aligned with the bubble by accounting for their
@@ -146,6 +146,18 @@ const PinnedMessagesList = ({
       return { ...current, [messageId]: { left, bottom } }
     })
   }
+
+  useEffect(() => {
+    if (pins) {
+      for (let i = 0; i < pins.length; i++) {
+        const pin = pins[i]
+        const pinnedElement = document.querySelector(`[data-pinned-message-id="${pin.id}"]`)
+        if (pinnedElement) {
+          positionNavigationControl(pin.message, pinnedElement)
+        }
+      }
+    }
+  }, [pins])
 
   useLayoutEffect(() => {
     const element = itemsRef.current
@@ -186,7 +198,7 @@ const PinnedMessagesList = ({
                 key={pin.id}
                 data-pinned-message-id={pin.id}
                 onMouseEnter={(event: React.MouseEvent<HTMLDivElement>) =>
-                  positionNavigationControl(pin.message, event)
+                  positionNavigationControl(pin.message, event.currentTarget)
                 }
               >
                 {renderMessage({
