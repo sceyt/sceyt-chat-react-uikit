@@ -80,6 +80,8 @@ export default function ReactionsPopup({
   const contactsMap = useSelector(contactsMapSelector)
   const getFromContacts = getShowOnlyContactUsers()
   const [activeTabKey, setActiveTabKey] = useState('all')
+  const reactionTotalsSignature = reactionTotals.map(({ key, count, score }) => `${key}:${count}:${score}`).join('|')
+  const reactionTotalsSignatureRef = useRef(reactionTotalsSignature)
   // const [popupHorizontalPosition, setPopupHorizontalPosition] = useState('')
   const [popupHeight, setPopupHeight] = useState(0)
   const [calculateSizes, setCalculateSizes] = useState(false)
@@ -103,7 +105,10 @@ export default function ReactionsPopup({
     }
   }
   const handleClicks = (e: any) => {
-    if (e.target.closest('.reactions_popup')) {
+    // The click that opens this portal can reach the document listener after
+    // mount. Treat its reaction chip as part of the popup interaction so a
+    // single reaction does not immediately close its own details list.
+    if (e.target.closest('.reactions_popup') || e.target.closest('[data-reactions-container]')) {
       return
     }
     if (closeIsApproved) {
@@ -140,6 +145,24 @@ export default function ReactionsPopup({
       handleReactionsPopupClose()
     }
   }, [reactionTotals])
+
+  // Keep the details list in sync with real-time reaction events. The popup
+  // receives updated totals through its message prop, so refresh only this
+  // message's active tab when those totals change.
+  useEffect(() => {
+    if (reactionTotalsSignatureRef.current === reactionTotalsSignature || !reactionTotals.length) {
+      return
+    }
+    reactionTotalsSignatureRef.current = reactionTotalsSignature
+
+    const nextActiveTabKey =
+      activeTabKey !== 'all' && reactionTotals.some((reaction) => reaction.key === activeTabKey) ? activeTabKey : 'all'
+
+    if (nextActiveTabKey !== activeTabKey) {
+      setActiveTabKey(nextActiveTabKey)
+    }
+    handleGetReactions(nextActiveTabKey === 'all' ? undefined : nextActiveTabKey)
+  }, [activeTabKey, reactionTotals, reactionTotalsSignature])
 
   const reactionsHeight = useMemo(() => {
     return reactions.length * 50 + 45

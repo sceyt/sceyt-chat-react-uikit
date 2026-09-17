@@ -3748,7 +3748,8 @@ function* deleteReaction(action: IAction): any {
     if (isLastReaction) {
       const channelUpdateParam = {
         userMessageReactions: [],
-        lastReactedMessage: null
+        lastReactedMessage: null,
+        newReactions: []
       }
       yield put(updateChannelDataAC(channel.id, channelUpdateParam))
       updateChannelOnAllChannels(channel.id, channelUpdateParam)
@@ -4568,7 +4569,8 @@ export const __messageSagaTestables = {
   prefetchMessages,
   prefetchMessagesFromAction,
   cancelChannelMessageProcesses,
-  refreshCacheAroundMessage
+  refreshCacheAroundMessage,
+  deleteReaction
 }
 
 export const __resetMessageSagaTestState = () => {
@@ -4694,7 +4696,9 @@ export default function* MessageSaga() {
   yield takeEvery(LOAD_MORE_MESSAGES, loadMoreMessages)
   yield takeEvery(PREFETCH_MESSAGES, prefetchMessagesFromAction)
   yield takeEvery(CANCEL_CHANNEL_MESSAGE_PROCESSES, cancelChannelMessageProcesses)
-  yield takeEvery(GET_REACTIONS, getReactions)
+  // Switching reaction tabs starts a new query for the same shared list.
+  // Ignore a slower response from the previously selected tab.
+  yield takeLatest(GET_REACTIONS, getReactions)
   yield takeEvery(LOAD_MORE_REACTIONS, loadMoreReactions)
   yield takeEvery(PAUSE_ATTACHMENT_UPLOADING, pauseAttachmentUploading)
   yield takeEvery(RESUME_ATTACHMENT_UPLOADING, resumeAttachmentUploading)

@@ -436,6 +436,40 @@ describe('message pending ordering', () => {
     expect(nextState.activeChannelMessages[0].reactionTotals).toEqual(message.reactionTotals)
   })
 
+  it('removes the final reaction from the rendered totals even if the delete response is stale', () => {
+    const channelId = 'channel-reaction-stale-delete'
+    const currentUser = makeUser({ id: 'current-user' })
+    const reaction = {
+      id: 'reaction-3',
+      key: '👍',
+      score: 1,
+      reason: '',
+      createdAt: new Date('2026-04-01T12:32:00.000Z'),
+      messageId: '5003',
+      user: currentUser
+    }
+    const cachedMessage = makeMessage({
+      id: reaction.messageId,
+      channelId,
+      user: currentUser,
+      userReactions: [reaction],
+      reactionTotals: [{ key: reaction.key, count: 1, score: 1 }]
+    })
+    const staleDeleteResponse = {
+      ...cachedMessage,
+      reactionTotals: [{ key: reaction.key, count: 1, score: 1 }]
+    }
+
+    const initialState = MessageReducer(undefined, setMessages({ messages: [cachedMessage] }))
+    const nextState = MessageReducer(
+      initialState,
+      deleteReactionFromMessageAC(staleDeleteResponse as any, reaction as any, true)
+    )
+
+    expect(nextState.activeChannelMessages[0].userReactions).toEqual([])
+    expect(nextState.activeChannelMessages[0].reactionTotals).toEqual([])
+  })
+
   it('keeps pending messages at the tail after paginating to older and newer pages around them', () => {
     const channelId = 'channel-window-pagination'
     const confirmedMiddle = makeMessage({

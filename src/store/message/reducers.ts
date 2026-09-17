@@ -9,6 +9,7 @@ import {
   MESSAGE_LOAD_DIRECTION,
   MESSAGES_MAX_PAGE_COUNT,
   PendingPollAction,
+  removeReactionFromTotals,
   updateMessageDeliveryStatusAndMarkers,
   shouldSkipDeliveryStatusUpdate
 } from '../../helpers/messagesHalper'
@@ -521,7 +522,7 @@ const messageSlice = createSlice({
           }
           return {
             ...msg,
-            reactionTotals: message.reactionTotals || msg.reactionTotals || [],
+            reactionTotals: removeReactionFromTotals(msg.reactionTotals, reaction.key),
             userReactions
           }
         }

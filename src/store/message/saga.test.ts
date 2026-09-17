@@ -1,4 +1,4 @@
-import { runSaga } from 'redux-saga'
+import { runSaga, stdChannel } from 'redux-saga'
 import log from 'loglevel'
 import { setClient } from '../../common/client'
 import {
@@ -40,10 +40,12 @@ import {
   addMessageAC,
   addMessagesAC,
   cancelChannelMessageProcessesAC,
+  deleteReactionAC,
   deleteMessageAC,
   deleteMessageFromListAC,
   editMessageAC,
   forwardMessageAC,
+  getReactionsAC,
   loadAroundMessageAC,
   loadDefaultMessagesAC,
   loadLatestMessagesAC,
@@ -63,6 +65,7 @@ import {
   setLoadingNextMessagesStateAC,
   setLoadingPrevMessagesStateAC,
   setPendingMessageMutationAC,
+  setReactionsListAC,
   setUnreadMessageIdAC,
   setUnreadScrollToAC,
   updateAttachmentUploadingStateAC,
@@ -70,7 +73,7 @@ import {
 } from './actions'
 import { updateChannelDataAC, updateChannelLastMessageAC } from '../channel/actions'
 import { setWaitToSendPendingMessagesAC } from '../user/actions'
-import { __messageSagaTestables, __resetMessageSagaTestState } from './saga'
+import MessageSaga, { __messageSagaTestables, __resetMessageSagaTestState } from './saga'
 import { navigateToLatest } from '../../helpers/messageListNavigator'
 import { IMessage } from '../../types'
 
@@ -227,6 +230,108 @@ describe('message saga message-list flows', () => {
     destroyChannelsMap()
     setActiveChannelId('')
     __resetMessageSagaTestState()
+  })
+
+  it('clears the latest-reaction preview when its final reaction is removed', async () => {
+    const currentUser = makeUser({ id: 'current-user' })
+    const channelId = 'channel-remove-latest-reaction'
+    const reaction = {
+      id: 'latest-reaction',
+      key: '👍',
+      score: 1,
+      reason: '',
+      createdAt: new Date('2026-04-02T12:30:00.000Z'),
+      messageId: 'latest-reaction-message',
+      user: currentUser
+    }
+    const updatedMessage = makeMessage({
+      id: reaction.messageId,
+      channelId,
+      user: currentUser,
+      userReactions: [],
+      reactionTotals: []
+    })
+    const channel = makeChannel({
+      id: channelId,
+      lastMessage: updatedMessage,
+      lastReactedMessage: updatedMessage,
+      newReactions: [reaction],
+      deleteReaction: jest.fn(async () => ({ message: updatedMessage, reaction }))
+    })
+
+    setChannelInMap(channel)
+
+    const dispatched = await runMessageSaga(
+      __messageSagaTestables.deleteReaction,
+      deleteReactionAC(channelId, updatedMessage.id, reaction.key, true)
+    )
+
+    expect(channel.deleteReaction).toHaveBeenCalledWith(updatedMessage.id, reaction.key)
+    expect(dispatched).toContainEqual(
+      updateChannelDataAC(channelId, {
+        userMessageReactions: [],
+        lastReactedMessage: null,
+        newReactions: []
+      })
+    )
+    expect(getChannelFromMap(channelId)).toEqual(
+      expect.objectContaining({
+        lastReactedMessage: null,
+        newReactions: []
+      })
+    )
+  })
+
+  it('keeps the latest reaction-tab response when tab requests finish out of order', async () => {
+    let resolveAllReactions: (value: { reactions: any[]; hasNext: boolean }) => void = () => undefined
+    const allReactionsQuery = {
+      loadNext: jest.fn(
+        () =>
+          new Promise<{ reactions: any[]; hasNext: boolean }>((resolve) => {
+            resolveAllReactions = resolve
+          })
+      )
+    }
+    const heartReactions = [{ id: 'heart-reaction', key: '❤️' }]
+    const heartReactionsQuery = {
+      loadNext: jest.fn(() => Promise.resolve({ reactions: heartReactions, hasNext: false }))
+    }
+
+    setClient({
+      user: { id: 'current-user' },
+      ReactionListQueryBuilder: class {
+        key?: string
+        limit = jest.fn()
+        setKey = jest.fn((key: string) => {
+          this.key = key
+        })
+
+        build = jest.fn(() => Promise.resolve(this.key ? heartReactionsQuery : allReactionsQuery))
+      }
+    })
+
+    const actionChannel = stdChannel()
+    const dispatched: any[] = []
+    const task = runSaga(
+      {
+        channel: actionChannel,
+        dispatch: (action) => dispatched.push(action),
+        getState: () => mockStoreState
+      },
+      MessageSaga
+    )
+
+    actionChannel.put(getReactionsAC('reaction-message'))
+    await flushAsyncWork()
+    actionChannel.put(getReactionsAC('reaction-message', '❤️'))
+    await flushAsyncWork()
+    resolveAllReactions({ reactions: [{ id: 'stale-all-reaction', key: '👍' }], hasNext: false })
+    await flushAsyncWork()
+    task.cancel()
+
+    expect(dispatched.filter((action) => action.type === setReactionsListAC([], false).type)).toEqual([
+      setReactionsListAC(heartReactions as any, false)
+    ])
   })
 
   it('loads near-unread messages, updates list flags, and keeps pending messages out of non-latest windows', async () => {

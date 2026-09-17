@@ -941,6 +941,16 @@ export function addReactionToMessageOnMap(channelId: string, message: IMessage, 
   }
 }
 
+export const removeReactionFromTotals = (reactionTotals: IMessage['reactionTotals'] = [], reactionKey: string) =>
+  reactionTotals.reduce<IMessage['reactionTotals']>((totals, reactionTotal) => {
+    if (reactionTotal.key !== reactionKey) {
+      totals.push(reactionTotal)
+    } else if (reactionTotal.count > 1) {
+      totals.push({ ...reactionTotal, count: reactionTotal.count - 1 })
+    }
+    return totals
+  }, [])
+
 export function removeReactionToMessageOnMap(
   channelId: string,
   message: IMessage,
@@ -961,7 +971,7 @@ export function removeReactionToMessageOnMap(
     }
     messagesMap[channelId][message.id || message.tid!] = {
       ...messageShouldBeUpdated,
-      reactionTotals: message.reactionTotals || messageShouldBeUpdated.reactionTotals || [],
+      reactionTotals: removeReactionFromTotals(messageShouldBeUpdated.reactionTotals, reaction.key),
       userReactions
     }
   }
