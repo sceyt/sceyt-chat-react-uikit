@@ -30,6 +30,11 @@ interface ISystemMessageProps {
   backgroundColor?: string
   borderRadius?: string
   setLastVisibleMessageId?: (message: IMessage) => void
+  /** Replaces a PM source-message preview for app-specific message types. */
+  renderPinnedMessagePreview?: (
+    message: IMessage,
+    context: { placement: 'banner' | 'system' }
+  ) => React.ReactNode | null | undefined
 }
 
 const Message = ({
@@ -43,7 +48,8 @@ const Message = ({
   backgroundColor,
   borderRadius,
   contactsMap,
-  setLastVisibleMessageId
+  setLastVisibleMessageId,
+  renderPinnedMessagePreview
 }: ISystemMessageProps) => {
   const { [THEME_COLORS.TEXT_ON_PRIMARY]: textOnPrimary, [THEME_COLORS.OVERLAY_BACKGROUND]: overlayBackground } =
     useColor()
@@ -68,6 +74,11 @@ const Message = ({
     return getPinnedMessagePreview(message.parentMessage, contactsMap, getFromContacts)
   }, [contactsMap, getFromContacts, message.parentMessage])
   const pinnedMessageDeleted = isPinnedMessageDeleted(message.parentMessage)
+  const customPinnedMessagePreview =
+    pinnedMessageDeleted || !message.parentMessage
+      ? null
+      : renderPinnedMessagePreview?.(message.parentMessage, { placement: 'system' })
+  const pinnedPreview = customPinnedMessagePreview ?? pinnedMessagePreview
 
   const navigateToPinnedMessage = () => {
     if (parentMessageId) navigateToMessage(parentMessageId)
@@ -127,11 +138,15 @@ const Message = ({
           disabled={!parentMessageId}
           aria-label={parentMessageId ? 'Go to pinned message' : undefined}
         >
-          {pinnedMessagePreview ? (
+          {pinnedPreview ? (
             <React.Fragment>
               {`${actorName} pinned `}
               <PinnedMessagePreview>
-                {pinnedMessageDeleted ? pinnedMessagePreview : `"${pinnedMessagePreview}"`}
+                {pinnedMessageDeleted || customPinnedMessagePreview ? (
+                  pinnedPreview
+                ) : (
+                  <React.Fragment>"{pinnedPreview}"</React.Fragment>
+                )}
               </PinnedMessagePreview>
               {!pinnedMessageDeleted && '.'}
             </React.Fragment>

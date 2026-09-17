@@ -16,6 +16,7 @@ import { Component } from 'components/VideoPreview'
 import { getPinnedMessageBody, isPinnedMessageDeleted } from 'helpers/pinnedMessage'
 import { contactsMapSelector } from '../../store/user/selector'
 import { getShowOnlyContactUsers } from '../../helpers/contacts'
+import { IMessage } from '../../types'
 
 const attachmentMetadata = (attachment: any) => {
   if (!attachment?.metadata) return {}
@@ -84,11 +85,20 @@ const markerMask = (fade: MarkerFade) => {
 const PinnedMessagesBanner = ({
   channelId,
   pinIcon,
-  onOpenList
+  onOpenList,
+  renderPinnedMessagePreview
 }: {
   channelId: string
   pinIcon?: JSX.Element
   onOpenList?: () => void
+  /**
+   * Lets an integrator replace the compact preview for app-specific message
+   * types. Return null or undefined to keep the UIKit preview.
+   */
+  renderPinnedMessagePreview?: (
+    message: IMessage,
+    context: { placement: 'banner' | 'system' }
+  ) => React.ReactNode | null | undefined
 }) => {
   const dispatch = useDispatch()
   const pins = useSelector(pinnedMessagesSelector(channelId))
@@ -159,6 +169,9 @@ const PinnedMessagesBanner = ({
   }
   const linkPreviewImage = getLinkPreviewImage(attachment)
   const sourceMessageDeleted = isPinnedMessageDeleted(active.message)
+  const customPinnedMessagePreview = sourceMessageDeleted
+    ? null
+    : renderPinnedMessagePreview?.(active.message, { placement: 'banner' })
   const hasLeadingPreview =
     !sourceMessageDeleted && (hasAttachmentTile(attachmentForPreview) || attachment?.type === attachmentTypes.link)
   const markerFade: MarkerFade = count <= 3 ? 'none' : index <= 1 ? 'top' : index >= count - 2 ? 'bottom' : 'both'
@@ -243,7 +256,7 @@ const PinnedMessagesBanner = ({
       <Copy textPrimary={textPrimary}>
         <strong>Pinned messages</strong>
         <PinnedCopyPreview key={active.id} textPrimary={textPrimary}>
-          {preview(active.message, contactsMap, getFromContacts)}
+          {customPinnedMessagePreview ?? preview(active.message, contactsMap, getFromContacts)}
         </PinnedCopyPreview>
       </Copy>
       <Controls

@@ -179,6 +179,14 @@ interface MessagesProps {
   endVoteIcon?: JSX.Element
   /** Replaces the default pin icon in the pinned-messages banner. */
   pinnedMessageIcon?: JSX.Element
+  /**
+   * Replaces the compact pinned-message preview for app-specific message
+   * types. Return null or undefined to use the UIKit preview.
+   */
+  renderPinnedMessagePreview?: (
+    message: IMessage,
+    context: { placement: 'banner' | 'system' }
+  ) => React.ReactNode | null | undefined
   messageStatusSize?: string
   messageStatusColor?: string
   messageReadStatusColor?: string
@@ -330,6 +338,7 @@ const MessageList: React.FC<MessagesProps> = ({
   retractVoteIcon,
   endVoteIcon,
   pinnedMessageIcon,
+  renderPinnedMessagePreview,
   allowEditDeleteIncomingMessage = true,
   starIcon,
   staredIcon,
@@ -830,6 +839,7 @@ const MessageList: React.FC<MessagesProps> = ({
           backgroundColor={dateDividerBackgroundColor}
           borderRadius={dateDividerBorderRadius}
           setLastVisibleMessageId={setLastVisibleMessageId}
+          renderPinnedMessagePreview={renderPinnedMessagePreview}
         />
       )
     }
@@ -1043,6 +1053,7 @@ const MessageList: React.FC<MessagesProps> = ({
             channelId={channel.id}
             pinIcon={pinnedMessageIcon}
             onOpenList={openPinnedMessagesList}
+            renderPinnedMessagePreview={renderPinnedMessagePreview}
           />
         )}
         <ScrollViewport>
