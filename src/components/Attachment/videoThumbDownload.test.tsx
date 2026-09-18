@@ -52,7 +52,7 @@ jest.mock('react-circular-progressbar', () => ({
 
 jest.mock('../VideoPreview', () => ({
   __esModule: true,
-  default: () => <div data-testid='video-preview' />
+  default: ({ src }: { src?: string }) => <div data-testid='video-preview' data-src={src || ''} />
 }))
 
 jest.mock('../AudioPlayer', () => ({
@@ -496,6 +496,60 @@ describe('video attachment preview and download states', () => {
       'https://cdn/inline-thumbnail-video.mp4',
       expect.objectContaining({ signal: expect.anything() })
     )
+  })
+
+  it('hydrates the original video after its initiating attachment effect is replaced during download', async () => {
+    let resolveDownload: ((blob: Blob) => void) | undefined
+    let cachedOriginalVideo: string | false = false
+    const originalVideoCacheKey = `${videoAttachment.url}_original_video_url`
+    mockCustomUploader = {
+      download: jest.fn(
+        () =>
+          new Promise<Blob>((resolve) => {
+            resolveDownload = resolve
+          })
+      )
+    }
+    mockGetAttachmentUrlFromCache.mockImplementation((cacheKey: string) =>
+      Promise.resolve(cacheKey === originalVideoCacheKey ? cachedOriginalVideo : false)
+    )
+    mockSetAttachmentToCache.mockImplementation(async () => {
+      cachedOriginalVideo = 'blob:completed-original-video'
+    })
+
+    const store = createMessageListStore({
+      UserReducer: { connectionStatus: CONNECTION_STATUS.CONNECTED }
+    })
+    const { rerender } = renderWithSceytProvider(
+      <Attachment
+        attachment={videoAttachment as any}
+        backgroundColor='#ffffff'
+        videoAttachmentMaxWidth={420}
+        messageType='initial'
+      />,
+      { store }
+    )
+    await flushAttachmentEffects()
+    expect(mockCustomUploader.download).toHaveBeenCalledTimes(1)
+
+    // A prop update replaces the effect while its shared request is active.
+    // The original callback must not be the only path that publishes the blob.
+    rerender(
+      <Attachment
+        attachment={videoAttachment as any}
+        backgroundColor='#ffffff'
+        videoAttachmentMaxWidth={420}
+        messageType='updated'
+      />
+    )
+    await act(async () => {
+      resolveDownload!(new Blob(['video'], { type: 'video/mp4' }))
+      await Promise.resolve()
+      await Promise.resolve()
+    })
+    await flushAttachmentEffects()
+
+    expect(screen.getByTestId('video-preview')).toHaveAttribute('data-src', 'blob:completed-original-video')
   })
 
   it('does not prefetch a media-grid video without preview metadata', async () => {

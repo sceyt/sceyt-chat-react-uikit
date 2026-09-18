@@ -116,6 +116,7 @@ const VideoPreview = memo(
 
     const isExtractingRef = useRef(false)
     const hasExtractionFailedRef = useRef(false)
+    const previousVideoSourceRef = useRef<string | undefined>(undefined)
 
     useEffect(() => {
       if (!videoThumb || downloadedPreviewImage) return
@@ -140,21 +141,21 @@ const VideoPreview = memo(
 
     useEffect(() => {
       const videoSource = src
-      if (
-        !videoSource ||
-        !shouldExtractVideoFirstFrame(file.metadata) ||
-        isExtractingRef.current ||
-        hasExtractionFailedRef.current
-      )
+      const canExtractFirstFrame = shouldExtractVideoFirstFrame(file.metadata)
+
+      if (previousVideoSourceRef.current !== videoSource) {
+        previousVideoSourceRef.current = videoSource
+        hasExtractionFailedRef.current = false
+      }
+
+      if (!videoSource || !canExtractFirstFrame || isExtractingRef.current || hasExtractionFailedRef.current) {
         return
+      }
 
       // If we already have a cached frame from store, skip extraction
       if (attachmentVideoFirstFrame || (isPreview && setVideoIsReadyToSend)) return
 
       const frameCacheKey = typeof file.url === 'string' ? file.url : undefined
-
-      // Reset extraction failed flag when source changes
-      hasExtractionFailedRef.current = false
 
       const checkCache = async (): Promise<boolean> => {
         if (!frameCacheKey) return false

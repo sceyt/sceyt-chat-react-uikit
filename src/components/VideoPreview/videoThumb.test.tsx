@@ -26,6 +26,15 @@ jest.mock('../../helpers/getVideoFrame', () => ({
   getVideoFirstFrame: jest.fn()
 }))
 
+jest.mock('../../helpers/attachmentsCache', () => {
+  const actual = jest.requireActual('../../helpers/attachmentsCache')
+  return {
+    ...actual,
+    getAttachmentUrlFromCache: jest.fn().mockResolvedValue(false),
+    setAttachmentToCache: jest.fn()
+  }
+})
+
 jest.mock('../../helpers/videoPreview', () => {
   const actual = jest.requireActual('../../helpers/videoPreview')
   return {
@@ -237,6 +246,128 @@ describe('VideoPreview video_thumb rendering', () => {
 
     expect(mockGetVideoFirstFrame).not.toHaveBeenCalled()
     expect(setVideoIsReadyToSend).not.toHaveBeenCalled()
+  })
+
+  it('replaces the placeholder with an extracted first frame as soon as a no-preview video finishes downloading', async () => {
+    mockGetVideoFirstFrame.mockResolvedValue({
+      frameBlobUrl: 'blob:extracted-first-frame',
+      blob: new Blob(['first-frame'], { type: 'image/jpeg' })
+    })
+    const file = {
+      id: 'no-preview-video-id',
+      tid: 'no-preview-video-tid',
+      messageId: 'message-id',
+      name: 'no-preview.mp4',
+      type: attachmentTypes.video,
+      url: 'https://cdn/no-preview.mp4',
+      // No video_thumb / previewImage / inline tmb is supplied by the server.
+      metadata: JSON.stringify({ szw: 1280, szh: 720, dur: 17 }),
+      attachmentUrl: '',
+      size: 100,
+      createdAt: new Date(),
+      progress: 0,
+      completion: 0,
+      upload: true,
+      data: new Blob(['video'], { type: 'video/mp4' })
+    }
+    const store = createMessageListStore()
+    const { container, rerender } = renderWithSceytProvider(
+      <VideoPreview width='420px' height='240px' file={file as any} src='' backgroundColor='#ffffff' downloading />,
+      { store }
+    )
+
+    await flushPreviewEffects()
+    expect(mockGetVideoFirstFrame).not.toHaveBeenCalled()
+
+    rerender(
+      <VideoPreview
+        width='420px'
+        height='240px'
+        file={file as any}
+        src='blob:downloaded-original-video'
+        backgroundColor='#ffffff'
+        downloading={false}
+      />
+    )
+    await flushPreviewEffects()
+
+    expect(mockGetVideoFirstFrame).toHaveBeenCalledWith(
+      'blob:downloaded-original-video',
+      expect.any(Number),
+      expect.any(Number)
+    )
+    const extractedFrame = Array.from(container.querySelectorAll('img')).find(
+      (image) => image.getAttribute('src') === 'blob:extracted-first-frame'
+    )
+    expect(extractedFrame).toBeDefined()
+    fireEvent.load(extractedFrame!)
+    expect(
+      Array.from(container.querySelectorAll('img')).some(
+        (image) => image.getAttribute('src') === 'blob:extracted-first-frame'
+      )
+    ).toBe(true)
+  })
+
+  it('retries first-frame extraction when the downloaded original replaces an earlier failed source', async () => {
+    const errorSpy = jest.spyOn(console, 'error').mockImplementation(() => undefined)
+    mockGetVideoFirstFrame.mockRejectedValueOnce(new Error('remote source is not ready')).mockResolvedValueOnce({
+      frameBlobUrl: 'blob:frame-after-download',
+      blob: new Blob(['first-frame'], { type: 'image/jpeg' })
+    })
+    const file = {
+      id: 'retry-frame-video-id',
+      tid: 'retry-frame-video-tid',
+      messageId: 'message-id',
+      name: 'retry-frame.mp4',
+      type: attachmentTypes.video,
+      url: 'https://cdn/retry-frame.mp4',
+      metadata: JSON.stringify({ szw: 1280, szh: 720, dur: 17 }),
+      attachmentUrl: '',
+      size: 100,
+      createdAt: new Date(),
+      progress: 0,
+      completion: 0,
+      upload: true,
+      data: new Blob(['video'], { type: 'video/mp4' })
+    }
+    const store = createMessageListStore()
+    const { rerender } = renderWithSceytProvider(
+      <VideoPreview
+        width='420px'
+        height='240px'
+        file={file as any}
+        src='https://cdn/retry-frame.mp4'
+        backgroundColor='#ffffff'
+        downloading
+      />,
+      { store }
+    )
+
+    await flushPreviewEffects()
+    expect(mockGetVideoFirstFrame).toHaveBeenCalledWith(
+      'https://cdn/retry-frame.mp4',
+      expect.any(Number),
+      expect.any(Number)
+    )
+
+    rerender(
+      <VideoPreview
+        width='420px'
+        height='240px'
+        file={file as any}
+        src='blob:downloaded-retry-frame-video'
+        backgroundColor='#ffffff'
+        downloading={false}
+      />
+    )
+    await flushPreviewEffects()
+
+    expect(mockGetVideoFirstFrame).toHaveBeenCalledWith(
+      'blob:downloaded-retry-frame-video',
+      expect.any(Number),
+      expect.any(Number)
+    )
+    errorSpy.mockRestore()
   })
 
   it('hides video controls while the attachment upload overlay is active', () => {

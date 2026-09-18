@@ -614,6 +614,16 @@ const Attachment = ({
       attachment.url,
       attachment.metadata
     )
+
+    // The shared coordinator outlives an individual Attachment effect. If a
+    // prop update replaced the effect while its request was loading, its
+    // original completion callback intentionally ignores the stale instance.
+    // Re-open cache hydration when that shared request completes so the
+    // currently mounted attachment still receives the original blob URL.
+    if (sharedOriginalVideoDownload.state === 'completed' && originalVideoDownloadStartedRef.current) {
+      originalVideoDownloadStartedRef.current = false
+    }
+
     if (typeof originalVideoUrlFromMap === 'string') {
       setAttachmentUrl(originalVideoUrlFromMap)
       setIsCached(true)
@@ -708,7 +718,8 @@ const Attachment = ({
     messageType,
     attachment.size,
     videoDownloadRetry,
-    isSharedOriginalVideoCancelled
+    isSharedOriginalVideoCancelled,
+    sharedOriginalVideoDownload.state
   ])
 
   const handleResumeOriginalVideoDownload = (event: React.MouseEvent) => {
