@@ -383,6 +383,10 @@ const messageSlice = createSlice({
         const beforeMax =
           isForwardMarker && maxMarkerId !== null && !!message.id ? BigInt(message.id) <= maxMarkerId : false
         if (!inMap && !beforeMax) continue
+        // A local queued message can already have an id while its send is
+        // still pending. A delivery marker for an earlier confirmed message
+        // must not make that queued item look delivered before it is sent.
+        if (!inMap && message.deliveryStatus === MESSAGE_DELIVERY_STATUS.PENDING) continue
         if (message.state !== 'Deleted') {
           // For cascade messages (not explicitly in the marker map), skip if already at this status or higher
           if (!inMap && shouldSkipDeliveryStatusUpdate(markerName, message.deliveryStatus)) continue

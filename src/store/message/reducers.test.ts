@@ -711,6 +711,61 @@ describe('message marker status updates', () => {
     expect(updatedMessage.markerTotals).toEqual([{ name: MESSAGE_DELIVERY_STATUS.DELIVERED, count: 1 }])
   })
 
+  it('does not advance queued messages when a delivered marker cascades across earlier ids', () => {
+    const channelId = 'marker-cascade-pending-queue'
+    const sentMessage = makeMessage({
+      id: '200',
+      channelId,
+      deliveryStatus: MESSAGE_DELIVERY_STATUS.SENT
+    })
+    // A queued message can receive an id from an SDK event before its own
+    // send promise resolves. It is still pending and must not inherit the
+    // earlier message's delivery marker.
+    const queuedMessage = makePendingMessage({
+      id: '199',
+      tid: 'queued-message-tid',
+      channelId,
+      deliveryStatus: MESSAGE_DELIVERY_STATUS.PENDING
+    })
+    const marker = {
+      messageIds: [sentMessage.id],
+      user: { id: 'recipient-user' },
+      name: MESSAGE_DELIVERY_STATUS.DELIVERED,
+      createdAt: new Date('2026-04-01T12:32:00.000Z')
+    } as any
+
+    const nextState = MessageReducer(
+      MessageReducer(undefined, setMessages({ messages: [queuedMessage, sentMessage] })),
+      updateMessagesStatus({
+        name: MESSAGE_DELIVERY_STATUS.DELIVERED,
+        markersMap: { [sentMessage.id]: marker },
+        isOwnMarker: false,
+        marker
+      })
+    )
+
+    addMessageToMap(channelId, queuedMessage)
+    addMessageToMap(channelId, sentMessage)
+    updateMessageStatusOnMap(
+      channelId,
+      {
+        name: MESSAGE_DELIVERY_STATUS.DELIVERED,
+        markersMap: { [sentMessage.id]: marker },
+        marker
+      },
+      false
+    )
+
+    expect(nextState.activeChannelMessages.find((message) => message.tid === queuedMessage.tid)?.deliveryStatus).toBe(
+      MESSAGE_DELIVERY_STATUS.PENDING
+    )
+    expect(nextState.activeChannelMessages.find((message) => message.id === sentMessage.id)?.deliveryStatus).toBe(
+      MESSAGE_DELIVERY_STATUS.DELIVERED
+    )
+    expect(getMessagesFromMap(channelId)[queuedMessage.id].deliveryStatus).toBe(MESSAGE_DELIVERY_STATUS.PENDING)
+    expect(getMessagesFromMap(channelId)[sentMessage.id].deliveryStatus).toBe(MESSAGE_DELIVERY_STATUS.DELIVERED)
+  })
+
   it('does not duplicate same-status own markers', () => {
     const existingMarker = {
       name: MESSAGE_DELIVERY_STATUS.READ,

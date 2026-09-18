@@ -1017,6 +1017,7 @@ export function updateMessageStatusOnMap(
     if (messageShouldBeUpdated) {
       // For cascade messages (not explicitly in the marker map), skip if already at this status or higher
       const isExplicit = explicitIds.includes(messageId)
+      if (!isExplicit && messageShouldBeUpdated.deliveryStatus === MESSAGE_DELIVERY_STATUS.PENDING) return
       if (!isExplicit && shouldSkipDeliveryStatusUpdate(newMarkers.name, messageShouldBeUpdated.deliveryStatus)) return
       const statusUpdatedMessage = updateMessageDeliveryStatusAndMarkers(
         messageShouldBeUpdated,
