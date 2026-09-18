@@ -11,8 +11,8 @@ import {
   PASTE_COMMAND
 } from 'lexical'
 
-import FormatMessagePlugin from './index'
-import { $createMentionNode, MentionNode } from '../MentionNode'
+import FormatMessagePlugin, { serializeFormattedMessage } from './index'
+import { $createMentionNode, isMentionTextUnchanged, MentionNode } from '../MentionNode'
 
 const mockUseLexicalComposerContext = jest.fn()
 
@@ -25,6 +25,50 @@ jest.mock('../../../hooks', () => ({
 }))
 
 describe('FormatMessagePlugin mention deletion', () => {
+  it('keeps an edited mention as the final plain text instead of restoring its ID token', () => {
+    const result = serializeFormattedMessage(
+      '@KarenTest',
+      [
+        {
+          type: 'mention',
+          text: '@KarenTest',
+          format: 0,
+          mentionName: 'member-1',
+          mentionText: '@KarenTestTwo Ch'
+        }
+      ],
+      [{ start: 0, end: '@KarenTest'.length }]
+    )
+
+    expect(result).toEqual({ messageText: '@KarenTest', bodyAttributes: [] })
+  })
+
+  it('still serializes an untouched mention as an ID token', () => {
+    const result = serializeFormattedMessage(
+      '@KarenTestTwo Ch',
+      [
+        {
+          type: 'mention',
+          text: '@KarenTestTwo Ch',
+          format: 0,
+          mentionName: 'member-1',
+          mentionText: '@KarenTestTwo Ch'
+        }
+      ],
+      [{ start: 0, end: '@KarenTestTwo Ch'.length }]
+    )
+
+    expect(result).toEqual({
+      messageText: '@member-1',
+      bodyAttributes: [{ type: 'mention', metadata: 'member-1', offset: 0, length: '@member-1'.length }]
+    })
+  })
+
+  it('marks edited mention text as no longer intact', () => {
+    expect(isMentionTextUnchanged('@My Phone Number', '@My Phone')).toBe(false)
+    expect(isMentionTextUnchanged('@My Phone Number', '@My Phone Number')).toBe(true)
+  })
+
   it('keeps the mention node when the preceding text node is removed', () => {
     const editor = createEditor({
       namespace: 'mention-deletion-test',

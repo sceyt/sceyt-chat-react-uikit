@@ -15,13 +15,84 @@ import { useDidUpdate } from '../../../hooks'
 import { bodyAttributesMapByType, makeUsername } from '../../../helpers/message'
 import { IMessage, IMember } from '../../../types'
 import { useCallback, useEffect } from 'react'
-import { $createMentionNode } from '../MentionNode'
+import { $createMentionNode, isMentionTextUnchanged } from '../MentionNode'
 import { mergeRegister } from '../FloatingTextFormatToolbarPlugin'
 
 interface FormattedSegment {
   text: string
   format: number
   mentionUserId?: string
+}
+
+interface SerializedEditorChild {
+  type: string
+  text: string
+  format: number
+  mentionName?: string
+  mentionText?: string
+  metadata?: string
+}
+
+interface OffsetRange {
+  start: number
+  end: number
+}
+
+/**
+ * Converts Lexical's display text into the wire format used by message
+ * attributes. A mention is only converted to its ID token while its text has
+ * not been changed by the user. Once edited, it becomes ordinary text.
+ */
+export function serializeFormattedMessage(
+  messageText: string,
+  children: SerializedEditorChild[],
+  offsetList: OffsetRange[]
+): { messageText: string; bodyAttributes: any[] } {
+  let currentOffsetDiff = 0
+  let newMessageText = messageText
+  const messageBodyAttributes: any[] = []
+
+  children.forEach((child, index) => {
+    const offsetRange = offsetList[index]
+    if (!offsetRange) return
+
+    const offset = offsetRange.start
+    const length = offsetRange.end - offsetRange.start
+    const attributeOffset = offset + currentOffsetDiff
+    const attributeTypes = bodyAttributesMapByType[child.format]
+    const isUnchangedMention =
+      child.type === 'mention' && Boolean(child.mentionName) && isMentionTextUnchanged(child.mentionText, child.text)
+
+    if (isUnchangedMention) {
+      const mentionId = `@${child.mentionName}`
+      const idLength = mentionId.length
+      newMessageText = `${newMessageText.slice(0, attributeOffset)}${mentionId}${newMessageText.slice(
+        attributeOffset + length
+      )}`
+      currentOffsetDiff += idLength - length
+      messageBodyAttributes.push({
+        type: 'mention',
+        metadata: child.mentionName,
+        offset: attributeOffset,
+        length: idLength
+      })
+    }
+
+    if (attributeTypes) {
+      const formattedLength = isUnchangedMention ? `@${child.mentionName}`.length : length
+      const formattedOffset = attributeOffset
+      attributeTypes.forEach((attributeType: string) => {
+        messageBodyAttributes.push({
+          type: attributeType,
+          metadata: child.metadata || '',
+          offset: formattedOffset,
+          length: formattedLength
+        })
+      })
+    }
+  })
+
+  return { messageText: newMessageText, bodyAttributes: messageBodyAttributes }
 }
 
 function parseHTMLToFormattedSegments(html: string): FormattedSegment[] {
@@ -294,7 +365,6 @@ function useFormatMessage(
         const parsedEditorState = editorState.toJSON()
         const offsetView = $createOffsetView(editor)
         const offsetList = Array.from(offsetView._offsetMap.values())
-        const messageBodyAttributes: any = []
         if (
           parsedEditorState.root &&
           parsedEditorState.root.children &&
@@ -304,78 +374,14 @@ function useFormatMessage(
               (parsedEditorState.root.children[0].children[0].type === 'mention' ||
                 parsedEditorState.root.children[0].children[0].format > 0)))
         ) {
-          let currentOffsetDiff = 0
-          let newMessageText = messageText
-          parsedEditorState.root.children[0].children.forEach((child: any, index: number) => {
-            if (child.type === 'mention') {
-              const offset = offsetList[index].start
-              const length = offsetList[index].end - offsetList[index].start
-              const mentionId = `@${child.mentionName}`
-              const idLength = mentionId.length
-              newMessageText = `${newMessageText.slice(
-                0,
-                offset + currentOffsetDiff
-              )}${mentionId}${newMessageText.slice(offset + currentOffsetDiff + length)}`
-              const menIndex = offset + currentOffsetDiff
-              currentOffsetDiff += idLength - length
-              messageBodyAttributes.push({
-                type: 'mention',
-                metadata: child.mentionName,
-                offset: menIndex,
-                length: idLength
-              })
-              if (child.format) {
-                const attributeTypes = bodyAttributesMapByType[child.format]
-
-                if (attributeTypes.length > 1) {
-                  attributeTypes.forEach((attributeType: string) => {
-                    messageBodyAttributes.push({
-                      type: attributeType,
-                      metadata: child.metadata || '',
-                      offset: menIndex,
-                      length
-                    })
-                  })
-                } else {
-                  messageBodyAttributes.push({
-                    type: attributeTypes[0],
-                    metadata: child.metadata || '',
-                    offset: menIndex,
-                    length
-                  })
-                }
-              }
-            } else {
-              const attributeTypes = bodyAttributesMapByType[child.format]
-              if (attributeTypes) {
-                const offset = offsetList[index].start
-                const length = offsetList[index].end - offsetList[index].start
-
-                const attIndex = offset + currentOffsetDiff
-
-                if (attributeTypes.length > 1) {
-                  attributeTypes.forEach((attributeType: string) => {
-                    messageBodyAttributes.push({
-                      type: attributeType,
-                      metadata: child.metadata || '',
-                      offset: attIndex,
-                      length
-                    })
-                  })
-                } else {
-                  messageBodyAttributes.push({
-                    type: attributeTypes[0],
-                    metadata: child.metadata || '',
-                    offset: attIndex,
-                    length
-                  })
-                }
-              }
-            }
-          })
+          const serializedMessage = serializeFormattedMessage(
+            messageText,
+            parsedEditorState.root.children[0].children,
+            offsetList
+          )
           if (messageText) {
-            setMessageText(newMessageText)
-            setMessageBodyAttributes(messageBodyAttributes)
+            setMessageText(serializedMessage.messageText)
+            setMessageBodyAttributes(serializedMessage.bodyAttributes)
           } else {
             setMessageText(messageToEdit ? messageToEdit.body : '')
           }
