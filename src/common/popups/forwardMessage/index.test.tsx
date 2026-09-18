@@ -153,7 +153,7 @@ describe('ForwardMessagePopup', () => {
     expect(screen.getByText('Video')).toBeInTheDocument()
   })
 
-  it('shows the generic file icon for a voice attachment, labeled Voice', () => {
+  it('does not show a generic file icon for a voice attachment, labeled Voice', () => {
     const forwardMessages: IForwardPreviewMessage[] = [
       { attachments: [makeAttachment({ type: attachmentTypes.voice })] }
     ]
@@ -161,7 +161,7 @@ describe('ForwardMessagePopup', () => {
 
     selectChannel('Jordyn Aminoff')
 
-    expect(screen.getByText('choseFile.svg')).toBeInTheDocument()
+    expect(screen.queryByText('choseFile.svg')).not.toBeInTheDocument()
     expect(screen.getByText('Voice')).toBeInTheDocument()
     expect(screen.queryByTestId('forward-attachment-thumb')).not.toBeInTheDocument()
   })

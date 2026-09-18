@@ -790,7 +790,7 @@ function ForwardMessagePopup({
                           <ForwardLinkPreviewIcon color={accentColor} bg={surface1} />
                         </ForwardLinkPreviewIconWrapper>
                       )
-                    ) : firstForwardAttachment ? (
+                    ) : firstForwardAttachment && firstForwardAttachment.type !== attachmentTypes.voice ? (
                       <ForwardPreviewIconWrapper backgroundColor={accentColor} iconColor={textOnPrimary}>
                         <ChooseFileIcon />
                       </ForwardPreviewIconWrapper>
