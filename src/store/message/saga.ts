@@ -1777,15 +1777,6 @@ function* forwardMessage(action: IAction): any {
   const activeChannelId = getActiveChannelId()
   let messageTid: string | null = null
   try {
-    // Send the optional note through the ordinary text-message path before the
-    // forwarded item. This preserves body attributes and mention notification
-    // handling, and guarantees both messages retain their expected order.
-    if (accompanyingMessage?.body) {
-      yield call(sendTextMessage, {
-        type: SEND_TEXT_MESSAGE,
-        payload: { message: accompanyingMessage, channelId, connectionState }
-      })
-    }
     channel = yield call(getChannelFromMap, channelId)
     if (!channel) {
       channel = getChannelFromAllChannels(channelId) || null
@@ -1966,6 +1957,16 @@ function* forwardMessage(action: IAction): any {
       } else {
         throw new Error('Connection required to forward message')
       }
+    }
+
+    // Send the optional note only after the forwarded item has been accepted.
+    // The note still uses the normal text-message path so body attributes and
+    // mention notifications retain their standard behavior.
+    if (accompanyingMessage?.body) {
+      yield call(sendTextMessage, {
+        type: SEND_TEXT_MESSAGE,
+        payload: { message: accompanyingMessage, channelId, connectionState }
+      })
     }
   } catch (e) {
     const isErrorResendable = isResendableError(e?.type)

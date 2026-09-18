@@ -2935,6 +2935,95 @@ describe('message saga message-list flows', () => {
     )
   })
 
+  it('sends a forwarded message before its accompanying note', async () => {
+    const currentUser = makeUser({ id: 'current-user' })
+    const sourceUser = makeUser({ id: 'source-user' })
+    const channel = makeChannel({ id: 'channel-forward-with-note' })
+    let messageCounter = 0
+
+    channel.createMessageBuilder = jest.fn(() => {
+      const draft: Record<string, any> = { attachments: [] }
+      const builder = {
+        setBody: jest.fn((body) => {
+          draft.body = body
+          return builder
+        }),
+        setBodyAttributes: jest.fn(() => builder),
+        setAttachments: jest.fn((attachments) => {
+          draft.attachments = attachments
+          return builder
+        }),
+        setMentionUserIds: jest.fn(() => builder),
+        setType: jest.fn(() => builder),
+        setDisableMentionsCount: jest.fn(() => builder),
+        setMetadata: jest.fn(() => builder),
+        setForwardingMessageId: jest.fn((messageId) => {
+          draft.forwardingMessageId = messageId
+          return builder
+        }),
+        setPollDetails: jest.fn(() => builder),
+        setDisplayCount: jest.fn(() => builder),
+        setSilent: jest.fn(() => builder),
+        create: jest.fn(() =>
+          makePendingMessage({
+            channelId: channel.id,
+            tid: `forward-note-${++messageCounter}`,
+            body: draft.body,
+            metadata: '{}',
+            user: currentUser,
+            attachments: draft.attachments,
+            ...(draft.forwardingMessageId ? { forwardingDetails: { messageId: draft.forwardingMessageId } } : {})
+          })
+        )
+      }
+      return builder as any
+    })
+    channel.sendMessage = jest.fn((outgoingMessage) =>
+      Promise.resolve(
+        makeMessage({
+          id: `confirmed-${outgoingMessage.tid}`,
+          tid: outgoingMessage.tid,
+          channelId: channel.id,
+          body: outgoingMessage.body,
+          metadata: {} as any,
+          user: currentUser,
+          attachments: outgoingMessage.attachments,
+          ...(outgoingMessage.forwardingDetails ? { forwardingDetails: outgoingMessage.forwardingDetails } : {})
+        })
+      )
+    )
+
+    mockStoreState.UserReducer.connectionStatus = CONNECTION_STATUS.CONNECTED
+    setActiveChannelId(channel.id)
+    setChannelInMap(channel)
+    setClient({ user: currentUser, Channel: { create: jest.fn() } })
+
+    const sourceMessage = makeMessage({
+      id: 'source-forward-with-note',
+      channelId: 'source-channel',
+      body: 'Forwarded message',
+      metadata: {} as any,
+      user: sourceUser,
+      attachments: []
+    })
+    const note = {
+      body: 'Added note',
+      bodyAttributes: [],
+      mentionedUsers: [],
+      attachments: [],
+      type: 'text' as const
+    }
+
+    await runMessageSaga(
+      __messageSagaTestables.forwardMessage,
+      forwardMessageAC(sourceMessage, channel.id, CONNECTION_STATUS.CONNECTED, true, note)
+    )
+
+    expect(channel.sendMessage).toHaveBeenCalledTimes(2)
+    expect(channel.sendMessage).toHaveBeenNthCalledWith(1, expect.objectContaining({ body: 'Forwarded message' }))
+    expect(channel.sendMessage).toHaveBeenNthCalledWith(2, expect.objectContaining({ body: 'Added note' }))
+  })
+
   it('does not append a forwarded message to the visible list when forwarding to another channel', async () => {
     const currentUser = makeUser({ id: 'current-user' })
     const sourceUser = makeUser({ id: 'source-user' })
