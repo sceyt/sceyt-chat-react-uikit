@@ -75,6 +75,7 @@ import {
   removeAllMessages,
   removeMessagesFromMap,
   removeReactionToMessageOnMap,
+  shouldSkipDeliveryStatusUpdate,
   shouldReplaceLastMessage,
   updateMessageDeliveryStatusAndMarkers,
   updateMessageOnMap,
@@ -199,11 +200,20 @@ export function* handleChannelMessageEvent(args: { channel: IChannel; message: I
     resolvedLastMessage &&
     ((resolvedLastMessage.id && storedChannel.lastMessage.id === resolvedLastMessage.id) ||
       (resolvedLastMessage.tid && storedChannel.lastMessage.tid === resolvedLastMessage.tid))
+  // The SDK can emit a delayed confirmation with SENT after a delivery marker
+  // has already upgraded this same message. Keep the higher local status so a
+  // late event cannot turn the channel-list icon back from two ticks to one.
+  const shouldRetainStoredDeliveryStatus =
+    !!isSameLastMessage &&
+    shouldSkipDeliveryStatusUpdate(message.deliveryStatus, storedChannel!.lastMessage!.deliveryStatus)
+  const resolvedDeliveryStatus = shouldRetainStoredDeliveryStatus
+    ? storedChannel!.lastMessage!.deliveryStatus
+    : message.deliveryStatus
   const resolvedLastMessageUpdate = isSameLastMessage
     ? {
         ...storedChannel!.lastMessage!,
         id: message.id,
-        deliveryStatus: message!.deliveryStatus,
+        deliveryStatus: resolvedDeliveryStatus,
         state: MESSAGE_STATUS.UNMODIFIED
       }
     : resolvedLastMessage
@@ -242,7 +252,7 @@ export function* handleChannelMessageEvent(args: { channel: IChannel; message: I
           updateMessageAC(existingMessage.id || existingMessage.tid!, {
             ...existingMessage,
             id: message.id,
-            deliveryStatus: message.deliveryStatus,
+            deliveryStatus: resolvedDeliveryStatus,
             state: MESSAGE_STATUS.UNMODIFIED
           })
         )
@@ -259,7 +269,10 @@ export function* handleChannelMessageEvent(args: { channel: IChannel; message: I
     }
   }
 
-  addMessageToMap(channel.id, message)
+  addMessageToMap(channel.id, {
+    ...message,
+    deliveryStatus: resolvedDeliveryStatus
+  })
   const channelDataUpdate: Omit<Partial<IChannel>, 'lastReactedMessage'> & {
     userMessageReactions: any[]
     lastReactedMessage: null

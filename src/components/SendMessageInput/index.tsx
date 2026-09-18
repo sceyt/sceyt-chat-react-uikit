@@ -455,7 +455,6 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
   const [messageBodyAttributes, setMessageBodyAttributes] = useState<any>([])
   const [mentionedUsers, setMentionedUsers] = useState<any>([])
   const [browser, setBrowser] = useState<any>('')
-  const [mentionsIsOpen, setMentionsIsOpen] = useState<any>(false)
 
   const [inputContainerHeight, setInputContainerHeight] = useState<any>()
 
@@ -851,7 +850,10 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
       }
     }
 
-    if (shouldSend && !mentionsIsOpen) {
+    // Cutting part of a mention can leave an `@…` prefix and reopen the
+    // typeahead. A visible suggestion menu must not prevent the explicit Send
+    // action from sending the text currently in the editor.
+    if (shouldSend) {
       if (isSendMessageInFlightRef.current) {
         event.preventDefault()
         event.stopPropagation()
@@ -2644,7 +2646,6 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
                                 userId={user.id}
                                 getFromContacts={getFromContacts}
                                 members={activeChannelMembers}
-                                setMentionsIsOpen={setMentionsIsOpen}
                                 channelId={activeChannel?.id}
                               />
                             )}

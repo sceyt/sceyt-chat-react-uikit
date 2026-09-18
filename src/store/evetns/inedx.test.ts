@@ -271,6 +271,86 @@ describe('event message last-message handling', () => {
     expect(getChannelFromMap(channelId)?.lastMessage.userMarkers).toEqual([])
   })
 
+  it('does not let a late sent message event downgrade the delivered channel-list preview', async () => {
+    const currentUser = makeUser({ id: 'current-user' })
+    const recipient = makeUser({ id: 'recipient-user' })
+    const channelId = 'channel-late-sent-event-after-delivery-marker'
+    const sentMessage = makeMessage({
+      id: '1220',
+      tid: 'late-sent-event-tid',
+      channelId,
+      body: 'resend after packet loss',
+      incoming: false,
+      user: currentUser,
+      deliveryStatus: MESSAGE_DELIVERY_STATUS.SENT
+    })
+    const channel = makeChannel({ id: channelId, lastMessage: sentMessage })
+    const deliveredMarker = {
+      messageIds: [sentMessage.id],
+      user: recipient,
+      name: MESSAGE_DELIVERY_STATUS.DELIVERED,
+      createdAt: new Date('2026-04-02T12:10:00.000Z')
+    } as any
+
+    setActiveChannelId(channelId)
+    setChannelInMap(channel)
+    addChannelToAllChannels(channel)
+    addMessageToMap(channelId, sentMessage)
+
+    await runSaga(
+      { getState: getSagaState, dispatch: () => undefined },
+      __eventsTestables.handleMessageMarkersReceivedEvent,
+      { channelId, markerList: deliveredMarker },
+      { user: currentUser }
+    ).toPromise()
+
+    const deliveredLastMessage = getChannelFromMap(channelId)!.lastMessage
+    expect(deliveredLastMessage.deliveryStatus).toBe(MESSAGE_DELIVERY_STATUS.DELIVERED)
+
+    // The delayed confirmation event is the same message but still carries
+    // the original SENT status. This is the order captured in the browser
+    // trace after a resend under packet loss.
+    const staleSentMessage = { ...sentMessage }
+    const staleChannel = { ...channel, lastMessage: staleSentMessage }
+    mockStore.getState = jest.fn(() => ({
+      ...defaultStoreState,
+      ChannelReducer: { channels: [{ ...channel, lastMessage: deliveredLastMessage }] },
+      MessageReducer: {
+        ...defaultStoreState.MessageReducer,
+        activeChannelMessages: [deliveredLastMessage]
+      }
+    }))
+    const dispatched: any[] = []
+
+    await runSaga(
+      {
+        getState: getSagaState,
+        dispatch: (action) => {
+          dispatched.push(action)
+        }
+      },
+      __eventsTestables.handleChannelMessageEvent,
+      { channel: staleChannel, message: staleSentMessage },
+      { user: currentUser }
+    ).toPromise()
+
+    const lastMessageUpdates = dispatched.filter(
+      (action) =>
+        action.type === updateChannelLastMessageAC(staleSentMessage, staleChannel as any).type ||
+        (action.type === updateChannelDataAC(channelId, {}).type && action.payload?.config?.lastMessage)
+    )
+
+    expect(lastMessageUpdates).toEqual([])
+    expect(
+      lastMessageUpdates.some(
+        (action) =>
+          action.payload?.message?.deliveryStatus === MESSAGE_DELIVERY_STATUS.SENT ||
+          action.payload?.config?.lastMessage?.deliveryStatus === MESSAGE_DELIVERY_STATUS.SENT
+      )
+    ).toBe(false)
+    expect(getChannelFromMap(channelId)?.lastMessage.deliveryStatus).toBe(MESSAGE_DELIVERY_STATUS.DELIVERED)
+  })
+
   it('keeps cached self reactions untouched for remote reaction-added events and tolerates missing cached messages', async () => {
     const currentUser = makeUser({ id: 'current-user' })
     const remoteUser = makeUser({ id: 'remote-user' })

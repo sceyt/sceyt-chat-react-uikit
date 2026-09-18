@@ -232,7 +232,6 @@ function MentionsContainer({
   selectedIndex,
   selectOptionAndCleanUp,
   setHighlightedIndex,
-  setMentionsIsOpen,
   channelId,
   alignLeft,
   handleLeftOffset
@@ -281,7 +280,6 @@ function MentionsContainer({
     }
   }, [selectedIndex])
   useEffect(() => {
-    setMentionsIsOpen(true)
     const menuTimeOut = setTimeout(() => {
       const menuElement = document.getElementById('typeahead-menu')
       if (menuElement) {
@@ -295,7 +293,6 @@ function MentionsContainer({
         menuElement.style.zIndex = '-1'
       }
       selectOptionAndCleanUp(null)
-      setMentionsIsOpen(false)
     }
   }, [])
 
@@ -354,7 +351,6 @@ export default function MentionsPlugin({
   userId,
   getFromContacts,
   setMentionMember,
-  setMentionsIsOpen,
   members,
   channelId
 }: {
@@ -363,8 +359,6 @@ export default function MentionsPlugin({
   getFromContacts?: boolean
   // eslint-disable-next-line no-unused-vars
   setMentionMember: (member: any) => void
-  // eslint-disable-next-line no-unused-vars
-  setMentionsIsOpen: (state: boolean) => void
   members: IMember[]
   channelId?: string
 }): JSX.Element | null {
@@ -442,7 +436,6 @@ export default function MentionsPlugin({
           <MentionsContainer
             queryString={queryString}
             options={options}
-            setMentionsIsOpen={setMentionsIsOpen}
             selectOptionAndCleanUp={selectOptionAndCleanUp}
             selectedIndex={selectedIndex}
             setHighlightedIndex={setHighlightedIndex}
@@ -456,7 +449,7 @@ export default function MentionsPlugin({
   )
 }
 
-export const MentionsContainerWrapper = styled.div<{ mentionsIsOpen?: boolean; ref?: any }>`
+export const MentionsContainerWrapper = styled.div`
   animation: fadeIn 0.2s ease-in-out;
   width: 0;
   @keyframes fadeIn {

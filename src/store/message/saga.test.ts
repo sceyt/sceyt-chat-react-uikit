@@ -23,7 +23,13 @@ import {
   setChannelInMap
 } from '../../helpers/channelHalper'
 import { CONNECTION_STATUS } from '../user/constants'
-import { attachmentTypes, LOADING_STATE, MESSAGE_STATUS, UPLOAD_STATE } from '../../helpers/constants'
+import {
+  attachmentTypes,
+  LOADING_STATE,
+  MESSAGE_DELIVERY_STATUS,
+  MESSAGE_STATUS,
+  UPLOAD_STATE
+} from '../../helpers/constants'
 import {
   makeChannel,
   makeMessage,
@@ -2285,6 +2291,118 @@ describe('message saga message-list flows', () => {
       expect.objectContaining({ tid: 'offline-tid', state: MESSAGE_STATUS.FAILED })
     )
     expect(getChannelFromMap(channel.id)?.lastMessage).toEqual(expect.objectContaining({ tid: 'offline-tid' }))
+  })
+
+  it('updates the channel-list delivery status after a packet-loss failure is manually resent', async () => {
+    const currentUser = makeUser({ id: 'current-user' })
+    const channel = makeChannel({
+      id: 'channel-resend-after-packet-loss',
+      lastMessage: makeMessage({
+        id: '709',
+        channelId: 'channel-resend-after-packet-loss',
+        body: 'last confirmed message',
+        user: currentUser
+      })
+    })
+    const pendingMessage = makePendingMessage({
+      channelId: channel.id,
+      tid: 'packet-loss-retry-tid',
+      body: 'resend after reconnect',
+      metadata: '',
+      user: currentUser
+    })
+    const deliveredMessage = makeMessage({
+      id: '710',
+      tid: pendingMessage.tid,
+      channelId: channel.id,
+      body: pendingMessage.body,
+      metadata: {} as any,
+      user: currentUser,
+      deliveryStatus: MESSAGE_DELIVERY_STATUS.DELIVERED
+    })
+    const builder = {
+      setBody: jest.fn().mockReturnThis(),
+      setBodyAttributes: jest.fn().mockReturnThis(),
+      setAttachments: jest.fn().mockReturnThis(),
+      setMentionUserIds: jest.fn().mockReturnThis(),
+      setType: jest.fn().mockReturnThis(),
+      setDisplayCount: jest.fn().mockReturnThis(),
+      setSilent: jest.fn().mockReturnThis(),
+      setMetadata: jest.fn().mockReturnThis(),
+      setPollDetails: jest.fn().mockReturnThis(),
+      setParentMessageId: jest.fn().mockReturnThis(),
+      setReplyInThread: jest.fn().mockReturnThis(),
+      setDisableMentionsCount: jest.fn().mockReturnThis(),
+      create: jest.fn(() => pendingMessage)
+    }
+
+    channel.createMessageBuilder = jest.fn(() => builder as any)
+    // The first request represents 100% packet loss. Once the client has
+    // reconnected under a slow (3G) link, the explicit retry is accepted and
+    // returns the server's delivered status.
+    channel.sendMessage = jest
+      .fn()
+      .mockRejectedValueOnce(new Error('packet loss'))
+      .mockResolvedValueOnce(deliveredMessage)
+
+    setActiveChannelId(channel.id)
+    setChannelInMap(channel)
+    mockStoreState.UserReducer.connectionStatus = CONNECTION_STATUS.CONNECTED
+    mockStoreState.ChannelReducer.channels = [{ ...channel }]
+    setClient({ user: currentUser, Channel: { create: jest.fn() } })
+
+    const inputMessage = {
+      body: pendingMessage.body,
+      bodyAttributes: [],
+      attachments: [],
+      mentionedUsers: [],
+      type: 'text',
+      metadata: null,
+      pollDetails: null,
+      parentMessage: null,
+      repliedInThread: false,
+      displayCount: 1,
+      silent: false
+    }
+
+    await runMessageSaga(
+      __messageSagaTestables.sendTextMessage,
+      sendTextMessageAC(inputMessage, channel.id, CONNECTION_STATUS.CONNECTED)
+    )
+
+    const failedMessage = getMessageFromMap(channel.id, pendingMessage.tid)!
+    expect(failedMessage.state).toBe(MESSAGE_STATUS.FAILED)
+
+    // runSaga records actions but does not reduce them, so bring the mocked
+    // Redux channel list to the same failed-preview state the UI has before
+    // the user taps "Send again".
+    mockStoreState.ChannelReducer.channels = [{ ...channel, lastMessage: { ...failedMessage } }]
+
+    const resendActions = await runMessageSaga(
+      __messageSagaTestables.resendMessage,
+      resendMessageAC(failedMessage, channel.id, CONNECTION_STATUS.CONNECTED)
+    )
+
+    expect(channel.sendMessage).toHaveBeenCalledTimes(2)
+    expect(resendActions).toEqual(
+      expect.arrayContaining([
+        updateMessageAC(
+          pendingMessage.tid,
+          expect.objectContaining({ deliveryStatus: MESSAGE_DELIVERY_STATUS.DELIVERED }),
+          true
+        ),
+        updateChannelDataAC(
+          channel.id,
+          expect.objectContaining({
+            lastMessage: expect.objectContaining({
+              id: deliveredMessage.id,
+              deliveryStatus: MESSAGE_DELIVERY_STATUS.DELIVERED
+            })
+          }),
+          true
+        )
+      ])
+    )
   })
 
   it('updates channel last message to the latest pending after each offline send', async () => {
