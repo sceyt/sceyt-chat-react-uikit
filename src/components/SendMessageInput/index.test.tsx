@@ -244,4 +244,64 @@ describe('SendMessageInput attachment sending', () => {
     expect(sendAction.payload.message.attachments[0].type).toBe(attachmentTypes.file)
     expect(sendAction.payload.message.attachments[0].data).toBe(video)
   })
+
+  it('creates only one send action when Send is tapped repeatedly while a video is preparing', async () => {
+    let resolveFrame: ((frame: any) => void) | undefined
+    require('../../helpers/getVideoFrame').getFrame.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          resolveFrame = resolve
+        })
+    )
+    const channel = makeChannel({ id: 'rapid-video-send-channel' })
+    const store = createMessageListStore({ ChannelReducer: { activeChannel: channel } })
+    const dispatchedActions: any[] = []
+    const dispatch = store.dispatch.bind(store)
+    jest.spyOn(store, 'dispatch').mockImplementation((action: any) => {
+      dispatchedActions.push(action)
+      return dispatch(action)
+    })
+    const { container } = renderWithSceytProvider(
+      <SendMessageInput CustomSendMessageButton={<button data-testid='send-message'>Send</button>} />,
+      { store }
+    )
+    const video = new File(['video'], 'rapid-send.mp4', { type: 'video/mp4' })
+    const fileInput = container.querySelector('input[type="file"]') as HTMLInputElement
+
+    // Selecting via the media picker makes the attachment wait for its video
+    // metadata before the optimistic message is created.
+    fireEvent.change(fileInput, {
+      target: { files: [video], accept: '.jpg,.jpeg,.png,.gif,.mp4,.mov,.avi,.wmv,.flv,.webm,.jfif' }
+    })
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0))
+    })
+
+    const sendButton = screen.getByTestId('send-message')
+    act(() => {
+      sendButton.click()
+      sendButton.click()
+      sendButton.click()
+    })
+
+    // The optimistic message is dispatched immediately; it does not wait for
+    // frame extraction or upload/network completion.
+    expect(dispatchedActions.filter((action) => action.type === SEND_MESSAGE)).toHaveLength(1)
+
+    await act(async () => {
+      resolveFrame!({
+        thumb: 'data:image/jpeg;base64,thumb',
+        width: 1280,
+        height: 720,
+        duration: 3,
+        frameBlobUrl: 'blob:video-thumb',
+        blob: new Blob(['thumb'], { type: 'image/jpeg' })
+      })
+      await Promise.resolve()
+      await Promise.resolve()
+      await Promise.resolve()
+    })
+
+    expect(dispatchedActions.filter((action) => action.type === SEND_MESSAGE)).toHaveLength(1)
+  })
 })

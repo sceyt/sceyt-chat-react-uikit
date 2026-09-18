@@ -89,11 +89,7 @@ import {
   subscribeToDraftMessages
 } from '../../helpers/messagesHalper'
 import { registerBlobUrl, releaseBlobUrls } from '../../helpers/attachmentBlobUrls'
-import {
-  getOutgoingAttachmentType,
-  mergePreparedAttachmentPatches,
-  waitForMediaAttachmentPreparation
-} from '../../helpers/attachmentSendPreparation'
+import { getOutgoingAttachmentType, mergePreparedAttachmentPatches } from '../../helpers/attachmentSendPreparation'
 import { attachmentTypes, DEFAULT_CHANNEL_TYPE, MESSAGE_DELIVERY_STATUS, USER_STATE } from '../../helpers/constants'
 import { hideUserPresence } from '../../helpers/userHelper'
 import { getReplyLinkPreviewImage, shouldShowLinkPreviewErrorFallback } from '../../helpers/replyPreview'
@@ -469,6 +465,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
   const [inTypingStateTimout, setInTypingStateTimout] = useState<any>()
   const [inTypingState, setInTypingState] = useState(false)
   const [sendMessageIsActive, setSendMessageIsActive] = useState(false)
+  const [isSendMessageInFlight, setIsSendMessageInFlight] = useState(false)
   const [attachments, setAttachments]: any = useState([])
 
   const [forwardPopupOpen, setForwardPopupOpen] = useState(false)
@@ -499,10 +496,23 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
   // it without racing a pending state update.
   const attachmentPreparationPromisesRef = useRef(new Map<string, Promise<void>>())
   const preparedAttachmentPatchesRef = useRef(new Map<string, any>())
+  // This must be a ref instead of state: a second tap can arrive before React
+  // has rendered a disabled button, while media preparation is still awaited.
+  const isSendMessageInFlightRef = useRef(false)
   const sendMessageWrapperRef = useRef<HTMLDivElement | null>(null)
   const restoringDraftRef = useRef(false)
   const restoredDraftChannelIdRef = useRef<string | null>(null)
   const isNavigatingChannelRef = useRef(false)
+
+  const releaseSendMessageLock = () => {
+    // Keep the synchronous lock through the current event turn. React then
+    // commits the cleared compose state before a second user action can send
+    // the same attachment snapshot, without waiting for network/upload work.
+    Promise.resolve().then(() => {
+      isSendMessageInFlightRef.current = false
+      setIsSendMessageInFlight(false)
+    })
+  }
 
   const [realEditorState, setRealEditorState] = useState()
   const [floatingAnchorElem, setFloatingAnchorElem] = useState<HTMLDivElement | null>(null)
@@ -835,6 +845,14 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
     }
 
     if (shouldSend && !mentionsIsOpen) {
+      if (isSendMessageInFlightRef.current) {
+        event.preventDefault()
+        event.stopPropagation()
+        return
+      }
+      isSendMessageInFlightRef.current = true
+      setIsSendMessageInFlight(true)
+
       event.preventDefault()
       event.stopPropagation()
       if (messageToEdit) {
@@ -920,11 +938,9 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
           dispatch(sendTextMessageAC(messageToSend, activeChannel.id, connectionStatus))
         }
         if (attachments.length) {
-          // Do not add an optimistic media message to the thread until its
-          // dimensions and preview metadata are ready. Otherwise a video can
-          // first render at its fallback height and briefly overlap the
-          // timestamp above it before the preview patch triggers a reflow.
-          await waitForMediaAttachmentPreparation(attachments, attachmentPreparationPromisesRef.current)
+          // The send saga owns the shared video-preparation registry. Dispatch
+          // now so the optimistic message appears immediately and this composer
+          // can accept another message while metadata/upload work continues.
           const sendAsSeparateMessage = getSendAttachmentsAsSeparateMessages()
           messageToSend.attachments = mergePreparedAttachmentPatches(
             attachments,
@@ -992,6 +1008,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
         setDismissedUrls(new Set())
       })
       dispatch(setCloseSearchChannelsAC(true))
+      releaseSendMessageLock()
     } else {
       if (typingTimout) {
         if (!inTypingStateTimout) {
@@ -2012,11 +2029,16 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
   )
 
   useEffect(() => {
-    if (messageContRef && messageContRef.current) {
-      setTimeout(() => {
-        dispatch(setSendMessageInputHeightAC(messageContRef.current.getBoundingClientRect().height))
-      }, 301)
-    }
+    if (!messageContRef.current) return undefined
+
+    const timeout = setTimeout(() => {
+      const messageContainer = messageContRef.current
+      if (messageContainer) {
+        dispatch(setSendMessageInputHeightAC(messageContainer.getBoundingClientRect().height))
+      }
+    }, 301)
+
+    return () => clearTimeout(timeout)
   }, [showLinkPreview])
 
   return (
@@ -2638,11 +2660,11 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
                   messageToEdit ? (
                     <SendMessageButton
                       isCustomButton={CustomSendMessageButton}
-                      isActive={sendMessageIsActive}
+                      isActive={sendMessageIsActive && !isSendMessageInFlight}
                       order={sendIconOrder}
                       color={backgroundSections}
                       height={inputContainerHeight || minHeight}
-                      onClick={sendMessageIsActive ? handleSendEditMessage : null}
+                      onClick={sendMessageIsActive && !isSendMessageInFlight ? handleSendEditMessage : null}
                       iconColor={accentColor}
                       activeColor={accentColor}
                     >
