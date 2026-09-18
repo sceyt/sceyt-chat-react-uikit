@@ -193,7 +193,7 @@ import { setConnectionStatus } from 'store/user/reducers'
 import { createAttachmentUnavailableError, isResendableError } from 'helpers/error'
 import { calculateRenderedImageWidth } from 'helpers'
 import { PendingMessageMutation } from './reducers'
-import { clearVideoPreparation, waitForVideoPreparation } from '../../helpers/attachmentPreparation'
+import { clearAttachmentPreparation, waitForAttachmentPreparation } from '../../helpers/attachmentPreparation'
 import { parseAttachmentMetadata, shouldExtractVideoFirstFrame, withVideoThumb } from '../../helpers/videoPreview'
 
 // Automatic reconnect resends per message tid — a message that keeps failing is
@@ -226,14 +226,14 @@ const hasLivePendingAttachment = (message: IMessage) =>
 const retractDeletedPendingMessage = (channel: IChannel, messageId: string) =>
   (channel.deleteMessageById as any)(messageId, false)
 
-const applyPreparedVideoAttachments = async (attachments: IAttachment[]) => {
+const applyPreparedMediaAttachments = async (attachments: IAttachment[], clearPreparation = true) => {
   await Promise.all(
     attachments.map(async (attachment) => {
       if (!attachment.tid) return
       // Local remuxing lazily loads an FFmpeg worker. If that worker request was
       // interrupted while offline, do not let a stale preparation promise block
       // reconnect delivery forever; send the preserved original after 10 seconds.
-      const prepared = await waitForVideoPreparation(attachment.tid, VIDEO_PREPARATION_TIMEOUT_MS)
+      const prepared = await waitForAttachmentPreparation(attachment.tid, VIDEO_PREPARATION_TIMEOUT_MS)
       if (prepared?.status === 'ready' && prepared.metadata) {
         attachment.url = prepared.file
         attachment.data = prepared.file
@@ -242,7 +242,12 @@ const applyPreparedVideoAttachments = async (attachments: IAttachment[]) => {
         attachment.metadata = prepared.metadata
         attachment.videoPreviewBlob = prepared.videoPreviewBlob
       }
-      clearVideoPreparation(attachment.tid)
+      // Keep a completed entry on an offline send. The reconnect attempt uses
+      // it to recover the prepared File and metadata from a serialized pending
+      // message; it is cleared after the connected attempt consumes it.
+      if (clearPreparation) {
+        clearAttachmentPreparation(attachment.tid)
+      }
     })
   )
   return attachments
@@ -1287,10 +1292,6 @@ function* sendMessage(action: IAction): any {
               parentMessage: message.parentMessage || null
             }
             pendingMessages.push(pending)
-            if (action.type !== RESEND_MESSAGE) {
-              yield call(loadOGMetadataForLinkMessages, [pending], true)
-              yield call(updateMessage, action.type, pending, channel.id, true, message)
-            }
           } else {
             attachmentsToSend.push(messageAttachment)
           }
@@ -1353,10 +1354,6 @@ function* sendMessage(action: IAction): any {
             parentMessage: message.parentMessage || null
           }
           pendingMessages.push(pending)
-          if (action.type !== RESEND_MESSAGE) {
-            yield call(loadOGMetadataForLinkMessages, [pending], true)
-            yield call(updateMessage, action.type, pending, channel.id, true, message)
-          }
 
           messageToSend = { ...messageToSend, attachments: attachmentsToSend }
           messagesToSend.push(messageToSend)
@@ -1377,18 +1374,36 @@ function* sendMessage(action: IAction): any {
         }
 
         try {
+          if (messageToSend.tid && isPendingMessageDeleted(channel.id, messageToSend.tid)) {
+            continue
+          }
+
+          // Do not insert an optimistic image/video message until its local
+          // preview metadata is ready. The compose input has already cleared,
+          // so this only delays the chat row—not the user's ability to type or
+          // send another message. A failed/timed-out preparation intentionally
+          // falls back to the original file after the bounded wait.
+          yield call(applyPreparedMediaAttachments, messageAttachment, connectionState === CONNECTION_STATUS.CONNECTED)
+          const pendingMessage = pendingMessages[i]
+          const pendingAttachments = pendingMessage.attachments.map((pendingAttachment: any) => {
+            const preparedAttachment = messageAttachment.find(
+              (attachment: any) => attachment.tid === pendingAttachment.tid
+            )
+            return preparedAttachment
+              ? { ...pendingAttachment, ...preparedAttachment, data: preparedAttachment.data || preparedAttachment.url }
+              : pendingAttachment
+          })
+          pendingMessage.attachments = pendingAttachments
+
+          if (action.type !== RESEND_MESSAGE) {
+            yield call(loadOGMetadataForLinkMessages, [pendingMessage], true)
+            yield call(updateMessage, action.type, pendingMessage, channel.id, true, message)
+          }
+
           if (connectionState === CONNECTION_STATUS.CONNECTED) {
             if (messageToSend.tid && isPendingMessageDeleted(channel.id, messageToSend.tid)) {
               continue
             }
-            // Do not wait for local video work while offline. The optimistic
-            // message must enter the reconnect queue immediately, retaining the
-            // preparation entry and source File for the retry that can upload.
-            yield call(applyPreparedVideoAttachments, messageAttachment)
-            const pendingAttachments = messageAttachment.map((attachment: any) => ({
-              ...attachment,
-              data: attachment.data || attachment.url
-            }))
             updateMessageOnMap(channel.id, {
               messageId: messageToSend.tid!,
               params: { attachments: pendingAttachments }

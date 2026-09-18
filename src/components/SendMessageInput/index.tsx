@@ -97,10 +97,10 @@ import { getShowOnlyContactUsers } from '../../helpers/contacts'
 import { getFrame, VideoThumbnailFrame } from '../../helpers/getVideoFrame'
 import { remuxVideoFileForUpload } from '../../helpers/videoConversion'
 import {
-  beginVideoPreparation,
-  clearVideoPreparation,
-  completeVideoPreparation,
-  failVideoPreparation
+  beginAttachmentPreparation,
+  clearAttachmentPreparation,
+  completeAttachmentPreparation,
+  failAttachmentPreparation
 } from '../../helpers/attachmentPreparation'
 import { CAN_USE_DOM } from '../../helpers/canUseDOM'
 
@@ -467,6 +467,10 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
   const [sendMessageIsActive, setSendMessageIsActive] = useState(false)
   const [isSendMessageInFlight, setIsSendMessageInFlight] = useState(false)
   const [attachments, setAttachments]: any = useState([])
+  // Native paste/drop handlers can queue a React state update immediately
+  // before Send is clicked. Keep the latest attachment snapshot synchronously
+  // so Send never reads the previous render's empty array.
+  const attachmentsRef = useRef<any[]>([])
 
   const [forwardPopupOpen, setForwardPopupOpen] = useState(false)
   const [deletePopupOpen, setDeletePopupOpen] = useState(false)
@@ -568,6 +572,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
     setMessageBodyAttributes([])
     setMentionedUsers([])
     setAttachments([])
+    attachmentsRef.current = []
     setViewOnce(false)
     setSendMessageIsActive(false)
     setShouldClearEditor({ clear: true })
@@ -605,6 +610,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
     setMessageText(draftMessage.text || '')
     setMentionedUsers(draftMessage.mentionedUsers || [])
     setAttachments(draftMessage.attachments || [])
+    attachmentsRef.current = draftMessage.attachments || []
     setViewOnce(!!draftMessage.viewOnce)
     if (draftMessage.messageForReply) dispatch(setMessageForReplyAC(draftMessage.messageForReply))
     setShouldClearEditor({ clear: true, draftMessage })
@@ -834,12 +840,13 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
     const isEnter: boolean = (code === 'Enter' || code === 'NumpadEnter') && shiftKey === false
     const isPoll = Boolean(pollDetails && pollDetails.options.length > 0 && pollDetails.name.trim())
     const messageTextForSend = isPoll ? pollDetails?.name.trim() : messageText.trim()
+    const composerAttachments = attachmentsRef.current
     const shouldSend =
       (isEnter || type === 'click') &&
-      (messageToEdit || messageTextForSend || (attachments.length && attachments.length > 0))
+      (messageToEdit || messageTextForSend || (composerAttachments.length && composerAttachments.length > 0))
     if (isEnter) {
       event.preventDefault()
-      if (!messageTextForSend?.trim() && !attachments.length && !messageToEdit) {
+      if (!messageTextForSend?.trim() && !composerAttachments.length && !messageToEdit) {
         setShouldClearEditor({ clear: true })
       }
     }
@@ -857,7 +864,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
       event.stopPropagation()
       if (messageToEdit) {
         handleEditMessage()
-      } else if (messageTextForSend?.trim() || (attachments.length && attachments.length > 0)) {
+      } else if (messageTextForSend?.trim() || (composerAttachments.length && composerAttachments.length > 0)) {
         const { body: messageTexToSend, bodyAttributes: adjustedBodyAttributes } = trimMessageBodyWithAttributes(
           messageText,
           messageBodyAttributes
@@ -926,7 +933,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
             }
           }
         }
-        if (hasSendableTextOrPoll(messageTexToSend, isPoll) && !attachments.length) {
+        if (hasSendableTextOrPoll(messageTexToSend, isPoll) && !composerAttachments.length) {
           if (linkAttachment) {
             messageToSend.attachments = [linkAttachment]
           }
@@ -937,13 +944,13 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
           }
           dispatch(sendTextMessageAC(messageToSend, activeChannel.id, connectionStatus))
         }
-        if (attachments.length) {
+        if (composerAttachments.length) {
           // The send saga owns the shared video-preparation registry. Dispatch
           // now so the optimistic message appears immediately and this composer
           // can accept another message while metadata/upload work continues.
           const sendAsSeparateMessage = getSendAttachmentsAsSeparateMessages()
           messageToSend.attachments = mergePreparedAttachmentPatches(
-            attachments,
+            composerAttachments,
             preparedAttachmentPatchesRef.current
           ).map((preparedAttachment: any) => {
             return {
@@ -979,7 +986,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
               sendAsSeparateMessage
             )
           )
-          attachments.forEach((attachment: any) => {
+          composerAttachments.forEach((attachment: any) => {
             attachmentPreparationPromisesRef.current.delete(attachment.tid)
             preparedAttachmentPatchesRef.current.delete(attachment.tid)
           })
@@ -995,6 +1002,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
         setTypingTimout(undefined)
       }
       setAttachments([])
+      attachmentsRef.current = []
       attachmentsUpdate = []
       removeDraftMessageFromMap(activeChannel.id)
       dispatch(setChannelDraftMessageIsRemovedAC(activeChannel.id))
@@ -1133,20 +1141,22 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
 
   const removeUpload = (attachmentId: string) => {
     if (attachmentId) {
-      const updatedAttachments = attachmentsUpdate.filter((item: any) => item.tid !== attachmentId)
+      const updatedAttachments = attachmentsRef.current.filter((item: any) => item.tid !== attachmentId)
       deleteVideoThumb(attachmentId)
-      clearVideoPreparation(attachmentId)
+      clearAttachmentPreparation(attachmentId)
       attachmentPreparationPromisesRef.current.delete(attachmentId)
       preparedAttachmentPatchesRef.current.delete(attachmentId)
       releaseBlobUrls([`compose_${attachmentId}`])
       setAttachments(updatedAttachments)
+      attachmentsRef.current = updatedAttachments
       attachmentsUpdate = updatedAttachments
     } else {
-      attachmentsUpdate.forEach((attachment: any) => clearVideoPreparation(attachment.tid))
+      attachmentsRef.current.forEach((attachment: any) => clearAttachmentPreparation(attachment.tid))
       attachmentPreparationPromisesRef.current.clear()
       preparedAttachmentPatchesRef.current.clear()
-      releaseBlobUrls(attachmentsUpdate.map((item: any) => `compose_${item.tid}`))
+      releaseBlobUrls(attachmentsRef.current.map((item: any) => `compose_${item.tid}`))
       setAttachments([])
+      attachmentsRef.current = []
       attachmentsUpdate = []
     }
     // Reset viewOnce when all attachments are removed
@@ -1411,8 +1421,8 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
     // Object URLs are supported by Chrome, Safari, Firefox, and Edge, and let the
     // browser decode directly from the selected file.
     setPendingAttachment(tid, { file })
-    if (fileType === 'video') {
-      beginVideoPreparation(tid, file)
+    if (fileType === 'image' || fileType === 'video') {
+      beginAttachmentPreparation(tid, file)
     }
     // Keep videos chosen from the generic file picker as file cards. Once their
     // background thumbnail is ready, AttachmentFile renders it like an ordinary
@@ -1443,16 +1453,20 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
           }
         : {})
     }
-    setAttachments((prevState: any[]) => [...prevState, attachment])
+    const nextAttachments = [...attachmentsRef.current, attachment]
+    attachmentsRef.current = nextAttachments
+    setAttachments(nextAttachments)
 
     const updateAttachment = (patch: any) => {
       preparedAttachmentPatchesRef.current.set(tid, {
         ...preparedAttachmentPatchesRef.current.get(tid),
         ...patch
       })
-      setAttachments((prevState: any[]) =>
-        prevState.map((current: any) => (current.tid === tid ? { ...current, ...patch } : current))
+      const nextAttachments = attachmentsRef.current.map((current: any) =>
+        current.tid === tid ? { ...current, ...patch } : current
       )
+      attachmentsRef.current = nextAttachments
+      setAttachments(nextAttachments)
     }
 
     // Yield once so React can paint the object-URL preview before optional CPU-heavy
@@ -1463,13 +1477,23 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
           if (fileType === 'image') {
             try {
               const { thumbnail, imageWidth, imageHeight } = await createImageThumbnail(file)
+              let preparedFile = file
+              let metadata: any
               if (customUploader) {
                 const resizedFile = await resizeImage(file)
                 const patch = {
                   size: isMediaAttachment && resizedFile?.blob ? resizedFile.blob.size : file.size,
                   metadata: { szw: imageWidth, szh: imageHeight, tmb: thumbnail }
                 }
-                updateAttachment(patch)
+                if (isMediaAttachment && resizedFile?.blob) {
+                  preparedFile = new File([resizedFile.blob], resizedFile.file.name, { type: file.type })
+                  patch.size = preparedFile.size
+                  updateAttachment({ ...patch, data: preparedFile })
+                  setPendingAttachment(tid, { file: preparedFile })
+                } else {
+                  updateAttachment(patch)
+                }
+                metadata = patch.metadata
                 handleAttachmentImageForCache({ ...attachment, ...patch })
               } else if (isMediaAttachment && file.type !== 'image/gif') {
                 const resizedFileData = await resizeImage(file)
@@ -1490,14 +1514,17 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
                 updateAttachment(patch)
                 setPendingAttachment(tid, { file: resizedFile })
                 handleAttachmentImageForCache({ ...attachment, ...patch })
+                preparedFile = resizedFile
+                metadata = patch.metadata
               } else {
-                updateAttachment({
-                  metadata: JSON.stringify({ tmb: thumbnail, szw: imageWidth, szh: imageHeight })
-                })
+                metadata = JSON.stringify({ tmb: thumbnail, szw: imageWidth, szh: imageHeight })
+                updateAttachment({ metadata })
               }
+              completeAttachmentPreparation(tid, { file: preparedFile, metadata })
             } catch (error) {
               // The original file preview/upload remains usable if optional optimization fails.
               log.warn('Unable to prepare image attachment preview:', error)
+              failAttachmentPreparation(tid)
             }
           } else if (fileType === 'video') {
             const remuxPromise = remuxVideoFileForUpload(file)
@@ -1538,9 +1565,9 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
               setPendingAttachment(tid, { file: uploadFile })
             }
             if (metadata) {
-              completeVideoPreparation(tid, { file: uploadFile, metadata, videoPreviewBlob: frame?.blob })
+              completeAttachmentPreparation(tid, { file: uploadFile, metadata, videoPreviewBlob: frame?.blob })
             } else {
-              failVideoPreparation(tid)
+              failAttachmentPreparation(tid)
               updateAttachment({ thumbnailState: 'failed' })
             }
           }
@@ -1846,6 +1873,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
       }
     }
     attachmentsUpdate = attachments
+    attachmentsRef.current = attachments
 
     // Check if there's an active audio recording
     const hasAudioRecording = showRecording || getAudioRecordingFromMap(activeChannel?.id)?.file

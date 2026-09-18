@@ -305,7 +305,14 @@ const Attachment = ({
   }
   const fallbackImageSource =
     withPrefix && attachmentThumb ? `data:image/jpeg;base64,${attachmentThumb}` : attachmentThumb
-  const preferredImageSource = attachment.attachmentUrl || attachmentUrlFromMap || attachmentUrl
+  // `attachmentUrl` is the short-lived compose preview. Once an attachment is
+  // confirmed, the shared cache URL is the stable session source and must win
+  // on every message-row remount; otherwise the row briefly revives a revoked
+  // compose blob before swapping to a newly minted cache blob. Compose previews
+  // intentionally retain their local URL priority while the message is unsent.
+  const preferredImageSource = isPreview
+    ? attachment.attachmentUrl || attachmentUrlFromMap || attachmentUrl
+    : attachmentUrlFromMap || attachment.attachmentUrl || attachmentUrl
   const {
     displayedSource: displayedImageSource,
     previousSource: previousImageSource,

@@ -6,6 +6,7 @@ import {
   clearMessagesMap,
   deletePendingMessage,
   deletePendingAttachment,
+  getPendingAttachment,
   getMessageFromMap,
   getPendingMessagesFromMap,
   setPendingAttachment
@@ -564,7 +565,78 @@ describe('attachment upload recovery', () => {
     expect(getMessageFromMap(channel.id, pendingMessage.tid!)).toBeNull()
   })
 
-  it('preserves an offline video source and sends it after reconnect', async () => {
+  it('does not add an optimistic image row until its local preview preparation resolves', async () => {
+    const currentUser = makeUser({ id: 'current-user' })
+    const channel = makeUploaderChannel('channel-image-preview-before-pending')
+    const image = new File(['image-bytes'], 'photo.png', { type: 'image/png' })
+    const attachmentTid = 'image-preview-before-pending-file-tid'
+    let resolveSend!: (value: any) => void
+    channel.sendMessage = jest.fn(
+      () =>
+        new Promise((resolve) => {
+          resolveSend = resolve
+        })
+    )
+    setActiveChannelId(channel.id)
+    setChannelInMap(channel)
+    beginVideoPreparation(attachmentTid, image)
+
+    const task = runSaga(
+      { dispatch: () => undefined, getState: () => mockStoreState },
+      __messageSagaTestables.sendMessage,
+      sendMessageAC(
+        {
+          body: 'photo',
+          bodyAttributes: [],
+          attachments: [
+            {
+              tid: attachmentTid,
+              type: attachmentTypes.image,
+              name: image.name,
+              size: image.size,
+              data: image,
+              metadata: '{}',
+              upload: false
+            }
+          ],
+          mentionedUsers: [],
+          type: 'text',
+          metadata: {},
+          parentMessage: null,
+          repliedInThread: false
+        },
+        channel.id,
+        CONNECTION_STATUS.CONNECTED,
+        false
+      )
+    )
+
+    await Promise.resolve()
+    expect(getPendingMessagesFromMap(channel.id)).toHaveLength(0)
+    expect(channel.sendMessage).not.toHaveBeenCalled()
+
+    completeVideoPreparation(attachmentTid, {
+      file: image,
+      metadata: { tmb: 'image-thumb', szw: 640, szh: 480 }
+    })
+    for (let attempt = 0; attempt < 20 && !channel.sendMessage.mock.calls.length; attempt++) {
+      await Promise.resolve()
+    }
+
+    const [pendingMessage] = getPendingMessagesFromMap(channel.id)
+    expect(pendingMessage).toEqual(
+      expect.objectContaining({
+        attachments: [
+          expect.objectContaining({ tid: attachmentTid, metadata: { tmb: 'image-thumb', szw: 640, szh: 480 } })
+        ]
+      })
+    )
+
+    resolveSend(makeServerResponse(pendingMessage.tid!, attachmentTid, currentUser))
+    await task.toPromise()
+  })
+
+  it('waits for the offline video preview before adding its pending message, then preserves it for reconnect', async () => {
     const currentUser = makeUser({ id: 'current-user' })
     const channel = makeUploaderChannel('channel-offline-video-reconnect')
     const video = new File(['video-bytes'], 'offline-video.mp4', { type: 'video/mp4' })
@@ -572,12 +644,15 @@ describe('attachment upload recovery', () => {
 
     setActiveChannelId(channel.id)
     setChannelInMap(channel)
-    // The compose background work is still running when Send is pressed.
-    // Offline sending must not wait on this promise before entering the
-    // reconnect queue.
+    // The compose background work is still running when Send is pressed. The
+    // pending row must not be rendered until it can show a video preview.
     beginVideoPreparation(attachmentTid, video)
 
-    await runMessageSaga(
+    const task = runSaga(
+      {
+        dispatch: () => undefined,
+        getState: () => mockStoreState
+      },
       __messageSagaTestables.sendMessage,
       sendMessageAC(
         {
@@ -606,17 +681,27 @@ describe('attachment upload recovery', () => {
       )
     )
 
-    const [offlinePendingMessage] = getPendingMessagesFromMap(channel.id)
-    expect(offlinePendingMessage).toEqual(expect.objectContaining({ state: MESSAGE_STATUS.FAILED }))
-    expect(uploadCalls).toHaveLength(0)
+    await Promise.resolve()
+    expect(getPendingMessagesFromMap(channel.id)).toHaveLength(0)
 
-    // Retry the serialized pending message, as reconnect does after Redux has
-    // rendered it. The File must be restored from the per-attachment source map.
     completeVideoPreparation(attachmentTid, {
       file: video,
       metadata: { tmb: 'local-thumb', szw: 1280, szh: 720, dur: 4 },
       videoPreviewBlob: new Blob(['preview'], { type: 'image/jpeg' })
     })
+    await task.toPromise()
+
+    const [offlinePendingMessage] = getPendingMessagesFromMap(channel.id)
+    expect(offlinePendingMessage).toEqual(expect.objectContaining({ state: MESSAGE_STATUS.FAILED }))
+    expect(offlinePendingMessage.attachments).toEqual(
+      expect.arrayContaining([expect.objectContaining({ tid: attachmentTid, type: attachmentTypes.video })])
+    )
+    expect(offlinePendingMessage.attachments[0].data).toBe(video)
+    expect(getPendingAttachment(attachmentTid)?.file).toBe(video)
+    expect(uploadCalls).toHaveLength(0)
+
+    // Retry the serialized pending message, as reconnect does after Redux has
+    // rendered it. The File must be restored from the per-attachment source map.
     channel.sendMessage = jest.fn((outgoingMessage: any) =>
       Promise.resolve({
         ...makeServerResponse(offlinePendingMessage.tid, attachmentTid, currentUser),

@@ -304,4 +304,44 @@ describe('SendMessageInput attachment sending', () => {
 
     expect(dispatchedActions.filter((action) => action.type === SEND_MESSAGE)).toHaveLength(1)
   })
+
+  it.each([
+    ['image', 'pasted-image.png', 'image/png', attachmentTypes.image],
+    ['video', 'pasted-video.mp4', 'video/mp4', attachmentTypes.video]
+  ])('includes a %s pasted immediately before Send in the outgoing message', async (_kind, name, mimeType, type) => {
+    const channel = makeChannel({ id: 'paste-image-send-channel' })
+    const store = createMessageListStore({ ChannelReducer: { activeChannel: channel } })
+    const dispatchedActions: any[] = []
+    const dispatch = store.dispatch.bind(store)
+    jest.spyOn(store, 'dispatch').mockImplementation((action: any) => {
+      dispatchedActions.push(action)
+      return dispatch(action)
+    })
+    const { container } = renderWithSceytProvider(
+      <SendMessageInput CustomSendMessageButton={<button data-testid='send-message'>Send</button>} />,
+      { store }
+    )
+
+    // Keep Send active before the native paste listener queues the attachment
+    // state update, matching a user pasting an image and immediately tapping Send.
+    fireEvent.click(screen.getByTestId('type-user-a-draft'))
+    await act(async () => {
+      await Promise.resolve()
+    })
+
+    const file = new File(['media'], name, { type: mimeType })
+    const pasteTarget = container.firstElementChild?.firstElementChild as HTMLElement
+    await act(async () => {
+      const pasteEvent = new Event('paste', { bubbles: true, cancelable: true })
+      Object.defineProperty(pasteEvent, 'clipboardData', {
+        value: { files: [file], items: [] }
+      })
+      pasteTarget.dispatchEvent(pasteEvent)
+      fireEvent.click(screen.getByTestId('send-message'))
+    })
+
+    const sendAction = dispatchedActions.find((action) => action.type === SEND_MESSAGE)
+    expect(sendAction).toBeDefined()
+    expect(sendAction.payload.message.attachments).toEqual([expect.objectContaining({ data: file, name, type })])
+  })
 })

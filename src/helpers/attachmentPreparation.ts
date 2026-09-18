@@ -1,9 +1,18 @@
-export type VideoPreparation = {
+/**
+ * Local work which must finish before an attachment can be rendered as an
+ * optimistic media message.  The registry started as video-only, but images
+ * also create their preview metadata asynchronously; treating both the same
+ * prevents a pending row from winning the race against its thumbnail.
+ */
+export type AttachmentPreparation = {
   file: File
   metadata?: any
   videoPreviewBlob?: Blob
   status: 'loading' | 'ready' | 'failed'
 }
+
+// Kept as an alias for existing video call sites and downstream consumers.
+export type VideoPreparation = AttachmentPreparation
 
 type PreparationEntry = VideoPreparation & {
   promise: Promise<VideoPreparation>
@@ -61,3 +70,9 @@ export const clearVideoPreparation = (tid: string) => {
   }
   preparations.delete(tid)
 }
+
+export const beginAttachmentPreparation = beginVideoPreparation
+export const completeAttachmentPreparation = completeVideoPreparation
+export const failAttachmentPreparation = failVideoPreparation
+export const waitForAttachmentPreparation = waitForVideoPreparation
+export const clearAttachmentPreparation = clearVideoPreparation

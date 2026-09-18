@@ -621,6 +621,36 @@ describe('video attachment preview and download states', () => {
     )
   })
 
+  it('uses the cached image blob on remount instead of briefly restoring a stale compose blob', () => {
+    const imageAttachment = {
+      ...videoAttachment,
+      id: 'sent-image-attachment-id',
+      tid: 'sent-image-attachment-tid',
+      type: attachmentTypes.image,
+      url: 'https://cdn/sent-image.jpg',
+      // This is the short-lived object URL from the compose preview. A
+      // confirmed message can still carry it while its cache entry has the
+      // long-lived session URL used by every remounted message row.
+      attachmentUrl: 'blob:compose-image-url',
+      metadata: JSON.stringify({ szw: 1280, szh: 720, tmb: 'a'.repeat(80) })
+    }
+    const messageState = {
+      attachmentUpdatedMap: {
+        'https://cdn/sent-image.jpg_1_0_2': 'blob:cached-image-url'
+      }
+    }
+
+    const first = renderMediaAttachment(imageAttachment, messageState)
+    expect(first.container.querySelector('img[src="blob:cached-image-url"]')).toBeInTheDocument()
+    expect(first.container.querySelector('img[src="blob:compose-image-url"]')).not.toBeInTheDocument()
+
+    first.unmount()
+
+    const remounted = renderMediaAttachment(imageAttachment, messageState)
+    expect(remounted.container.querySelector('img[src="blob:cached-image-url"]')).toBeInTheDocument()
+    expect(remounted.container.querySelector('img[src="blob:compose-image-url"]')).not.toBeInTheDocument()
+  })
+
   it('does not open an image in the slider while its original download is in progress', async () => {
     const handleMediaItemClick = jest.fn()
     const imageAttachment = {
