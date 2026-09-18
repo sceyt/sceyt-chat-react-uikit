@@ -1191,6 +1191,7 @@ const MessageList: React.FC<MessagesProps> = ({
           channelId={channel.id}
           onClose={closePinnedMessagesList}
           closeRequested={pinnedMessagesListCloseRequested}
+          selectionIsActive={Boolean(selectedMessagesMap?.size)}
           ScrollContainer={Container}
           MessagesContainer={MessagesBox}
           renderMessage={({ message, prevMessage, nextMessage, index }) =>

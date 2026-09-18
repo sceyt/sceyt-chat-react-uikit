@@ -13,6 +13,7 @@ import MessageReducer, {
   setOGMetadata,
   setPinnedMessagesListOpen,
   requestPinnedMessagesListClose,
+  addSelectedMessage,
   OG_METADATA_MAX
 } from './reducers'
 import { addReactionToMessageAC, deleteReactionFromMessageAC } from './actions'
@@ -598,6 +599,18 @@ describe('pinned messages list close', () => {
 
     expect(closingState.pinnedMessagesListOpen).toBe(false)
     expect(closingState.pinnedMessagesListCloseRequested).toBe(true)
+  })
+
+  it('clears pinned-list message selection before restoring the chat', () => {
+    const selectedMessage = makeMessage({ id: 'selected-pinned-message', body: 'Selected pinned message' })
+    const selectedState = MessageReducer(
+      MessageReducer(undefined, addSelectedMessage({ message: selectedMessage })),
+      setPinnedMessagesListOpen({ isOpen: true })
+    )
+
+    const closingState = MessageReducer(selectedState, requestPinnedMessagesListClose())
+
+    expect(closingState.selectedMessagesMap).toBeNull()
   })
 })
 

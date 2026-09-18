@@ -677,6 +677,7 @@ const messageSlice = createSlice({
         // its exit animation.
         state.pinnedMessagesListOpen = false
         state.pinnedMessagesListCloseRequested = true
+        state.selectedMessagesMap = null
       }
     },
 

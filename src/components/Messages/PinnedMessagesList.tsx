@@ -24,6 +24,7 @@ const PinnedMessagesList = ({
   channelId,
   onClose,
   closeRequested,
+  selectionIsActive = false,
   renderMessage,
   ScrollContainer,
   MessagesContainer
@@ -31,6 +32,7 @@ const PinnedMessagesList = ({
   channelId: string
   onClose: () => void
   closeRequested?: boolean
+  selectionIsActive?: boolean
   renderMessage: RenderPinnedMessage
   ScrollContainer: ScrollContainerComponent
   MessagesContainer: MessagesContainerComponent
@@ -207,7 +209,7 @@ const PinnedMessagesList = ({
                   nextMessage: displayedPins[index + 1]?.message || null,
                   index
                 })}
-                {(pin.message.id || pin.message.tid) && (
+                {!selectionIsActive && (pin.message.id || pin.message.tid) && (
                   <GoToMessageButton
                     background={backgroundSections}
                     className='pinned-message-navigation'
