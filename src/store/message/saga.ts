@@ -201,6 +201,7 @@ import { parseAttachmentMetadata, shouldExtractVideoFirstFrame, withVideoThumb }
 // on the failed message stays available and resets the budget.
 const MAX_AUTO_RESEND_ATTEMPTS = 5
 const autoResendAttempts = new Map<string, number>()
+const autoResendsInFlight = new Set<string>()
 const loadMoreMessagesInFlight = new Set<string>()
 const prefetchInFlight = new Set<string>()
 const queuedPrefetchRequests = new Map<string, { fromMessageId: string; pages: number }>()
@@ -2122,13 +2123,18 @@ const sendPendingMessages = function* (connectionState: string) {
     for (const msg of pendingMessagesMap[channelId]) {
       const attachments = msg?.attachments?.filter((att: IAttachment) => att?.type !== attachmentTypes.link)
       const resendKey = msg?.tid || msg?.id
+      const resendInFlightKey = resendKey ? `${channelId}:${resendKey}` : null
       if (resendKey) {
+        if (autoResendsInFlight.has(resendInFlightKey!)) {
+          continue
+        }
         const attempts = autoResendAttempts.get(resendKey) || 0
         if (attempts >= MAX_AUTO_RESEND_ATTEMPTS) {
           log.info(`Skipping auto-resend of message ${resendKey} after ${attempts} failed attempts`)
           continue
         }
         autoResendAttempts.set(resendKey, attempts + 1)
+        autoResendsInFlight.add(resendInFlightKey!)
       }
 
       try {
@@ -2156,6 +2162,10 @@ const sendPendingMessages = function* (connectionState: string) {
       } catch (error) {
         log.error(`Failed to send pending message ${msg.tid || msg.id}:`, error)
         // Continue with next message even if this one fails
+      } finally {
+        if (resendInFlightKey) {
+          autoResendsInFlight.delete(resendInFlightKey)
+        }
       }
     }
   }
@@ -4596,6 +4606,7 @@ export const __resetMessageSagaTestState = () => {
   prefetchCompletionWaiters.clear()
   prefetchCancelVersions.clear()
   autoResendAttempts.clear()
+  autoResendsInFlight.clear()
 }
 
 const REFRESH_WINDOW_HALF = 30

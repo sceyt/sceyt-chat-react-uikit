@@ -4077,6 +4077,71 @@ describe('message saga message-list flows', () => {
     expect(channel.sendMessage).toHaveBeenCalledWith(expect.objectContaining({ tid: pendingMessage.tid }))
   })
 
+  it('does not start a duplicate resend when reconnect triggers overlap', async () => {
+    const channelId = 'channel-overlapping-reconnect-resend'
+    const pendingMessage = makePendingMessage({
+      channelId,
+      tid: 'overlapping-reconnect-tid',
+      body: 'queued while offline',
+      metadata: ''
+    })
+    const confirmedMessage = makeMessage({
+      id: '905',
+      tid: pendingMessage.tid,
+      channelId,
+      body: pendingMessage.body,
+      metadata: ''
+    })
+    const channel = makeChannel({ id: channelId, lastMessage: pendingMessage })
+    const builder = {
+      setBody: jest.fn().mockReturnThis(),
+      setBodyAttributes: jest.fn().mockReturnThis(),
+      setAttachments: jest.fn().mockReturnThis(),
+      setMentionUserIds: jest.fn().mockReturnThis(),
+      setType: jest.fn().mockReturnThis(),
+      setDisplayCount: jest.fn().mockReturnThis(),
+      setSilent: jest.fn().mockReturnThis(),
+      setMetadata: jest.fn().mockReturnThis(),
+      setPollDetails: jest.fn().mockReturnThis(),
+      setDisableMentionsCount: jest.fn().mockReturnThis(),
+      create: jest.fn()
+    }
+    const resolvers: Array<(message: any) => void> = []
+
+    channel.createMessageBuilder = jest.fn(() => builder as any)
+    channel.sendMessage = jest.fn(
+      () =>
+        new Promise((resolve) => {
+          resolvers.push(resolve)
+        })
+    )
+
+    mockStoreState.UserReducer.connectionStatus = CONNECTION_STATUS.CONNECTED
+    setActiveChannelId(channelId)
+    setChannelInMap(channel)
+    addMessageToMap(channelId, pendingMessage)
+
+    const firstTask = runSaga(
+      { dispatch: () => undefined, getState: () => mockStoreState },
+      __messageSagaTestables.sendPendingMessages,
+      CONNECTION_STATUS.CONNECTED
+    ).toPromise()
+    await flushAsyncWork()
+
+    const secondTask = runSaga(
+      { dispatch: () => undefined, getState: () => mockStoreState },
+      __messageSagaTestables.sendPendingMessages,
+      CONNECTION_STATUS.CONNECTED
+    ).toPromise()
+    await flushAsyncWork()
+
+    const attemptsBeforeAnyResponse = channel.sendMessage.mock.calls.length
+    resolvers.forEach((resolve) => resolve(confirmedMessage))
+    await Promise.all([firstTask, secondTask])
+
+    expect(attemptsBeforeAnyResponse).toBe(1)
+  })
+
   it('keeps channel last message on confirmed server truth while reconnect resend confirms older pending messages', async () => {
     const currentUser = makeUser({ id: 'current-user' })
     const channelId = 'channel-resend-last-message-order'
