@@ -3,6 +3,10 @@ import { MessageTextFormat } from '../messageUtils'
 
 export const isPinnedMessageDeleted = (message?: any): boolean => message?.state === MESSAGE_STATUS.DELETE
 
+/** Attachment-only pins announce their media type rather than a file name or quoted text. */
+export const isPinnedMessageAttachmentOnly = (message?: any): boolean =>
+  !String(message?.body || '').trim() && Boolean(message?.attachments?.length)
+
 /** Uses the same mention formatting as message bubbles for plain-text pin previews. */
 export const getPinnedMessageBody = (
   message?: any,
@@ -44,5 +48,5 @@ export const getPinnedMessagePreview = (
   if (attachment.type === attachmentTypes.video) return 'Video'
   if (attachment.type === attachmentTypes.voice) return 'Voice message'
   if (attachment.type === attachmentTypes.link) return 'Link'
-  return attachment.name || 'File'
+  return 'File'
 }

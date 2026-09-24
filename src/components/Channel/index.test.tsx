@@ -154,12 +154,12 @@ describe('Channel pinned system-message preview', () => {
     expect(screen.queryByText('PM')).not.toBeInTheDocument()
   })
 
-  it('uses the pinned parent attachment label when it has no body', () => {
+  it('uses an unquoted pinned parent attachment label when it has no body', () => {
     const parentMessage = makeMessage({ id: 'pinned-parent-image', attachments: [{ type: attachmentTypes.image }] })
     parentMessage.body = ''
     renderPinnedSystemMessage(parentMessage)
 
-    expect(screen.getByText('Remote pinned "Photo".')).toBeInTheDocument()
+    expect(screen.getByText('Remote pinned Photo.')).toBeInTheDocument()
   })
 
   it('uses an unquoted deleted-message label for a deleted pinned source', () => {

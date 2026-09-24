@@ -72,4 +72,17 @@ describe('PinnedMessagesBanner', () => {
     expect(screen.queryByTestId('contact-preview')).not.toBeInTheDocument()
     expect(screen.getByText('Deleted Message')).toBeInTheDocument()
   })
+
+  it('uses File instead of the file name for an attachment-only pinned message', () => {
+    mockPins[0].message = {
+      id: 'file-message',
+      body: '',
+      attachments: [{ type: 'file', name: 'contract.pdf' }]
+    }
+
+    render(<PinnedMessagesBanner channelId='channel-1' />)
+
+    expect(screen.getByText('File')).toBeInTheDocument()
+    expect(screen.queryByText('contract.pdf')).not.toBeInTheDocument()
+  })
 })

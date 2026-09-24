@@ -63,4 +63,27 @@ describe('SystemMessage pinned preview', () => {
     expect(screen.queryByTestId('contact-preview')).not.toBeInTheDocument()
     expect(screen.getByRole('button')).toHaveTextContent('Other User pinned Deleted message')
   })
+
+  it.each([
+    ['file', 'contract.pdf', 'File'],
+    ['image', 'photo.jpg', 'Photo'],
+    ['video', 'video.mp4', 'Video']
+  ])('renders an unquoted %s label for an attachment-only pinned message', (type, name, label) => {
+    const attachmentMessage = {
+      ...message,
+      parentMessage: { id: `${type}-message`, body: '', attachments: [{ type, name }] }
+    }
+
+    render(
+      <SystemMessage
+        channel={{ id: 'channel-1' } as any}
+        message={attachmentMessage}
+        nextMessage={null as any}
+        contactsMap={{}}
+      />
+    )
+
+    expect(screen.getByRole('button')).toHaveTextContent(`Other User pinned ${label}.`)
+    expect(screen.getByRole('button')).not.toHaveTextContent(`"${label}"`)
+  })
 })

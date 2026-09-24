@@ -1,3 +1,4 @@
+import { attachmentTypes } from './constants'
 import { getPinnedMessagePreview } from './pinnedMessage'
 import { setClient } from '../common/client'
 
@@ -22,5 +23,13 @@ describe('getPinnedMessagePreview', () => {
     }
 
     expect(getPinnedMessagePreview(message)).toBe('Please ask @Jane Doe')
+  })
+
+  it('uses attachment type labels instead of file names for attachment-only pins', () => {
+    expect(getPinnedMessagePreview({ attachments: [{ type: attachmentTypes.file, name: 'contract.pdf' }] })).toBe(
+      'File'
+    )
+    expect(getPinnedMessagePreview({ attachments: [{ type: attachmentTypes.image, name: 'photo.jpg' }] })).toBe('Photo')
+    expect(getPinnedMessagePreview({ attachments: [{ type: attachmentTypes.video, name: 'video.mp4' }] })).toBe('Video')
   })
 })

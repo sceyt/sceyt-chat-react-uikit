@@ -42,7 +42,11 @@ import { IChannel, IContact, IMessage, IUser } from '../../types'
 import { MessageStatusIcon, MessageTextFormat } from '../../messageUtils'
 import { useColor } from '../../hooks'
 import { MESSAGE_TYPE } from '../../types/enum'
-import { getPinnedMessagePreview, isPinnedMessageDeleted } from '../../helpers/pinnedMessage'
+import {
+  getPinnedMessagePreview,
+  isPinnedMessageAttachmentOnly,
+  isPinnedMessageDeleted
+} from '../../helpers/pinnedMessage'
 
 interface IChannelProps {
   channel: IChannel
@@ -205,9 +209,12 @@ const ChannelMessageText = ({
             (() => {
               const pinnedMessagePreview = getPinnedMessagePreview(lastMessage.parentMessage)
               const pinnedMessageDeleted = isPinnedMessageDeleted(lastMessage.parentMessage)
+              const pinnedMessageAttachmentOnly = isPinnedMessageAttachmentOnly(lastMessage.parentMessage)
               return pinnedMessagePreview
                 ? `${systemMessageActor} pinned ${
-                    pinnedMessageDeleted ? pinnedMessagePreview : `"${pinnedMessagePreview}"`
+                    pinnedMessageDeleted || pinnedMessageAttachmentOnly
+                      ? pinnedMessagePreview
+                      : `"${pinnedMessagePreview}"`
                   }${pinnedMessageDeleted ? '' : '.'}`
                 : `${systemMessageActor} pinned a message.`
             })()

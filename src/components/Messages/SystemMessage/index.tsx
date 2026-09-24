@@ -16,7 +16,7 @@ import { removeVisibleMessageAC, scrollToNewMessageAC, setVisibleMessageAC } fro
 import { scrollToNewMessageSelector, unreadScrollToSelector } from 'store/message/selector'
 import { MESSAGE_TYPE } from 'types/enum'
 import { navigateToMessage } from 'helpers/messageListNavigator'
-import { getPinnedMessagePreview, isPinnedMessageDeleted } from 'helpers/pinnedMessage'
+import { getPinnedMessagePreview, isPinnedMessageAttachmentOnly, isPinnedMessageDeleted } from 'helpers/pinnedMessage'
 
 interface ISystemMessageProps {
   channel: IChannel
@@ -74,6 +74,7 @@ const Message = ({
     return getPinnedMessagePreview(message.parentMessage, contactsMap, getFromContacts)
   }, [contactsMap, getFromContacts, message.parentMessage])
   const pinnedMessageDeleted = isPinnedMessageDeleted(message.parentMessage)
+  const pinnedMessageAttachmentOnly = isPinnedMessageAttachmentOnly(message.parentMessage)
   const customPinnedMessagePreview =
     pinnedMessageDeleted || !message.parentMessage
       ? null
@@ -142,7 +143,7 @@ const Message = ({
             <React.Fragment>
               {`${actorName} pinned `}
               <PinnedMessagePreview>
-                {pinnedMessageDeleted || customPinnedMessagePreview ? (
+                {pinnedMessageDeleted || customPinnedMessagePreview || pinnedMessageAttachmentOnly ? (
                   pinnedPreview
                 ) : (
                   <React.Fragment>"{pinnedPreview}"</React.Fragment>

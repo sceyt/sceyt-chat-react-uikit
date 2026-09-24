@@ -49,7 +49,7 @@ const preview = (message: any, contactsMap: Record<string, any>, getFromContacts
     return 'Video'
   }
   if (attachment.type === attachmentTypes.link) return attachment.url || 'Link'
-  return attachment.name || 'File'
+  return 'File'
 }
 
 const formatDuration = (duration: number | string) => {
