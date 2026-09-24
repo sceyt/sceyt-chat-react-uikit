@@ -25,8 +25,9 @@ import {
 import { CONNECTION_STATUS } from '../user/constants'
 import {
   attachmentTypes,
-  LOADING_STATE,
   MESSAGE_DELIVERY_STATUS,
+  channelDetailsTabs,
+  LOADING_STATE,
   MESSAGE_STATUS,
   UPLOAD_STATE
 } from '../../helpers/constants'
@@ -48,6 +49,7 @@ import {
   cancelChannelMessageProcessesAC,
   deleteReactionAC,
   deleteMessageAC,
+  getAttachmentsAC,
   deleteMessageFromListAC,
   editMessageAC,
   forwardMessageAC,
@@ -68,6 +70,7 @@ import {
   setMessagesAC,
   setMessagesHasNextAC,
   setMessagesHasPrevAC,
+  setCachedTabAttachmentsAC,
   setLoadingNextMessagesStateAC,
   setLoadingPrevMessagesStateAC,
   setPendingMessageMutationAC,
@@ -79,7 +82,7 @@ import {
 } from './actions'
 import { updateChannelDataAC, updateChannelLastMessageAC } from '../channel/actions'
 import { setWaitToSendPendingMessagesAC } from '../user/actions'
-import MessageSaga, { __messageSagaTestables, __resetMessageSagaTestState } from './saga'
+import MessageSaga, { __messageSagaTestables, __resetMessageSagaTestState, updateTabAttachmentCache } from './saga'
 import { navigateToLatest } from '../../helpers/messageListNavigator'
 import { IMessage } from '../../types'
 
@@ -5055,6 +5058,118 @@ describe('loadAroundMessage generic cache-first', () => {
       'server-401',
       'server-402'
     ])
+  })
+})
+
+describe('message attachment cache synchronization', () => {
+  beforeEach(() => {
+    mockStore.dispatch.mockClear()
+    mockStore.getState.mockImplementation(() => mockStoreState)
+    mockStoreState.MessageReducer.tabAttachmentsCache = {}
+    __resetMessageSagaTestState()
+  })
+
+  it('creates a tab cache entry for an incoming media attachment before the tab query completes', () => {
+    const attachment = { id: '102', type: attachmentTypes.video } as any
+
+    updateTabAttachmentCache('channel-media-race', [attachment])
+
+    expect(mockStore.dispatch).toHaveBeenCalledWith(
+      setCachedTabAttachmentsAC(`channel-media-race_${channelDetailsTabs.media}`, [attachment])
+    )
+  })
+
+  it('keeps media received while the initial attachment query is loading', async () => {
+    const channelId = 'channel-media-race'
+    const receivedAttachment = { id: '102', type: attachmentTypes.video, name: 'received.mp4' } as any
+    const staleQueryAttachment = { id: '101', type: attachmentTypes.video, name: 'older.mp4' } as any
+    const cacheKey = `${channelId}_${channelDetailsTabs.media}`
+    const attachmentQuery = {
+      loadPrevious: jest.fn(() => {
+        // Simulate the channel message event arriving after this request begins
+        // but before a poor-network response returns.
+        mockStoreState.MessageReducer.tabAttachmentsCache[cacheKey] = [receivedAttachment]
+        return Promise.resolve({ attachments: [staleQueryAttachment], hasNext: false })
+      })
+    }
+
+    setClient({
+      user: { id: 'current-user' },
+      AttachmentListQueryBuilder: class {
+        limit = jest.fn()
+        build = jest.fn(() => Promise.resolve(attachmentQuery))
+      }
+    })
+
+    const dispatched = await runMessageSaga(
+      __messageSagaTestables.getMessageAttachments,
+      getAttachmentsAC(channelId, channelDetailsTabs.media, 35)
+    )
+
+    expect(attachmentQuery.loadPrevious).toHaveBeenCalled()
+    expect(dispatched).toContainEqual(
+      setCachedTabAttachmentsAC(cacheKey, expect.arrayContaining([receivedAttachment, staleQueryAttachment]))
+    )
+    expect(dispatched).toContainEqual(
+      expect.objectContaining({
+        type: setCachedTabAttachmentsAC(cacheKey, []).type,
+        payload: {
+          key: cacheKey,
+          attachments: [receivedAttachment, staleQueryAttachment]
+        }
+      })
+    )
+  })
+
+  it('loads attachment previews from the latest cached ID after reconnecting', async () => {
+    const channelId = 'channel-media-reconnect'
+    const cacheKey = `${channelId}_${channelDetailsTabs.media}`
+    const latestCachedAttachment = {
+      id: '101',
+      type: attachmentTypes.video,
+      name: 'cached.mp4',
+      createdAt: new Date('2026-04-02T12:00:00.000Z')
+    } as any
+    const receivedAttachment = {
+      id: '102',
+      type: attachmentTypes.video,
+      name: 'received.mp4',
+      createdAt: new Date('2026-04-02T12:01:00.000Z')
+    } as any
+    mockStoreState.MessageReducer.tabAttachmentsCache[cacheKey] = [latestCachedAttachment]
+
+    const initialQuery = {
+      loadPrevious: jest.fn(() => Promise.resolve({ attachments: [latestCachedAttachment], hasNext: false }))
+    }
+    setClient({
+      user: { id: 'current-user' },
+      AttachmentListQueryBuilder: class {
+        limit = jest.fn()
+        build = jest.fn(() => Promise.resolve(initialQuery))
+      }
+    })
+    await runMessageSaga(
+      __messageSagaTestables.getMessageAttachments,
+      getAttachmentsAC(channelId, channelDetailsTabs.media, 35)
+    )
+
+    const reconnectQuery = {
+      loadNextAttachmentId: jest.fn(() => Promise.resolve({ attachments: [receivedAttachment], hasNext: false }))
+    }
+    setClient({
+      user: { id: 'current-user' },
+      AttachmentListQueryBuilder: class {
+        limit = jest.fn()
+        build = jest.fn(() => Promise.resolve(reconnectQuery))
+      }
+    })
+
+    const dispatched = await runMessageSaga(__messageSagaTestables.refreshActiveMediaAttachmentsAfterReconnect, {
+      payload: { status: CONNECTION_STATUS.CONNECTED }
+    })
+
+    expect(reconnectQuery.loadNextAttachmentId).toHaveBeenCalledWith(latestCachedAttachment.id)
+    expect(dispatched).toContainEqual(setCachedTabAttachmentsAC(cacheKey, [receivedAttachment, latestCachedAttachment]))
   })
 })
 

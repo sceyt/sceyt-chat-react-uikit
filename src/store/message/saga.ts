@@ -318,6 +318,7 @@ const prepareAndUploadVideoPreview = async (attachment: IAttachment, messageType
 }
 
 let activeDisplayedCacheKey: string | null = null
+let activeDisplayedAttachmentScope: { channelId: string; attachmentType: string } | null = null
 
 export const updateTabAttachmentCache = (channelId: string, attachments: IAttachment[], messageUser?: any) => {
   if (!attachments?.length) return
@@ -334,7 +335,6 @@ export const updateTabAttachmentCache = (channelId: string, attachments: IAttach
     const tab = tabForType(att.type)
     if (!tab) continue
     const cacheKey = `${channelId}_${tab}`
-    if (!(cacheKey in cache)) continue
     const attWithUser = messageUser && !att.user ? { ...att, user: messageUser } : att
     if (!tabUpdates[cacheKey]) tabUpdates[cacheKey] = []
     tabUpdates[cacheKey].push(attWithUser)
@@ -3834,8 +3834,15 @@ function* getMessageAttachments(action: IAction): any {
   const { channelId, attachmentType, limit, direction, attachmentId, forPopup } = action.payload
   const cacheKey = `${channelId}_${attachmentType}`
   const cachedAttachments = !forPopup ? store.getState().MessageReducer.tabAttachmentsCache?.[cacheKey] : undefined
+  // The attachment query is eventually consistent with channel message events.
+  // Keep track of the cache at request start so an attachment delivered while
+  // this query is in flight is not lost when an older response arrives.
+  const cachedAttachmentIdsAtRequestStart = new Set(
+    (cachedAttachments || []).map((attachment: IAttachment) => attachment.id)
+  )
   if (!forPopup) {
     activeDisplayedCacheKey = cacheKey
+    activeDisplayedAttachmentScope = { channelId, attachmentType }
   }
   try {
     if (cachedAttachments !== undefined) {
@@ -3898,7 +3905,17 @@ function* getMessageAttachments(action: IAction): any {
     } else {
       query.AttachmentByTypeQuery = AttachmentByTypeQuery
       yield put(setAttachmentsCompleteAC(result.hasNext))
-      const freshAttachments = JSON.parse(JSON.stringify(attachments))
+      const cachedAttachmentsAfterRequest = store.getState().MessageReducer.tabAttachmentsCache?.[cacheKey] || []
+      const receivedWhileLoading = cachedAttachmentsAfterRequest.filter(
+        (attachment: IAttachment) => !cachedAttachmentIdsAtRequestStart.has(attachment.id)
+      )
+      const resultAttachmentIds = new Set(attachments.map((attachment: IAttachment) => attachment.id))
+      const freshAttachments = JSON.parse(
+        JSON.stringify([
+          ...attachments,
+          ...receivedWhileLoading.filter((attachment: IAttachment) => !resultAttachmentIds.has(attachment.id))
+        ])
+      ).sort((a: IAttachment, b: IAttachment) => Number(b.id || 0) - Number(a.id || 0))
       yield put(setCachedTabAttachmentsAC(cacheKey, freshAttachments))
       yield put(setAttachmentsAC(freshAttachments))
     }
@@ -3958,6 +3975,63 @@ function* loadMoreMessageAttachments(action: any) {
     }
   } finally {
     yield put(setAttachmentsLoadingStateAC(LOADING_STATE.LOADED, forPopup))
+  }
+}
+
+function* refreshActiveMediaAttachmentsAfterReconnect(action: IAction): any {
+  if (action.payload?.status !== CONNECTION_STATUS.CONNECTED) {
+    return
+  }
+
+  const scope = activeDisplayedAttachmentScope
+  if (!scope || scope.attachmentType !== channelDetailsTabs.media) {
+    return
+  }
+
+  const cacheKey = `${scope.channelId}_${scope.attachmentType}`
+  const cachedAttachments: IAttachment[] = store.getState().MessageReducer.tabAttachmentsCache?.[cacheKey] || []
+  const latestAttachmentId = cachedAttachments[0]?.id
+  if (!latestAttachmentId) {
+    return
+  }
+
+  try {
+    const SceytChatClient = getClient()
+    const queryBuilder = new (SceytChatClient.AttachmentListQueryBuilder as any)(scope.channelId, [
+      attachmentTypes.video,
+      attachmentTypes.image
+    ])
+    queryBuilder.limit(35)
+    const attachmentQuery = yield call(queryBuilder.build)
+    const result: { attachments: IAttachment[]; hasNext: boolean } = yield call(
+      attachmentQuery.loadNextAttachmentId,
+      latestAttachmentId
+    )
+
+    // Do not apply a reconnect response to a different tab if the user has
+    // navigated away while the network request was in flight.
+    if (activeDisplayedCacheKey !== cacheKey) {
+      return
+    }
+
+    const currentCachedAttachments: IAttachment[] =
+      store.getState().MessageReducer.tabAttachmentsCache?.[cacheKey] || []
+    const attachmentIds = new Set<string>()
+    const refreshedAttachments = [...(result.attachments || []), ...currentCachedAttachments]
+      .filter((attachment) => {
+        if (!attachment.id) return true
+        if (attachmentIds.has(attachment.id)) return false
+        attachmentIds.add(attachment.id)
+        return true
+      })
+      .sort((a, b) => Number(b.id || 0) - Number(a.id || 0))
+
+    query.AttachmentByTypeQuery = attachmentQuery
+    yield put(setAttachmentsCompleteAC(result.hasNext))
+    yield put(setCachedTabAttachmentsAC(cacheKey, refreshedAttachments))
+    yield put(setAttachmentsAC(refreshedAttachments))
+  } catch (e) {
+    log.error('error refreshing media attachments after reconnect', e)
   }
 }
 
@@ -4596,7 +4670,9 @@ export const __messageSagaTestables = {
   prefetchMessagesFromAction,
   cancelChannelMessageProcesses,
   refreshCacheAroundMessage,
-  deleteReaction
+  deleteReaction,
+  getMessageAttachments,
+  refreshActiveMediaAttachmentsAfterReconnect
 }
 
 export const __resetMessageSagaTestState = () => {
@@ -4607,6 +4683,8 @@ export const __resetMessageSagaTestState = () => {
   prefetchCancelVersions.clear()
   autoResendAttempts.clear()
   autoResendsInFlight.clear()
+  activeDisplayedCacheKey = null
+  activeDisplayedAttachmentScope = null
 }
 
 const REFRESH_WINDOW_HALF = 30
@@ -4702,6 +4780,7 @@ function* refreshCacheAroundMessage(action: IAction): any {
 
 export default function* MessageSaga() {
   yield takeEvery(setConnectionStatus.type, resumePendingMessagesAfterReconnect)
+  yield takeEvery(setConnectionStatus.type, refreshActiveMediaAttachmentsAfterReconnect)
   yield takeEvery(SEND_MESSAGE, sendMessage)
   yield takeEvery(SEND_TEXT_MESSAGE, sendTextMessage)
   yield takeEvery(FORWARD_MESSAGE, forwardMessage)
