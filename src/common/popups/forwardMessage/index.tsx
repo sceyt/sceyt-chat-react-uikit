@@ -15,7 +15,7 @@ import {
   channelsLoadingStateForForwardSelector,
   searchedChannelsForForwardSelector
 } from '../../../store/channel/selector'
-import { IAttachment, IBodyAttribute, IChannel, IMember, IUser } from '../../../types'
+import { IAttachment, IBodyAttribute, IChannel, IContactsMap, IMember, IUser } from '../../../types'
 import ChannelSearch from '../../../components/ChannelList/ChannelSearch'
 import { Avatar, ThemeMode } from '../../../components'
 import Attachment from '../../../components/Attachment'
@@ -63,6 +63,8 @@ interface ISelectedChannelsData {
 export interface IForwardPreviewMessage {
   body?: string
   attachments?: IAttachment[]
+  bodyAttributes?: IBodyAttribute[]
+  mentionedUsers?: IUser[]
 }
 
 interface IProps {
@@ -80,22 +82,71 @@ interface IProps {
   forwardMessages?: IForwardPreviewMessage[]
 }
 
-const getForwardPreviewLabel = (message?: IForwardPreviewMessage) => {
+interface IForwardPreviewSegment {
+  text: string
+  isMention: boolean
+}
+
+const getForwardPreviewBody = (
+  message: IForwardPreviewMessage,
+  contactsMap: IContactsMap,
+  getFromContacts: boolean,
+  currentUserId: string
+): IForwardPreviewSegment[] => {
+  const body = message.body || ''
+  const mentionAttributes = (message.bodyAttributes || [])
+    .filter((attribute) => attribute.type.includes('mention'))
+    .sort((first, second) => first.offset - second.offset)
+  if (!mentionAttributes.length) return [{ text: body, isMention: false }]
+
+  const segments: IForwardPreviewSegment[] = []
+  let cursor = 0
+  mentionAttributes.forEach((attribute) => {
+    const start = Math.max(cursor, Math.min(attribute.offset, body.length))
+    const end = Math.max(start, Math.min(attribute.offset + attribute.length, body.length))
+    if (start > cursor) segments.push({ text: body.slice(cursor, start), isMention: false })
+
+    const mentionedUser = message.mentionedUsers?.find((user) => user.id === attribute.metadata)
+    segments.push({
+      text: mentionedUser
+        ? `@${makeUsername(
+            mentionedUser.id === currentUserId ? undefined : contactsMap[mentionedUser.id],
+            mentionedUser,
+            getFromContacts
+          ).trim()}`
+        : body.slice(start, end),
+      isMention: !!mentionedUser
+    })
+    cursor = end
+  })
+  if (cursor < body.length) segments.push({ text: body.slice(cursor), isMention: false })
+  return segments
+}
+
+const getForwardPreviewLabel = (
+  message: IForwardPreviewMessage | undefined,
+  contactsMap: IContactsMap,
+  getFromContacts: boolean,
+  currentUserId: string
+): IForwardPreviewSegment[] => {
   const attachment = message?.attachments?.[0]
-  if (!attachment) return message?.body || 'Message'
+  if (!attachment)
+    return message
+      ? getForwardPreviewBody(message, contactsMap, getFromContacts, currentUserId)
+      : [{ text: 'Message', isMention: false }]
   switch (attachment.type) {
     case attachmentTypes.voice:
-      return 'Voice'
+      return [{ text: 'Voice', isMention: false }]
     case attachmentTypes.image:
-      return 'Photo'
+      return [{ text: 'Photo', isMention: false }]
     case attachmentTypes.video:
-      return 'Video'
+      return [{ text: 'Video', isMention: false }]
     case attachmentTypes.audio:
-      return 'Audio'
+      return [{ text: 'Audio', isMention: false }]
     case attachmentTypes.link:
-      return attachment.url || 'File'
+      return [{ text: attachment.url || 'File', isMention: false }]
     default:
-      return 'File'
+      return [{ text: 'File', isMention: false }]
   }
 }
 
@@ -185,7 +236,6 @@ function ForwardMessagePopup({
 
   const firstForwardMessage = forwardMessages[0]
   const firstForwardAttachment = firstForwardMessage?.attachments?.[0]
-  const forwardPreviewLabel = getForwardPreviewLabel(firstForwardMessage)
   const forwardMoreCount = forwardMessages.length > 1 ? forwardMessages.length - 1 : 0
   const forwardLinkPreviewImage = getReplyLinkPreviewImage(firstForwardMessage?.attachments)
   const [forwardLinkPreviewImageFailed, setForwardLinkPreviewImageFailed] = useState(false)
@@ -197,6 +247,7 @@ function ForwardMessagePopup({
   const searchedChannels = useSelector(searchedChannelsForForwardSelector) || []
   const contactsMap = useSelector(contactsMapSelector)
   const getFromContacts = getShowOnlyContactUsers()
+  const forwardPreviewLabel = getForwardPreviewLabel(firstForwardMessage, contactsMap, getFromContacts, user.id)
   const channelsLoading = useSelector(channelsLoadingStateForForwardSelector)
   const channelsHasNext = useSelector(channelsForForwardHasNextSelector)
   const channelMembersMap = useSelector(activeChannelMembersMapSelector) || {}
@@ -801,7 +852,15 @@ function ForwardMessagePopup({
                         Forwarded message
                       </ForwardPreviewTitle>
                       <ForwardPreviewLabel color={textPrimary}>
-                        {forwardPreviewLabel}
+                        {forwardPreviewLabel.map((segment, index) =>
+                          segment.isMention ? (
+                            <ForwardPreviewMentionText key={index} color={accentColor}>
+                              {segment.text}
+                            </ForwardPreviewMentionText>
+                          ) : (
+                            <React.Fragment key={index}>{segment.text}</React.Fragment>
+                          )
+                        )}
                         {forwardMoreCount > 0 && (
                           <ForwardPreviewMoreCount color={textSecondary}>
                             {` +${forwardMoreCount} more`}
@@ -1025,6 +1084,10 @@ const ForwardPreviewLabel = styled.div<{ color: string }>`
 
 const ForwardPreviewMoreCount = styled.span<{ color: string }>`
   font-weight: 400;
+  color: ${(props) => props.color};
+`
+
+const ForwardPreviewMentionText = styled.span<{ color: string }>`
   color: ${(props) => props.color};
 `
 

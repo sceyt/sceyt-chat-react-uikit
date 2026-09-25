@@ -9,7 +9,8 @@ import {
   resetMessageListFixtureIds
 } from '../../../testUtils/messageListHarness'
 import { attachmentTypes, DEFAULT_CHANNEL_TYPE, LOADING_STATE } from '../../../helpers/constants'
-import { IAttachment, IChannel } from '../../../types'
+import { IAttachment, IChannel, IContactsMap } from '../../../types'
+import { setShowOnlyContactUsers } from '../../../helpers/contacts'
 
 // Attachment is a large, heavy component with its own extensive test surface —
 // it isn't the target of these tests, so it's stubbed to a simple marker (matching
@@ -45,8 +46,12 @@ const makeAttachment = (overrides: Partial<IAttachment> = {}): IAttachment =>
 const renderPopup = ({
   channels = [makeChannel({ id: 'chan-1', subject: 'Jordyn Aminoff' })],
   forwardMessages,
+  contactsMap = {},
   ...props
-}: Partial<React.ComponentProps<typeof ForwardMessagePopup>> & { channels?: IChannel[] } = {}) => {
+}: Partial<React.ComponentProps<typeof ForwardMessagePopup>> & {
+  channels?: IChannel[]
+  contactsMap?: IContactsMap
+} = {}) => {
   const handleForward = jest.fn()
   const togglePopup = jest.fn()
 
@@ -56,6 +61,9 @@ const renderPopup = ({
       channelsForForwardLoadingState: LOADING_STATE.LOADED,
       channelsForForwardHasNext: false,
       searchedChannelsForForward: { chats_groups: [], channels: [], contacts: [] }
+    },
+    UserReducer: {
+      contactsMap
     }
   })
 
@@ -87,6 +95,11 @@ const makeMentionMembers = () => [
 describe('ForwardMessagePopup', () => {
   beforeEach(() => {
     resetMessageListFixtureIds()
+    setShowOnlyContactUsers(false)
+  })
+
+  afterEach(() => {
+    setShowOnlyContactUsers(false)
   })
 
   it('renders the channel list and title, with no note card and no footer buttons before anything is selected', () => {
@@ -254,6 +267,34 @@ describe('ForwardMessagePopup', () => {
     expect(screen.queryByText('choseFile.svg')).not.toBeInTheDocument()
     expect(screen.queryByText('linkIcon.svg')).not.toBeInTheDocument()
     expect(screen.queryByTestId('forward-attachment-thumb')).not.toBeInTheDocument()
+  })
+
+  it('uses the contact name, rather than the raw phone number, for a mention in the forwarded preview', () => {
+    setShowOnlyContactUsers(true)
+    const mentionedUser = makeUser({ id: 'mentioned-user', firstName: '+37499111222', lastName: '' })
+    const body = '@+37499111222 please review this'
+    const forwardMessages: IForwardPreviewMessage[] = [
+      {
+        body,
+        bodyAttributes: [{ type: 'mention', metadata: mentionedUser.id, offset: 0, length: '@+37499111222'.length }],
+        mentionedUsers: [mentionedUser]
+      }
+    ]
+    const contactsMap: IContactsMap = {
+      [mentionedUser.id]: {
+        id: mentionedUser.id,
+        firstName: 'Alice',
+        lastName: 'Anderson',
+        keys: [],
+        user: mentionedUser
+      }
+    }
+    renderPopup({ forwardMessages, contactsMap })
+
+    selectChannel('Jordyn Aminoff')
+
+    expect(screen.getByText('@Alice Anderson')).toBeInTheDocument()
+    expect(screen.queryByText(body)).not.toBeInTheDocument()
   })
 
   it('shows a "+N more" suffix based on the first message when forwarding several messages', () => {
