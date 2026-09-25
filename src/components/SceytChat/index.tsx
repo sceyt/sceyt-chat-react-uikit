@@ -135,6 +135,15 @@ const SceytChat = ({
       dispatch(setIsDraggingAC(true))
     }
   }
+  const handleDragLeave = (e: React.DragEvent<HTMLDivElement>) => {
+    const nextTarget = e.relatedTarget
+
+    // `dragleave` bubbles when moving between children. Only clear the state
+    // after the drag has actually left the chat container (including the page).
+    if (!nextTarget || !(nextTarget instanceof Node) || !e.currentTarget.contains(nextTarget)) {
+      dispatch(setIsDraggingAC(false))
+    }
+  }
 
   const handleUserInteraction = () => {
     // Request notification permission on first user interaction
@@ -382,6 +391,7 @@ const SceytChat = ({
         <ChatContainer
           onDrop={handleDropFile}
           onDragOver={handleDragOver}
+          onDragLeave={handleDragLeave}
           onClick={handleUserInteraction}
           withChannelsList={channelsListWidth && channelsListWidth > 0}
           backgroundColor={backgroundColor}
