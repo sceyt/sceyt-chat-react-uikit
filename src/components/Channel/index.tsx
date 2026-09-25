@@ -435,14 +435,11 @@ const Channel: React.FC<IChannelProps> = ({
           } else {
             setDraftMessageText(draftText)
             setDraftMessage({
-              mentionedUsers: channelDraftMessage.mentionedUsers,
+              ...channelDraftMessage,
               // Lexical can leave whitespace in an otherwise attachment-only
               // composer. Keep real text untouched, but normalize that empty
               // editor value so the existing attachment preview is used.
               body: channelDraftMessage.text?.trim() ? channelDraftMessage.text : '',
-              bodyAttributes: channelDraftMessage.bodyAttributes,
-              attachments: channelDraftMessage.attachments,
-              viewOnce: channelDraftMessage.viewOnce,
               type: channelDraftMessage.viewOnce ? MESSAGE_TYPE.VIEW_ONCE : undefined
             })
           }
@@ -1098,6 +1095,7 @@ export const DraftMessageText = styled.span<{ color: string }>`
   display: flex;
   align-items: flex-end;
   gap: 4px;
+  margin-top: 2px;
 `
 export const LastMessageAuthor = styled.div<{ color: string; typing?: boolean; recording?: boolean }>`
   max-width: 120px;

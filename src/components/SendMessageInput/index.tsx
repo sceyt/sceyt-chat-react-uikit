@@ -15,7 +15,7 @@ import LexicalErrorBoundary from '@lexical/react/LexicalErrorBoundary'
 import { OnChangePlugin } from '@lexical/react/LexicalOnChangePlugin'
 import MentionsPlugin from './MentionsPlugin'
 import FloatingTextFormatToolbarPlugin from './FloatingTextFormatToolbarPlugin'
-import { MentionNode } from './MentionNode'
+import { $createMentionNode, MentionNode } from './MentionNode'
 import EditMessagePlugin from './EditMessagePlugin'
 import FormatMessagePlugin from './FormatMessagePlugin'
 import EmojisPopup from './EmojisPlugin'
@@ -144,6 +144,7 @@ import { MESSAGE_TYPE } from 'types/enum'
 import { getMembersAC } from 'store/member/actions'
 import { getClipboardFiles, getMediaAttachmentValidationError, hasSendableTextOrPoll } from './sendMessageUtils'
 import { getDraftHandoff } from './draftOwnership'
+import { getDraftMentionSegments } from './draftMentions'
 
 function AutoFocusPlugin({ messageForReply }: any) {
   const [editor] = useLexicalComposerContext()
@@ -156,7 +157,7 @@ function AutoFocusPlugin({ messageForReply }: any) {
   return null
 }
 
-function ClearEditorPlugin({ shouldClearEditor, setEditorCleared }: any) {
+function ClearEditorPlugin({ shouldClearEditor, setEditorCleared, contactsMap, getFromContacts }: any) {
   const [editor] = useLexicalComposerContext()
   useDidUpdate(() => {
     if (shouldClearEditor.clear) {
@@ -167,7 +168,20 @@ function ClearEditorPlugin({ shouldClearEditor, setEditorCleared }: any) {
           editor.setEditorState(shouldClearEditor.draftMessage.editorState)
         } else if (shouldClearEditor.draftMessage) {
           const paragraphNode = $createParagraphNode()
-          paragraphNode.append($createTextNode(shouldClearEditor.draftMessage.text))
+          const draftMessage = shouldClearEditor.draftMessage
+          const segments = getDraftMentionSegments(
+            draftMessage.text || '',
+            draftMessage.bodyAttributes,
+            draftMessage.mentionedUsers
+          )
+          segments.forEach(({ text, mentionId, mentionedUser }) => {
+            if (mentionId && mentionedUser) {
+              const mentionName = makeUsername(contactsMap?.[mentionId], mentionedUser, getFromContacts)
+              paragraphNode.append($createMentionNode({ ...mentionedUser, id: mentionId, name: `@${mentionName}` }))
+            } else if (text) {
+              paragraphNode.append($createTextNode(text))
+            }
+          })
           rootNode.append(paragraphNode)
           rootNode.selectEnd()
         } else {
@@ -200,7 +214,7 @@ function ClearEditorPlugin({ shouldClearEditor, setEditorCleared }: any) {
         setEditorCleared()
       })
     }
-  }, [shouldClearEditor])
+  }, [shouldClearEditor, contactsMap, getFromContacts])
 
   return null
 }
@@ -1394,11 +1408,14 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
     dispatch(clearSelectedMessagesAC())
   }
 
-  const handleSetMentionMember = (mentionMember: any) => {
-    if (composerChannelId === activeChannel.id) {
-      setMentionedUsers((prevState: any[]) => [...prevState, mentionMember])
-    }
-  }
+  const handleSetMentionMember = useCallback(
+    (mentionMember: any) => {
+      if (composerChannelId === activeChannel.id) {
+        setMentionedUsers((prevState: any[]) => [...prevState, mentionMember])
+      }
+    },
+    [activeChannel.id, composerChannelId]
+  )
 
   // Compose preview URLs are tracked in the blob-URL registry under a
   // compose_<tid> key; they're released when the attachment is removed from
@@ -2607,6 +2624,8 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
                           <ClearEditorPlugin
                             shouldClearEditor={shouldClearEditor}
                             setEditorCleared={() => setShouldClearEditor({ clear: false })}
+                            contactsMap={contactsMap}
+                            getFromContacts={getFromContacts}
                           />
                           {/* eslint-disable-next-line react/jsx-no-bind */}
                           <OnChangePlugin onChange={onChange} />

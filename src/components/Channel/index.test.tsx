@@ -22,6 +22,8 @@ import {
   setDraftMessageToMap
 } from '../../helpers/messagesHalper'
 
+let mockMessageTextFormatArgs: any
+
 jest.mock('../../hooks', () => ({
   useColor: () => {
     const { THEME_COLORS } = require('../../UIHelper/constants')
@@ -55,7 +57,10 @@ jest.mock('../Avatar', () => ({
 
 jest.mock('../../messageUtils', () => ({
   MessageStatusIcon: () => <span data-testid='message-status-icon' />,
-  MessageTextFormat: ({ text }: { text?: string }) => text || null
+  MessageTextFormat: (args: { text?: string }) => {
+    mockMessageTextFormatArgs = args
+    return args.text || null
+  }
 }))
 
 const ConnectedChannel = ({ channelId }: { channelId: string }) => {
@@ -73,6 +78,7 @@ const ConnectedChannel = ({ channelId }: { channelId: string }) => {
 describe('Channel unread badge', () => {
   beforeEach(() => {
     resetMessageListFixtureIds()
+    mockMessageTextFormatArgs = undefined
     setClient({
       user: makeUser({ id: 'current-user', firstName: 'Current' })
     })
@@ -226,6 +232,26 @@ describe('Channel draft preview', () => {
     expect(screen.getByText('Draft')).toBeInTheDocument()
     expect(screen.getByText('unsent draft text')).toBeInTheDocument()
     expect(screen.queryByTestId('message-status-icon')).not.toBeInTheDocument()
+  })
+
+  it('passes the full draft, including mentioned users, to its preview message', () => {
+    const mentionedUser = { id: '+15551234567', firstName: 'Jane', lastName: 'Doe' }
+    setDraftMessageToMap(channelId, {
+      text: 'Hello @+15551234567',
+      mentionedUsers: [mentionedUser],
+      bodyAttributes: [{ type: 'mention', offset: 6, length: 13, metadata: mentionedUser.id }]
+    })
+
+    renderOwnLastMessageChannel()
+
+    expect(mockMessageTextFormatArgs.message).toEqual(
+      expect.objectContaining({
+        body: 'Hello @+15551234567',
+        text: 'Hello @+15551234567',
+        mentionedUsers: [mentionedUser],
+        bodyAttributes: [{ type: 'mention', offset: 6, length: 13, metadata: mentionedUser.id }]
+      })
+    )
   })
 
   it('shows the latest message instead of a draft while the channel has unread messages', () => {

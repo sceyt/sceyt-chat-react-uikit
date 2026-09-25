@@ -47,4 +47,27 @@ describe('MessageTextFormat mentions', () => {
     expect(onMentionNameClick).toHaveBeenCalledWith(mentionedUser)
     getSelection.mockRestore()
   })
+
+  it('resolves a serialized mention identifier through its mentioned user', () => {
+    const mentionedUser = { id: '+15551234567', firstName: 'Jane', lastName: 'Doe' }
+    const draft: any = {
+      body: 'Before @+15551234567 after',
+      bodyAttributes: [{ type: 'mention', offset: 7, length: 13, metadata: mentionedUser.id }],
+      mentionedUsers: [mentionedUser]
+    }
+
+    const result: any = MessageTextFormat({
+      text: draft.body,
+      message: draft,
+      contactsMap: {},
+      getFromContacts: false,
+      accentColor: '#000',
+      textSecondary: '#000'
+    })
+    const mention = result.find(
+      (part: any) => React.isValidElement(part) && String(part.props.className).includes('mention')
+    )
+
+    expect(mention.props.children).toBe('@Jane Doe')
+  })
 })

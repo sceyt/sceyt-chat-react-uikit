@@ -398,7 +398,7 @@ export default function MentionsPlugin({
         closeMenu()
       }
     },
-    [editor]
+    [editor, setMentionMember]
   )
 
   const checkForMentionMatch = useCallback(
