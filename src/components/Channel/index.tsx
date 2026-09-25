@@ -186,7 +186,7 @@ const ChannelMessageText = ({
       )}
       {!isTypingOrRecording &&
         (draftMessageText ? (
-          <DraftMessageText color={textSecondary}>
+          <DraftMessageText color={textSecondary} flex={!!(!lastMessage.body && lastMessage.attachments?.length)}>
             {!lastMessage.body && lastMessage.attachments?.length ? LastMessageAttachments({ lastMessage }) : null}
             {(!lastMessage.attachments?.length || lastMessage.body) &&
               MessageTextFormat({
@@ -1090,12 +1090,11 @@ export const DraftMessageTitle = styled.span<{ color: string }>`
   color: ${(props) => props.color};
   margin-right: 4px;
 `
-export const DraftMessageText = styled.span<{ color: string }>`
+export const DraftMessageText = styled.span<{ color: string; flex: boolean }>`
   color: ${(props) => props.color};
-  display: flex;
+  ${(props) => props.flex && `display: flex;`}
   align-items: flex-end;
   gap: 4px;
-  margin-top: 2px;
 `
 export const LastMessageAuthor = styled.div<{ color: string; typing?: boolean; recording?: boolean }>`
   max-width: 120px;
