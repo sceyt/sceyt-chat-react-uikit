@@ -80,6 +80,11 @@ const getMediaThumbnailSource = (file: IMedia): string | undefined => {
   }
 }
 
+const getMediaSizes = (file: IMedia): { width: number; height: number } => {
+  const metadata = isJSON(file.metadata) ? JSON.parse(file.metadata) : file.metadata
+  return { width: metadata?.szw || 0, height: metadata?.szh || 0 }
+}
+
 const sliderDiagnosticSource = (source?: string) => {
   if (!source) return null
   // Blob URLs are safe to expose in local diagnostics and must remain exact:
@@ -719,141 +724,145 @@ const SliderPopup: React.FC<IProps> = ({
             }}
             isRTL={false}
           >
-            {popupAttachments.map((file: IMedia) => (
-              <CarouselItem
-                className='custom_carousel_item'
-                key={file.id}
-                draggable={false}
-                onMouseDown={handleCarouselItemMouseDown}
-                onContextMenu={(e: React.MouseEvent) => {
-                  e.stopPropagation()
-                }}
-              >
-                {file.id === currentFile?.id && sharedMediaDownload.state === 'loading' && (
-                  <ItemLoadingCont data-testid='media-preview-download-progress'>
-                    <ProgressWrapper>
-                      <CircularProgressbar
-                        minValue={0}
-                        maxValue={100}
-                        value={sharedMediaDownload.progress || 3}
-                        background
-                        backgroundPadding={6}
-                        text=''
-                        styles={{
-                          background: { fill: `${overlayBackground2}66` },
-                          path: { stroke: textOnPrimary, strokeLinecap: 'butt', strokeWidth: '6px' }
-                        }}
-                      />
-                    </ProgressWrapper>
-                  </ItemLoadingCont>
-                )}
-                {isItemLoading(file.id) && file.type === 'image' && (
-                  <ItemLoadingCont>
-                    <UploadingIcon color={textOnPrimary} />
-                  </ItemLoadingCont>
-                )}
-                {file.type === 'image' ? (
-                  <React.Fragment>
-                    {((file.id === currentFile?.id ? currentAttachmentUrl : undefined) ||
-                      attachmentUpdatedMap[getAttachmentURLWithVersion(file.url + '_original_image_url')] ||
-                      getMediaThumbnailSource(file)) && (
-                      <img
-                        className='slider-preview-media'
-                        loading='eager'
-                        decoding='async'
-                        draggable={false}
-                        src={
-                          (file.id === currentFile?.id ? currentAttachmentUrl : undefined) ||
-                          attachmentUpdatedMap[getAttachmentURLWithVersion(file.url + '_original_image_url')] ||
-                          getMediaThumbnailSource(file)
-                        }
-                        alt={file.name || 'Attachment'}
-                        onMouseDown={(e) => {
-                          if (e.button === 2) {
-                            e.stopPropagation()
+            {popupAttachments.map((file: IMedia) => {
+              const sizes = getMediaSizes(file)
+              return (
+                <CarouselItem
+                  widthBigThenHeight={sizes.width >= sizes.height}
+                  className='custom_carousel_item'
+                  key={file.id}
+                  draggable={false}
+                  onMouseDown={handleCarouselItemMouseDown}
+                  onContextMenu={(e: React.MouseEvent) => {
+                    e.stopPropagation()
+                  }}
+                >
+                  {file.id === currentFile?.id && sharedMediaDownload.state === 'loading' && (
+                    <ItemLoadingCont data-testid='media-preview-download-progress'>
+                      <ProgressWrapper>
+                        <CircularProgressbar
+                          minValue={0}
+                          maxValue={100}
+                          value={sharedMediaDownload.progress || 3}
+                          background
+                          backgroundPadding={6}
+                          text=''
+                          styles={{
+                            background: { fill: `${overlayBackground2}66` },
+                            path: { stroke: textOnPrimary, strokeLinecap: 'butt', strokeWidth: '6px' }
+                          }}
+                        />
+                      </ProgressWrapper>
+                    </ItemLoadingCont>
+                  )}
+                  {isItemLoading(file.id) && file.type === 'image' && (
+                    <ItemLoadingCont>
+                      <UploadingIcon color={textOnPrimary} />
+                    </ItemLoadingCont>
+                  )}
+                  {file.type === 'image' ? (
+                    <React.Fragment>
+                      {((file.id === currentFile?.id ? currentAttachmentUrl : undefined) ||
+                        attachmentUpdatedMap[getAttachmentURLWithVersion(file.url + '_original_image_url')] ||
+                        getMediaThumbnailSource(file)) && (
+                        <img
+                          className='slider-preview-media'
+                          loading='eager'
+                          decoding='async'
+                          draggable={false}
+                          src={
+                            (file.id === currentFile?.id ? currentAttachmentUrl : undefined) ||
+                            attachmentUpdatedMap[getAttachmentURLWithVersion(file.url + '_original_image_url')] ||
+                            getMediaThumbnailSource(file)
                           }
-                        }}
-                        style={{ position: 'relative', zIndex: 2, opacity: 1 }}
-                        onLoad={() => {
-                          const fileId = file.id
-                          if (fileId) {
-                            setItemsLoadedMap((prev) => ({ ...prev, [fileId]: true }))
-                          }
-                          if (file.id === currentFile?.id) {
-                            log.info(
-                              '[MEDIA_IMAGE_SLIDER] active image loaded ' +
-                                JSON.stringify({
-                                  channelId: channel.id,
-                                  fileId: file.id,
-                                  source: sliderDiagnosticSource(
-                                    (file.id === currentFile?.id ? currentAttachmentUrl : undefined) ||
-                                      attachmentUpdatedMap[
-                                        getAttachmentURLWithVersion(file.url + '_original_image_url')
-                                      ] ||
-                                      getMediaThumbnailSource(file)
-                                  )
-                                })
-                            )
-                          }
-                        }}
-                        onError={() => {
-                          const fileId = file.id
-                          if (fileId) {
-                            setItemsLoadedMap((prev) => ({ ...prev, [fileId]: false }))
-                          }
-                          if (file.id === currentFile?.id) {
-                            log.error(
-                              '[MEDIA_IMAGE_SLIDER] active image failed to render ' +
-                                JSON.stringify({
-                                  channelId: channel.id,
-                                  fileId: file.id,
-                                  source: sliderDiagnosticSource(
-                                    (file.id === currentFile?.id ? currentAttachmentUrl : undefined) ||
-                                      attachmentUpdatedMap[
-                                        getAttachmentURLWithVersion(file.url + '_original_image_url')
-                                      ] ||
-                                      getMediaThumbnailSource(file)
-                                  )
-                                })
-                            )
-                          }
-                        }}
-                      />
-                    )}
-                  </React.Fragment>
-                ) : (
-                  <React.Fragment>
-                    {file.id === currentFile?.id && currentAttachmentUrl && (
-                      <VideoPlayer
-                        readyToPlay={readyToPlay}
-                        activeFileId={currentFile?.id || ''}
-                        videoFileId={file.id || ''}
-                        src={currentAttachmentUrl}
-                        // A cached original can render immediately. Supplying a
-                        // poster in that case flashes the low-resolution frame
-                        // before the already-local video paints.
-                        poster={currentAttachmentUrl.startsWith('blob:') ? undefined : getMediaThumbnailSource(file)}
-                        onMouseDown={(e: React.MouseEvent) => {
-                          if (e.button === 2) {
-                            e.stopPropagation()
-                          }
-                        }}
-                      />
-                    )}
-                    {file.id !== currentFile?.id && getMediaThumbnailSource(file) && (
-                      <img
-                        loading='lazy'
-                        decoding='async'
-                        draggable={false}
-                        src={getMediaThumbnailSource(file)}
-                        alt={file.name || 'Video attachment'}
-                        style={{ position: 'relative', zIndex: 1, opacity: 1 }}
-                      />
-                    )}
-                  </React.Fragment>
-                )}
-              </CarouselItem>
-            ))}
+                          alt={file.name || 'Attachment'}
+                          onMouseDown={(e) => {
+                            if (e.button === 2) {
+                              e.stopPropagation()
+                            }
+                          }}
+                          style={{ position: 'relative', zIndex: 2, opacity: 1 }}
+                          onLoad={() => {
+                            const fileId = file.id
+                            if (fileId) {
+                              setItemsLoadedMap((prev) => ({ ...prev, [fileId]: true }))
+                            }
+                            if (file.id === currentFile?.id) {
+                              log.info(
+                                '[MEDIA_IMAGE_SLIDER] active image loaded ' +
+                                  JSON.stringify({
+                                    channelId: channel.id,
+                                    fileId: file.id,
+                                    source: sliderDiagnosticSource(
+                                      (file.id === currentFile?.id ? currentAttachmentUrl : undefined) ||
+                                        attachmentUpdatedMap[
+                                          getAttachmentURLWithVersion(file.url + '_original_image_url')
+                                        ] ||
+                                        getMediaThumbnailSource(file)
+                                    )
+                                  })
+                              )
+                            }
+                          }}
+                          onError={() => {
+                            const fileId = file.id
+                            if (fileId) {
+                              setItemsLoadedMap((prev) => ({ ...prev, [fileId]: false }))
+                            }
+                            if (file.id === currentFile?.id) {
+                              log.error(
+                                '[MEDIA_IMAGE_SLIDER] active image failed to render ' +
+                                  JSON.stringify({
+                                    channelId: channel.id,
+                                    fileId: file.id,
+                                    source: sliderDiagnosticSource(
+                                      (file.id === currentFile?.id ? currentAttachmentUrl : undefined) ||
+                                        attachmentUpdatedMap[
+                                          getAttachmentURLWithVersion(file.url + '_original_image_url')
+                                        ] ||
+                                        getMediaThumbnailSource(file)
+                                    )
+                                  })
+                              )
+                            }
+                          }}
+                        />
+                      )}
+                    </React.Fragment>
+                  ) : (
+                    <React.Fragment>
+                      {file.id === currentFile?.id && currentAttachmentUrl && (
+                        <VideoPlayer
+                          readyToPlay={readyToPlay}
+                          activeFileId={currentFile?.id || ''}
+                          videoFileId={file.id || ''}
+                          src={currentAttachmentUrl}
+                          // A cached original can render immediately. Supplying a
+                          // poster in that case flashes the low-resolution frame
+                          // before the already-local video paints.
+                          poster={currentAttachmentUrl.startsWith('blob:') ? undefined : getMediaThumbnailSource(file)}
+                          onMouseDown={(e: React.MouseEvent) => {
+                            if (e.button === 2) {
+                              e.stopPropagation()
+                            }
+                          }}
+                        />
+                      )}
+                      {file.id !== currentFile?.id && getMediaThumbnailSource(file) && (
+                        <img
+                          loading='lazy'
+                          decoding='async'
+                          draggable={false}
+                          src={getMediaThumbnailSource(file)}
+                          alt={file.name || 'Video attachment'}
+                          style={{ position: 'relative', zIndex: 1, opacity: 1 }}
+                        />
+                      )}
+                    </React.Fragment>
+                  )}
+                </CarouselItem>
+              )
+            })}
           </Carousel>
         )}
       </SliderBody>
@@ -1014,7 +1023,7 @@ const IconWrapper = styled.span<{ margin?: string; hideInMobile?: boolean; color
     }
   `}
 `
-const CarouselItem = styled.div`
+const CarouselItem = styled.div<{ widthBigThenHeight: boolean }>`
   position: relative;
   display: flex;
   width: calc(100% - 200px);
@@ -1027,7 +1036,7 @@ const CarouselItem = styled.div`
 
   img,
   video {
-    height: 100%;
+    ${({ widthBigThenHeight }) => (widthBigThenHeight ? 'width: 100%;' : 'height: 100%;')}
     min-width: 0;
     min-height: 0;
     object-fit: contain;
