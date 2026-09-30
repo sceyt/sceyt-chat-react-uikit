@@ -724,6 +724,24 @@ const getReduxChannelLastMessage = (channelId: string): IMessage | null =>
   (store.getState().ChannelReducer?.channels || []).find((channel: IChannel) => channel.id === channelId)
     ?.lastMessage || null
 
+// The channel was already moved when its optimistic message was added. The
+// server timestamp on the confirmation is later than the local pending
+// timestamps of other chats sent in the same burst (e.g. a multi-chat
+// forward), so re-sorting here makes each confirmed chat jump above the rest.
+// A resend is a new user action on an older (failed) preview, so it still moves.
+const shouldMoveChannelOnConfirm = (actionType: string, channelId: string, nextLastMessage: IMessage | null) => {
+  if (actionType === RESEND_MESSAGE) {
+    return true
+  }
+  const currentLastMessage = getReduxChannelLastMessage(channelId)
+  const confirmsPendingPreview =
+    !!currentLastMessage &&
+    !currentLastMessage.id &&
+    currentLastMessage.state !== MESSAGE_STATUS.FAILED &&
+    messagesShareReference(currentLastMessage, nextLastMessage)
+  return !confirmsPendingPreview
+}
+
 const shouldReplaceChannelLastMessage = (
   channelId: string,
   nextLastMessage: IMessage,
@@ -1573,12 +1591,13 @@ function* sendMessage(action: IAction): any {
             }
             const resolvedLastMessage = getResolvedChannelLastMessage(channel.id, messageToUpdate, messageToSend)
             if (lastMessageNeedsUpdate(getReduxChannelLastMessage(channel.id), resolvedLastMessage)) {
+              const moveUp = shouldMoveChannelOnConfirm(action.type, channel.id, resolvedLastMessage)
               updateChannelLastMessageOnAllChannels(channel.id, resolvedLastMessage!)
               const channelUpdateParam = {
                 lastMessage: resolvedLastMessage,
                 lastReactedMessage: null
               }
-              yield put(updateChannelDataAC(channel.id, channelUpdateParam, true))
+              yield put(updateChannelDataAC(channel.id, channelUpdateParam, moveUp))
               updateChannelOnAllChannels(channel.id, channelUpdateParam)
             }
           } else {
@@ -1733,12 +1752,13 @@ function* sendTextMessage(action: IAction): any {
         resolvedLastMessage
       )
       if (shouldUpdateChannelList) {
+        const moveUp = shouldMoveChannelOnConfirm(action.type, channel.id, resolvedLastMessage)
         updateChannelLastMessageOnAllChannels(channel.id, resolvedLastMessage!)
         const channelUpdateParam = {
           lastMessage: resolvedLastMessage,
           lastReactedMessage: null
         }
-        yield put(updateChannelDataAC(channel.id, channelUpdateParam, true))
+        yield put(updateChannelDataAC(channel.id, channelUpdateParam, moveUp))
         updateChannelOnAllChannels(channel.id, channelUpdateParam)
         channel.lastMessage = resolvedLastMessage!
       }
@@ -1946,12 +1966,13 @@ function* forwardMessage(action: IAction): any {
         }
         const resolvedLastMessage = getResolvedChannelLastMessage(channel.id, messageToUpdate, messageToSend)
         if (lastMessageNeedsUpdate(getReduxChannelLastMessage(channel.id), resolvedLastMessage)) {
+          const moveUp = shouldMoveChannelOnConfirm(action.type, channel.id, resolvedLastMessage)
           updateChannelLastMessageOnAllChannels(channel.id, resolvedLastMessage!)
           const channelUpdateParam = {
             lastMessage: resolvedLastMessage,
             lastReactedMessage: null
           }
-          yield put(updateChannelDataAC(channel.id, { ...channel, ...channelUpdateParam }, true, false, true))
+          yield put(updateChannelDataAC(channel.id, { ...channel, ...channelUpdateParam }, moveUp, false, true))
           updateChannelOnAllChannels(channel.id, channelUpdateParam)
         }
       } else {

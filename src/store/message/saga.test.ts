@@ -84,8 +84,9 @@ import { updateChannelDataAC, updateChannelLastMessageAC } from '../channel/acti
 import { setWaitToSendPendingMessagesAC } from '../user/actions'
 import MessageSaga, { __messageSagaTestables, __resetMessageSagaTestState, updateTabAttachmentCache } from './saga'
 import MessageReducer from './reducers'
+import ChannelReducer from '../channel/reducers'
 import { navigateToLatest } from '../../helpers/messageListNavigator'
-import { IMessage } from '../../types'
+import { IChannel, IMessage } from '../../types'
 
 const mockStoreState = {
   ChannelReducer: {
@@ -3152,6 +3153,105 @@ describe('message saga message-list flows', () => {
       ])
     )
     expect(getPendingMessagesFromMap(channel.id)).toEqual([])
+  })
+
+  it('keeps the chat list order stable while a forward to several chats is confirmed', async () => {
+    const currentUser = makeUser({ id: 'current-user' })
+    const sourceChannelId = 'multi-forward-source'
+    const otherChannel = makeChannel({ id: 'multi-forward-other' })
+    const destinations = ['multi-forward-a', 'multi-forward-b'].map((id) => makeChannel({ id }))
+    const resolvers: Record<string, () => void> = {}
+
+    destinations.forEach((channel, index) => {
+      const pending = makePendingMessage({
+        channelId: channel.id,
+        tid: `${channel.id}-tid`,
+        user: currentUser,
+        forwardingDetails: { messageId: 'multi-forward-origin' } as any
+      })
+      const confirmed = makeMessage({
+        id: `${channel.id}-confirmed`,
+        tid: pending.tid,
+        channelId: channel.id,
+        user: currentUser,
+        // The server timestamp is always later than the local pending ones.
+        createdAt: new Date(Date.now() + 60_000 + index)
+      })
+      const builder: any = {
+        create: jest.fn(() => pending)
+      }
+      ;[
+        'setBody',
+        'setBodyAttributes',
+        'setAttachments',
+        'setMentionUserIds',
+        'setType',
+        'setDisableMentionsCount',
+        'setMetadata',
+        'setForwardingMessageId',
+        'setPollDetails'
+      ].forEach((method) => {
+        builder[method] = jest.fn().mockReturnValue(builder)
+      })
+      channel.createMessageBuilder = jest.fn(() => builder)
+      channel.sendMessage = jest.fn(
+        () =>
+          new Promise((resolve) => {
+            resolvers[channel.id] = () => resolve(confirmed)
+          })
+      ) as any
+      setChannelInMap(channel)
+    })
+
+    const toListChannel = (channel: any) => ({
+      id: channel.id,
+      createdAt: channel.createdAt,
+      lastMessage: channel.lastMessage
+    })
+    let channelState: any = ChannelReducer(undefined, { type: '@@init' })
+    channelState = {
+      ...channelState,
+      channels: [otherChannel, ...destinations].map(toListChannel)
+    }
+    const orders: string[][] = []
+    const reduce = (action: any) => {
+      channelState = ChannelReducer(channelState, action)
+      mockStoreState.ChannelReducer = channelState
+      const order = channelState.channels.map((channel: IChannel) => channel.id)
+      if (orders[orders.length - 1]?.join() !== order.join()) orders.push(order)
+    }
+    mockStoreState.ChannelReducer = channelState
+    mockStore.dispatch.mockImplementation(reduce)
+    mockStoreState.UserReducer.connectionStatus = CONNECTION_STATUS.CONNECTED
+    setActiveChannelId(sourceChannelId)
+    setClient({ user: currentUser, Channel: { create: jest.fn() } })
+
+    const sourceMessage = makeMessage({ id: 'multi-forward-origin', channelId: sourceChannelId, attachments: [] })
+    const runs = destinations.map((channel) =>
+      runSaga(
+        { dispatch: reduce, getState: () => mockStoreState },
+        __messageSagaTestables.forwardMessage,
+        forwardMessageAC(sourceMessage, channel.id, CONNECTION_STATUS.CONNECTED, true)
+      ).toPromise()
+    )
+    for (let i = 0; i < 20 && Object.keys(resolvers).length < destinations.length; i++) {
+      await flushAsyncWork()
+    }
+    const orderAfterPending = orders[orders.length - 1]
+    expect(orderAfterPending).toEqual(['multi-forward-b', 'multi-forward-a', 'multi-forward-other'])
+
+    resolvers['multi-forward-a']()
+    await flushAsyncWork()
+    resolvers['multi-forward-b']()
+    await Promise.all(runs)
+
+    expect(orders[orders.length - 1]).toEqual(orderAfterPending)
+    expect(orders.slice(orders.indexOf(orderAfterPending))).toHaveLength(1)
+    expect(channelState.channels.map((channel: IChannel) => channel.lastMessage.id)).toEqual([
+      'multi-forward-b-confirmed',
+      'multi-forward-a-confirmed',
+      otherChannel.lastMessage.id
+    ])
   })
 
   it('does not append a forwarded message to the visible list when forwarding to another channel', async () => {
