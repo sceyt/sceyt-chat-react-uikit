@@ -238,3 +238,120 @@ describe('SliderPopup cached media', () => {
     expect(setIsSliderOpen).not.toHaveBeenCalled()
   })
 })
+
+describe('SliderPopup media fit', () => {
+  // 3:2 landscape image
+  const landscapeImage = {
+    ...selectedImage,
+    metadata: JSON.stringify({ tmb: 'a'.repeat(80), szw: 1500, szh: 1000 })
+  }
+  const cacheKey = `${landscapeImage.url}_original_image_url_1_0_2`
+
+  let itemBox = { width: 0, height: 0 }
+  let resizeObserverCallbacks: Array<() => void> = []
+  const disconnect = jest.fn()
+  const originalResizeObserver = (window as any).ResizeObserver
+
+  const isCarouselItem = (element: HTMLElement) => element.classList.contains('custom_carousel_item')
+
+  const renderImageSlider = () => {
+    const store = createMessageListStore({
+      UserReducer: { connectionStatus: 'connected' },
+      MessageReducer: { attachmentUpdatedMap: { [cacheKey]: 'blob:cached-image' } }
+    })
+    return renderWithSceytProvider(
+      <SliderPopup
+        channel={{ id: 'channel-1', type: 'group' } as any}
+        currentMediaFile={landscapeImage as any}
+        setIsSliderOpen={jest.fn()}
+      />,
+      { store }
+    )
+  }
+
+  const getImageFit = () => {
+    const style = window.getComputedStyle(screen.getByAltText(landscapeImage.name))
+    return { width: style.width, height: style.height }
+  }
+
+  beforeAll(() => {
+    Object.defineProperty(HTMLElement.prototype, 'clientWidth', {
+      configurable: true,
+      get() {
+        return isCarouselItem(this) ? itemBox.width : 0
+      }
+    })
+    Object.defineProperty(HTMLElement.prototype, 'clientHeight', {
+      configurable: true,
+      get() {
+        return isCarouselItem(this) ? itemBox.height : 0
+      }
+    })
+  })
+
+  // jsdom defines clientWidth/clientHeight on Element.prototype, so removing the
+  // HTMLElement overrides restores the original getters.
+  afterAll(() => {
+    delete (HTMLElement.prototype as any).clientWidth
+    delete (HTMLElement.prototype as any).clientHeight
+  })
+
+  beforeEach(() => {
+    jest.clearAllMocks()
+    setClient({ user: { id: 'current-user' } })
+    mockGetAttachmentUrlFromCache.mockResolvedValue(false)
+    mockGetRegisteredBlobUrl.mockReturnValue(undefined)
+    resizeObserverCallbacks = []
+    ;(window as any).ResizeObserver = class {
+      constructor(callback: () => void) {
+        resizeObserverCallbacks.push(callback)
+      }
+
+      observe() {}
+
+      disconnect = disconnect
+    }
+  })
+
+  afterEach(() => {
+    ;(window as any).ResizeObserver = originalResizeObserver
+  })
+
+  it('fits a landscape image by height when the item box is relatively wider than the image', () => {
+    // 2:1 box is wider than the 3:2 image, so height is the limiting side
+    itemBox = { width: 1000, height: 500 }
+    renderImageSlider()
+
+    expect(getImageFit()).toEqual({ width: '', height: '100%' })
+  })
+
+  it('fits a landscape image by width when the image is relatively wider than the item box', () => {
+    // 1:1 box is narrower than the 3:2 image, so width is the limiting side
+    itemBox = { width: 600, height: 600 }
+    renderImageSlider()
+
+    expect(getImageFit()).toEqual({ width: '100%', height: '' })
+  })
+
+  it('re-evaluates the fit when the slider is resized', () => {
+    itemBox = { width: 1000, height: 500 }
+    renderImageSlider()
+    expect(getImageFit()).toEqual({ width: '', height: '100%' })
+
+    itemBox = { width: 600, height: 600 }
+    act(() => {
+      resizeObserverCallbacks.forEach((callback) => callback())
+    })
+
+    expect(getImageFit()).toEqual({ width: '100%', height: '' })
+  })
+
+  it('stops observing resizes on unmount', () => {
+    itemBox = { width: 1000, height: 500 }
+    const { unmount } = renderImageSlider()
+
+    unmount()
+
+    expect(disconnect).toHaveBeenCalled()
+  })
+})

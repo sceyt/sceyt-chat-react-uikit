@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState, useCallback, useRef } from 'react'
+import React, { useEffect, useLayoutEffect, useMemo, useState, useCallback, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { shallowEqual } from 'react-redux'
 import { useSelector, useDispatch } from 'store/hooks'
@@ -85,6 +85,21 @@ const getMediaSizes = (file: IMedia): { width: number; height: number } => {
   return { width: metadata?.szw || 0, height: metadata?.szh || 0 }
 }
 
+// True when the media is relatively wider than its container box, so it has
+// to be fitted by width; otherwise it is fitted by height.
+const isMediaWiderThanBox = (file: IMedia, boxRatio: number) => {
+  const { width, height } = getMediaSizes(file)
+  if (!width || !height || !boxRatio) return width >= height
+  return width / height >= boxRatio
+}
+
+// The library build (microbundle-crl) type-checks with TypeScript 3.9, whose DOM
+// lib has no ResizeObserver typings, so the constructor is typed locally.
+type ResizeObserverConstructor = new (callback: () => void) => {
+  observe: (target: Element) => void
+  disconnect: () => void
+}
+
 const sliderDiagnosticSource = (source?: string) => {
   if (!source) return null
   // Blob URLs are safe to expose in local diagnostics and must remain exact:
@@ -118,6 +133,8 @@ const SliderPopup: React.FC<IProps> = ({
   const [forwardPopupOpen, setForwardPopupOpen] = useState(false)
   const [readyToPlay, setReadyToPlay] = useState(true)
   const [messageToDelete, setMessageToDelete] = useState<IMessage | undefined>()
+  const [mediaBoxRatio, setMediaBoxRatio] = useState(0)
+  const sliderBodyRef = useRef<HTMLDivElement>(null)
   const attachmentLoadingStateForPopup = useSelector(attachmentForPopupLoadingStateSelector)
   const attachmentsForPopupHasPrev = useSelector(attachmentsForPopupHasPrevSelector)
   const attachmentsForPopupHasNext = useSelector(attachmentsForPopupHasNextSelector)
@@ -548,6 +565,30 @@ const SliderPopup: React.FC<IProps> = ({
     return popupAttachments.findIndex((item: IMedia) => item.id === currentFile.id)
   }, [currentFile, popupAttachments])
 
+  const isCarouselRendered = activeFileIndex >= 0 && popupAttachments.length > 0
+
+  // Every carousel item has the same box, so its width/height ratio decides
+  // whether a media file is fitted by width or by height. Measured from the
+  // rendered item (not recomputed from CSS offsets) and kept in sync on resize.
+  useLayoutEffect(() => {
+    const sliderBody = sliderBodyRef.current
+    if (!isCarouselRendered || !sliderBody) return
+    const updateMediaBoxRatio = () => {
+      const item = sliderBody.querySelector<HTMLElement>('.custom_carousel_item')
+      if (!item || !item.clientWidth || !item.clientHeight) return
+      setMediaBoxRatio(item.clientWidth / item.clientHeight)
+    }
+    updateMediaBoxRatio()
+    const ResizeObserverCtor = (window as unknown as { ResizeObserver?: ResizeObserverConstructor }).ResizeObserver
+    if (!ResizeObserverCtor) {
+      window.addEventListener('resize', updateMediaBoxRatio)
+      return () => window.removeEventListener('resize', updateMediaBoxRatio)
+    }
+    const resizeObserver = new ResizeObserverCtor(updateMediaBoxRatio)
+    resizeObserver.observe(sliderBody)
+    return () => resizeObserver.disconnect()
+  }, [isCarouselRendered])
+
   // Replace the selected item with the latest query result without changing
   // its identity. Carousel tracks the matching id via activeFileIndex.
   useEffect(() => {
@@ -659,6 +700,7 @@ const SliderPopup: React.FC<IProps> = ({
         </ClosePopupWrapper>
       </SliderHeader>
       <SliderBody
+        ref={sliderBodyRef}
         onClick={handleClicks}
         onMouseDown={(e: React.MouseEvent) => {
           if (e.button === 2) {
@@ -674,7 +716,7 @@ const SliderPopup: React.FC<IProps> = ({
             <UploadingIcon color={textOnPrimary} />
           </UploadCont>
         )}
-        {activeFileIndex >= 0 && popupAttachments.length > 0 && (
+        {isCarouselRendered && (
           <Carousel
             pagination={false}
             className='custom_carousel'
@@ -725,10 +767,9 @@ const SliderPopup: React.FC<IProps> = ({
             isRTL={false}
           >
             {popupAttachments.map((file: IMedia) => {
-              const sizes = getMediaSizes(file)
               return (
                 <CarouselItem
-                  widthBigThenHeight={sizes.width >= sizes.height}
+                  widthBigThenHeight={isMediaWiderThanBox(file, mediaBoxRatio)}
                   className='custom_carousel_item'
                   key={file.id}
                   draggable={false}
