@@ -190,11 +190,12 @@ export const setChannelToUnHideAC = (channel: IChannel | null) => setChannelToUn
 
 export const setChannelsAC = (channels: IChannel[]) => setChannels({ channels })
 
-export const setActiveChannelAC = (channel: IChannel | {}) => setActiveChannel({ channel })
+export const setActiveChannelAC = (channel: IChannel | {}, openAtLatest?: boolean) =>
+  setActiveChannel({ channel, openAtLatest })
 
-export const switchChannelActionAC = (channel: IChannel | null, updateActiveChannel = true) => ({
+export const switchChannelActionAC = (channel: IChannel | null, updateActiveChannel = true, openAtLatest = false) => ({
   type: SWITCH_CHANNEL,
-  payload: { channel, updateActiveChannel }
+  payload: { channel, updateActiveChannel, openAtLatest }
 })
 
 export const setChannelInviteKeyAvailableAC = (available: boolean) => setChannelInviteKeyAvailable({ available })

@@ -174,14 +174,6 @@ const flushMockServerDelay = async () => {
   })
 }
 
-const getHistoryEdgeScrollTop = (scrollHeight: number, clientHeight: number) => {
-  const maxScrollTop = Math.max(0, scrollHeight - clientHeight)
-  const minScrollTop = Math.min(LATEST_EDGE_GAP_PX, maxScrollTop)
-  const maxVisibleScrollTop = Math.max(minScrollTop, maxScrollTop - LATEST_EDGE_GAP_PX)
-
-  return Math.min(maxVisibleScrollTop, Math.max(minScrollTop, LATEST_EDGE_GAP_PX))
-}
-
 const getLatestEdgeScrollTop = (scrollHeight: number, clientHeight: number) => {
   const maxScrollTop = Math.max(0, scrollHeight - clientHeight)
   const minScrollTop = Math.min(LATEST_EDGE_GAP_PX, maxScrollTop)
@@ -461,6 +453,61 @@ describe('MessageList', () => {
 
     expect(dispatchSpy).toHaveBeenCalledWith(setUnreadMessageIdAC(''))
     expect(dispatchSpy).toHaveBeenCalledWith(loadNearUnreadAC(channel))
+  })
+
+  it('loads the latest window when a forward opens an unloaded chat with unread history', () => {
+    const channel = makeChannel({
+      id: 'channel-forward-first-open',
+      newMessageCount: 40,
+      lastDisplayedMessageId: '100',
+      lastMessage: makeMessage({ id: '140', channelId: 'channel-forward-first-open' })
+    })
+    const store = createMessageListStore({
+      ChannelReducer: { activeChannel: channel, activeChannelOpenAtLatest: true },
+      MessageReducer: { unreadScrollTo: false },
+      UserReducer: { connectionStatus: CONNECTION_STATUS.CONNECTED }
+    })
+    const dispatchSpy = jest.spyOn(store, 'dispatch')
+
+    renderMessageList(store)
+
+    expect(dispatchSpy).toHaveBeenCalledWith(loadLatestMessagesAC(channel, undefined, undefined, true, true))
+    expect(dispatchSpy).not.toHaveBeenCalledWith(loadNearUnreadAC(channel))
+  })
+
+  it('scrolls to the forwarded message after the first latest-window load finishes', async () => {
+    const channelId = 'channel-forward-delayed-first-open'
+    const latestMessages = Array.from({ length: 40 }, (_, index) =>
+      makeMessage({ id: String(101 + index), channelId, body: index === 39 ? 'forwarded-latest' : `history-${index}` })
+    )
+    const channel = makeChannel({
+      id: channelId,
+      newMessageCount: 40,
+      lastDisplayedMessageId: '100',
+      lastMessage: latestMessages[39]
+    })
+    const store = createMessageListStore({
+      ChannelReducer: { activeChannel: channel, activeChannelOpenAtLatest: true },
+      MessageReducer: { activeChannelMessages: [], unreadScrollTo: false },
+      UserReducer: { connectionStatus: CONNECTION_STATUS.CONNECTED }
+    })
+    attachDelayedServerToMessageListStore(store, {
+      onLoadLatest: () => ({ messages: latestMessages, hasNext: false })
+    })
+
+    const rendered = renderMessageList(store)
+    const scrollable = rendered.container.querySelector('#scrollableDiv') as HTMLDivElement
+    act(() => {
+      setScrollMetrics(scrollable, { scrollTop: 0, scrollHeight: 2600, clientHeight: 240 })
+    })
+
+    await flushMockServerDelay()
+    act(() => {
+      flushAnimationFrames()
+    })
+
+    expect(scrollable.scrollTop).toBe(getLatestEdgeScrollTop(2600, 240))
+    expect(screen.getByText('forwarded-latest')).toBeInTheDocument()
   })
 
   it('renders date dividers and the unread divider from activeChannelMessages', () => {
@@ -2641,7 +2688,7 @@ describe('MessageList', () => {
     expect(getRenderedMessageBodies()).toEqual(['target-last-displayed', 'target-unread-one', 'target-unread-two'])
   })
 
-  it('scrolls fully to latest when the first opened channel has 50+ unread messages and the user taps scroll-to-bottom after waiting', async () => {
+  it('scrolls fully to latest after the first opened channel loads unread history', async () => {
     const targetChannelId = 'channel-first-open-50-plus-unread'
     const lastDisplayed = makeMessage({
       id: '2000',

@@ -60,6 +60,7 @@ import { LATEST_EDGE_GAP_PX, useChatController } from './useChatController'
 type HarnessProps = {
   messages: IMessage[]
   channel: IChannel
+  openAtLatest?: boolean
   hasPrevMessages?: boolean
   hasNextMessages?: boolean
   loadingPrevMessages?: number | null
@@ -439,6 +440,7 @@ const ControllerHarness = (props: HarnessProps) => {
   const controller = useChatController({
     messages,
     channel,
+    openAtLatest: props.openAtLatest,
     hasPrevMessages,
     hasNextMessages,
     loadingPrevMessages,
@@ -1616,6 +1618,91 @@ describe('useChatController', () => {
     })
 
     expect(dispatch).toHaveBeenCalledWith(markMessagesAsReadAC(channel.id, [unreadMessage.id]))
+  })
+
+  it('finishes at the latest edge when two forwarded messages arrive during the first load', async () => {
+    const channelId = 'channel-forward-two-during-load'
+    const baseMessage = makeMessage({ id: '100', channelId, body: 'earlier-message' })
+    const firstForward = makePendingMessage({ tid: 'forward-first', channelId, body: 'first-forward' })
+    const secondForward = makePendingMessage({ tid: 'forward-second', channelId, body: 'second-forward' })
+    const thirdForward = makePendingMessage({ tid: 'forward-third', channelId, body: 'third-forward' })
+    const channel = makeChannel({ id: channelId, lastMessage: baseMessage })
+    const dispatch = jest.fn()
+    const layoutSpec = (scrollHeight: number, scrollTop = 100) => ({
+      containerRect: { top: 0, left: 0, width: 320, height: 240 },
+      scrollMetrics: { scrollTop, scrollHeight, clientHeight: 240, offsetTop: 0, offsetHeight: 240 }
+    })
+    const rendered = renderController({
+      channel,
+      openAtLatest: true,
+      messages: [baseMessage],
+      hasNextMessages: true,
+      loadingNextMessages: LOADING_STATE.LOADING,
+      connectionStatus: CONNECTION_STATUS.CONNECTED,
+      dispatch,
+      layoutSpec: layoutSpec(800)
+    })
+
+    rendered.rerender(
+      <ControllerHarness
+        channel={channel}
+        openAtLatest={true}
+        messages={[baseMessage, firstForward]}
+        hasNextMessages={true}
+        loadingNextMessages={LOADING_STATE.LOADING}
+        connectionStatus={CONNECTION_STATUS.CONNECTED}
+        dispatch={dispatch}
+        layoutSpec={layoutSpec(840)}
+      />
+    )
+    rendered.rerender(
+      <ControllerHarness
+        channel={channel}
+        openAtLatest={true}
+        messages={[baseMessage, firstForward, secondForward]}
+        hasNextMessages={true}
+        loadingNextMessages={LOADING_STATE.LOADING}
+        connectionStatus={CONNECTION_STATUS.CONNECTED}
+        dispatch={dispatch}
+        layoutSpec={layoutSpec(880)}
+      />
+    )
+    rendered.rerender(
+      <ControllerHarness
+        channel={channel}
+        openAtLatest={true}
+        messages={[baseMessage, firstForward, secondForward]}
+        hasNextMessages={false}
+        loadingNextMessages={LOADING_STATE.LOADED}
+        connectionStatus={CONNECTION_STATUS.CONNECTED}
+        dispatch={dispatch}
+        layoutSpec={layoutSpec(880)}
+      />
+    )
+
+    await flushEffects()
+    act(() => {
+      flushAnimationFrames()
+    })
+
+    expect(rendered.scrollable.scrollTop).toBe(getLatestEdgeScrollTop(880, 240))
+    expect(screen.getByText('second-forward')).toBeInTheDocument()
+
+    rendered.rerender(
+      <ControllerHarness
+        channel={channel}
+        openAtLatest={true}
+        messages={[baseMessage, firstForward, secondForward, thirdForward]}
+        hasNextMessages={false}
+        loadingNextMessages={LOADING_STATE.LOADED}
+        connectionStatus={CONNECTION_STATUS.CONNECTED}
+        dispatch={dispatch}
+        layoutSpec={layoutSpec(920, getLatestEdgeScrollTop(880, 240))}
+      />
+    )
+
+    expect(rendered.scrollable.scrollTop).toBe(getLatestEdgeScrollTop(920, 240))
+    expect(screen.getByText('third-forward')).toBeInTheDocument()
   })
 
   it('dispatches loadLatestMessages when jumpToLatest is used while connected and latest is outside the window', () => {

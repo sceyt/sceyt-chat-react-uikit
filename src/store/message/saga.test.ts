@@ -83,6 +83,7 @@ import {
 import { updateChannelDataAC, updateChannelLastMessageAC } from '../channel/actions'
 import { setWaitToSendPendingMessagesAC } from '../user/actions'
 import MessageSaga, { __messageSagaTestables, __resetMessageSagaTestState, updateTabAttachmentCache } from './saga'
+import MessageReducer from './reducers'
 import { navigateToLatest } from '../../helpers/messageListNavigator'
 import { IMessage } from '../../types'
 
@@ -3056,7 +3057,7 @@ describe('message saga message-list flows', () => {
     )
   })
 
-  it('sends a forwarded message before its accompanying note', async () => {
+  it('confirms a forwarded message and its note after switching to the destination', async () => {
     const currentUser = makeUser({ id: 'current-user' })
     const sourceUser = makeUser({ id: 'source-user' })
     const channel = makeChannel({ id: 'channel-forward-with-note' })
@@ -3099,8 +3100,9 @@ describe('message saga message-list flows', () => {
       }
       return builder as any
     })
-    channel.sendMessage = jest.fn((outgoingMessage) =>
-      Promise.resolve(
+    channel.sendMessage = jest.fn((outgoingMessage) => {
+      setActiveChannelId(channel.id)
+      return Promise.resolve(
         makeMessage({
           id: `confirmed-${outgoingMessage.tid}`,
           tid: outgoingMessage.tid,
@@ -3112,10 +3114,10 @@ describe('message saga message-list flows', () => {
           ...(outgoingMessage.forwardingDetails ? { forwardingDetails: outgoingMessage.forwardingDetails } : {})
         })
       )
-    )
+    })
 
     mockStoreState.UserReducer.connectionStatus = CONNECTION_STATUS.CONNECTED
-    setActiveChannelId(channel.id)
+    setActiveChannelId('source-channel')
     setChannelInMap(channel)
     setClient({ user: currentUser, Channel: { create: jest.fn() } })
 
@@ -3135,7 +3137,7 @@ describe('message saga message-list flows', () => {
       type: 'text' as const
     }
 
-    await runMessageSaga(
+    const dispatched = await runMessageSaga(
       __messageSagaTestables.forwardMessage,
       forwardMessageAC(sourceMessage, channel.id, CONNECTION_STATUS.CONNECTED, true, note)
     )
@@ -3143,6 +3145,13 @@ describe('message saga message-list flows', () => {
     expect(channel.sendMessage).toHaveBeenCalledTimes(2)
     expect(channel.sendMessage).toHaveBeenNthCalledWith(1, expect.objectContaining({ body: 'Forwarded message' }))
     expect(channel.sendMessage).toHaveBeenNthCalledWith(2, expect.objectContaining({ body: 'Added note' }))
+    expect(dispatched).toEqual(
+      expect.arrayContaining([
+        updateMessageAC('forward-note-1', expect.objectContaining({ id: 'confirmed-forward-note-1' }), true),
+        updateMessageAC('forward-note-2', expect.objectContaining({ id: 'confirmed-forward-note-2' }), true)
+      ])
+    )
+    expect(getPendingMessagesFromMap(channel.id)).toEqual([])
   })
 
   it('does not append a forwarded message to the visible list when forwarding to another channel', async () => {
@@ -3226,6 +3235,99 @@ describe('message saga message-list flows', () => {
       expect.objectContaining({ id: confirmedForward.id, body: 'cross channel forward body' })
     )
   })
+
+  it.each([
+    ['destination-channel-forward-race', false, true],
+    ['unrelated-channel-forward-race', false, false],
+    ['destination-channel-forward-race', true, true],
+    ['unrelated-channel-forward-race', true, false]
+  ])(
+    'reconciles a forwarded message after switching to %s before confirmation (failure: %s)',
+    async (channelAfterSwitch, sendFails, shouldUpdateVisibleList) => {
+      const currentUser = makeUser({ id: 'current-user' })
+      const sourceUser = makeUser({ id: 'source-user' })
+      const sourceChannelId = 'source-channel-forward-race'
+      const destinationChannel = makeChannel({ id: 'destination-channel-forward-race' })
+      const pendingForward = makePendingMessage({
+        channelId: destinationChannel.id,
+        tid: 'forward-race-tid',
+        body: 'forward race body',
+        metadata: '{}',
+        user: currentUser,
+        forwardingDetails: { messageId: 'forward-race-source' } as any
+      })
+      const confirmedForward = makeMessage({
+        id: 'forward-race-confirmed',
+        tid: pendingForward.tid,
+        channelId: destinationChannel.id,
+        body: pendingForward.body,
+        user: currentUser,
+        forwardingDetails: { messageId: 'forward-race-source' } as any
+      })
+      const builder = {
+        setBody: jest.fn().mockReturnThis(),
+        setBodyAttributes: jest.fn().mockReturnThis(),
+        setAttachments: jest.fn().mockReturnThis(),
+        setMentionUserIds: jest.fn().mockReturnThis(),
+        setType: jest.fn().mockReturnThis(),
+        setDisableMentionsCount: jest.fn().mockReturnThis(),
+        setMetadata: jest.fn().mockReturnThis(),
+        setForwardingMessageId: jest.fn().mockReturnThis(),
+        setPollDetails: jest.fn().mockReturnThis(),
+        create: jest.fn(() => pendingForward)
+      }
+      destinationChannel.createMessageBuilder = jest.fn(() => builder as any)
+      destinationChannel.sendMessage = jest.fn(() => {
+        // The destination can render its pending item while the send is in flight.
+        setActiveChannelId(channelAfterSwitch)
+        return sendFails ? Promise.reject(new Error('send failed')) : resolveWithMockServerDelay(confirmedForward)
+      })
+
+      setActiveChannelId(sourceChannelId)
+      setChannelInMap(destinationChannel)
+      mockStoreState.UserReducer.connectionStatus = CONNECTION_STATUS.CONNECTED
+      setClient({ user: currentUser, Channel: { create: jest.fn() } })
+      const sourceMessage = makeMessage({
+        id: 'forward-race-source',
+        channelId: sourceChannelId,
+        body: pendingForward.body,
+        user: sourceUser,
+        attachments: []
+      })
+
+      const dispatched = await runMessageSaga(
+        __messageSagaTestables.forwardMessage,
+        forwardMessageAC(sourceMessage, destinationChannel.id, CONNECTION_STATUS.CONNECTED, true)
+      )
+
+      const reconciliationAction = dispatched.find(
+        (action) => action.type === updateMessageAC(pendingForward.tid!, {}, true).type
+      )
+      expect(Boolean(reconciliationAction)).toBe(shouldUpdateVisibleList)
+      if (sendFails) {
+        expect(getPendingMessagesFromMap(destinationChannel.id)).toEqual([
+          expect.objectContaining({ tid: pendingForward.tid, state: MESSAGE_STATUS.FAILED })
+        ])
+      } else {
+        expect(getPendingMessagesFromMap(destinationChannel.id)).toEqual([])
+        expect(getMessageFromMap(destinationChannel.id, confirmedForward.id)).toEqual(
+          expect.objectContaining({ id: confirmedForward.id, tid: pendingForward.tid })
+        )
+      }
+
+      if (shouldUpdateVisibleList) {
+        const visibleWithPending = MessageReducer(undefined, setMessagesAC([pendingForward]))
+        const visibleAfterConfirmation = dispatched.reduce(MessageReducer, visibleWithPending)
+        expect(visibleAfterConfirmation.activeChannelMessages).toEqual([
+          expect.objectContaining(
+            sendFails
+              ? { tid: pendingForward.tid, state: MESSAGE_STATUS.FAILED }
+              : { id: confirmedForward.id, tid: pendingForward.tid }
+          )
+        ])
+      }
+    }
+  )
 
   it('adds the destination channel to the channels list and moves it to the top when forwarding to a channel not in the list', async () => {
     const currentUser = makeUser({ id: 'current-user' })

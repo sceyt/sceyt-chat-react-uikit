@@ -333,7 +333,7 @@ const SliderPopup: React.FC<IProps> = ({
           const messages = await channelInstance.getMessagesById([currentFile.messageId])
           if (!messages || messages.length === 0) {
             log.error('Message not found for forwarding')
-            return
+            return false
           }
           message = messages[0]
         }
@@ -343,8 +343,10 @@ const SliderPopup: React.FC<IProps> = ({
           })
         }
         setIsSliderOpen(false)
+        return true
       } catch (error) {
         log.error('Error forwarding message:', error)
+        return false
       }
     },
     [currentFile.messageId, channel.id, connectionStatus, dispatch]

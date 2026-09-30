@@ -1775,7 +1775,6 @@ function* forwardMessage(action: IAction): any {
   const isNotShowOwnMessageForward = message?.user?.id === SceytChatClient.user.id && !showOwnMessageForward
   let pendingMessage: IMessage | null = null
   let channel: IChannel | null = null
-  const activeChannelId = getActiveChannelId()
   let messageTid: string | null = null
   try {
     channel = yield call(getChannelFromMap, channelId)
@@ -1887,7 +1886,7 @@ function* forwardMessage(action: IAction): any {
             action.type,
             pendingMessage,
             channel.id,
-            channelId === activeChannelId,
+            channelId === getActiveChannelId(),
             message,
             isNotShowOwnMessageForward,
             false
@@ -1929,7 +1928,7 @@ function* forwardMessage(action: IAction): any {
               : messageResponse.forwardingDetails,
           parentMessage: isForward ? null : messageResponse.parentMessage
         }
-        if (channelId === activeChannelId) {
+        if (channelId === getActiveChannelId()) {
           yield put(updateMessageAC(messageToSend.tid, JSON.parse(JSON.stringify(messageUpdateData)), true))
         }
         const confirmedForward = JSON.parse(JSON.stringify(messageUpdateData))

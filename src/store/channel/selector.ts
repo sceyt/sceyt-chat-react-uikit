@@ -9,6 +9,7 @@ export const addedToChannelSelector = (store: any) => store.ChannelReducer.added
 export const hiddenChannelSelector = (store: any) => store.ChannelReducer.hiddenChannel
 export const visibleChannelSelector = (store: any) => store.ChannelReducer.visibleChannel
 export const activeChannelSelector = (store: any) => store.ChannelReducer.activeChannel
+export const activeChannelOpenAtLatestSelector = (store: any) => store.ChannelReducer.activeChannelOpenAtLatest
 export const channelsLoadingState = (store: any) => store.ChannelReducer.channelsLoadingState
 export const channelsLoadingStateForForwardSelector = (store: any) =>
   store.ChannelReducer.channelsForForwardLoadingState

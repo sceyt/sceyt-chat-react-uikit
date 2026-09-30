@@ -1409,7 +1409,7 @@ function* markMessagesDelivered(action: IAction): any {
 function* switchChannel(action: IAction): any {
   try {
     const { payload } = action
-    const { channel, updateActiveChannel } = payload
+    const { channel, updateActiveChannel, openAtLatest = false } = payload
     let channelToSwitch = channel
     if (!channel?.id && updateActiveChannel) {
       yield call(setActiveChannelId, '')
@@ -1437,7 +1437,7 @@ function* switchChannel(action: IAction): any {
     }
     if (updateActiveChannel) {
       const currentActiveChannel = getChannelFromMap(getActiveChannelId())
-      yield put(setUnreadScrollToAC(true))
+      yield put(setUnreadScrollToAC(!openAtLatest))
       removeAllMessages()
       yield put(clearTabAttachmentsCacheAC())
       yield put(setMessagesHasPrevAC(true))
@@ -1449,7 +1449,7 @@ function* switchChannel(action: IAction): any {
       if (channel.isLinkedChannel) {
         channelToSwitch.linkedFrom = currentActiveChannel
       }
-      yield put(setActiveChannelAC({ ...channelToSwitch }))
+      yield put(setActiveChannelAC({ ...channelToSwitch }, openAtLatest))
     }
   } catch (e) {
     log.error('error in switch channel', e)
@@ -2337,6 +2337,7 @@ export default function* ChannelsSaga() {
 }
 
 export const __channelSagaTestables = {
+  switchChannel,
   updateChannel,
   leaveChannel,
   markMessagesRead,

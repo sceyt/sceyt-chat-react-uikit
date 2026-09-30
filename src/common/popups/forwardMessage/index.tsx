@@ -6,10 +6,12 @@ import {
   getChannelsForForwardAC,
   loadMoreChannelsForForward,
   searchChannelsForForwardAC,
-  setSearchedChannelsForForwardAC
+  setSearchedChannelsForForwardAC,
+  switchChannelActionAC
 } from '../../../store/channel/actions'
 import { useSelector, useDispatch } from 'store/hooks'
 import {
+  activeChannelSelector,
   channelsForForwardHasNextSelector,
   channelsForForwardSelector,
   channelsLoadingStateForForwardSelector,
@@ -73,7 +75,8 @@ interface IProps {
   buttonText?: string
   togglePopup: () => void
   // eslint-disable-next-line no-unused-vars
-  handleForward: (channelIds: string[], note?: IForwardMessageNote) => void
+  handleForward: (channelIds: string[], note?: IForwardMessageNote) => void | boolean | Promise<void | boolean>
+  navigateOnSingleForward?: boolean
   loading?: boolean
   maxSelectedCount?: number
   /** Defaults to 1000 characters and can be adjusted to match an application's message policy. */
@@ -213,6 +216,7 @@ function ForwardMessagePopup({
   title,
   togglePopup,
   handleForward,
+  navigateOnSingleForward = true,
   loading,
   maxSelectedCount = 5,
   maxNoteLength = DEFAULT_FORWARD_NOTE_MAX_LENGTH,
@@ -243,6 +247,7 @@ function ForwardMessagePopup({
   const ChatClient = getClient()
   const { user } = ChatClient
   const dispatch = useDispatch()
+  const activeChannel = useSelector(activeChannelSelector)
   const channels = useSelector(channelsForForwardSelector) || []
   const searchedChannels = useSelector(searchedChannelsForForwardSelector) || []
   const contactsMap = useSelector(contactsMapSelector)
@@ -315,7 +320,7 @@ function ForwardMessagePopup({
     }
   }
 
-  const handleForwardMessage = () => {
+  const handleForwardMessage = async () => {
     const { body, bodyAttributes } = trimMessageBodyWithAttributes(noteText, noteAttributes)
     const mentionedUsers = bodyAttributes
       .filter((attribute: IBodyAttribute) => attribute.type === 'mention')
@@ -330,10 +335,18 @@ function ForwardMessagePopup({
           type: 'text' as const
         }
       : undefined
-    handleForward(
+    const forwarded = await handleForward(
       selectedChannels.map((channel) => channel.id),
       note
     )
+    if (
+      forwarded !== false &&
+      navigateOnSingleForward &&
+      selectedChannels.length === 1 &&
+      activeChannel?.id !== selectedChannels[0].id
+    ) {
+      dispatch(switchChannelActionAC(selectedChannels[0].channel, true, true))
+    }
     togglePopup()
   }
 

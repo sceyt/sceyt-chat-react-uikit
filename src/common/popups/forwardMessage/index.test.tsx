@@ -1,5 +1,5 @@
 import React from 'react'
-import { fireEvent, screen } from '@testing-library/react'
+import { act, fireEvent, screen } from '@testing-library/react'
 import ForwardMessagePopup, { IForwardPreviewMessage } from './index'
 import {
   createMessageListStore,
@@ -11,6 +11,7 @@ import {
 import { attachmentTypes, DEFAULT_CHANNEL_TYPE, LOADING_STATE } from '../../../helpers/constants'
 import { IAttachment, IChannel, IContactsMap } from '../../../types'
 import { setShowOnlyContactUsers } from '../../../helpers/contacts'
+import { setActiveChannelAC, switchChannelActionAC } from '../../../store/channel/actions'
 
 // Attachment is a large, heavy component with its own extensive test surface —
 // it isn't the target of these tests, so it's stubbed to a simple marker (matching
@@ -66,6 +67,7 @@ const renderPopup = ({
       contactsMap
     }
   })
+  const dispatch = jest.spyOn(store, 'dispatch')
 
   const utils = renderWithSceytProvider(
     <ForwardMessagePopup
@@ -78,10 +80,12 @@ const renderPopup = ({
     { store }
   )
 
-  return { ...utils, handleForward, togglePopup, store }
+  return { ...utils, handleForward, togglePopup, store, dispatch }
 }
 
 const selectChannel = (subject: string) => fireEvent.click(screen.getByText(subject))
+const expectNoChannelSwitch = (dispatch: jest.SpyInstance) =>
+  expect(dispatch.mock.calls.some(([action]) => action.type === switchChannelActionAC(null).type)).toBe(false)
 
 const setScrollHeight = (element: HTMLElement, value: number) =>
   Object.defineProperty(element, 'scrollHeight', { configurable: true, value })
@@ -311,8 +315,9 @@ describe('ForwardMessagePopup', () => {
     expect(screen.getByText(/\+2 more/)).toBeInTheDocument()
   })
 
-  it('sends the typed note along with the selected channel and closes the popup', () => {
-    const { handleForward, togglePopup } = renderPopup()
+  it('sends the typed note and opens the only selected channel', async () => {
+    const channel = makeChannel({ id: 'chan-1', subject: 'Jordyn Aminoff' })
+    const { handleForward, togglePopup, dispatch } = renderPopup({ channels: [channel] })
 
     selectChannel('Jordyn Aminoff')
     fireEvent.change(screen.getByPlaceholderText('Write a message'), { target: { value: 'hello team' } })
@@ -327,7 +332,103 @@ describe('ForwardMessagePopup', () => {
         type: 'text'
       })
     )
+    await act(async () => {
+      await Promise.resolve()
+    })
     expect(togglePopup).toHaveBeenCalledTimes(1)
+    expect(dispatch).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: switchChannelActionAC(channel).type,
+        payload: expect.objectContaining({ channel, openAtLatest: true })
+      })
+    )
+  })
+
+  it('keeps the current channel when forwarding to several channels', async () => {
+    const channels = [
+      makeChannel({ id: 'chan-1', subject: 'Design Team' }),
+      makeChannel({ id: 'chan-2', subject: 'Marketing' })
+    ]
+    const { handleForward, togglePopup, dispatch } = renderPopup({ channels })
+
+    selectChannel('Design Team')
+    selectChannel('Marketing')
+    fireEvent.click(screen.getByRole('button', { name: 'Forward' }))
+
+    expect(handleForward).toHaveBeenCalledWith(['chan-1', 'chan-2'], undefined)
+    await act(async () => {
+      await Promise.resolve()
+    })
+    expect(togglePopup).toHaveBeenCalledTimes(1)
+    expectNoChannelSwitch(dispatch)
+  })
+
+  it('waits for an async forward before opening its destination', async () => {
+    let finishForward!: (result: boolean) => void
+    const channel = makeChannel({ id: 'chan-1', subject: 'Jordyn Aminoff' })
+    const { handleForward, togglePopup, dispatch } = renderPopup({ channels: [channel] })
+    handleForward.mockReturnValue(
+      new Promise<boolean>((resolve) => {
+        finishForward = resolve
+      })
+    )
+
+    selectChannel('Jordyn Aminoff')
+    fireEvent.click(screen.getByRole('button', { name: 'Forward' }))
+
+    expectNoChannelSwitch(dispatch)
+    await act(async () => {
+      finishForward(true)
+      await Promise.resolve()
+    })
+    expect(togglePopup).toHaveBeenCalledTimes(1)
+    expect(dispatch).toHaveBeenCalledWith(switchChannelActionAC(channel, true, true))
+  })
+
+  it('does not open a destination when forwarding fails', async () => {
+    const channel = makeChannel({ id: 'chan-1', subject: 'Jordyn Aminoff' })
+    const { handleForward, togglePopup, dispatch } = renderPopup({ channels: [channel] })
+    handleForward.mockResolvedValue(false)
+
+    selectChannel('Jordyn Aminoff')
+    fireEvent.click(screen.getByRole('button', { name: 'Forward' }))
+
+    await act(async () => {
+      await Promise.resolve()
+    })
+    expect(togglePopup).toHaveBeenCalledTimes(1)
+    expectNoChannelSwitch(dispatch)
+  })
+
+  it('allows link sharing to keep the current channel', async () => {
+    const channel = makeChannel({ id: 'chan-1', subject: 'Jordyn Aminoff' })
+    const { togglePopup, dispatch } = renderPopup({ channels: [channel], navigateOnSingleForward: false })
+
+    selectChannel('Jordyn Aminoff')
+    fireEvent.click(screen.getByRole('button', { name: 'Forward' }))
+
+    await act(async () => {
+      await Promise.resolve()
+    })
+    expect(togglePopup).toHaveBeenCalledTimes(1)
+    expectNoChannelSwitch(dispatch)
+  })
+
+  it('does not reopen a chat that is already active', async () => {
+    const channel = makeChannel({ id: 'chan-1', subject: 'Jordyn Aminoff' })
+    const { store, togglePopup, dispatch } = renderPopup({ channels: [channel] })
+    act(() => {
+      store.dispatch(setActiveChannelAC(channel))
+    })
+
+    selectChannel('Jordyn Aminoff')
+    fireEvent.click(screen.getByRole('button', { name: 'Forward' }))
+
+    await act(async () => {
+      await Promise.resolve()
+    })
+    expect(togglePopup).toHaveBeenCalledTimes(1)
+    expectNoChannelSwitch(dispatch)
   })
 
   it('sends with no note when the textarea is left empty', () => {
