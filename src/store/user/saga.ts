@@ -297,3 +297,13 @@ export default function* MembersSaga() {
   yield takeLatest(UNBLOCK_USERS, unblockUser)
   yield takeLatest(UPDATE_PROFILE, updateProfile)
 }
+
+// Exported for testing
+export const __userSagaTestables = {
+  getContacts,
+  getUsers,
+  loadMoreUsers,
+  blockUser,
+  unblockUser,
+  updateProfile
+}
