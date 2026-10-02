@@ -770,7 +770,14 @@ const AsyncControllerHarness = ({ server, dispatch, layoutSpec, ...props }: Asyn
         scheduleResponse('both', server.onLoadAround)(action)
       }
     },
-    [resolvedDispatch, scheduleResponse, server.onLoadAround, server.onLoadDefault, server.onLoadLatest, server.onLoadMore]
+    [
+      resolvedDispatch,
+      scheduleResponse,
+      server.onLoadAround,
+      server.onLoadDefault,
+      server.onLoadLatest,
+      server.onLoadMore
+    ]
   )
 
   const resolvedLayoutSpec = typeof layoutSpec === 'function' ? layoutSpec(state) : layoutSpec
@@ -2247,6 +2254,7 @@ describe('useChatController', () => {
     )
   })
 
+  // eslint-disable-next-line max-len
   it('does not snap scrollTop to the history edge for an intermediate scroll event within PRELOAD_TRIGGER_PX during a smooth jumpToLatest animation', () => {
     const channelId = 'channel-jump-no-snap-first'
     const channel = makeChannel({ id: channelId })
@@ -6675,6 +6683,7 @@ describe('useChatController', () => {
       expect(screen.getByTestId('is-viewing-latest')).toHaveTextContent('true')
     })
 
+    // eslint-disable-next-line max-len
     it('scrolls fully to the latest edge and marks isViewingLatest true after CONNECTED jump when unread separator was visible', async () => {
       const channelId = 'channel-connected-unread-full-scroll'
       const channel = makeChannel({
@@ -6775,6 +6784,7 @@ describe('useChatController', () => {
       expect(screen.getByTestId('is-viewing-latest')).toHaveTextContent('true')
     })
 
+    // eslint-disable-next-line max-len
     it('re-arms the latest jump lock when the post-load smooth scroll starts so intermediate scroll events do not trigger idle refresh', async () => {
       const channelId = 'channel-connected-unread-force-latest-after-load'
       const channel = makeChannel({
@@ -6895,11 +6905,12 @@ describe('useChatController', () => {
       })
 
       expect(screen.getByTestId('is-viewing-latest')).toHaveTextContent('true')
-      expect(dispatch.mock.calls.some(([action]) => action.type === refreshCacheAroundMessageAC(channelId, '').type)).toBe(
-        false
-      )
+      expect(
+        dispatch.mock.calls.some(([action]) => action.type === refreshCacheAroundMessageAC(channelId, '').type)
+      ).toBe(false)
     })
 
+    // eslint-disable-next-line max-len
     it('scrolls fully to the latest edge when the unread anchor was never visible in the initial window (unreadRestoreCompleted starts false)', async () => {
       // Scenario: the component boots with unreadMessageId='' so the initial useLayoutEffect
       // takes the to-bottom path (not reveal-unread-separator), leaving

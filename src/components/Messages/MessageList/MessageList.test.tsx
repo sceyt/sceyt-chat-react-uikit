@@ -174,14 +174,6 @@ const flushMockServerDelay = async () => {
   })
 }
 
-const getHistoryEdgeScrollTop = (scrollHeight: number, clientHeight: number) => {
-  const maxScrollTop = Math.max(0, scrollHeight - clientHeight)
-  const minScrollTop = Math.min(LATEST_EDGE_GAP_PX, maxScrollTop)
-  const maxVisibleScrollTop = Math.max(minScrollTop, maxScrollTop - LATEST_EDGE_GAP_PX)
-
-  return Math.min(maxVisibleScrollTop, Math.max(minScrollTop, LATEST_EDGE_GAP_PX))
-}
-
 const getLatestEdgeScrollTop = (scrollHeight: number, clientHeight: number) => {
   const maxScrollTop = Math.max(0, scrollHeight - clientHeight)
   const minScrollTop = Math.min(LATEST_EDGE_GAP_PX, maxScrollTop)
@@ -2641,6 +2633,7 @@ describe('MessageList', () => {
     expect(getRenderedMessageBodies()).toEqual(['target-last-displayed', 'target-unread-one', 'target-unread-two'])
   })
 
+  // eslint-disable-next-line max-len
   it('scrolls fully to latest when the first opened channel has 50+ unread messages and the user taps scroll-to-bottom after waiting', async () => {
     const targetChannelId = 'channel-first-open-50-plus-unread'
     const lastDisplayed = makeMessage({

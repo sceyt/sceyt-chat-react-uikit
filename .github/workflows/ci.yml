@@ -1,0 +1,56 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Lint, test, build
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 18
+          cache: yarn
+          cache-dependency-path: |
+            yarn.lock
+            examples/sceyt-livechat-demo/yarn.lock
+
+      # --ignore-scripts skips the root "prepare" (= build) so a build failure
+      # shows up in its own step below. The only other install scripts are
+      # core-js donation banners.
+      - name: Install dependencies
+        run: yarn install --frozen-lockfile --ignore-scripts
+
+      # Tests resolve react / react-dom from the demo app (see NODE_PATH in
+      # the test scripts), so its dependencies must be installed too.
+      - name: Install demo dependencies (react, react-dom for tests)
+        working-directory: examples/sceyt-livechat-demo
+        run: yarn install --frozen-lockfile --ignore-scripts
+
+      - name: Lint
+        run: yarn test:lint
+
+      - name: Unit tests with coverage thresholds
+        run: yarn test:coverage
+
+      - name: Build
+        run: yarn build
+
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage
+          path: coverage/
+          retention-days: 14

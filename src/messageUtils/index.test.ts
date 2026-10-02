@@ -35,6 +35,7 @@ describe('extractUrlMatches', () => {
 
   it('returns the full Kibana rison URL without truncation', () => {
     const kibanaUrl =
+      // eslint-disable-next-line max-len
       "http://172.16.1.139:5601/app/discover#/?_g=(filters:!(),refreshInterval:(pause:!t,value:60000),time:(from:now-1h,to:now))&_a=(columns:!(),dataSource:(dataViewId:'0f5cf92b-9fad-47b9-8649-3005f3e44436',type:dataView),filters:!(),interval:auto,query:(language:kuery,query:''),sort:!(!('@timestamp',desc)))"
 
     const result = extractUrlMatches(kibanaUrl)
@@ -45,6 +46,7 @@ describe('extractUrlMatches', () => {
 
   it('returns full Kibana URL even when surrounded by text', () => {
     const kibanaUrl =
+      // eslint-disable-next-line max-len
       "http://172.16.1.139:5601/app/discover#/?_g=(filters:!(),refreshInterval:(pause:!t,value:60000),time:(from:now-1h,to:now))&_a=(columns:!(),dataSource:(dataViewId:'abc',type:dataView),filters:!(),interval:auto,query:(language:kuery,query:''),sort:!(!('@timestamp',desc)))"
     const text = `see logs here ${kibanaUrl} and let me know`
 
@@ -114,6 +116,7 @@ describe('extractUrlMatches', () => {
   it('captures more of the URL than linkify-it alone would', () => {
     // linkify-it stops after "to:now)" — the result must be longer
     const fullUrl =
+      // eslint-disable-next-line max-len
       "http://172.16.1.139:5601/app/discover#/?_g=(filters:!(),refreshInterval:(pause:!t,value:60000),time:(from:now-1h,to:now))&_a=(columns:!(),dataSource:(dataViewId:'0f5cf92b-9fad-47b9-8649-3005f3e44436',type:dataView),filters:!(),interval:auto,query:(language:kuery,query:''),sort:!(!('@timestamp',desc)))"
     const truncatedByLinkify =
       'http://172.16.1.139:5601/app/discover#/?_g=(filters:!(),refreshInterval:(pause:!t,value:60000),time:(from:now-1h,to:now))'
