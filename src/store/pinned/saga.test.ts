@@ -1,17 +1,15 @@
 import { runSaga } from 'redux-saga'
-import {
-  destroyChannelsMap,
-  setChannelInMap,
-  setActiveChannelId
-} from '../../helpers/channelHalper'
+import { destroyChannelsMap, setChannelInMap, setActiveChannelId } from '../../helpers/channelHalper'
 import { makeChannel, makeMessage, resetMessageListFixtureIds } from '../../testUtils/messageFixtures'
 import { CONNECTION_STATUS } from '../user/constants'
 import {
   pinMessageAC,
   unpinMessageAC,
   applyPinnedMessagesEventAC,
-  resendPendingPinMutationsAC
+  resendPendingPinMutationsAC,
+  removePendingPinMutationAC
 } from './actions'
+import { sendTextMessageAC } from '../message/actions'
 import { __pinnedSagaTestables } from './saga'
 import { PendingPinMutation, PinnedMessageRecord, clearPinnedMessages } from './reducers'
 import { setClient } from '../../common/client'
@@ -236,10 +234,7 @@ describe('pinned saga UNPIN operation', () => {
     const channel = createMockChannel('ch-unpin-success', { unpinMessage: unpinMessageMock })
     setChannelInMap(channel as any)
 
-    const dispatched = await runPinnedSaga(
-      __pinnedSagaTestables.unpinMessage,
-      unpinMessageAC('ch-unpin-success', pin)
-    )
+    const dispatched = await runPinnedSaga(__pinnedSagaTestables.unpinMessage, unpinMessageAC('ch-unpin-success', pin))
 
     expect(unpinMessageMock).toHaveBeenCalledWith('201', PIN_TYPE_SHARED)
     expect(dispatched).toContainEqual(
@@ -262,10 +257,7 @@ describe('pinned saga UNPIN operation', () => {
     const channel = createMockChannel('ch-unpin-fail', { unpinMessage: unpinMessageMock })
     setChannelInMap(channel as any)
 
-    const dispatched = await runPinnedSaga(
-      __pinnedSagaTestables.unpinMessage,
-      unpinMessageAC('ch-unpin-fail', pin)
-    )
+    const dispatched = await runPinnedSaga(__pinnedSagaTestables.unpinMessage, unpinMessageAC('ch-unpin-fail', pin))
 
     expect(dispatched).toContainEqual(
       expect.objectContaining({
@@ -306,7 +298,8 @@ describe('pinned saga offline queue (P0-3)', () => {
   it('pin while offline is queued then sent on reconnect', async () => {
     const message = makeMessage({ id: '301', channelId: 'ch-offline-pin', body: 'offline pin' })
     const pin = makePinnedMessageRecord(message, PIN_TYPE_SHARED)
-    const pinMessageMock = jest.fn()
+    const pinMessageMock = jest
+      .fn()
       .mockRejectedValueOnce(new Error('Offline'))
       .mockResolvedValueOnce({ pins: [pin], changed: true })
 
@@ -342,17 +335,12 @@ describe('pinned saga offline queue (P0-3)', () => {
     expect(mockRemovePersistedPinMutation).toHaveBeenCalledWith(queuedMutation.id)
   })
 
-  it('pin then unpin before reconnect queues both mutations', async () => {
+  it('pin then unpin before reconnect cancels out: nothing is sent on reconnect', async () => {
     const message = makeMessage({ id: '302', channelId: 'ch-no-op', body: 'no-op message' })
     const pin = makePinnedMessageRecord(message, PIN_TYPE_SHARED)
 
-    const pinMessageMock = jest.fn()
-      .mockRejectedValueOnce(new Error('Offline'))
-      .mockResolvedValueOnce({ pins: [pin], changed: true })
-    const unpinMessageMock = jest.fn()
-      .mockRejectedValueOnce(new Error('Offline'))
-      .mockResolvedValueOnce({ pins: [pin] })
-
+    const pinMessageMock = jest.fn().mockRejectedValue(new Error('Offline'))
+    const unpinMessageMock = jest.fn().mockRejectedValue(new Error('Offline'))
     const channel = createMockChannel('ch-no-op', {
       pinMessage: pinMessageMock,
       unpinMessage: unpinMessageMock,
@@ -360,30 +348,88 @@ describe('pinned saga offline queue (P0-3)', () => {
     })
     setChannelInMap(channel as any)
 
-    // PIN while offline
+    // PIN while offline -> queued
     await runPinnedSaga(__pinnedSagaTestables.pinMessage, pinMessageAC('ch-no-op', message, PIN_TYPE_SHARED))
+    expect(mockPersistPinMutation).toHaveBeenCalledTimes(1)
     const pinMutation = mockPersistPinMutation.mock.calls[0][0] as PendingPinMutation
+    mockStoreState.PinnedReducer.pendingMutations = { [pinMutation.id]: pinMutation }
 
-    // UNPIN while offline (same message)
-    await runPinnedSaga(__pinnedSagaTestables.unpinMessage, unpinMessageAC('ch-no-op', pin))
-    const unpinMutation = mockPersistPinMutation.mock.calls[1][0] as PendingPinMutation
+    // UNPIN of the same message while still offline -> removes the queued PIN instead of queueing
+    const dispatched = await runPinnedSaga(__pinnedSagaTestables.unpinMessage, unpinMessageAC('ch-no-op', pin))
+    expect(mockPersistPinMutation).toHaveBeenCalledTimes(1)
+    expect(mockRemovePersistedPinMutation).toHaveBeenCalledWith(pinMutation.id)
+    expect(dispatched).toContainEqual(removePendingPinMutationAC(pinMutation.id))
+    mockStoreState.PinnedReducer.pendingMutations = {}
 
-    // Both mutations queued
-    expect(pinMutation.operation).toBe('PIN')
-    expect(unpinMutation.operation).toBe('UNPIN')
+    // Reconnect: no pin, no unpin, no "pinned a message" system message
+    pinMessageMock.mockClear()
+    unpinMessageMock.mockClear()
+    const resent = await runPinnedSaga(__pinnedSagaTestables.resendPendingPinMutations, resendPendingPinMutationsAC())
+    expect(pinMessageMock).not.toHaveBeenCalled()
+    expect(unpinMessageMock).not.toHaveBeenCalled()
+    expect(resent.some((a) => a.type === sendTextMessageAC({} as any, '', '').type)).toBe(false)
+  })
 
-    // Put both mutations in pending state
+  it('cancels against a mutation persisted before a reload (IndexedDB only)', async () => {
+    const message = makeMessage({ id: '303', channelId: 'ch-reload', body: 'reloaded' })
+    const pin = makePinnedMessageRecord(message, PIN_TYPE_SHARED)
+    setChannelInMap(
+      createMockChannel('ch-reload', {
+        unpinMessage: jest.fn().mockRejectedValue(new Error('Offline')),
+        createPinnedMessageListQueryBuilder: undefined
+      }) as any
+    )
+    const persistedPin: PendingPinMutation = {
+      id: 'persisted-pin',
+      channelId: 'ch-reload',
+      operation: 'PIN',
+      messageId: '303',
+      pinType: PIN_TYPE_SHARED,
+      queuedAt: Date.now()
+    }
+    mockRestorePinnedMutations.mockResolvedValue([persistedPin] as any)
+
+    await runPinnedSaga(__pinnedSagaTestables.unpinMessage, unpinMessageAC('ch-reload', pin))
+
+    expect(mockRemovePersistedPinMutation).toHaveBeenCalledWith('persisted-pin')
+    expect(mockPersistPinMutation).not.toHaveBeenCalled()
+  })
+
+  it('does not cancel mutations for a different message or pin scope', async () => {
+    const message = makeMessage({ id: '304', channelId: 'ch-scope', body: 'scoped' })
+    setChannelInMap(
+      createMockChannel('ch-scope', {
+        unpinMessage: jest.fn().mockRejectedValue(new Error('Offline')),
+        createPinnedMessageListQueryBuilder: undefined
+      }) as any
+    )
     mockStoreState.PinnedReducer.pendingMutations = {
-      [pinMutation.id]: pinMutation,
-      [unpinMutation.id]: unpinMutation
+      other: {
+        id: 'other',
+        channelId: 'ch-scope',
+        operation: 'PIN',
+        messageId: '999',
+        pinType: PIN_TYPE_SHARED,
+        queuedAt: 1
+      },
+      priv: {
+        id: 'priv',
+        channelId: 'ch-scope',
+        operation: 'PIN',
+        messageId: '304',
+        pinType: PIN_TYPE_PRIVATE,
+        queuedAt: 1
+      }
     }
 
-    // On reconnect, both should be executed
-    await runPinnedSaga(__pinnedSagaTestables.resendPendingPinMutations, resendPendingPinMutationsAC())
+    await runPinnedSaga(
+      __pinnedSagaTestables.unpinMessage,
+      unpinMessageAC('ch-scope', makePinnedMessageRecord(message, PIN_TYPE_SHARED))
+    )
 
-    // Both mutations attempted since they were queued separately
-    expect(pinMessageMock).toHaveBeenCalledTimes(2) // 1 failed + 1 replay
-    expect(unpinMessageMock).toHaveBeenCalledTimes(2) // 1 failed + 1 replay
+    expect(mockRemovePersistedPinMutation).not.toHaveBeenCalled()
+    expect(mockPersistPinMutation).toHaveBeenCalledTimes(1)
+    expect((mockPersistPinMutation.mock.calls[0][0] as PendingPinMutation).operation).toBe('UNPIN')
   })
 
   it('uses persisted mutations from IndexedDB when reconnecting', async () => {
@@ -553,16 +599,9 @@ describe('pinned saga applyPinnedMessagesEvent', () => {
       actor: { id: 'remote-user', firstName: 'Alice' }
     }
 
-    await runPinnedSaga(
-      __pinnedSagaTestables.applyPinnedMessagesEvent,
-      applyPinnedMessagesEventAC(channel, event)
-    )
+    await runPinnedSaga(__pinnedSagaTestables.applyPinnedMessagesEvent, applyPinnedMessagesEventAC(channel, event))
 
-    expect(mockSetNotification).toHaveBeenCalledWith(
-      expect.stringContaining('@Alice pinned'),
-      event.actor,
-      channel
-    )
+    expect(mockSetNotification).toHaveBeenCalledWith(expect.stringContaining('@Alice pinned'), event.actor, channel)
 
     global.Notification = originalNotification
   })
@@ -588,10 +627,7 @@ describe('pinned saga applyPinnedMessagesEvent', () => {
       actor: { id: 'current-user' } // Same as client user
     }
 
-    await runPinnedSaga(
-      __pinnedSagaTestables.applyPinnedMessagesEvent,
-      applyPinnedMessagesEventAC(channel, event)
-    )
+    await runPinnedSaga(__pinnedSagaTestables.applyPinnedMessagesEvent, applyPinnedMessagesEventAC(channel, event))
 
     expect(mockSetNotification).not.toHaveBeenCalled()
 
@@ -619,10 +655,7 @@ describe('pinned saga applyPinnedMessagesEvent', () => {
       actor: { id: 'remote-user' }
     }
 
-    await runPinnedSaga(
-      __pinnedSagaTestables.applyPinnedMessagesEvent,
-      applyPinnedMessagesEventAC(channel, event)
-    )
+    await runPinnedSaga(__pinnedSagaTestables.applyPinnedMessagesEvent, applyPinnedMessagesEventAC(channel, event))
 
     expect(mockSetNotification).not.toHaveBeenCalled()
 
