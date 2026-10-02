@@ -28,7 +28,10 @@ import {
 import { MESSAGE_DELIVERY_STATUS, MESSAGE_STATUS } from '../../helpers/constants'
 import {
   markMessagesAsDeliveredAC,
+  removeChannelAC,
   resendPendingChannelReadsAC,
+  setChannelToRemoveAC,
+  switchChannelActionAC,
   updateChannelDataAC,
   updateChannelLastMessageAC,
   updateChannelLastMessageStatusAC
@@ -36,6 +39,7 @@ import {
 import {
   addMessagesAC,
   addReactionToMessageAC,
+  clearMessagesAC,
   deleteReactionFromMessageAC,
   resendPendingMessageMutationsAC,
   updateMessageAC,
@@ -43,6 +47,7 @@ import {
   updateMessagesStatusAC
 } from '../message/actions'
 import { getRolesAC } from '../member/actions'
+import { resendPendingPinMutationsAC } from '../pinned/actions'
 import { setConnectionStatusAC } from '../user/actions'
 import { CONNECTION_STATUS } from '../user/constants'
 import { navigateToLatest } from '../../helpers/messageListNavigator'
@@ -1119,6 +1124,525 @@ describe('event message last-message handling', () => {
     // BUG: currently fails — channelId is message.parentMessage.id ('990') instead of channel.id
     expect(deliverAction.payload.channelId).toBe(channelId)
     expect(deliverAction.payload.messageIds).toEqual([threadMessage.id])
+  })
+
+  // --- P0-1: Extended event handler tests (table-driven) ---
+
+  describe('MESSAGE event handler - channel state tests', () => {
+    it('non-active channel bumps unread count and lastMessage only', async () => {
+      const activeChannelId = 'other-channel'
+      const channelId = 'target-channel'
+      const initialUnreadCount = 2
+      const expectedUnreadCount = 3
+
+      const incomingMessage = makeMessage({
+        id: '9000000000000000001',
+        channelId,
+        incoming: true,
+        body: 'new incoming message'
+      })
+      const channel = makeChannel({
+        id: channelId,
+        newMessageCount: initialUnreadCount,
+        lastMessage: makeMessage({ id: '9000', channelId, body: 'previous message' })
+      })
+      const dispatched: any[] = []
+
+      setActiveChannelId(activeChannelId)
+      setChannelInMap(channel)
+      addChannelToAllChannels(channel)
+
+      await runSaga(
+        { getState: getSagaState, dispatch: (action) => dispatched.push(action) },
+        __eventsTestables.handleChannelMessageEvent,
+        { channel: { ...channel, newMessageCount: expectedUnreadCount, lastMessage: incomingMessage }, message: incomingMessage },
+        { user: { id: 'current-user' } }
+      ).toPromise()
+
+      // Check channel data update includes expected unread count
+      const updateAction = dispatched.find(
+        (action) =>
+          action.type === updateChannelDataAC(channelId, {}).type && action.payload.channelId === channelId
+      )
+      expect(updateAction).toBeDefined()
+      expect(updateAction.payload.config.newMessageCount).toBe(expectedUnreadCount)
+
+      // Should NOT add to message list for non-active channel
+      const addMessageAction = dispatched.find((action) => action.type === addMessagesAC([], 'next').type)
+      expect(addMessageAction).toBeUndefined()
+    })
+
+    it('active channel adds message to list, unread unchanged', async () => {
+      const channelId = 'target-channel'
+      const expectedUnreadCount = 0
+      const previousMessage = makeMessage({ id: '9000', channelId, body: 'previous message' })
+
+      const incomingMessage = makeMessage({
+        id: '9000000000000000001',
+        channelId,
+        incoming: true,
+        body: 'new incoming message'
+      })
+      const channel = makeChannel({
+        id: channelId,
+        newMessageCount: 0,
+        lastMessage: previousMessage
+      })
+      const dispatched: any[] = []
+
+      setActiveChannelId(channelId)
+      setChannelInMap(channel)
+      addChannelToAllChannels(channel)
+      addMessageToMap(channelId, previousMessage)
+      setVisibleMessages(previousMessage)
+
+      // Setup mock store state for active channel
+      mockStore.getState = jest.fn(() => ({
+        ...defaultStoreState,
+        MessageReducer: {
+          ...defaultStoreState.MessageReducer,
+          messagesHasNext: false,
+          activeChannelMessages: [previousMessage]
+        }
+      }))
+
+      await runSaga(
+        { getState: getSagaState, dispatch: (action) => dispatched.push(action) },
+        __eventsTestables.handleChannelMessageEvent,
+        { channel: { ...channel, newMessageCount: expectedUnreadCount, lastMessage: incomingMessage }, message: incomingMessage },
+        { user: { id: 'current-user' } }
+      ).toPromise()
+
+      // Check channel data update includes expected unread count
+      const updateAction = dispatched.find(
+        (action) =>
+          action.type === updateChannelDataAC(channelId, {}).type && action.payload.channelId === channelId
+      )
+      expect(updateAction).toBeDefined()
+      expect(updateAction.payload.config.newMessageCount).toBe(expectedUnreadCount)
+
+      // Should add to message list for active channel
+      const addMessageAction = dispatched.find((action) => action.type === addMessagesAC([], 'next').type)
+      expect(addMessageAction).toBeDefined()
+      expect(addMessageAction.payload.messages).toEqual([incomingMessage])
+    })
+
+    it('MESSAGE echoing own pending message (same tid) replaces it, no duplicate', async () => {
+      const channelId = 'channel-echo-pending'
+      const tid = 'pending-message-tid-123'
+      const pendingMessage = makePendingMessage({
+        tid,
+        channelId,
+        body: 'sent message',
+        user: makeUser({ id: 'current-user' })
+      })
+      const confirmedMessage = makeMessage({
+        id: '840827767688048640',
+        tid,
+        channelId,
+        body: 'sent message',
+        incoming: false,
+        deliveryStatus: MESSAGE_DELIVERY_STATUS.SENT
+      })
+      const channel = makeChannel({ id: channelId, lastMessage: pendingMessage })
+      const dispatched: any[] = []
+
+      setActiveChannelId(channelId)
+      setChannelInMap(channel)
+      addChannelToAllChannels(channel)
+      addMessageToMap(channelId, pendingMessage)
+      mockStore.getState = jest.fn(() => ({
+        ...defaultStoreState,
+        MessageReducer: {
+          ...defaultStoreState.MessageReducer,
+          messagesHasNext: false,
+          activeChannelMessages: [pendingMessage]
+        }
+      }))
+
+      await runSaga(
+        { getState: getSagaState, dispatch: (action) => dispatched.push(action) },
+        __eventsTestables.handleChannelMessageEvent,
+        { channel: { ...channel, lastMessage: confirmedMessage }, message: confirmedMessage },
+        { user: { id: 'current-user' } }
+      ).toPromise()
+
+      // Should update the existing message, not add a new one
+      const updateAction = dispatched.find(
+        (action) => action.type === updateMessageAC('', {}).type && action.payload.messageId === tid
+      )
+      expect(updateAction).toBeDefined()
+      expect(updateAction.payload.params.id).toBe(confirmedMessage.id)
+
+      // Should NOT add a duplicate message
+      const addAction = dispatched.find((action) => action.type === addMessagesAC([], 'next').type)
+      expect(addAction).toBeUndefined()
+    })
+  })
+
+  describe('EDIT_MESSAGE / DELETE_MESSAGE for uncached messages', () => {
+    it('EDIT_MESSAGE for a message not in cache does not crash and updates lastMessage if needed', async () => {
+      const channelId = 'channel-edit-uncached'
+      const editedMessage = makeMessage({
+        id: '2000',
+        channelId,
+        body: 'edited body',
+        state: MESSAGE_STATUS.EDIT
+      })
+      const channel = makeChannel({ id: channelId, lastMessage: editedMessage })
+      const dispatched: any[] = []
+
+      setChannelInMap(channel)
+      addChannelToAllChannels(channel)
+      // Note: NOT adding message to map - simulating uncached
+
+      await runSaga(
+        { getState: getSagaState, dispatch: () => {} },
+        __eventsTestables.handleEditMessageEvent,
+        { channel, message: editedMessage }
+      ).toPromise()
+
+      // Should not throw and channel should still work
+      expect(getChannelFromMap(channelId)).toBeDefined()
+    })
+
+    it('DELETE_MESSAGE for a message not in cache does not crash and updates channel lastMessage', async () => {
+      const channelId = 'channel-delete-uncached'
+      const deletedMessage = makeMessage({
+        id: '2001',
+        channelId,
+        body: '',
+        state: MESSAGE_STATUS.DELETE
+      })
+      const channel = makeChannel({ id: channelId, lastMessage: deletedMessage })
+      const dispatched: any[] = []
+
+      setChannelInMap(channel)
+      addChannelToAllChannels(channel)
+      // Note: NOT adding message to map - simulating uncached
+
+      await runSaga(
+        { getState: getSagaState, dispatch: (action) => dispatched.push(action) },
+        __eventsTestables.handleDeleteMessageEvent,
+        { channel, deletedMessage }
+      ).toPromise()
+
+      // Should not throw
+      expect(getChannelFromMap(channelId)).toBeDefined()
+      // lastMessage should be updated since it matches the deleted message
+      const lastMessageUpdate = dispatched.find(
+        (action) => action.type === updateChannelLastMessageAC(deletedMessage, channel).type
+      )
+      expect(lastMessageUpdate).toBeDefined()
+    })
+  })
+
+  describe('MESSAGE_MARKERS_RECEIVED out of order', () => {
+    it('a late "delivered" marker arriving after "read" must not downgrade the status', async () => {
+      const currentUser = makeUser({ id: 'current-user' })
+      const remoteUser = makeUser({ id: 'remote-user' })
+      const channelId = 'channel-marker-order'
+      // Message already has READ status
+      const message = makeMessage({
+        id: '3000',
+        channelId,
+        user: currentUser,
+        incoming: false,
+        deliveryStatus: MESSAGE_DELIVERY_STATUS.READ,
+        userMarkers: [],
+        markerTotals: [{ name: MESSAGE_DELIVERY_STATUS.READ, count: 1 }]
+      })
+      const channel = makeChannel({ id: channelId, lastMessage: message })
+
+      // Now a late DELIVERED marker arrives
+      const lateDeliveredMarker = {
+        messageIds: [message.id],
+        user: remoteUser,
+        name: MESSAGE_DELIVERY_STATUS.DELIVERED,
+        createdAt: new Date('2026-04-02T11:00:00.000Z') // Earlier timestamp
+      } as any
+
+      setActiveChannelId(channelId)
+      setChannelInMap(channel)
+      addChannelToAllChannels(channel)
+      addMessageToMap(channelId, message)
+
+      await runSaga(
+        { getState: getSagaState, dispatch: () => {} },
+        __eventsTestables.handleMessageMarkersReceivedEvent,
+        { channelId, markerList: lateDeliveredMarker },
+        { user: currentUser }
+      ).toPromise()
+
+      // The message should still have READ status, not downgraded to DELIVERED
+      const cachedMessage = getMessagesFromMap(channelId)[message.id]
+      expect(cachedMessage.deliveryStatus).toBe(MESSAGE_DELIVERY_STATUS.READ)
+
+      // Channel lastMessage should also retain READ status
+      expect(getChannelFromMap(channelId)?.lastMessage.deliveryStatus).toBe(MESSAGE_DELIVERY_STATUS.READ)
+    })
+  })
+
+  describe('CLEAR_HISTORY event', () => {
+    it('clears messages, lastMessage, and resets unread count', async () => {
+      const channelId = 'channel-clear-history'
+      const message1 = makeMessage({ id: '4000', channelId, body: 'msg1' })
+      const message2 = makeMessage({ id: '4001', channelId, body: 'msg2' })
+      const channel = makeChannel({
+        id: channelId,
+        lastMessage: message2,
+        newMessageCount: 5,
+        newMentionCount: 2,
+        unread: true
+      })
+      const dispatched: any[] = []
+
+      setActiveChannelId(channelId)
+      setChannelInMap(channel)
+      addChannelToAllChannels(channel)
+      addMessageToMap(channelId, message1)
+      addMessageToMap(channelId, message2)
+
+      await runSaga(
+        { getState: getSagaState, dispatch: (action) => dispatched.push(action) },
+        __eventsTestables.handleClearHistoryEvent,
+        { channel }
+      ).toPromise()
+
+      // Should dispatch clearMessagesAC for active channel
+      expect(dispatched.some((a) => a.type === clearMessagesAC().type)).toBe(true)
+
+      // Should dispatch updateChannelDataAC with null lastMessage and zero counts
+      const updateAction = dispatched.find(
+        (action) =>
+          action.type === updateChannelDataAC(channelId, {}).type && action.payload.channelId === channelId
+      )
+      expect(updateAction).toBeDefined()
+      expect(updateAction.payload.config.lastMessage).toBeNull()
+      expect(updateAction.payload.config.newMessageCount).toBe(0)
+      expect(updateAction.payload.config.newMentionCount).toBe(0)
+    })
+  })
+
+  describe('KICK_MEMBERS / LEAVE where user is me', () => {
+    it('KICK_MEMBERS where current user is kicked removes channel and switches active channel', async () => {
+      const kickedChannelId = 'channel-kicked'
+      const fallbackChannelId = 'channel-fallback'
+      const currentUser = makeUser({ id: 'current-user' })
+      const kickedMember = { ...currentUser, role: 'member' }
+
+      const kickedChannel = makeChannel({ id: kickedChannelId })
+      const fallbackChannel = makeChannel({ id: fallbackChannelId })
+      const dispatched: any[] = []
+
+      setActiveChannelId(kickedChannelId)
+      setChannelInMap(kickedChannel)
+      setChannelInMap(fallbackChannel)
+      addChannelToAllChannels(kickedChannel)
+      addChannelToAllChannels(fallbackChannel)
+
+      await runSaga(
+        { getState: getSagaState, dispatch: (action) => dispatched.push(action) },
+        __eventsTestables.handleKickMembersEvent,
+        { channel: kickedChannel, removedMembers: [kickedMember] },
+        { user: currentUser }
+      ).toPromise()
+
+      // Should dispatch removeChannelAC
+      expect(dispatched.some((a) => a.type === removeChannelAC('').type)).toBe(true)
+
+      // Should dispatch switchChannelActionAC to switch to another channel
+      const switchAction = dispatched.find((a) => a.type === switchChannelActionAC(null).type)
+      expect(switchAction).toBeDefined()
+    })
+
+    it('LEAVE where current user leaves removes channel', async () => {
+      const leftChannelId = 'channel-left'
+      const currentUser = makeUser({ id: 'current-user' })
+
+      const leftChannel = makeChannel({ id: leftChannelId })
+      const dispatched: any[] = []
+
+      setActiveChannelId(leftChannelId)
+      setChannelInMap(leftChannel)
+      addChannelToAllChannels(leftChannel)
+
+      await runSaga(
+        { getState: getSagaState, dispatch: (action) => dispatched.push(action) },
+        __eventsTestables.handleLeaveEvent,
+        { channel: leftChannel, member: currentUser },
+        { user: currentUser }
+      ).toPromise()
+
+      // Should dispatch switchChannelActionAC(null) - payload has { channel: null, updateActiveChannel: true }
+      const switchAction = dispatched.find((a) => a.type === switchChannelActionAC(null).type)
+      expect(switchAction).toBeDefined()
+      expect(switchAction.payload.channel).toBeNull()
+
+      // Should dispatch removeChannelAC
+      expect(dispatched.some((a) => a.type === removeChannelAC('').type)).toBe(true)
+
+      // Should dispatch setChannelToRemoveAC
+      expect(dispatched.some((a) => a.type === setChannelToRemoveAC({} as any).type)).toBe(true)
+    })
+  })
+
+  describe('REACTION_ADDED / REACTION_DELETED - totals and self flags', () => {
+    it('REACTION_ADDED from remote user updates reactionTotals correctly', async () => {
+      const currentUser = makeUser({ id: 'current-user' })
+      const remoteUser = makeUser({ id: 'remote-user' })
+      const channelId = 'channel-reaction-totals'
+      const message = makeMessage({
+        id: '5000',
+        channelId,
+        user: currentUser,
+        reactionTotals: [{ key: 'thumbsup', count: 1, score: 1 }],
+        userReactions: []
+      })
+      const reaction = {
+        id: 'reaction-1',
+        key: 'heart',
+        score: 1,
+        reason: '',
+        createdAt: new Date('2026-04-02T12:30:00.000Z'),
+        messageId: message.id,
+        user: remoteUser
+      }
+      const channel = makeChannel({ id: channelId, lastMessage: message, newReactions: [] })
+      const dispatched: any[] = []
+
+      setActiveChannelId(channelId)
+      addMessageToMap(channelId, message)
+
+      await runSaga(
+        { getState: getSagaState, dispatch: (action) => dispatched.push(action) },
+        __eventsTestables.handleReactionAddedEvent,
+        { channel, user: remoteUser, message, reaction },
+        { user: currentUser }
+      ).toPromise()
+
+      // Should dispatch addReactionToMessageAC with isSelf=false
+      expect(dispatched).toContainEqual(addReactionToMessageAC(message, reaction as any, false))
+    })
+
+    it('REACTION_ADDED from self user flags as self reaction', async () => {
+      const currentUser = makeUser({ id: 'current-user' })
+      const channelId = 'channel-reaction-self'
+      const message = makeMessage({
+        id: '5001',
+        channelId,
+        user: makeUser({ id: 'other-user' }),
+        reactionTotals: [],
+        userReactions: []
+      })
+      const reaction = {
+        id: 'reaction-2',
+        key: 'thumbsup',
+        score: 1,
+        reason: '',
+        createdAt: new Date('2026-04-02T12:31:00.000Z'),
+        messageId: message.id,
+        user: currentUser
+      }
+      const channel = makeChannel({ id: channelId, lastMessage: message, newReactions: [] })
+      const dispatched: any[] = []
+
+      setActiveChannelId(channelId)
+      addMessageToMap(channelId, message)
+
+      await runSaga(
+        { getState: getSagaState, dispatch: (action) => dispatched.push(action) },
+        __eventsTestables.handleReactionAddedEvent,
+        { channel, user: currentUser, message, reaction },
+        { user: currentUser }
+      ).toPromise()
+
+      // Should dispatch addReactionToMessageAC with isSelf=true
+      expect(dispatched).toContainEqual(addReactionToMessageAC(message, reaction as any, true))
+    })
+
+    it('REACTION_DELETED from remote user updates totals correctly', async () => {
+      const currentUser = makeUser({ id: 'current-user' })
+      const remoteUser = makeUser({ id: 'remote-user' })
+      const channelId = 'channel-reaction-delete-totals'
+      const reaction = {
+        id: 'reaction-3',
+        key: 'heart',
+        score: 1,
+        reason: '',
+        createdAt: new Date('2026-04-02T12:32:00.000Z'),
+        messageId: '5002',
+        user: remoteUser
+      }
+      const message = makeMessage({
+        id: '5002',
+        channelId,
+        user: currentUser,
+        reactionTotals: [{ key: 'heart', count: 2, score: 2 }],
+        userReactions: []
+      })
+      const channel = makeChannel({ id: channelId, lastMessage: message, newReactions: [] })
+      const dispatched: any[] = []
+
+      setActiveChannelId(channelId)
+      setChannelInMap(channel)
+      addMessageToMap(channelId, message)
+
+      await runSaga(
+        { getState: getSagaState, dispatch: (action) => dispatched.push(action) },
+        __eventsTestables.handleReactionDeletedEvent,
+        { channel, user: remoteUser, message, reaction },
+        { user: currentUser }
+      ).toPromise()
+
+      // Should dispatch deleteReactionFromMessageAC with isSelf=false
+      expect(dispatched).toContainEqual(deleteReactionFromMessageAC(message, reaction as any, false))
+    })
+  })
+
+  describe('CONNECTION_STATUS_CHANGED to connected', () => {
+    it('dispatches resend actions for pending messages and pin mutations on reconnect', async () => {
+      const dispatched: any[] = []
+
+      await runSaga(
+        { getState: getSagaState, dispatch: (action) => dispatched.push(action) },
+        __eventsTestables.handleConnectionStatusChangedEvent,
+        CONNECTION_STATUS.CONNECTED
+      ).toPromise()
+
+      // Should dispatch setConnectionStatusAC
+      expect(dispatched).toContainEqual(setConnectionStatusAC(CONNECTION_STATUS.CONNECTED))
+
+      // Should dispatch getRolesAC
+      expect(dispatched).toContainEqual(getRolesAC())
+
+      // Should dispatch resendPendingMessageMutationsAC
+      expect(dispatched).toContainEqual(resendPendingMessageMutationsAC(CONNECTION_STATUS.CONNECTED))
+
+      // Should dispatch resendPendingChannelReadsAC
+      expect(dispatched).toContainEqual(resendPendingChannelReadsAC(CONNECTION_STATUS.CONNECTED))
+
+      // Should dispatch resendPendingPinMutationsAC
+      expect(dispatched.some((a) => a.type === resendPendingPinMutationsAC().type)).toBe(true)
+    })
+
+    it('does not dispatch resend actions for non-connected status', async () => {
+      const dispatched: any[] = []
+
+      await runSaga(
+        { getState: getSagaState, dispatch: (action) => dispatched.push(action) },
+        __eventsTestables.handleConnectionStatusChangedEvent,
+        CONNECTION_STATUS.DISCONNECTED
+      ).toPromise()
+
+      // Should dispatch setConnectionStatusAC
+      expect(dispatched).toContainEqual(setConnectionStatusAC(CONNECTION_STATUS.DISCONNECTED))
+
+      // Should NOT dispatch resend actions
+      expect(dispatched.find((a) => a.type === resendPendingMessageMutationsAC('').type)).toBeUndefined()
+      expect(dispatched.find((a) => a.type === resendPendingChannelReadsAC('').type)).toBeUndefined()
+      expect(dispatched.find((a) => a.type === resendPendingPinMutationsAC().type)).toBeUndefined()
+    })
   })
 
   it('does not dispatch markMessagesAsDeliveredAC for own messages', async () => {
