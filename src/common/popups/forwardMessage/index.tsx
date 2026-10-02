@@ -263,6 +263,7 @@ function ForwardMessagePopup({
   const [noteMentionedUsers, setNoteMentionedUsers] = useState<IUser[]>([])
   const [mentionQuery, setMentionQuery] = useState<{ start: number; value: string } | null>(null)
   const [highlightedMentionIndex, setHighlightedMentionIndex] = useState(0)
+  const popupRef = useRef<HTMLDivElement>(null)
   const noteInputRef = useRef<HTMLTextAreaElement>(null)
   const noteHighlightRef = useRef<HTMLDivElement>(null)
   const noteContainerRef = useRef<HTMLDivElement>(null)
@@ -454,6 +455,10 @@ function ForwardMessagePopup({
   }, [noteText])
 
   useLayoutEffect(() => {
+    if (selectedChannels.length) popupRef.current?.focus()
+  }, [selectedChannels.length])
+
+  useLayoutEffect(() => {
     setNoteContainerHeight(noteContainerRef.current ? noteContainerRef.current.offsetHeight : 0)
   }, [selectedChannels.length, firstForwardMessage, noteText])
 
@@ -486,6 +491,7 @@ function ForwardMessagePopup({
   }
 
   const handleNoteKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
+    if (event.nativeEvent.isComposing) return
     if (mentionQuery && visibleMentionCandidates.length > 0) {
       if (event.key === 'ArrowDown') {
         event.preventDefault()
@@ -508,6 +514,31 @@ function ForwardMessagePopup({
     if (event.key === 'Escape' && mentionQuery) {
       event.preventDefault()
       setMentionQuery(null)
+    }
+  }
+
+  const handlePopupKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
+    if (
+      event.key !== 'Enter' ||
+      event.shiftKey ||
+      event.nativeEvent.isComposing ||
+      event.defaultPrevented ||
+      event.target instanceof HTMLInputElement ||
+      !selectedChannels.length
+    ) {
+      return
+    }
+    event.preventDefault()
+    handleForwardMessage()
+  }
+
+  const handlePopupClick = (event: React.MouseEvent<HTMLDivElement>) => {
+    if (
+      selectedChannels.length &&
+      event.target instanceof Element &&
+      !event.target.closest('input, textarea, button, a, select, [contenteditable="true"]')
+    ) {
+      popupRef.current?.focus()
     }
   }
 
@@ -557,6 +588,10 @@ function ForwardMessagePopup({
   return (
     <PopupContainer>
       <Popup
+        ref={popupRef}
+        tabIndex={-1}
+        onKeyDown={handlePopupKeyDown}
+        onClick={handlePopupClick}
         maxWidth='522px'
         minWidth='522px'
         height='640px'
@@ -958,6 +993,10 @@ const ForwardChannelsCont = styled.div<{
   overflow-y: auto;
   margin-top: 16px;
   max-height: ${(props) =>
+    `calc(100% - ${
+      props.selectedChannelsHeight + (props.noteContainerHeight ? props.noteContainerHeight - 4 : -8)
+    }px)`};
+  height: ${(props) =>
     `calc(100% - ${
       props.selectedChannelsHeight + (props.noteContainerHeight ? props.noteContainerHeight - 4 : -8)
     }px)`};

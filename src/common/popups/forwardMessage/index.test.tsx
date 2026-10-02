@@ -339,6 +339,78 @@ describe('ForwardMessagePopup', () => {
     expect(handleForward).toHaveBeenCalledWith(['chan-1'], undefined)
   })
 
+  it('forwards without a note on Enter from the popup outside the note field', () => {
+    const { handleForward, togglePopup } = renderPopup()
+
+    selectChannel('Jordyn Aminoff')
+    expect(screen.getByPlaceholderText('Write a message')).not.toHaveFocus()
+    expect(document.activeElement).toContainElement(screen.getByText('Forward message'))
+    fireEvent.keyDown(document.activeElement as Element, { key: 'Enter' })
+
+    expect(handleForward).toHaveBeenCalledTimes(1)
+    expect(handleForward).toHaveBeenCalledWith(['chan-1'], undefined)
+    expect(togglePopup).toHaveBeenCalledTimes(1)
+  })
+
+  it('does not forward on Enter in the channel search field', () => {
+    const { handleForward } = renderPopup()
+
+    selectChannel('Jordyn Aminoff')
+    const search = screen.getByPlaceholderText('Search for channels')
+    search.focus()
+    fireEvent.change(search, { target: { value: 'another chat' } })
+    fireEvent.keyDown(search, { key: 'Enter' })
+
+    expect(handleForward).not.toHaveBeenCalled()
+  })
+
+  it('forwards after clicking a non-input part of the popup', () => {
+    const { handleForward } = renderPopup()
+
+    selectChannel('Jordyn Aminoff')
+    screen.getByPlaceholderText('Search for channels').focus()
+    fireEvent.click(screen.getByText('Forward message'))
+    expect(screen.getByPlaceholderText('Search for channels')).not.toHaveFocus()
+    fireEvent.keyDown(document.activeElement as Element, { key: 'Enter' })
+
+    expect(handleForward).toHaveBeenCalledWith(['chan-1'], undefined)
+  })
+
+  it('does not forward on Enter outside the popup', () => {
+    const { handleForward } = renderPopup()
+
+    selectChannel('Jordyn Aminoff')
+    fireEvent.keyDown(document.body, { key: 'Enter' })
+
+    expect(handleForward).not.toHaveBeenCalled()
+  })
+
+  it('does not forward on Enter before a channel is selected', () => {
+    const { handleForward } = renderPopup()
+
+    fireEvent.keyDown(screen.getByText('Forward message'), { key: 'Enter' })
+
+    expect(handleForward).not.toHaveBeenCalled()
+  })
+
+  it('forwards the typed note on Enter and keeps Shift+Enter for a new line', () => {
+    const { handleForward, togglePopup } = renderPopup()
+
+    selectChannel('Jordyn Aminoff')
+    const textarea = screen.getByPlaceholderText('Write a message')
+    fireEvent.change(textarea, { target: { value: 'hello team' } })
+
+    expect(fireEvent.keyDown(textarea, { key: 'Enter', shiftKey: true })).toBe(true)
+    expect(handleForward).not.toHaveBeenCalled()
+
+    expect(fireEvent.keyDown(textarea, { key: 'Enter' })).toBe(false)
+    expect(handleForward).toHaveBeenCalledWith(
+      ['chan-1'],
+      expect.objectContaining({ body: 'hello team', type: 'text' })
+    )
+    expect(togglePopup).toHaveBeenCalledTimes(1)
+  })
+
   it('grows the note textarea with its content, capped at 3 lines', () => {
     renderPopup()
     selectChannel('Jordyn Aminoff')
@@ -419,7 +491,7 @@ describe('ForwardMessagePopup', () => {
         members: makeMentionMembers()
       })
     ]
-    renderPopup({ channels })
+    const { handleForward } = renderPopup({ channels })
 
     selectChannel('Design Team')
     const textarea = screen.getByPlaceholderText('Write a message') as HTMLTextAreaElement
@@ -432,6 +504,7 @@ describe('ForwardMessagePopup', () => {
     fireEvent.keyDown(textarea, { key: 'Enter' })
 
     expect(textarea).toHaveValue('@Bob Baker')
+    expect(handleForward).not.toHaveBeenCalled()
   })
 
   it('does not open the mention dropdown for a direct channel', () => {
