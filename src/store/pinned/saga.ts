@@ -340,3 +340,15 @@ export default function* PinnedMessagesSaga() {
   yield takeEvery(RESEND_PENDING_PIN_MUTATIONS, resendPendingPinMutations)
   yield takeEvery(clearPinnedMessages.type, clearChannelPinnedMessages)
 }
+
+export const __pinnedSagaTestables = {
+  pinMessage,
+  unpinMessage,
+  executePin,
+  queueMutation,
+  loadPinnedMessages,
+  applyPinnedMessagesEvent,
+  resendPendingPinMutations,
+  clearChannelPinnedMessages,
+  clearServerPinRefreshes: () => serverPinRefreshes.clear()
+}
