@@ -113,7 +113,7 @@ const MessageReactions: React.FC<MessageReactionsProps> = ({
         rtlDirection={rtlDirection}
         isReacted={message.reactionTotals && message.reactionTotals.length > 0}
       >
-        {message.reactionTotals && message.reactionTotals.length && (
+        {message.reactionTotals && message.reactionTotals.length ? (
           <MessageReactionsCont rtlDirection={rtlDirection} onClick={onToggleReactionsPopup}>
             {message.reactionTotals.slice(0, reactionsDisplayCount).map((summery) => (
               <MessageReaction
@@ -134,7 +134,7 @@ const MessageReactions: React.FC<MessageReactionsProps> = ({
                 </MessageReactionKey>
               </MessageReaction>
             ))}
-            {showTotalReactionCount && reactionsCount && reactionsCount > 1 && (
+            {showTotalReactionCount && reactionsCount && reactionsCount > 1 ? (
               <MessageReaction
                 border={reactionItemBorder}
                 color={textPrimary}
@@ -146,8 +146,12 @@ const MessageReactions: React.FC<MessageReactionsProps> = ({
               >
                 {reactionsCount}
               </MessageReaction>
+            ) : (
+              <React.Fragment />
             )}
           </MessageReactionsCont>
+        ) : (
+          <React.Fragment />
         )}
       </ReactionsContainer>
     </React.Fragment>

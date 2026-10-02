@@ -8,6 +8,7 @@ import {
   updateMessagesStatus
 } from '../message/reducers'
 import { MESSAGE_STATUS } from '../../helpers/constants'
+import { removeReactionFromTotals } from '../../helpers/messagesHalper'
 
 export type PinnedMessageRecord = {
   id: string
@@ -172,7 +173,7 @@ const pinnedSlice = createSlice({
       if (!messageId) return
       updatePinnedMessageSnapshots(state, messageId, (pinnedMessage) => ({
         ...pinnedMessage,
-        reactionTotals: message.reactionTotals || pinnedMessage.reactionTotals || [],
+        reactionTotals: removeReactionFromTotals(pinnedMessage.reactionTotals, reaction.key),
         userReactions: isSelf
           ? (pinnedMessage.userReactions || []).filter((currentReaction: any) => currentReaction.key !== reaction.key)
           : pinnedMessage.userReactions || []

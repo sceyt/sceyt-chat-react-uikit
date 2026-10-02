@@ -5,7 +5,7 @@ import PinnedReducer, {
   setPinnedMessages,
   upsertPinnedMessages
 } from './reducers'
-import { updateMessage } from '../message/reducers'
+import { deleteReactionFromMessage, updateMessage } from '../message/reducers'
 import { MESSAGE_STATUS } from '../../helpers/constants'
 
 const pin = (id: string, messageId: string, pinType = 0) => ({
@@ -93,6 +93,46 @@ describe('pinned message state', () => {
     state = PinnedReducer(state, updateMessage({ messageId: 'm1', params: { body: 'Edited pinned text' } as any }))
 
     expect(state.byChannel.c1[0].message.body).toBe('Edited pinned text')
+  })
+
+  it('removes the last reaction from a pinned message even when the delete response has stale totals', () => {
+    const reaction = { key: '👍', id: 'r1' }
+    const message = {
+      id: 'm1',
+      userReactions: [reaction],
+      reactionTotals: [{ key: reaction.key, count: 1, score: 1 }]
+    }
+    const initialState = PinnedReducer(
+      undefined,
+      setPinnedMessages({ channelId: 'c1', pins: [{ id: 'p1', pinType: 0, message }] })
+    )
+    const nextState = PinnedReducer(
+      initialState,
+      deleteReactionFromMessage({ message: { ...message } as any, reaction: reaction as any, isSelf: true })
+    )
+
+    expect(nextState.byChannel.c1[0].message.reactionTotals).toEqual([])
+    expect(nextState.byChannel.c1[0].message.userReactions).toEqual([])
+  })
+
+  it('decrements a pinned reaction count without removing another user’s reaction', () => {
+    const reaction = { key: '👍', id: 'r1' }
+    const message = {
+      id: 'm1',
+      userReactions: [reaction],
+      reactionTotals: [{ key: reaction.key, count: 2, score: 1 }]
+    }
+    const initialState = PinnedReducer(
+      undefined,
+      setPinnedMessages({ channelId: 'c1', pins: [{ id: 'p1', pinType: 0, message }] })
+    )
+    const nextState = PinnedReducer(
+      initialState,
+      deleteReactionFromMessage({ message: { ...message } as any, reaction: reaction as any, isSelf: false })
+    )
+
+    expect(nextState.byChannel.c1[0].message.reactionTotals).toEqual([{ key: reaction.key, count: 1, score: 1 }])
+    expect(nextState.byChannel.c1[0].message.userReactions).toEqual([reaction])
   })
 
   it('removes a pin immediately when its source message is deleted by an update event', () => {
