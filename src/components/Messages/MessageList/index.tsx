@@ -28,7 +28,11 @@ import {
   visibleMessagesMapSelector
 } from '../../../store/message/selector'
 import { setPinnedMessagesListOpenAC } from '../../../store/message/actions'
-import { activeChannelSelector, isDraggingSelector } from '../../../store/channel/selector'
+import {
+  activeChannelOpenAtLatestSelector,
+  activeChannelSelector,
+  isDraggingSelector
+} from '../../../store/channel/selector'
 import { browserTabIsActiveSelector, connectionStatusSelector, contactsMapSelector } from '../../../store/user/selector'
 // Hooks
 import { useColor } from '../../../hooks'
@@ -461,6 +465,7 @@ const MessageList: React.FC<MessagesProps> = ({
 
   const dispatch = useDispatch()
   const channel: IChannel = useSelector(activeChannelSelector)
+  const openAtLatest = useSelector(activeChannelOpenAtLatestSelector)
   const contactsMap: IContactsMap = useSelector(contactsMapSelector, shallowEqual)
   const connectionStatus = useSelector(connectionStatusSelector, shallowEqual)
   // const sendMessageInputHeight: number = useSelector(sendMessageInputHeightSelector)
@@ -528,6 +533,7 @@ const MessageList: React.FC<MessagesProps> = ({
   } = useChatController({
     messages,
     channel,
+    openAtLatest,
     hasPrevMessages,
     hasNextMessages,
     loadingPrevMessages,

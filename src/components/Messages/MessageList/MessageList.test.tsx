@@ -455,6 +455,61 @@ describe('MessageList', () => {
     expect(dispatchSpy).toHaveBeenCalledWith(loadNearUnreadAC(channel))
   })
 
+  it('loads the latest window when a forward opens an unloaded chat with unread history', () => {
+    const channel = makeChannel({
+      id: 'channel-forward-first-open',
+      newMessageCount: 40,
+      lastDisplayedMessageId: '100',
+      lastMessage: makeMessage({ id: '140', channelId: 'channel-forward-first-open' })
+    })
+    const store = createMessageListStore({
+      ChannelReducer: { activeChannel: channel, activeChannelOpenAtLatest: true },
+      MessageReducer: { unreadScrollTo: false },
+      UserReducer: { connectionStatus: CONNECTION_STATUS.CONNECTED }
+    })
+    const dispatchSpy = jest.spyOn(store, 'dispatch')
+
+    renderMessageList(store)
+
+    expect(dispatchSpy).toHaveBeenCalledWith(loadLatestMessagesAC(channel, undefined, undefined, true, true))
+    expect(dispatchSpy).not.toHaveBeenCalledWith(loadNearUnreadAC(channel))
+  })
+
+  it('scrolls to the forwarded message after the first latest-window load finishes', async () => {
+    const channelId = 'channel-forward-delayed-first-open'
+    const latestMessages = Array.from({ length: 40 }, (_, index) =>
+      makeMessage({ id: String(101 + index), channelId, body: index === 39 ? 'forwarded-latest' : `history-${index}` })
+    )
+    const channel = makeChannel({
+      id: channelId,
+      newMessageCount: 40,
+      lastDisplayedMessageId: '100',
+      lastMessage: latestMessages[39]
+    })
+    const store = createMessageListStore({
+      ChannelReducer: { activeChannel: channel, activeChannelOpenAtLatest: true },
+      MessageReducer: { activeChannelMessages: [], unreadScrollTo: false },
+      UserReducer: { connectionStatus: CONNECTION_STATUS.CONNECTED }
+    })
+    attachDelayedServerToMessageListStore(store, {
+      onLoadLatest: () => ({ messages: latestMessages, hasNext: false })
+    })
+
+    const rendered = renderMessageList(store)
+    const scrollable = rendered.container.querySelector('#scrollableDiv') as HTMLDivElement
+    act(() => {
+      setScrollMetrics(scrollable, { scrollTop: 0, scrollHeight: 2600, clientHeight: 240 })
+    })
+
+    await flushMockServerDelay()
+    act(() => {
+      flushAnimationFrames()
+    })
+
+    expect(scrollable.scrollTop).toBe(getLatestEdgeScrollTop(2600, 240))
+    expect(screen.getByText('forwarded-latest')).toBeInTheDocument()
+  })
+
   it('renders date dividers and the unread divider from activeChannelMessages', () => {
     const now = new Date()
     const yesterday = new Date(now.getTime() - 24 * 60 * 60 * 1000)

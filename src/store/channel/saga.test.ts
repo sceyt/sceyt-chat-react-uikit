@@ -5,17 +5,20 @@ import {
   getPendingChannelRead,
   getPendingChannelReads,
   removePendingChannelRead,
+  setActiveChannelId,
   setChannelInMap,
   setPendingChannelRead
 } from '../../helpers/channelHalper'
 import { addMessageToMap } from '../../helpers/messagesHalper'
 import { MESSAGE_DELIVERY_STATUS } from '../../helpers/constants'
 import { makeChannel, makeMessage, makePendingMessage, makeUser } from '../../testUtils/messageFixtures'
-import { updateMessageAC } from '../message/actions'
+import { setUnreadScrollToAC, updateMessageAC } from '../message/actions'
 import { CONNECTION_STATUS } from '../user/constants'
 import {
   markChannelAsReadAC,
   markMessagesAsReadAC,
+  setActiveChannelAC,
+  switchChannelActionAC,
   leaveChannelAC,
   resendPendingChannelReadsAC,
   setChannelsAC,
@@ -77,6 +80,21 @@ describe('channel saga read markers', () => {
 
   afterEach(() => {
     __channelSagaTestables.resetWaitForReadMarkerRetry()
+    setActiveChannelId('')
+  })
+
+  it('opens a forwarded destination at latest without enabling unread restore', async () => {
+    const channel = makeChannel({ id: 'forward-destination', newMessageCount: 30, lastDisplayedMessageId: '100' })
+    setChannelInMap(channel)
+    setActiveChannelId('forward-source')
+
+    const dispatched = await runChannelSaga(
+      __channelSagaTestables.switchChannel,
+      switchChannelActionAC(channel, true, true)
+    )
+
+    expect(dispatched).toContainEqual(setUnreadScrollToAC(false))
+    expect(dispatched).toContainEqual(setActiveChannelAC(channel, true))
   })
 
   it('advances lastDisplayedMessageId when displayed messages are read', async () => {

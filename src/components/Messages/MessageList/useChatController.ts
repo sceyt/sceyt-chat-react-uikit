@@ -144,6 +144,7 @@ type TimelineItem =
 export interface UseChatControllerParams {
   messages: IMessage[]
   channel: IChannel
+  openAtLatest?: boolean
   hasPrevMessages: boolean
   hasNextMessages: boolean
   loadingPrevMessages: number | null
@@ -383,6 +384,7 @@ const getUnreadTrackingStartIndex = (messages: IMessage[]) => {
 export function useChatController({
   messages,
   channel,
+  openAtLatest = false,
   hasPrevMessages,
   hasNextMessages,
   loadingPrevMessages,
@@ -477,6 +479,20 @@ export function useChatController({
   loadingNextMessagesRef.current = loadingNextMessages
   const isPreviousLoading = loadingPrevMessages === LOADING_STATE.LOADING
   const isNextLoading = loadingNextMessages === LOADING_STATE.LOADING
+  // openAtLatest only covers the FIRST latest-window load of this channel visit. Once that
+  // load has started and settled, later "load next" requests (after the user scrolled away)
+  // must be judged by the real scroll position again.
+  const openAtLatestSawLoadingRef = useRef<string | null>(null)
+  const openAtLatestSettledRef = useRef<string | null>(null)
+  const keepLatestWhileOpening = openAtLatest && isNextLoading && openAtLatestSettledRef.current !== channel?.id
+  useEffect(() => {
+    if (!openAtLatest || !channel?.id) return
+    if (isNextLoading) {
+      openAtLatestSawLoadingRef.current = channel.id
+    } else if (openAtLatestSawLoadingRef.current === channel.id) {
+      openAtLatestSettledRef.current = channel.id
+    }
+  }, [openAtLatest, isNextLoading, channel?.id])
 
   const isViewportLoadSettled = useCallback((scope: null | 'previous' | 'next' | 'around' | 'window') => {
     switch (scope) {
@@ -642,10 +658,10 @@ export function useChatController({
   }, [])
 
   const syncLatestState = useCallback(() => {
-    const nextIsViewingLatest = !hasNext && isPinnedToLatest(scrollRef.current)
+    const nextIsViewingLatest = keepLatestWhileOpening || (!hasNext && isPinnedToLatest(scrollRef.current))
     viewIsAtLatestRef.current = nextIsViewingLatest
     setIsViewingLatest(nextIsViewingLatest)
-  }, [hasNext])
+  }, [hasNext, keepLatestWhileOpening])
 
   const setHighlight = useCallback((itemId: string | null) => {
     highlightedItemIdRef.current = itemId
@@ -1314,7 +1330,7 @@ export function useChatController({
 
   const notifyIncomingItems = useCallback(
     (incomingItems: IMessage[]) => {
-      const nextIsViewingLatest = !hasNext && isPinnedToLatest(scrollRef.current)
+      const nextIsViewingLatest = keepLatestWhileOpening || (!hasNext && isPinnedToLatest(scrollRef.current))
       viewIsAtLatestRef.current = nextIsViewingLatest
       setIsViewingLatest(nextIsViewingLatest)
 
@@ -1327,12 +1343,12 @@ export function useChatController({
       pendingNewestCountRef.current += incomingItems.length
       setPendingNewestCount(pendingNewestCountRef.current)
     },
-    [hasNext]
+    [hasNext, keepLatestWhileOpening]
   )
 
   const notifyOutgoingItem = useCallback(
     (outgoingItem: IMessage) => {
-      const nextIsViewingLatest = !hasNext && isPinnedToLatest(scrollRef.current)
+      const nextIsViewingLatest = keepLatestWhileOpening || (!hasNext && isPinnedToLatest(scrollRef.current))
       viewIsAtLatestRef.current = nextIsViewingLatest
       setIsViewingLatest(nextIsViewingLatest)
 
@@ -1345,7 +1361,7 @@ export function useChatController({
       pendingNewestCountRef.current += outgoingItem ? 1 : 0
       setPendingNewestCount(pendingNewestCountRef.current)
     },
-    [hasNext]
+    [hasNext, keepLatestWhileOpening]
   )
 
   const loadPrevious = useCallback(
@@ -2442,16 +2458,19 @@ export function useChatController({
       return
     }
 
-    // Priority 3: unread boot; Priority 4: default/latest boot
+    // A forwarded chat opens at its newest message, even when unread history exists.
     dispatch(clearVisibleMessagesMapAC())
-    if (channel.newMessageCount && channel.lastDisplayedMessageId) {
+    if (openAtLatest) {
+      suppressNextMessageChange()
+      dispatch(loadLatestMessagesAC(channel, undefined, undefined, true, true))
+    } else if (channel.newMessageCount && channel.lastDisplayedMessageId) {
       suppressNextMessageChange()
       dispatch(loadNearUnreadAC(channel))
     } else {
       suppressNextMessageChange()
       dispatch(loadDefaultMessagesAC(channel))
     }
-  }, [dispatch, channel?.id, channel.backToLinkedChannel, suppressNextMessageChange])
+  }, [dispatch, channel?.id, channel.backToLinkedChannel, openAtLatest, suppressNextMessageChange])
 
   useEffect(() => {
     if (!channel?.id || clearedSelectionChannelIdRef.current === channel.id) {

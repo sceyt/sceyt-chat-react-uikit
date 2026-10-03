@@ -40,6 +40,7 @@ import ChannelReducer, {
   IChannelState,
   getChannels
 } from './reducers'
+import { setActiveChannelAC } from './actions'
 import { updateMessage } from '../message/reducers'
 import { DEFAULT_CHANNEL_TYPE, LOADING_STATE, MESSAGE_DELIVERY_STATUS, MESSAGE_STATUS } from '../../helpers/constants'
 import { makeChannel, makeMessage, makeUser, resetMessageListFixtureIds } from '../../testUtils/messageFixtures'
@@ -1039,5 +1040,22 @@ describe('channel last-message parent snapshots', () => {
       id: 'pinned-source',
       state: MESSAGE_STATUS.DELETE
     })
+  })
+})
+
+describe('active channel latest-window intent', () => {
+  it('survives updates to the opened chat and clears when selecting another chat', () => {
+    const forwardedChat = { id: 'forwarded-chat', subject: 'Before update' }
+    let state = ChannelReducer(undefined, setActiveChannelAC(forwardedChat as any, true))
+
+    state = ChannelReducer(state, setActiveChannelAC({ ...forwardedChat, subject: 'After update' } as any))
+    expect(state.activeChannelOpenAtLatest).toBe(true)
+
+    state = ChannelReducer(state, setActiveChannelAC({ ...forwardedChat, subject: 'After update' } as any, false))
+    expect(state.activeChannelOpenAtLatest).toBe(false)
+
+    state = ChannelReducer(state, setActiveChannelAC(forwardedChat as any, true))
+    state = ChannelReducer(state, setActiveChannelAC({ id: 'other-chat' } as any))
+    expect(state.activeChannelOpenAtLatest).toBe(false)
   })
 })
