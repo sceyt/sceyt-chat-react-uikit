@@ -119,6 +119,10 @@
       "./src/messageUtils/index.tsx": {
         "lines": 83,
         "branches": 70
+      },
+      "./src/components/ChannelList/index.tsx": {
+        "lines": 75,
+        "branches": 55
       }
     }
   },

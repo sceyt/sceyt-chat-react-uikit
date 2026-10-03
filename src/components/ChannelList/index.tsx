@@ -29,6 +29,7 @@ import {
   setChannelListWithAC,
   setChannelsAC,
   setChannelToAddAC,
+  setAddedToChannelAC,
   setChannelToHideAC,
   setChannelToRemoveAC,
   setChannelToUnHideAC,
@@ -359,7 +360,8 @@ const ChannelList: React.FC<IChannelListProps> = ({
         removeChannelFromMap(deletedChannel.id)
         dispatch(removeChannelAC(deletedChannel.id))
         if (activeChannel.id === deletedChannel.id) {
-          const activeChannel = getLastChannelFromMap()
+          // Skip chats that are themselves pending delete
+          const activeChannel = getLastChannelFromMap(true)
           dispatch(switchChannelActionAC(activeChannel ? JSON.parse(JSON.stringify(activeChannel)) : {}))
           if (!activeChannel) {
             dispatch(switchChannelInfoAC(false))
@@ -397,7 +399,7 @@ const ChannelList: React.FC<IChannelListProps> = ({
       } else {
         dispatch(addChannelAC(addedToChannel))
       }
-      dispatch(setChannelToAddAC(null))
+      dispatch(setAddedToChannelAC(null))
     }
   }, [addedToChannel])
 
@@ -417,7 +419,7 @@ const ChannelList: React.FC<IChannelListProps> = ({
       if (onChannelVisible) {
         onChannelVisible(channels, visibleChannel, (updatedChannels) => handleSetChannelList(updatedChannels, true))
       } else {
-        dispatch(addChannelAC(hiddenChannel))
+        dispatch(addChannelAC(visibleChannel))
       }
       dispatch(setChannelToUnHideAC(null))
     }
