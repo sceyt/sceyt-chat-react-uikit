@@ -6,7 +6,7 @@ let channelSequence = 1
 let messageSequence = 1
 const TEST_TIME_ORIGIN = new Date('2026-04-01T12:00:00.000Z').getTime()
 
-const makeMember = (user: IUser, role = 'owner'): IMember => ({
+export const makeMember = (user: IUser, role = 'owner'): IMember => ({
   ...user,
   role
 })
@@ -156,7 +156,18 @@ export const makeChannel = (overrides: Partial<IChannel> = {}): IChannel => {
     createMessageBuilder: overrides.createMessageBuilder || jest.fn(() => ({})),
     createAttachmentBuilder: overrides.createAttachmentBuilder || jest.fn(() => ({})),
     createThread: overrides.createThread || jest.fn(() => channel),
-    getMessagesById: overrides.getMessagesById || jest.fn(async () => [])
+    getMessagesById: overrides.getMessagesById || jest.fn(async () => []),
+    // Member management methods
+    createMemberBuilder:
+      overrides.createMemberBuilder ||
+      jest.fn(() => ({
+        setRole: jest.fn().mockReturnThis(),
+        create: jest.fn()
+      })),
+    addMembers: overrides.addMembers || jest.fn(async () => []),
+    kickMembers: overrides.kickMembers || jest.fn(async () => []),
+    blockMembers: overrides.blockMembers || jest.fn(async () => []),
+    changeMembersRole: overrides.changeMembersRole || jest.fn(async () => [])
   } as IChannel
 
   return channel

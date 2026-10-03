@@ -1,3 +1,4 @@
+import log from 'loglevel'
 import React, { ChangeEvent, KeyboardEvent, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { Popup, PopupName, CloseIcon, PopupBody } from '../../../UIHelper'
 import { THEME_COLORS } from '../../../UIHelper/constants'
@@ -6,10 +7,12 @@ import {
   getChannelsForForwardAC,
   loadMoreChannelsForForward,
   searchChannelsForForwardAC,
-  setSearchedChannelsForForwardAC
+  setSearchedChannelsForForwardAC,
+  switchChannelActionAC
 } from '../../../store/channel/actions'
 import { useSelector, useDispatch } from 'store/hooks'
 import {
+  activeChannelSelector,
   channelsForForwardHasNextSelector,
   channelsForForwardSelector,
   channelsLoadingStateForForwardSelector,
@@ -73,7 +76,8 @@ interface IProps {
   buttonText?: string
   togglePopup: () => void
   // eslint-disable-next-line no-unused-vars
-  handleForward: (channelIds: string[], note?: IForwardMessageNote) => void
+  handleForward: (channelIds: string[], note?: IForwardMessageNote) => void | boolean | Promise<void | boolean>
+  navigateOnSingleForward?: boolean
   loading?: boolean
   maxSelectedCount?: number
   /** Defaults to 1000 characters and can be adjusted to match an application's message policy. */
@@ -213,6 +217,7 @@ function ForwardMessagePopup({
   title,
   togglePopup,
   handleForward,
+  navigateOnSingleForward = true,
   loading,
   maxSelectedCount = 5,
   maxNoteLength = DEFAULT_FORWARD_NOTE_MAX_LENGTH,
@@ -243,6 +248,7 @@ function ForwardMessagePopup({
   const ChatClient = getClient()
   const { user } = ChatClient
   const dispatch = useDispatch()
+  const activeChannel = useSelector(activeChannelSelector)
   const channels = useSelector(channelsForForwardSelector) || []
   const searchedChannels = useSelector(searchedChannelsForForwardSelector) || []
   const contactsMap = useSelector(contactsMapSelector)
@@ -254,6 +260,9 @@ function ForwardMessagePopup({
   const [searchValue, setSearchValue] = useState('')
   const [selectedChannelsContHeight, setSelectedChannelsHeight] = useState(0)
   const [selectedChannels, setSelectedChannels] = useState<ISelectedChannelsData[]>([])
+  // A ref (not only state) so a second click/Enter in the same tick is also blocked.
+  const forwardInFlightRef = useRef(false)
+  const [isForwarding, setIsForwarding] = useState(false)
   const selectedChannelsContRef = useRef<any>()
   const [isScrolling, setIsScrolling] = useState<boolean>(false)
   const [isNoteScrolling, setIsNoteScrolling] = useState<boolean>(false)
@@ -316,7 +325,10 @@ function ForwardMessagePopup({
     }
   }
 
-  const handleForwardMessage = () => {
+  const handleForwardMessage = async () => {
+    if (forwardInFlightRef.current) return
+    forwardInFlightRef.current = true
+    setIsForwarding(true)
     const { body, bodyAttributes } = trimMessageBodyWithAttributes(noteText, noteAttributes)
     const mentionedUsers = bodyAttributes
       .filter((attribute: IBodyAttribute) => attribute.type === 'mention')
@@ -331,10 +343,27 @@ function ForwardMessagePopup({
           type: 'text' as const
         }
       : undefined
-    handleForward(
-      selectedChannels.map((channel) => channel.id),
-      note
-    )
+    let forwarded: void | boolean = false
+    try {
+      forwarded = await handleForward(
+        selectedChannels.map((channel) => channel.id),
+        note
+      )
+    } catch (e) {
+      log.error('Forward failed', e)
+      forwarded = false
+    }
+    if (
+      forwarded !== false &&
+      navigateOnSingleForward &&
+      selectedChannels.length === 1 &&
+      activeChannel?.id !== selectedChannels[0].id
+    ) {
+      dispatch(switchChannelActionAC(selectedChannels[0].channel, true, true))
+    }
+    // The popup unmounts on toggle; the guard only needs resetting if a caller keeps it open.
+    forwardInFlightRef.current = false
+    setIsForwarding(false)
     togglePopup()
   }
 
@@ -967,7 +996,7 @@ function ForwardMessagePopup({
                 <SendNoteButton
                   type='button'
                   iconColor={accentColor}
-                  disabled={!selectedChannels.length}
+                  disabled={!selectedChannels.length || isForwarding}
                   onClick={handleForwardMessage}
                   aria-label='Forward'
                 >

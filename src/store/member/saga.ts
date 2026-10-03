@@ -323,3 +323,15 @@ export default function* MembersSaga() {
   yield takeEvery(CHANGE_MEMBER_ROLE, changeMemberRole)
   yield takeLatest(GET_ROLES, getRoles)
 }
+
+// Exported for testing
+export const __memberSagaTestables = {
+  getMembers,
+  loadMoreMembers,
+  addMembers,
+  kickMemberFromChannel,
+  blockMember,
+  changeMemberRole,
+  reportMember,
+  getRoles
+}

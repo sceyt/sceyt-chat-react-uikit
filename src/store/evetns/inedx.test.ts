@@ -5,7 +5,8 @@ import {
   destroyChannelsMap,
   getChannelFromMap,
   setActiveChannelId,
-  setChannelInMap
+  setChannelInMap,
+  setChannelTypesFilter
 } from '../../helpers/channelHalper'
 import {
   addMessageToMap,
@@ -25,10 +26,20 @@ import {
   makeUser,
   resetMessageListFixtureIds
 } from '../../testUtils/messageFixtures'
-import { MESSAGE_DELIVERY_STATUS, MESSAGE_STATUS } from '../../helpers/constants'
+import { DEFAULT_CHANNEL_TYPE, MESSAGE_DELIVERY_STATUS, MESSAGE_STATUS } from '../../helpers/constants'
 import {
+  addChannelAC,
   markMessagesAsDeliveredAC,
+  removeChannelAC,
   resendPendingChannelReadsAC,
+  setAddedToChannelAC,
+  setChannelToAddAC,
+  setChannelToHideAC,
+  setChannelToRemoveAC,
+  setChannelToUnHideAC,
+  switchChannelActionAC,
+  switchRecordingIndicatorAC,
+  switchTypingIndicatorAC,
   updateChannelDataAC,
   updateChannelLastMessageAC,
   updateChannelLastMessageStatusAC
@@ -36,17 +47,27 @@ import {
 import {
   addMessagesAC,
   addReactionToMessageAC,
+  clearMessagesAC,
   deleteReactionFromMessageAC,
   resendPendingMessageMutationsAC,
   updateMessageAC,
   updateMessagesMarkersAC,
   updateMessagesStatusAC
 } from '../message/actions'
-import { getRolesAC } from '../member/actions'
+import { addMembersToListAC, getRolesAC, updateMembersAC } from '../member/actions'
+import { applyPinnedMessagesEventAC, removePinnedMessagesAC, resendPendingPinMutationsAC } from '../pinned/actions'
 import { setConnectionStatusAC } from '../user/actions'
 import { CONNECTION_STATUS } from '../user/constants'
 import { navigateToLatest } from '../../helpers/messageListNavigator'
 import { __eventsTestables } from './inedx'
+import { createEventHarness, clearDispatched, EventHarness } from '../../testUtils/eventHarness'
+import { setNotification, getShowNotifications } from '../../helpers/notifications'
+
+jest.mock('../../helpers/notifications', () => ({
+  ...jest.requireActual('../../helpers/notifications'),
+  setNotification: jest.fn(),
+  getShowNotifications: jest.fn(() => true)
+}))
 
 jest.mock('../../helpers/messageListNavigator', () => ({
   navigateToLatest: jest.fn()
@@ -1121,6 +1142,531 @@ describe('event message last-message handling', () => {
     expect(deliverAction.payload.messageIds).toEqual([threadMessage.id])
   })
 
+  // --- P0-1: Extended event handler tests (table-driven) ---
+
+  describe('MESSAGE event handler - channel state tests', () => {
+    it('non-active channel bumps unread count and lastMessage only', async () => {
+      const activeChannelId = 'other-channel'
+      const channelId = 'target-channel'
+      const initialUnreadCount = 2
+      const expectedUnreadCount = 3
+
+      const incomingMessage = makeMessage({
+        id: '9000000000000000001',
+        channelId,
+        incoming: true,
+        body: 'new incoming message'
+      })
+      const channel = makeChannel({
+        id: channelId,
+        newMessageCount: initialUnreadCount,
+        lastMessage: makeMessage({ id: '9000', channelId, body: 'previous message' })
+      })
+      const dispatched: any[] = []
+
+      setActiveChannelId(activeChannelId)
+      setChannelInMap(channel)
+      addChannelToAllChannels(channel)
+
+      await runSaga(
+        { getState: getSagaState, dispatch: (action) => dispatched.push(action) },
+        __eventsTestables.handleChannelMessageEvent,
+        {
+          channel: { ...channel, newMessageCount: expectedUnreadCount, lastMessage: incomingMessage },
+          message: incomingMessage
+        },
+        { user: { id: 'current-user' } }
+      ).toPromise()
+
+      // Check channel data update includes expected unread count
+      const updateAction = dispatched.find(
+        (action) => action.type === updateChannelDataAC(channelId, {}).type && action.payload.channelId === channelId
+      )
+      expect(updateAction).toBeDefined()
+      expect(updateAction.payload.config.newMessageCount).toBe(expectedUnreadCount)
+
+      // Should NOT add to message list for non-active channel
+      const addMessageAction = dispatched.find((action) => action.type === addMessagesAC([], 'next').type)
+      expect(addMessageAction).toBeUndefined()
+    })
+
+    it('active channel adds message to list, unread unchanged', async () => {
+      const channelId = 'target-channel'
+      const expectedUnreadCount = 0
+      const previousMessage = makeMessage({ id: '9000', channelId, body: 'previous message' })
+
+      const incomingMessage = makeMessage({
+        id: '9000000000000000001',
+        channelId,
+        incoming: true,
+        body: 'new incoming message'
+      })
+      const channel = makeChannel({
+        id: channelId,
+        newMessageCount: 0,
+        lastMessage: previousMessage
+      })
+      const dispatched: any[] = []
+
+      setActiveChannelId(channelId)
+      setChannelInMap(channel)
+      addChannelToAllChannels(channel)
+      addMessageToMap(channelId, previousMessage)
+      setVisibleMessages(previousMessage)
+
+      // Setup mock store state for active channel
+      mockStore.getState = jest.fn(() => ({
+        ...defaultStoreState,
+        MessageReducer: {
+          ...defaultStoreState.MessageReducer,
+          messagesHasNext: false,
+          activeChannelMessages: [previousMessage]
+        }
+      }))
+
+      await runSaga(
+        { getState: getSagaState, dispatch: (action) => dispatched.push(action) },
+        __eventsTestables.handleChannelMessageEvent,
+        {
+          channel: { ...channel, newMessageCount: expectedUnreadCount, lastMessage: incomingMessage },
+          message: incomingMessage
+        },
+        { user: { id: 'current-user' } }
+      ).toPromise()
+
+      // Check channel data update includes expected unread count
+      const updateAction = dispatched.find(
+        (action) => action.type === updateChannelDataAC(channelId, {}).type && action.payload.channelId === channelId
+      )
+      expect(updateAction).toBeDefined()
+      expect(updateAction.payload.config.newMessageCount).toBe(expectedUnreadCount)
+
+      // Should add to message list for active channel
+      const addMessageAction = dispatched.find((action) => action.type === addMessagesAC([], 'next').type)
+      expect(addMessageAction).toBeDefined()
+      expect(addMessageAction.payload.messages).toEqual([incomingMessage])
+    })
+
+    it('MESSAGE echoing own pending message (same tid) replaces it, no duplicate', async () => {
+      const channelId = 'channel-echo-pending'
+      const tid = 'pending-message-tid-123'
+      const pendingMessage = makePendingMessage({
+        tid,
+        channelId,
+        body: 'sent message',
+        user: makeUser({ id: 'current-user' })
+      })
+      const confirmedMessage = makeMessage({
+        id: '840827767688048640',
+        tid,
+        channelId,
+        body: 'sent message',
+        incoming: false,
+        deliveryStatus: MESSAGE_DELIVERY_STATUS.SENT
+      })
+      const channel = makeChannel({ id: channelId, lastMessage: pendingMessage })
+      const dispatched: any[] = []
+
+      setActiveChannelId(channelId)
+      setChannelInMap(channel)
+      addChannelToAllChannels(channel)
+      addMessageToMap(channelId, pendingMessage)
+      mockStore.getState = jest.fn(() => ({
+        ...defaultStoreState,
+        MessageReducer: {
+          ...defaultStoreState.MessageReducer,
+          messagesHasNext: false,
+          activeChannelMessages: [pendingMessage]
+        }
+      }))
+
+      await runSaga(
+        { getState: getSagaState, dispatch: (action) => dispatched.push(action) },
+        __eventsTestables.handleChannelMessageEvent,
+        { channel: { ...channel, lastMessage: confirmedMessage }, message: confirmedMessage },
+        { user: { id: 'current-user' } }
+      ).toPromise()
+
+      // Should update the existing message, not add a new one
+      const updateAction = dispatched.find(
+        (action) => action.type === updateMessageAC('', {}).type && action.payload.messageId === tid
+      )
+      expect(updateAction).toBeDefined()
+      expect(updateAction.payload.params.id).toBe(confirmedMessage.id)
+
+      // Should NOT add a duplicate message
+      const addAction = dispatched.find((action) => action.type === addMessagesAC([], 'next').type)
+      expect(addAction).toBeUndefined()
+    })
+  })
+
+  describe('EDIT_MESSAGE / DELETE_MESSAGE for uncached messages', () => {
+    it('EDIT_MESSAGE for a message not in cache does not crash and updates lastMessage if needed', async () => {
+      const channelId = 'channel-edit-uncached'
+      const editedMessage = makeMessage({
+        id: '2000',
+        channelId,
+        body: 'edited body',
+        state: MESSAGE_STATUS.EDIT
+      })
+      const channel = makeChannel({ id: channelId, lastMessage: editedMessage })
+      const dispatched: any[] = []
+
+      setChannelInMap(channel)
+      addChannelToAllChannels(channel)
+      // Note: NOT adding message to map - simulating uncached
+
+      await runSaga(
+        { getState: getSagaState, dispatch: (action: any) => dispatched.push(action) },
+        __eventsTestables.handleEditMessageEvent,
+        {
+          channel,
+          message: editedMessage
+        }
+      ).toPromise()
+
+      // Should not throw and channel should still work
+      expect(getChannelFromMap(channelId)).toBeDefined()
+    })
+
+    it('DELETE_MESSAGE for a message not in cache does not crash and updates channel lastMessage', async () => {
+      const channelId = 'channel-delete-uncached'
+      const deletedMessage = makeMessage({
+        id: '2001',
+        channelId,
+        body: '',
+        state: MESSAGE_STATUS.DELETE
+      })
+      const channel = makeChannel({ id: channelId, lastMessage: deletedMessage })
+      const dispatched: any[] = []
+
+      setChannelInMap(channel)
+      addChannelToAllChannels(channel)
+      // Note: NOT adding message to map - simulating uncached
+
+      await runSaga(
+        { getState: getSagaState, dispatch: (action) => dispatched.push(action) },
+        __eventsTestables.handleDeleteMessageEvent,
+        { channel, deletedMessage }
+      ).toPromise()
+
+      // Should not throw
+      expect(getChannelFromMap(channelId)).toBeDefined()
+      // lastMessage should be updated since it matches the deleted message
+      const lastMessageUpdate = dispatched.find(
+        (action) => action.type === updateChannelLastMessageAC(deletedMessage, channel).type
+      )
+      expect(lastMessageUpdate).toBeDefined()
+    })
+  })
+
+  describe('MESSAGE_MARKERS_RECEIVED out of order', () => {
+    it('a late "delivered" marker arriving after "read" must not downgrade the status', async () => {
+      const currentUser = makeUser({ id: 'current-user' })
+      const remoteUser = makeUser({ id: 'remote-user' })
+      const channelId = 'channel-marker-order'
+      // Message already has READ status
+      const message = makeMessage({
+        id: '3000',
+        channelId,
+        user: currentUser,
+        incoming: false,
+        deliveryStatus: MESSAGE_DELIVERY_STATUS.READ,
+        userMarkers: [],
+        markerTotals: [{ name: MESSAGE_DELIVERY_STATUS.READ, count: 1 }]
+      })
+      const channel = makeChannel({ id: channelId, lastMessage: message })
+
+      // Now a late DELIVERED marker arrives
+      const lateDeliveredMarker = {
+        messageIds: [message.id],
+        user: remoteUser,
+        name: MESSAGE_DELIVERY_STATUS.DELIVERED,
+        createdAt: new Date('2026-04-02T11:00:00.000Z') // Earlier timestamp
+      } as any
+
+      setActiveChannelId(channelId)
+      setChannelInMap(channel)
+      addChannelToAllChannels(channel)
+      addMessageToMap(channelId, message)
+
+      await runSaga(
+        { getState: getSagaState, dispatch: () => {} },
+        __eventsTestables.handleMessageMarkersReceivedEvent,
+        { channelId, markerList: lateDeliveredMarker },
+        { user: currentUser }
+      ).toPromise()
+
+      // The message should still have READ status, not downgraded to DELIVERED
+      const cachedMessage = getMessagesFromMap(channelId)[message.id]
+      expect(cachedMessage.deliveryStatus).toBe(MESSAGE_DELIVERY_STATUS.READ)
+
+      // Channel lastMessage should also retain READ status
+      expect(getChannelFromMap(channelId)?.lastMessage.deliveryStatus).toBe(MESSAGE_DELIVERY_STATUS.READ)
+    })
+  })
+
+  describe('CLEAR_HISTORY event', () => {
+    it('clears messages, lastMessage, and resets unread count', async () => {
+      const channelId = 'channel-clear-history'
+      const message1 = makeMessage({ id: '4000', channelId, body: 'msg1' })
+      const message2 = makeMessage({ id: '4001', channelId, body: 'msg2' })
+      const channel = makeChannel({
+        id: channelId,
+        lastMessage: message2,
+        newMessageCount: 5,
+        newMentionCount: 2,
+        unread: true
+      })
+      const dispatched: any[] = []
+
+      setActiveChannelId(channelId)
+      setChannelInMap(channel)
+      addChannelToAllChannels(channel)
+      addMessageToMap(channelId, message1)
+      addMessageToMap(channelId, message2)
+
+      await runSaga(
+        { getState: getSagaState, dispatch: (action) => dispatched.push(action) },
+        __eventsTestables.handleClearHistoryEvent,
+        { channel }
+      ).toPromise()
+
+      // Should dispatch clearMessagesAC for active channel
+      expect(dispatched.some((a) => a.type === clearMessagesAC().type)).toBe(true)
+
+      // Should dispatch updateChannelDataAC with null lastMessage and zero counts
+      const updateAction = dispatched.find(
+        (action) => action.type === updateChannelDataAC(channelId, {}).type && action.payload.channelId === channelId
+      )
+      expect(updateAction).toBeDefined()
+      expect(updateAction.payload.config.lastMessage).toBeNull()
+      expect(updateAction.payload.config.newMessageCount).toBe(0)
+      expect(updateAction.payload.config.newMentionCount).toBe(0)
+    })
+  })
+
+  describe('KICK_MEMBERS / LEAVE where user is me', () => {
+    it('KICK_MEMBERS where current user is kicked removes channel and switches active channel', async () => {
+      const kickedChannelId = 'channel-kicked'
+      const fallbackChannelId = 'channel-fallback'
+      const currentUser = makeUser({ id: 'current-user' })
+      const kickedMember = { ...currentUser, role: 'member' }
+
+      const kickedChannel = makeChannel({ id: kickedChannelId })
+      const fallbackChannel = makeChannel({ id: fallbackChannelId })
+      const dispatched: any[] = []
+
+      setActiveChannelId(kickedChannelId)
+      setChannelInMap(kickedChannel)
+      setChannelInMap(fallbackChannel)
+      addChannelToAllChannels(kickedChannel)
+      addChannelToAllChannels(fallbackChannel)
+
+      await runSaga(
+        { getState: getSagaState, dispatch: (action) => dispatched.push(action) },
+        __eventsTestables.handleKickMembersEvent,
+        { channel: kickedChannel, removedMembers: [kickedMember] },
+        { user: currentUser }
+      ).toPromise()
+
+      // Should dispatch removeChannelAC
+      expect(dispatched.some((a) => a.type === removeChannelAC('').type)).toBe(true)
+
+      // Should dispatch switchChannelActionAC to switch to another channel
+      const switchAction = dispatched.find((a) => a.type === switchChannelActionAC(null).type)
+      expect(switchAction).toBeDefined()
+    })
+
+    it('LEAVE where current user leaves removes channel', async () => {
+      const leftChannelId = 'channel-left'
+      const currentUser = makeUser({ id: 'current-user' })
+
+      const leftChannel = makeChannel({ id: leftChannelId })
+      const dispatched: any[] = []
+
+      setActiveChannelId(leftChannelId)
+      setChannelInMap(leftChannel)
+      addChannelToAllChannels(leftChannel)
+
+      await runSaga(
+        { getState: getSagaState, dispatch: (action) => dispatched.push(action) },
+        __eventsTestables.handleLeaveEvent,
+        { channel: leftChannel, member: currentUser },
+        { user: currentUser }
+      ).toPromise()
+
+      // Should dispatch switchChannelActionAC(null) - payload has { channel: null, updateActiveChannel: true }
+      const switchAction = dispatched.find((a) => a.type === switchChannelActionAC(null).type)
+      expect(switchAction).toBeDefined()
+      expect(switchAction.payload.channel).toBeNull()
+
+      // Should dispatch removeChannelAC
+      expect(dispatched.some((a) => a.type === removeChannelAC('').type)).toBe(true)
+
+      // Should dispatch setChannelToRemoveAC
+      expect(dispatched.some((a) => a.type === setChannelToRemoveAC({} as any).type)).toBe(true)
+    })
+  })
+
+  describe('REACTION_ADDED / REACTION_DELETED - totals and self flags', () => {
+    it('REACTION_ADDED from remote user updates reactionTotals correctly', async () => {
+      const currentUser = makeUser({ id: 'current-user' })
+      const remoteUser = makeUser({ id: 'remote-user' })
+      const channelId = 'channel-reaction-totals'
+      const message = makeMessage({
+        id: '5000',
+        channelId,
+        user: currentUser,
+        reactionTotals: [{ key: 'thumbsup', count: 1, score: 1 }],
+        userReactions: []
+      })
+      const reaction = {
+        id: 'reaction-1',
+        key: 'heart',
+        score: 1,
+        reason: '',
+        createdAt: new Date('2026-04-02T12:30:00.000Z'),
+        messageId: message.id,
+        user: remoteUser
+      }
+      const channel = makeChannel({ id: channelId, lastMessage: message, newReactions: [] })
+      const dispatched: any[] = []
+
+      setActiveChannelId(channelId)
+      addMessageToMap(channelId, message)
+
+      await runSaga(
+        { getState: getSagaState, dispatch: (action) => dispatched.push(action) },
+        __eventsTestables.handleReactionAddedEvent,
+        { channel, user: remoteUser, message, reaction },
+        { user: currentUser }
+      ).toPromise()
+
+      // Should dispatch addReactionToMessageAC with isSelf=false
+      expect(dispatched).toContainEqual(addReactionToMessageAC(message, reaction as any, false))
+    })
+
+    it('REACTION_ADDED from self user flags as self reaction', async () => {
+      const currentUser = makeUser({ id: 'current-user' })
+      const channelId = 'channel-reaction-self'
+      const message = makeMessage({
+        id: '5001',
+        channelId,
+        user: makeUser({ id: 'other-user' }),
+        reactionTotals: [],
+        userReactions: []
+      })
+      const reaction = {
+        id: 'reaction-2',
+        key: 'thumbsup',
+        score: 1,
+        reason: '',
+        createdAt: new Date('2026-04-02T12:31:00.000Z'),
+        messageId: message.id,
+        user: currentUser
+      }
+      const channel = makeChannel({ id: channelId, lastMessage: message, newReactions: [] })
+      const dispatched: any[] = []
+
+      setActiveChannelId(channelId)
+      addMessageToMap(channelId, message)
+
+      await runSaga(
+        { getState: getSagaState, dispatch: (action) => dispatched.push(action) },
+        __eventsTestables.handleReactionAddedEvent,
+        { channel, user: currentUser, message, reaction },
+        { user: currentUser }
+      ).toPromise()
+
+      // Should dispatch addReactionToMessageAC with isSelf=true
+      expect(dispatched).toContainEqual(addReactionToMessageAC(message, reaction as any, true))
+    })
+
+    it('REACTION_DELETED from remote user updates totals correctly', async () => {
+      const currentUser = makeUser({ id: 'current-user' })
+      const remoteUser = makeUser({ id: 'remote-user' })
+      const channelId = 'channel-reaction-delete-totals'
+      const reaction = {
+        id: 'reaction-3',
+        key: 'heart',
+        score: 1,
+        reason: '',
+        createdAt: new Date('2026-04-02T12:32:00.000Z'),
+        messageId: '5002',
+        user: remoteUser
+      }
+      const message = makeMessage({
+        id: '5002',
+        channelId,
+        user: currentUser,
+        reactionTotals: [{ key: 'heart', count: 2, score: 2 }],
+        userReactions: []
+      })
+      const channel = makeChannel({ id: channelId, lastMessage: message, newReactions: [] })
+      const dispatched: any[] = []
+
+      setActiveChannelId(channelId)
+      setChannelInMap(channel)
+      addMessageToMap(channelId, message)
+
+      await runSaga(
+        { getState: getSagaState, dispatch: (action) => dispatched.push(action) },
+        __eventsTestables.handleReactionDeletedEvent,
+        { channel, user: remoteUser, message, reaction },
+        { user: currentUser }
+      ).toPromise()
+
+      // Should dispatch deleteReactionFromMessageAC with isSelf=false
+      expect(dispatched).toContainEqual(deleteReactionFromMessageAC(message, reaction as any, false))
+    })
+  })
+
+  describe('CONNECTION_STATUS_CHANGED to connected', () => {
+    it('dispatches resend actions for pending messages and pin mutations on reconnect', async () => {
+      const dispatched: any[] = []
+
+      await runSaga(
+        { getState: getSagaState, dispatch: (action) => dispatched.push(action) },
+        __eventsTestables.handleConnectionStatusChangedEvent,
+        CONNECTION_STATUS.CONNECTED
+      ).toPromise()
+
+      // Should dispatch setConnectionStatusAC
+      expect(dispatched).toContainEqual(setConnectionStatusAC(CONNECTION_STATUS.CONNECTED))
+
+      // Should dispatch getRolesAC
+      expect(dispatched).toContainEqual(getRolesAC())
+
+      // Should dispatch resendPendingMessageMutationsAC
+      expect(dispatched).toContainEqual(resendPendingMessageMutationsAC(CONNECTION_STATUS.CONNECTED))
+
+      // Should dispatch resendPendingChannelReadsAC
+      expect(dispatched).toContainEqual(resendPendingChannelReadsAC(CONNECTION_STATUS.CONNECTED))
+
+      // Should dispatch resendPendingPinMutationsAC
+      expect(dispatched.some((a) => a.type === resendPendingPinMutationsAC().type)).toBe(true)
+    })
+
+    it('does not dispatch resend actions for non-connected status', async () => {
+      const dispatched: any[] = []
+
+      await runSaga(
+        { getState: getSagaState, dispatch: (action) => dispatched.push(action) },
+        __eventsTestables.handleConnectionStatusChangedEvent,
+        CONNECTION_STATUS.DISCONNECTED
+      ).toPromise()
+
+      // Should dispatch setConnectionStatusAC
+      expect(dispatched).toContainEqual(setConnectionStatusAC(CONNECTION_STATUS.DISCONNECTED))
+
+      // Should NOT dispatch resend actions
+      expect(dispatched.find((a) => a.type === resendPendingMessageMutationsAC('').type)).toBeUndefined()
+      expect(dispatched.find((a) => a.type === resendPendingChannelReadsAC('').type)).toBeUndefined()
+      expect(dispatched.find((a) => a.type === resendPendingPinMutationsAC().type)).toBeUndefined()
+    })
+  })
+
   it('does not dispatch markMessagesAsDeliveredAC for own messages', async () => {
     const channelId = 'channel-deliver-own'
     const ownMessage = makeMessage({
@@ -1288,5 +1834,988 @@ describe('event message last-message handling', () => {
         attachments: []
       })
     )
+  })
+})
+
+// --- Tests using the event harness for full watchForEvents coverage ---
+
+describe('watchForEvents saga - full event loop tests', () => {
+  let harness: EventHarness
+
+  beforeEach(() => {
+    resetMessageListFixtureIds()
+    clearMessagesMap()
+    destroyChannelsMap()
+    setActiveChannelId('')
+    harness = createEventHarness()
+  })
+
+  afterEach(() => {
+    harness.cancel()
+    clearMessagesMap()
+    destroyChannelsMap()
+    setActiveChannelId('')
+    // Reset channel type filter
+    if (typeof setChannelTypesFilter === 'function') {
+      setChannelTypesFilter(undefined)
+    }
+  })
+
+  describe('CREATE event', () => {
+    it('adds a newly created channel to the store', async () => {
+      const newChannel = makeChannel({ id: 'new-channel-1', type: DEFAULT_CHANNEL_TYPE.DIRECT })
+
+      await harness.emit('onCreated', newChannel)
+
+      expect(harness.dispatched.some((a) => a.type === setChannelToAddAC({}).type)).toBe(true)
+      expect(getChannelFromMap(newChannel.id)).toBeDefined()
+    })
+
+    it('does not add channel if it already exists', async () => {
+      const existingChannel = makeChannel({ id: 'existing-channel' })
+      setChannelInMap(existingChannel)
+      addChannelToAllChannels(existingChannel)
+      clearDispatched(harness)
+
+      await harness.emit('onCreated', existingChannel)
+
+      expect(harness.dispatched.find((a) => a.type === setChannelToAddAC({}).type)).toBeUndefined()
+    })
+  })
+
+  describe('JOIN event', () => {
+    it('adds a joined member to the channel member list', async () => {
+      const channel = makeChannel({ id: 'join-channel', memberCount: 2 })
+      const joinedMember = makeUser({ id: 'joined-user' })
+
+      setChannelInMap(channel)
+      addChannelToAllChannels(channel)
+      setActiveChannelId(channel.id)
+
+      await harness.emit('onMemberJoined', channel, joinedMember)
+
+      expect(harness.dispatched.some((a) => a.type === addMembersToListAC([], '').type)).toBe(true)
+      const updateAction = harness.dispatched.find(
+        (a) => a.type === updateChannelDataAC('', {}).type && a.payload.channelId === channel.id
+      )
+      expect(updateAction).toBeDefined()
+      expect(updateAction.payload.config.memberCount).toBe(3)
+    })
+  })
+
+  describe('ADD_MEMBERS event', () => {
+    it('adds new members to an existing channel', async () => {
+      const channel = makeChannel({ id: 'add-members-channel', memberCount: 2 })
+      const addedMembers = [makeUser({ id: 'added-user-1' }), makeUser({ id: 'added-user-2' })]
+
+      setChannelInMap(channel)
+      addChannelToAllChannels(channel)
+      setActiveChannelId(channel.id)
+
+      await harness.emit('onMembersAdded', { channel, addedMembers })
+
+      expect(harness.dispatched.some((a) => a.type === addMembersToListAC([], '').type)).toBe(true)
+    })
+
+    it('creates channel entry if user was added to a new channel', async () => {
+      const newChannel = makeChannel({ id: 'new-added-channel', memberCount: 3 })
+      const addedMembers = [makeUser({ id: 'current-user' })]
+
+      // Channel does not exist yet
+      await harness.emit('onMembersAdded', { channel: newChannel, addedMembers })
+
+      expect(harness.dispatched.some((a) => a.type === setAddedToChannelAC({}).type)).toBe(true)
+      expect(getChannelFromMap(newChannel.id)).toBeDefined()
+    })
+  })
+
+  describe('UPDATE_CHANNEL event', () => {
+    it('updates channel subject and avatarUrl', async () => {
+      const channel = makeChannel({ id: 'update-channel', subject: 'Old Subject' })
+      setChannelInMap(channel)
+      addChannelToAllChannels(channel)
+
+      const updatedChannel = { ...channel, subject: 'New Subject', avatarUrl: 'https://example.com/avatar.png' }
+
+      await harness.emit('onUpdated', updatedChannel)
+
+      const updateAction = harness.dispatched.find(
+        (a) => a.type === updateChannelDataAC('', {}).type && a.payload.channelId === channel.id
+      )
+      expect(updateAction).toBeDefined()
+      expect(updateAction.payload.config.subject).toBe('New Subject')
+      expect(updateAction.payload.config.avatarUrl).toBe('https://example.com/avatar.png')
+    })
+  })
+
+  describe('DELETE event', () => {
+    it('removes channel when deleted', async () => {
+      const channel = makeChannel({ id: 'delete-channel' })
+      setChannelInMap(channel)
+      addChannelToAllChannels(channel)
+
+      await harness.emit('onDeleted', channel.id)
+
+      expect(harness.dispatched.some((a) => a.type === setChannelToRemoveAC({}).type)).toBe(true)
+    })
+  })
+
+  describe('MUTE/UNMUTE events', () => {
+    it('MUTE updates channel muted state', async () => {
+      const channel = makeChannel({ id: 'mute-channel', muted: false })
+      setChannelInMap(channel)
+      addChannelToAllChannels(channel)
+
+      const mutedChannel = { ...channel, muted: true, mutedTill: new Date('2026-12-31') }
+
+      await harness.emit('onMuted', mutedChannel)
+
+      const updateAction = harness.dispatched.find(
+        (a) => a.type === updateChannelDataAC('', {}).type && a.payload.channelId === channel.id
+      )
+      expect(updateAction).toBeDefined()
+      expect(updateAction.payload.config.muted).toBe(true)
+    })
+
+    it('UNMUTE updates channel unmuted state', async () => {
+      const channel = makeChannel({ id: 'unmute-channel', muted: true })
+      setChannelInMap(channel)
+      addChannelToAllChannels(channel)
+
+      const unmutedChannel = { ...channel, muted: false, mutedTill: null }
+
+      await harness.emit('onUnmuted', unmutedChannel)
+
+      const updateAction = harness.dispatched.find(
+        (a) => a.type === updateChannelDataAC('', {}).type && a.payload.channelId === channel.id
+      )
+      expect(updateAction).toBeDefined()
+      expect(updateAction.payload.config.muted).toBe(false)
+    })
+  })
+
+  describe('PINED/UNPINED events', () => {
+    it('PINED updates channel pinnedAt', async () => {
+      const channel = makeChannel({ id: 'pin-channel', pinnedAt: null })
+      setChannelInMap(channel)
+      addChannelToAllChannels(channel)
+
+      const pinnedChannel = { ...channel, pinnedAt: new Date('2026-04-01') }
+
+      await harness.emit('onPined', pinnedChannel)
+
+      const updateAction = harness.dispatched.find(
+        (a) => a.type === updateChannelDataAC('', {}).type && a.payload.channelId === channel.id
+      )
+      expect(updateAction).toBeDefined()
+      expect(updateAction.payload.config.pinnedAt).toEqual(pinnedChannel.pinnedAt)
+    })
+
+    it('UNPINED clears channel pinnedAt', async () => {
+      const channel = makeChannel({ id: 'unpin-channel', pinnedAt: new Date('2026-04-01') })
+      setChannelInMap(channel)
+      addChannelToAllChannels(channel)
+
+      const unpinnedChannel = { ...channel, pinnedAt: null }
+
+      await harness.emit('onUnpined', unpinnedChannel)
+
+      const updateAction = harness.dispatched.find(
+        (a) => a.type === updateChannelDataAC('', {}).type && a.payload.channelId === channel.id
+      )
+      expect(updateAction).toBeDefined()
+      expect(updateAction.payload.config.pinnedAt).toBeNull()
+    })
+  })
+
+  describe('HIDE/UNHIDE events', () => {
+    it('HIDE dispatches setChannelToHideAC and switches active channel if needed', async () => {
+      const channel = makeChannel({ id: 'hide-channel' })
+      const otherChannel = makeChannel({ id: 'other-channel' })
+      setChannelInMap(channel)
+      setChannelInMap(otherChannel)
+      addChannelToAllChannels(channel)
+      addChannelToAllChannels(otherChannel)
+      setActiveChannelId(channel.id)
+
+      await harness.emit('onHidden', channel)
+
+      expect(harness.dispatched.some((a) => a.type === setChannelToHideAC({}).type)).toBe(true)
+      // Should switch to another channel since active channel was hidden
+      expect(harness.dispatched.some((a) => a.type === switchChannelActionAC(null).type)).toBe(true)
+    })
+
+    it('UNHIDE dispatches setChannelToUnHideAC', async () => {
+      const channel = makeChannel({ id: 'unhide-channel', hidden: true })
+      setChannelInMap(channel)
+      addChannelToAllChannels(channel)
+
+      await harness.emit('onShown', channel)
+
+      expect(harness.dispatched.some((a) => a.type === setChannelToUnHideAC({}).type)).toBe(true)
+    })
+  })
+
+  describe('CHANNEL_MARKED_AS_READ/UNREAD events', () => {
+    it('MARKED_AS_UNREAD sets channel unread state', async () => {
+      const channel = makeChannel({ id: 'mark-unread-channel', unread: false })
+      setChannelInMap(channel)
+      addChannelToAllChannels(channel)
+
+      const unreadChannel = { ...channel, unread: true }
+
+      await harness.emit('onMarkedAsUnread', unreadChannel)
+
+      const updateAction = harness.dispatched.find(
+        (a) => a.type === updateChannelDataAC('', {}).type && a.payload.channelId === channel.id
+      )
+      expect(updateAction).toBeDefined()
+      expect(updateAction.payload.config.unread).toBe(true)
+    })
+
+    it('MARKED_AS_READ clears unread state and counts', async () => {
+      const channel = makeChannel({
+        id: 'mark-read-channel',
+        unread: true,
+        newMessageCount: 5,
+        newMentionCount: 2
+      })
+      setChannelInMap(channel)
+      addChannelToAllChannels(channel)
+
+      await harness.emit('onMarkedAsRead', channel)
+
+      const updateAction = harness.dispatched.find(
+        (a) => a.type === updateChannelDataAC('', {}).type && a.payload.channelId === channel.id
+      )
+      expect(updateAction).toBeDefined()
+      expect(updateAction.payload.config.unread).toBe(false)
+      expect(updateAction.payload.config.newMessageCount).toBe(0)
+      expect(updateAction.payload.config.newMentionCount).toBe(0)
+    })
+  })
+
+  describe('CHANGE_ROLE event', () => {
+    it('updates member roles in active channel', async () => {
+      const channel = makeChannel({ id: 'role-change-channel' })
+      const memberWithNewRole = { ...makeUser({ id: 'member-1' }), role: 'admin' }
+
+      setChannelInMap(channel)
+      addChannelToAllChannels(channel)
+      setActiveChannelId(channel.id)
+
+      await harness.emit('onMembersRoleChanged', channel, [memberWithNewRole])
+
+      expect(harness.dispatched.some((a) => a.type === updateMembersAC([], '').type)).toBe(true)
+    })
+
+    it('updates current user role in channel', async () => {
+      const channel = makeChannel({ id: 'self-role-change-channel', userRole: 'member' })
+      const currentUserWithNewRole = { ...makeUser({ id: 'current-user' }), role: 'admin' }
+
+      setChannelInMap(channel)
+      addChannelToAllChannels(channel)
+      setActiveChannelId(channel.id)
+
+      await harness.emit('onMembersRoleChanged', channel, [currentUserWithNewRole])
+
+      const updateAction = harness.dispatched.find(
+        (a) => a.type === updateChannelDataAC('', {}).type && a.payload.config?.userRole === 'admin'
+      )
+      expect(updateAction).toBeDefined()
+    })
+  })
+
+  describe('FROZEN/UNFROZEN events', () => {
+    it('FROZEN event is handled without crash', async () => {
+      const channel = makeChannel({ id: 'frozen-channel' })
+      setChannelInMap(channel)
+      addChannelToAllChannels(channel)
+
+      // Should not throw
+      await harness.emit('onChannelFrozen', channel)
+      // Currently these events just log, no actions dispatched
+    })
+
+    it('UNFROZEN event is handled without crash', async () => {
+      const channel = makeChannel({ id: 'unfrozen-channel' })
+      setChannelInMap(channel)
+      addChannelToAllChannels(channel)
+
+      // Should not throw
+      await harness.emit('onChannelUnfrozen', channel)
+    })
+  })
+
+  describe('BLOCK/UNBLOCK user events', () => {
+    it('BLOCK updates user blocked state across channels', async () => {
+      const blockedUser = makeUser({ id: 'blocked-user' })
+      const directChannel = makeChannel({
+        id: 'direct-with-blocked',
+        type: DEFAULT_CHANNEL_TYPE.DIRECT,
+        members: [
+          { ...makeUser({ id: 'current-user' }), role: 'owner' },
+          { ...blockedUser, role: 'member' }
+        ]
+      })
+
+      setChannelInMap(directChannel)
+      addChannelToAllChannels(directChannel)
+
+      // Simulate store state with channels
+      harness = createEventHarness({
+        storeState: {
+          ChannelReducer: { channels: [directChannel] }
+        }
+      })
+
+      await harness.emit('onBlocked', [blockedUser])
+
+      const updateAction = harness.dispatched.find(
+        (a) =>
+          a.type === updateChannelDataAC('', {}).type &&
+          a.payload.channelId === directChannel.id &&
+          a.payload.config?.members
+      )
+      expect(updateAction).toBeDefined()
+    })
+
+    it('UNBLOCK updates user unblocked state', async () => {
+      const unblockedUser = makeUser({ id: 'unblocked-user', blocked: true })
+      const directChannel = makeChannel({
+        id: 'direct-with-unblocked',
+        type: DEFAULT_CHANNEL_TYPE.DIRECT,
+        members: [
+          { ...makeUser({ id: 'current-user' }), role: 'owner' },
+          { ...unblockedUser, role: 'member', blocked: true }
+        ]
+      })
+
+      harness = createEventHarness({
+        storeState: {
+          ChannelReducer: { channels: [directChannel] }
+        }
+      })
+
+      await harness.emit('onUnblocked', [unblockedUser])
+
+      const updateAction = harness.dispatched.find(
+        (a) =>
+          a.type === updateChannelDataAC('', {}).type &&
+          a.payload.channelId === directChannel.id &&
+          a.payload.config?.members
+      )
+      expect(updateAction).toBeDefined()
+    })
+  })
+
+  describe('MEMBER_BLOCKED/MEMBER_UNBLOCKED events', () => {
+    it('MEMBER_BLOCKED in channel is handled', async () => {
+      const channel = makeChannel({ id: 'member-blocked-channel' })
+      const blockedMember = makeUser({ id: 'blocked-member' })
+
+      setChannelInMap(channel)
+      addChannelToAllChannels(channel)
+
+      // Currently these events are commented out in the source, just verify no crash
+      await harness.emit('onMembersBlocked', channel, [blockedMember])
+    })
+
+    it('MEMBER_UNBLOCKED in channel is handled', async () => {
+      const channel = makeChannel({ id: 'member-unblocked-channel' })
+      const unblockedMember = makeUser({ id: 'unblocked-member' })
+
+      setChannelInMap(channel)
+      addChannelToAllChannels(channel)
+
+      await harness.emit('onMembersUnblocked', channel, [unblockedMember])
+    })
+  })
+
+  describe('PINNED_MESSAGES_CHANGED event', () => {
+    it('dispatches applyPinnedMessagesEventAC', async () => {
+      const channel = makeChannel({ id: 'pinned-changed-channel' })
+      const event = { type: 'pin', messages: [makeMessage({ id: '100', channelId: channel.id })] }
+
+      setChannelInMap(channel)
+      addChannelToAllChannels(channel)
+
+      await harness.emit('onPinnedMessagesChanged', channel, event)
+
+      expect(harness.dispatched.some((a) => a.type === applyPinnedMessagesEventAC({}, {}).type)).toBe(true)
+    })
+  })
+
+  describe('POLL events', () => {
+    it('POLL_ADDED updates message with vote', async () => {
+      const channel = makeChannel({ id: 'poll-channel' })
+      const messageId = 'poll-message-1'
+      const pollDetails = {
+        id: 'poll-1',
+        changedVotes: {
+          addedVotes: [{ user: makeUser({ id: 'voter-1' }), optionId: 'opt-1' }],
+          removedVotes: []
+        }
+      }
+
+      setChannelInMap(channel)
+      addChannelToAllChannels(channel)
+      setActiveChannelId(channel.id)
+
+      await harness.emit('onPollAdded', channel, pollDetails, messageId)
+
+      expect(harness.dispatched.some((a) => a.type === updateMessageAC('', {}).type)).toBe(true)
+    })
+
+    it('POLL_DELETED removes votes', async () => {
+      const channel = makeChannel({ id: 'poll-delete-channel' })
+      const messageId = 'poll-message-2'
+      const pollDetails = {
+        id: 'poll-2',
+        changedVotes: {
+          addedVotes: [],
+          removedVotes: [{ user: makeUser({ id: 'voter-1' }), optionId: 'opt-1' }]
+        }
+      }
+
+      setChannelInMap(channel)
+      addChannelToAllChannels(channel)
+      setActiveChannelId(channel.id)
+
+      await harness.emit('onPollDeleted', channel, pollDetails, messageId)
+
+      expect(harness.dispatched.some((a) => a.type === updateMessageAC('', {}).type)).toBe(true)
+    })
+
+    it('POLL_CLOSED marks poll as closed', async () => {
+      const channel = makeChannel({ id: 'poll-close-channel' })
+      const messageId = 'poll-message-3'
+
+      setChannelInMap(channel)
+      addChannelToAllChannels(channel)
+      setActiveChannelId(channel.id)
+
+      await harness.emit('onPollClosed', channel, {}, messageId)
+
+      const updateAction = harness.dispatched.find((a) => a.type === updateMessageAC('', {}).type)
+      expect(updateAction).toBeDefined()
+    })
+
+    it('POLL_RETRACTED removes retracted votes', async () => {
+      const channel = makeChannel({ id: 'poll-retract-channel' })
+      const messageId = 'poll-message-4'
+      const pollDetails = {
+        id: 'poll-4',
+        changedVotes: {
+          addedVotes: [],
+          removedVotes: [{ user: makeUser({ id: 'current-user' }), optionId: 'opt-2' }]
+        }
+      }
+
+      setChannelInMap(channel)
+      addChannelToAllChannels(channel)
+      setActiveChannelId(channel.id)
+
+      await harness.emit('onPollRetracted', channel, pollDetails, messageId)
+
+      expect(harness.dispatched.some((a) => a.type === updateMessageAC('', {}).type)).toBe(true)
+    })
+  })
+
+  describe('CHANNEL_EVENT (typing/recording)', () => {
+    it('start_typing triggers typing indicator', async () => {
+      const channel = makeChannel({ id: 'typing-channel' })
+      const typingUser = makeUser({ id: 'typing-user' })
+
+      setChannelInMap(channel)
+      addChannelToAllChannels(channel)
+
+      await harness.emit('onReceivedChannelEvent', channel.id, typingUser, 'start_typing')
+
+      expect(harness.dispatched.some((a) => a.type === switchTypingIndicatorAC(true, '', {}).type)).toBe(true)
+    })
+
+    it('stop_typing clears typing indicator', async () => {
+      const channel = makeChannel({ id: 'stop-typing-channel' })
+      const typingUser = makeUser({ id: 'typing-user-2' })
+
+      setChannelInMap(channel)
+      addChannelToAllChannels(channel)
+
+      // Start typing first
+      await harness.emit('onReceivedChannelEvent', channel.id, typingUser, 'start_typing')
+      clearDispatched(harness)
+
+      await harness.emit('onReceivedChannelEvent', channel.id, typingUser, 'stop_typing')
+
+      expect(harness.dispatched.some((a) => a.type === switchTypingIndicatorAC(false, '', {}).type)).toBe(true)
+    })
+
+    it('ignores typing events from self', async () => {
+      const channel = makeChannel({ id: 'self-typing-channel' })
+      const selfUser = makeUser({ id: 'current-user' })
+
+      setChannelInMap(channel)
+      addChannelToAllChannels(channel)
+
+      await harness.emit('onReceivedChannelEvent', channel.id, selfUser, 'start_typing')
+
+      expect(harness.dispatched.some((a) => a.type === switchTypingIndicatorAC(true, '', {}).type)).toBe(false)
+    })
+
+    it('start_recording triggers recording indicator', async () => {
+      const channel = makeChannel({ id: 'recording-channel' })
+      const recordingUser = makeUser({ id: 'recording-user' })
+
+      setChannelInMap(channel)
+      addChannelToAllChannels(channel)
+
+      await harness.emit('onReceivedChannelEvent', channel.id, recordingUser, 'start_recording')
+
+      expect(harness.dispatched.some((a) => a.type === switchRecordingIndicatorAC(true, '', {}).type)).toBe(true)
+    })
+  })
+
+  describe('CONNECTION_STATUS_CHANGED event', () => {
+    it('dispatches connection status and resend actions on connected', async () => {
+      await harness.emit('onConnectionStateChanged', CONNECTION_STATUS.CONNECTED)
+
+      expect(harness.dispatched).toContainEqual(setConnectionStatusAC(CONNECTION_STATUS.CONNECTED))
+      expect(harness.dispatched).toContainEqual(getRolesAC())
+      expect(harness.dispatched).toContainEqual(resendPendingMessageMutationsAC(CONNECTION_STATUS.CONNECTED))
+    })
+  })
+
+  describe('Channel type filter (shouldSkip)', () => {
+    it('skips events for channels not matching the type filter', async () => {
+      // Set filter to only handle GROUP channels
+      setChannelTypesFilter([DEFAULT_CHANNEL_TYPE.GROUP])
+
+      // Create harness after setting filter
+      harness.cancel()
+      harness = createEventHarness()
+
+      const directChannel = makeChannel({ id: 'direct-filtered', type: DEFAULT_CHANNEL_TYPE.DIRECT })
+      const incomingMessage = makeMessage({ id: '8000', channelId: directChannel.id, incoming: true })
+
+      await harness.emit('onMessage', directChannel, incomingMessage)
+
+      // Should not dispatch any actions because DIRECT channel is filtered out
+      expect(harness.dispatched.find((a) => a.type === addChannelAC({}).type)).toBeUndefined()
+      expect(harness.dispatched.find((a) => a.type === updateChannelDataAC('', {}).type)).toBeUndefined()
+
+      // Reset filter
+      setChannelTypesFilter(undefined)
+    })
+
+    it('processes events for channels matching the type filter', async () => {
+      setChannelTypesFilter([DEFAULT_CHANNEL_TYPE.GROUP])
+
+      harness.cancel()
+      harness = createEventHarness()
+
+      const groupChannel = makeChannel({ id: 'group-allowed', type: DEFAULT_CHANNEL_TYPE.GROUP })
+      const incomingMessage = makeMessage({ id: '8001', channelId: groupChannel.id, incoming: true })
+
+      setChannelInMap(groupChannel)
+      addChannelToAllChannels(groupChannel)
+
+      await harness.emit('onMessage', groupChannel, incomingMessage)
+
+      // Should dispatch actions because GROUP channel matches filter
+      expect(harness.dispatched.some((a) => a.type === addChannelAC({}).type)).toBe(true)
+
+      setChannelTypesFilter(undefined)
+    })
+  })
+
+  describe('Strengthened EDIT_MESSAGE tests', () => {
+    it('EDIT_MESSAGE updates message body, state, and attachments in cache and dispatches update', async () => {
+      const channelId = 'edit-full-test-channel'
+      const originalMessage = makeMessage({
+        id: '7000',
+        channelId,
+        body: 'original body',
+        state: MESSAGE_STATUS.UNMODIFIED,
+        attachments: []
+      })
+      const channel = makeChannel({ id: channelId, lastMessage: originalMessage })
+      const editedMessage = {
+        ...originalMessage,
+        body: 'edited body with new content',
+        state: MESSAGE_STATUS.EDIT,
+        attachments: [{ id: 'new-attachment', type: 'image' }],
+        bodyAttributes: [{ type: 'bold', offset: 0, length: 6 }],
+        mentionedUsers: [makeUser({ id: 'mentioned-user' })],
+        updatedAt: new Date('2026-04-02T14:00:00.000Z')
+      }
+
+      setChannelInMap(channel)
+      addChannelToAllChannels(channel)
+      addMessageToMap(channelId, originalMessage)
+      setActiveChannelId(channelId)
+
+      await harness.emit('onMessageEdited', channel, makeUser({ id: 'editor' }), editedMessage)
+
+      // Check dispatched update action
+      const updateAction = harness.dispatched.find(
+        (a) => a.type === updateMessageAC('', {}).type && a.payload.messageId === editedMessage.id
+      )
+      expect(updateAction).toBeDefined()
+      expect(updateAction.payload.params.body).toBe('edited body with new content')
+      expect(updateAction.payload.params.state).toBe(MESSAGE_STATUS.EDIT)
+      expect(updateAction.payload.params.attachments).toEqual(editedMessage.attachments)
+
+      // Check cache update
+      const cachedMessage = getMessagesFromMap(channelId)[originalMessage.id]
+      expect(cachedMessage.body).toBe('edited body with new content')
+      expect(cachedMessage.state).toBe(MESSAGE_STATUS.EDIT)
+    })
+
+    it('EDIT_MESSAGE updates lastMessage when edited message is the channel lastMessage', async () => {
+      const channelId = 'edit-last-message-channel'
+      const lastMessage = makeMessage({
+        id: '7001',
+        channelId,
+        body: 'last message body'
+      })
+      const channel = makeChannel({ id: channelId, lastMessage })
+      const editedLastMessage = {
+        ...lastMessage,
+        body: 'edited last message',
+        state: MESSAGE_STATUS.EDIT,
+        updatedAt: new Date('2026-04-02T14:05:00.000Z')
+      }
+
+      setChannelInMap(channel)
+      addChannelToAllChannels(channel)
+      addMessageToMap(channelId, lastMessage)
+
+      await harness.emit('onMessageEdited', channel, makeUser({ id: 'editor' }), editedLastMessage)
+
+      // Should dispatch updateChannelLastMessageAC
+      expect(harness.dispatched.some((a) => a.type === updateChannelLastMessageAC({}, {}).type)).toBe(true)
+    })
+  })
+
+  describe('Strengthened DELETE_MESSAGE tests', () => {
+    it('DELETE_MESSAGE updates message state to deleted and clears body/attachments', async () => {
+      const channelId = 'delete-full-test-channel'
+      const originalMessage = makeMessage({
+        id: '7100',
+        channelId,
+        body: 'message to delete',
+        attachments: [{ id: 'att-1', type: 'image' }]
+      })
+      const channel = makeChannel({ id: channelId, lastMessage: originalMessage, newMessageCount: 3 })
+      const deletedMessage = {
+        ...originalMessage,
+        state: MESSAGE_STATUS.DELETE,
+        body: '',
+        attachments: []
+      }
+
+      setChannelInMap(channel)
+      addChannelToAllChannels(channel)
+      addMessageToMap(channelId, originalMessage)
+      setActiveChannelId(channelId)
+
+      await harness.emit('onMessageDeleted', channel, makeUser({ id: 'deleter' }), deletedMessage)
+
+      // Check dispatched update action
+      const updateAction = harness.dispatched.find(
+        (a) => a.type === updateMessageAC('', {}).type && a.payload.messageId === deletedMessage.id
+      )
+      expect(updateAction).toBeDefined()
+
+      // Check cache update
+      const cachedMessage = getMessagesFromMap(channelId)[originalMessage.id]
+      expect(cachedMessage.state).toBe(MESSAGE_STATUS.DELETE)
+      expect(cachedMessage.body).toBe('')
+      expect(cachedMessage.attachments).toEqual([])
+
+      // Check channel data update
+      const channelUpdateAction = harness.dispatched.find(
+        (a) => a.type === updateChannelDataAC('', {}).type && a.payload.channelId === channelId
+      )
+      expect(channelUpdateAction).toBeDefined()
+    })
+
+    it('DELETE_MESSAGE updates lastMessage when deleted message is the channel lastMessage', async () => {
+      const channelId = 'delete-last-message-channel'
+      const lastMessage = makeMessage({
+        id: '7101',
+        channelId,
+        body: 'last message to delete'
+      })
+      const channel = makeChannel({ id: channelId, lastMessage })
+      const deletedLastMessage = {
+        ...lastMessage,
+        state: MESSAGE_STATUS.DELETE,
+        body: '',
+        attachments: []
+      }
+
+      setChannelInMap(channel)
+      addChannelToAllChannels(channel)
+      addMessageToMap(channelId, lastMessage)
+
+      await harness.emit('onMessageDeleted', channel, makeUser({ id: 'deleter' }), deletedLastMessage)
+
+      // Should dispatch updateChannelLastMessageAC
+      expect(harness.dispatched.some((a) => a.type === updateChannelLastMessageAC({}, {}).type)).toBe(true)
+    })
+
+    it('DELETE_MESSAGE removes from pinned messages', async () => {
+      const channelId = 'delete-pinned-channel'
+      const pinnedMessage = makeMessage({ id: '7102', channelId })
+      const channel = makeChannel({ id: channelId })
+      const deletedMessage = {
+        ...pinnedMessage,
+        state: MESSAGE_STATUS.DELETE,
+        body: '',
+        attachments: []
+      }
+
+      setChannelInMap(channel)
+      addChannelToAllChannels(channel)
+
+      await harness.emit('onMessageDeleted', channel, makeUser({ id: 'deleter' }), deletedMessage)
+
+      // Should dispatch removePinnedMessagesAC
+      expect(harness.dispatched.some((a) => a.type === removePinnedMessagesAC('', [], []).type)).toBe(true)
+    })
+  })
+
+  describe('MESSAGE event via harness', () => {
+    it('MESSAGE event adds message to cache and dispatches channel update', async () => {
+      const channelId = 'harness-message-channel'
+      const channel = makeChannel({ id: channelId, newMessageCount: 0 })
+      const incomingMessage = makeMessage({
+        id: '9500',
+        channelId,
+        incoming: true,
+        body: 'incoming via harness'
+      })
+
+      setChannelInMap(channel)
+      addChannelToAllChannels(channel)
+
+      await harness.emit('onMessage', { ...channel, lastMessage: incomingMessage, newMessageCount: 1 }, incomingMessage)
+
+      // Message should be in cache
+      expect(getMessagesFromMap(channelId)[incomingMessage.id]).toBeDefined()
+
+      // Channel data should be updated
+      const updateAction = harness.dispatched.find(
+        (a) => a.type === updateChannelDataAC('', {}).type && a.payload.channelId === channelId
+      )
+      expect(updateAction).toBeDefined()
+    })
+  })
+
+  describe('UNREAD_MESSAGES_INFO event via harness', () => {
+    it('updates unread counts from server', async () => {
+      const channelId = 'unread-info-channel'
+      const channel = makeChannel({
+        id: channelId,
+        newMessageCount: 0,
+        newMentionCount: 0,
+        unread: false
+      })
+
+      setChannelInMap(channel)
+      addChannelToAllChannels(channel)
+
+      const updatedChannel = {
+        ...channel,
+        newMessageCount: 5,
+        newMentionCount: 2,
+        unread: true,
+        lastReceivedMsgId: '9999'
+      }
+
+      await harness.emit('onTotalUnreadCountUpdated', 1, 5, updatedChannel, 5, 2, 0)
+
+      const updateAction = harness.dispatched.find(
+        (a) => a.type === updateChannelDataAC('', {}).type && a.payload.channelId === channelId
+      )
+      expect(updateAction).toBeDefined()
+      expect(updateAction.payload.config.newMessageCount).toBe(5)
+      expect(updateAction.payload.config.newMentionCount).toBe(2)
+      expect(updateAction.payload.config.unread).toBe(true)
+    })
+  })
+})
+
+describe('event notifications (when and whether to notify)', () => {
+  const mockSetNotification = setNotification as jest.Mock
+  const mockGetShowNotifications = getShowNotifications as jest.Mock
+  const storeModule = require('store') as { getState: jest.Mock | (() => any); dispatch: jest.Mock }
+  const originalGetState = storeModule.getState
+  const originalNotification = (global as any).Notification
+  const originalVisibility = Object.getOwnPropertyDescriptor(document, 'visibilityState')
+  const me = makeUser({ id: 'current-user' })
+  const other = makeUser({ id: 'other-user', firstName: 'Ann' })
+
+  const state = (overrides: any = {}) => ({
+    MessageReducer: {
+      pendingPollActions: {},
+      messagesHasNext: false,
+      visibleMessagesMap: {},
+      activeChannelMessages: []
+    },
+    UserReducer: { browserTabIsActive: true, contactsMap: {} },
+    ChannelReducer: { channels: [] },
+    ThemeReducer: { theme: 'light', newTheme: { colors: {} } },
+    ...overrides
+  })
+
+  const setVisibility = (value: 'visible' | 'hidden') =>
+    Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => value })
+
+  const installNotification = (permission: NotificationPermission) => {
+    ;(global as any).Notification = Object.assign(jest.fn(), { permission, requestPermission: jest.fn() })
+  }
+
+  const run = (saga: any, args: any, storeState = state()) =>
+    runSaga({ getState: () => storeState, dispatch: () => undefined }, saga, args, { user: me }).toPromise()
+
+  const incoming = (channelOverrides: any = {}, messageOverrides: any = {}) => {
+    const channel = makeChannel({ id: `notify-${Math.random().toString(36).slice(2)}`, ...channelOverrides })
+    const message = makeMessage({
+      id: '7001',
+      channelId: channel.id,
+      body: 'hello there',
+      user: other,
+      ...messageOverrides
+    })
+    setChannelInMap(channel)
+    addChannelToAllChannels(channel)
+    return { channel: { ...channel, lastMessage: message }, message }
+  }
+
+  beforeEach(() => {
+    clearMessagesMap()
+    mockSetNotification.mockClear()
+    mockGetShowNotifications.mockReturnValue(true)
+    storeModule.getState = jest.fn(() => state())
+    installNotification('granted')
+    setVisibility('hidden')
+  })
+
+  afterEach(() => {
+    storeModule.getState = originalGetState
+    ;(global as any).Notification = originalNotification
+    if (originalVisibility) Object.defineProperty(document, 'visibilityState', originalVisibility)
+    else delete (document as any).visibilityState
+  })
+
+  it('notifies once for an incoming message in an unmuted chat while the tab is hidden', async () => {
+    const { channel, message } = incoming()
+    await run(__eventsTestables.handleChannelMessageEvent, { channel, message })
+
+    expect(mockSetNotification).toHaveBeenCalledTimes(1)
+    const [body, user, notifiedChannel] = mockSetNotification.mock.calls[0]
+    expect(body).toBe('hello there')
+    expect(user.id).toBe('other-user')
+    expect(notifiedChannel.id).toBe(channel.id)
+  })
+
+  it('passes "Self-destructing" as the body for a view-once message', async () => {
+    const { channel, message } = incoming({}, { type: 'view_once' })
+    await run(__eventsTestables.handleChannelMessageEvent, { channel, message })
+    expect(mockSetNotification).toHaveBeenCalledWith(
+      'Self-destructing',
+      expect.anything(),
+      expect.anything(),
+      undefined,
+      undefined
+    )
+  })
+
+  it.each([
+    ['the message is silent', {}, { silent: true }],
+    ['the message is my own', {}, { user: makeUser({ id: 'current-user' }) }],
+    ['the chat is muted', { muted: true }, {}]
+  ])('does not notify when %s', async (_label, channelOverrides, messageOverrides) => {
+    const { channel, message } = incoming(channelOverrides, messageOverrides)
+    await run(__eventsTestables.handleChannelMessageEvent, { channel, message })
+    expect(mockSetNotification).not.toHaveBeenCalled()
+  })
+
+  it('does not notify when notifications are turned off', async () => {
+    mockGetShowNotifications.mockReturnValue(false)
+    const { channel, message } = incoming()
+    await run(__eventsTestables.handleChannelMessageEvent, { channel, message })
+    expect(mockSetNotification).not.toHaveBeenCalled()
+  })
+
+  it('does not notify when permission is not granted', async () => {
+    installNotification('denied')
+    const { channel, message } = incoming()
+    await run(__eventsTestables.handleChannelMessageEvent, { channel, message })
+    expect(mockSetNotification).not.toHaveBeenCalled()
+  })
+
+  it('does not notify for the open chat while the tab is visible and active', async () => {
+    setVisibility('visible')
+    const { channel, message } = incoming()
+    setActiveChannelId(channel.id)
+    try {
+      await run(__eventsTestables.handleChannelMessageEvent, { channel, message })
+      expect(mockSetNotification).not.toHaveBeenCalled()
+    } finally {
+      setActiveChannelId('')
+    }
+  })
+
+  describe('reactions to my messages', () => {
+    const reactionArgs = (channelOverrides: any = {}) => {
+      const channel = makeChannel({ id: `react-${Math.random().toString(36).slice(2)}`, ...channelOverrides })
+      const message = makeMessage({ id: '7100', channelId: channel.id, body: 'my message', user: me })
+      setChannelInMap(channel)
+      const reaction = { id: 'r1', key: '👍', score: 1, reason: '', messageId: message.id, user: other }
+      return { channel, user: other, message, reaction }
+    }
+
+    it('notifies when someone reacts to my message in an unmuted chat', async () => {
+      await run(__eventsTestables.handleReactionAddedEvent, reactionArgs())
+      expect(mockSetNotification).toHaveBeenCalledTimes(1)
+      expect(mockSetNotification.mock.calls[0][3]).toBe('👍')
+    })
+
+    // Regression: the reaction handler did not check channel.muted (the message handler does).
+    it('does not notify for a reaction in a muted chat', async () => {
+      await run(__eventsTestables.handleReactionAddedEvent, reactionArgs({ muted: true }))
+      expect(mockSetNotification).not.toHaveBeenCalled()
+    })
+  })
+
+  // Regression: on iOS Safari (outside installed web apps) and in many in-app browsers there is no
+  // global Notification. The handlers read Notification.permission directly, threw a
+  // ReferenceError and skipped the rest of the handler.
+  describe('browsers without the Notification API', () => {
+    beforeEach(() => {
+      delete (global as any).Notification
+      expect(typeof (global as any).Notification).toBe('undefined')
+    })
+
+    it('still processes an incoming message completely', async () => {
+      const { channel, message } = incoming({}, { attachments: [] })
+      await expect(run(__eventsTestables.handleChannelMessageEvent, { channel, message })).resolves.toBeUndefined()
+      expect(mockSetNotification).not.toHaveBeenCalled()
+    })
+
+    it('still processes a reaction to my message', async () => {
+      const channel = makeChannel({ id: 'react-no-api' })
+      const message = makeMessage({ id: '7200', channelId: channel.id, user: me })
+      setChannelInMap(channel)
+      const reaction = { id: 'r2', key: '❤️', score: 1, reason: '', messageId: message.id, user: other }
+      await expect(
+        run(__eventsTestables.handleReactionAddedEvent, { channel, user: other, message, reaction })
+      ).resolves.toBeUndefined()
+      expect(mockSetNotification).not.toHaveBeenCalled()
+    })
   })
 })

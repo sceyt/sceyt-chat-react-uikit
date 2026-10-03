@@ -46,11 +46,85 @@
     "test:build": "run-s build",
     "test:lint": "eslint .",
     "test:all": "CI=1 NODE_PATH=examples/sceyt-livechat-demo/node_modules react-scripts test --env=jsdom --watchAll=false --runInBand --silent --testPathIgnorePatterns=src/index.test.tsx",
+    "test:coverage": "CI=1 NODE_PATH=examples/sceyt-livechat-demo/node_modules react-scripts test --env=jsdom --watchAll=false --silent --coverage --testPathIgnorePatterns=src/index.test.tsx",
     "test:message-list": "CI=1 NODE_PATH=examples/sceyt-livechat-demo/node_modules react-scripts test --env=jsdom --runTestsByPath src/helpers/messageMarkerBatcher.test.ts src/store/message/reducers.test.ts src/store/message/saga.test.ts src/store/evetns/inedx.test.ts src/components/Message/index.test.tsx src/components/Messages/MessageList/MessageList.test.tsx src/components/Messages/MessageList/useChatController.test.tsx --watch=false --runInBand --silent",
     "test:unit": "cross-env CI=1 react-scripts test --env=jsdom",
     "test:watch": "react-scripts test --env=jsdom",
     "predeploy": "cd example && yarn install && yarn run build",
     "deploy": "gh-pages -d example/build"
+  },
+  "jest": {
+    "collectCoverageFrom": [
+      "src/**/*.{ts,tsx}",
+      "!src/**/*.test.{ts,tsx}",
+      "!src/**/*.d.ts",
+      "!src/testUtils/**",
+      "!src/setupTests.ts",
+      "!src/assets/**"
+    ],
+    "coverageReporters": [
+      "text-summary",
+      "json-summary",
+      "lcov"
+    ],
+    "coverageThreshold": {
+      "./src/store/message/saga.ts": {
+        "lines": 64,
+        "branches": 52
+      },
+      "./src/store/channel/reducers.ts": {
+        "lines": 95,
+        "branches": 82
+      },
+      "./src/store/evetns/inedx.ts": {
+        "lines": 85,
+        "branches": 63
+      },
+      "./src/store/pinned/saga.ts": {
+        "lines": 88,
+        "branches": 65
+      },
+      "./src/store/member/saga.ts": {
+        "lines": 84,
+        "branches": 53
+      },
+      "./src/store/user/saga.ts": {
+        "lines": 92,
+        "branches": 88
+      },
+      "./src/helpers/messagesHalper/index.ts": {
+        "lines": 78,
+        "branches": 63
+      },
+      "./src/helpers/channelHalper/index.ts": {
+        "lines": 85,
+        "branches": 85
+      },
+      "./src/helpers/messagesIdb.ts": {
+        "lines": 88,
+        "branches": 86
+      },
+      "./src/helpers/message.tsx": {
+        "lines": 85,
+        "branches": 78
+      },
+      "./src/helpers/index.tsx": {
+        "lines": 49,
+        "branches": 46
+      },
+      "./src/helpers/notifications.ts": {
+        "lines": 95,
+        "branches": 80
+      },
+      "./src/messageUtils/index.tsx": {
+        "lines": 83,
+        "branches": 70
+      },
+      "./src/components/ChannelList/index.tsx": {
+        "lines": 75,
+        "branches": 55
+      }
+    }
   },
   "peerDependencies": {
     "react": "18.2.0",
@@ -88,6 +162,7 @@
     "eslint-plugin-react": "^7.33.2",
     "eslint-plugin-react-hooks": "^4.6.0",
     "eslint-plugin-standard": "^5.0.0",
+    "fake-indexeddb": "^5",
     "microbundle-crl": "^0.13.11",
     "moment": "^2.29.4",
     "npm-run-all": "4.1.5",

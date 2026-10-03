@@ -148,11 +148,13 @@ export const combineMessageAttributes = (attributes: IBodyAttribute[]): IBodyAtt
 }
 
 export const bytesToSize = (bytes: number, decimals = 2) => {
-  if (bytes === 0) return '0 Bytes'
+  // 0, negative, NaN and Infinity have no meaningful size; values below 1 byte
+  // would give a negative unit index (Math.log < 0).
+  if (!Number.isFinite(bytes) || bytes <= 0) return '0 Bytes'
   const k = 1000
   const dm = decimals < 0 ? 0 : decimals
   const sizes = ['B', 'KB', 'MB', 'GB', 'TB', 'PB', 'EB', 'ZB', 'YB']
-  const i = Math.floor(Math.log(bytes) / Math.log(k))
+  const i = Math.min(Math.max(0, Math.floor(Math.log(bytes) / Math.log(k))), sizes.length - 1)
   return `${parseFloat((bytes / k ** i).toFixed(dm))} ${sizes[i]}`
 }
 
@@ -481,8 +483,13 @@ export const bodyAttributesToHTML = (
   const mentionRanges = new Map<number, { userId: string; displayName: string; length: number }>()
 
   for (const attr of bodyAttributes) {
-    const start = attr.offset
+    const start = Math.max(0, attr.offset)
     const end = Math.min(attr.offset + attr.length, body.length)
+    // Malformed ranges (zero/negative length, or entirely outside the body) are
+    // ignored: a zero-length mention would otherwise never advance the render loop.
+    if (!(end > start) || start >= body.length) {
+      continue
+    }
     if (attr.type === 'mention') {
       const mentionUser = mentionedUsers?.find((u) => u.id === attr.metadata)
       let displayName: string
@@ -492,7 +499,7 @@ export const bodyAttributesToHTML = (
       } else {
         displayName = body.slice(start, end)
       }
-      mentionRanges.set(start, { userId: attr.metadata, displayName, length: attr.length })
+      mentionRanges.set(start, { userId: attr.metadata, displayName, length: end - start })
     } else {
       const types = attr.type.split(' ')
       for (let i = start; i < end; i++) {

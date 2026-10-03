@@ -101,6 +101,7 @@ const MessagesScrollToUnreadMentionsButton: React.FC<MessagesScrollToUnreadMenti
       if (repliedMessage) {
         const scrollRef = document.getElementById('scrollableDiv') as HTMLElement
         if (scrollRef) {
+          // eslint-disable-next-line prefer-const -- assigned after the closures that clear it
           let safetyTimer: NodeJS.Timeout
           // Function to handle scroll completion
           const handleScrollEnd = () => {

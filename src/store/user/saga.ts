@@ -1,24 +1,8 @@
 import { call, put, takeLatest } from 'redux-saga/effects'
 import { getClient } from '../../common/client'
-import {
-  BLOCK_USERS,
-  CONNECTION_STATUS,
-  GET_CONTACTS,
-  GET_USERS,
-  LOAD_MORE_USERS,
-  UNBLOCK_USERS,
-  UPDATE_PROFILE
-} from './constants'
+import { BLOCK_USERS, CONNECTION_STATUS, GET_USERS, LOAD_MORE_USERS, UNBLOCK_USERS, UPDATE_PROFILE } from './constants'
 import { DEFAULT_CHANNEL_TYPE, LOADING_STATE } from '../../helpers/constants'
-import {
-  addUsersAC,
-  setContactsAC,
-  setContactsLoadingStateAC,
-  setUsersAC,
-  setUsersLoadingStateAC,
-  updateUserProfileAC,
-  updateUserStatusOnMapAC
-} from './actions'
+import { addUsersAC, setUsersAC, setUsersLoadingStateAC, updateUserProfileAC, updateUserStatusOnMapAC } from './actions'
 import { IAction, IMember } from '../../types'
 import {
   getActiveChannelId,
@@ -31,22 +15,6 @@ import { updateChannelDataAC, updateChannelsMembersAC, updateUserStatusOnChannel
 import log from 'loglevel'
 import { updateMembersPresenceAC } from 'store/member/actions'
 import { updateUserOnMap } from 'helpers/userHelper'
-
-function* getContacts(): any {
-  try {
-    const SceytChatClient = getClient()
-    if (SceytChatClient.connectionState === CONNECTION_STATUS.CONNECTED) {
-      const contactsData = yield call(SceytChatClient.getAllContacts)
-      yield put(setContactsAC(JSON.parse(JSON.stringify(contactsData))))
-      yield put(setContactsLoadingStateAC(LOADING_STATE.LOADED))
-    }
-  } catch (e) {
-    log.error('ERROR in get contacts - :', e.message)
-    if (e.code !== 10008) {
-      // yield put(setErrorNotification(e.message))
-    }
-  }
-}
 
 function* blockUser(action: IAction): any {
   try {
@@ -290,10 +258,18 @@ function* loadMoreUsers(action: IAction): any {
 }
 
 export default function* MembersSaga() {
-  yield takeLatest(GET_CONTACTS, getContacts)
   yield takeLatest(GET_USERS, getUsers)
   yield takeLatest(LOAD_MORE_USERS, loadMoreUsers)
   yield takeLatest(BLOCK_USERS, blockUser)
   yield takeLatest(UNBLOCK_USERS, unblockUser)
   yield takeLatest(UPDATE_PROFILE, updateProfile)
+}
+
+// Exported for testing
+export const __userSagaTestables = {
+  getUsers,
+  loadMoreUsers,
+  blockUser,
+  unblockUser,
+  updateProfile
 }

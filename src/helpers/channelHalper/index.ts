@@ -287,6 +287,7 @@ export function getLastChannelFromMap(deletePending: boolean = false) {
         return channel
       }
     }
+    return undefined
   }
   return channels[0]
 }
@@ -454,15 +455,19 @@ export function updateChannelLastMessageOnAllChannels(channelId: string, message
     }
   } else {
     const updatedChannels = allChannels.filter((chan) => chan.id !== channelId)
+    // A channel can be in channelsMap without being in the allChannels list
+    // (e.g. opened from search), so derive the preserved READ status from
+    // whichever copy exists and apply it to every copy.
+    const currentLastMessage = (updateChannel || channelsMap[channelId] || allChannelsMap[channelId])?.lastMessage
+    let updateMessage = message
+    if (
+      currentLastMessage &&
+      currentLastMessage.id === message.id &&
+      currentLastMessage.deliveryStatus === MESSAGE_DELIVERY_STATUS.READ
+    ) {
+      updateMessage = { ...message, deliveryStatus: MESSAGE_DELIVERY_STATUS.READ }
+    }
     if (updateChannel) {
-      let updateMessage = message
-      if (
-        updateChannel.lastMessage &&
-        updateChannel.lastMessage.id === message.id &&
-        updateChannel.lastMessage.deliveryStatus === MESSAGE_DELIVERY_STATUS.READ
-      ) {
-        updateMessage = { ...message, deliveryStatus: MESSAGE_DELIVERY_STATUS.READ }
-      }
       updateChannel = { ...updateChannel, lastMessage: updateMessage }
       // update channel on channel map
       channelsMap[channelId] = updateChannel
@@ -471,10 +476,10 @@ export function updateChannelLastMessageOnAllChannels(channelId: string, message
       allChannels = [updateChannel, ...updatedChannels]
     }
     if (channelsMap[channelId]) {
-      channelsMap[channelId] = { ...channelsMap[channelId], lastMessage: message }
+      channelsMap[channelId] = { ...channelsMap[channelId], lastMessage: updateMessage }
     }
     if (allChannelsMap[channelId]) {
-      allChannelsMap[channelId] = { ...allChannelsMap[channelId], lastMessage: message }
+      allChannelsMap[channelId] = { ...allChannelsMap[channelId], lastMessage: updateMessage }
     }
   }
 }

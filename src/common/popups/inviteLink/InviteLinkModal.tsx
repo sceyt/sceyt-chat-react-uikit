@@ -559,6 +559,7 @@ export default function InviteLinkModal({ onClose, SVGOrPNGLogoIcon, channelId }
       )}
       {openForwardPopup && (
         <ForwardMessagePopup
+          navigateOnSingleForward={false}
           title={'Share invite'}
           togglePopup={() => setOpenForwardPopup(false)}
           handleForward={handleForwardChannels}
