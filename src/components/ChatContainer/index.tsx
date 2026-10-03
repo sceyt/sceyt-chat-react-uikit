@@ -3,7 +3,7 @@ import { Provider } from 'react-redux'
 import log from 'loglevel'
 import store from '../../store'
 import SceytChat from '../SceytChat'
-import { IAttachment, IChannel, ICustomAvatarColors, IMember, IMessage, IUser } from '../../types'
+import { IAttachment, IChannel, IContact, ICustomAvatarColors, IMember, IMessage, IUser } from '../../types'
 import { SceytReduxContext } from 'store/context'
 
 import {
@@ -141,6 +141,7 @@ export interface IChatClientProps {
     updateMembersEvent?: (channelId: string, updatedMembers: IMember[], members: IMember[]) => IMember[]
   } | null
   showOwnMessageForward?: boolean
+  contacts?: IContact[] | null
 }
 
 const SceytChatContainer = ({
@@ -177,7 +178,8 @@ const SceytChatContainer = ({
   onUpdateChannel,
   disappearingSettings = null,
   customLoadMembersFunctions = null,
-  showOwnMessageForward = true
+  showOwnMessageForward = true,
+  contacts = null
 }: IChatClientProps) => {
   useEffect(() => {
     log.setLevel(logLevel)
@@ -242,6 +244,7 @@ const SceytChatContainer = ({
         chatMinWidth={chatMinWidth}
         embeddedJoinGroupPopup={embeddedJoinGroupPopup}
         onUpdateChannel={onUpdateChannel}
+        contacts={contacts}
       />
     </Provider>
   )

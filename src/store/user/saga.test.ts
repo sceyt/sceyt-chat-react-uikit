@@ -3,9 +3,9 @@ import { destroyChannelsMap, setChannelInMap, query, setActiveChannelId } from '
 import { makeChannel, makeUser, makeMember } from '../../testUtils/messageFixtures'
 import { setClient } from '../../common/client'
 import { __userSagaTestables } from './saga'
-import { CONNECTION_STATUS, SET_CONTACT_LOADING_STATE } from './constants'
+import { CONNECTION_STATUS } from './constants'
 import { LOADING_STATE, DEFAULT_CHANNEL_TYPE } from '../../helpers/constants'
-import { getContactsAC, getUsersAC, loadMoreUsersAC, blockUserAC, unblockUserAC, updateProfileAC } from './actions'
+import { getUsersAC, loadMoreUsersAC, blockUserAC, unblockUserAC, updateProfileAC } from './actions'
 
 function createMockStoreState(overrides: any) {
   const opts = overrides || {}
@@ -127,58 +127,6 @@ describe('user saga', () => {
   afterEach(() => {
     destroyChannelsMap()
     query.usersQuery = undefined
-  })
-
-  describe('getContacts', () => {
-    it('fetches contacts and dispatches success actions when connected', async () => {
-      const mockContacts = [
-        { id: 'contact-1', firstName: 'John', lastName: 'Doe' },
-        { id: 'contact-2', firstName: 'Jane', lastName: 'Smith' }
-      ]
-      mockClient.getAllContacts = jest.fn().mockResolvedValue(mockContacts)
-
-      const dispatched = await runUserSaga(__userSagaTestables.getContacts, getContactsAC())
-
-      expect(mockClient.getAllContacts).toHaveBeenCalled()
-
-      // Should dispatch setContactsAC (RTK action: users/setContacts)
-      expect(dispatched).toContainEqual(
-        expect.objectContaining({
-          type: 'users/setContacts',
-          payload: { contacts: mockContacts }
-        })
-      )
-
-      // Should dispatch setContactsLoadingStateAC (saga action: SET_CONTACT_LOADING_STATE)
-      expect(dispatched).toContainEqual(
-        expect.objectContaining({
-          type: SET_CONTACT_LOADING_STATE,
-          payload: { status: LOADING_STATE.LOADED }
-        })
-      )
-    })
-
-    it('does not fetch contacts when not connected', async () => {
-      mockClient.connectionState = CONNECTION_STATUS.DISCONNECTED
-
-      const dispatched = await runUserSaga(__userSagaTestables.getContacts, getContactsAC())
-
-      expect(mockClient.getAllContacts).not.toHaveBeenCalled()
-      expect(dispatched).toHaveLength(0)
-    })
-
-    it('handles SDK error gracefully', async () => {
-      mockClient.getAllContacts = jest.fn().mockRejectedValue({ code: 5000, message: 'Network error' })
-
-      // Should not throw
-      const dispatched = await runUserSaga(__userSagaTestables.getContacts, getContactsAC())
-
-      expect(dispatched).not.toContainEqual(
-        expect.objectContaining({
-          type: 'users/setContacts'
-        })
-      )
-    })
   })
 
   describe('getUsers', () => {

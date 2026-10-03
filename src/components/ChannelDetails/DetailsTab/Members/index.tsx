@@ -14,7 +14,6 @@ import {
   openInviteModalSelector,
   rolesMapSelector
 } from '../../../../store/member/selector'
-import { getContactsAC } from '../../../../store/user/actions'
 import { connectionStatusSelector, contactsMapSelector } from '../../../../store/user/selector'
 import { createChannelAC } from '../../../../store/channel/actions'
 // Assets
@@ -245,9 +244,6 @@ const Members = ({
 
   useEffect(() => {
     if (connectionStatus === CONNECTION_STATUS.CONNECTED) {
-      if (getFromContacts) {
-        dispatch(getContactsAC())
-      }
       if (channel?.id && !(channel.type === DEFAULT_CHANNEL_TYPE.DIRECT && channel.memberCount === 2)) {
         dispatch(getMembersAC(channel.id))
       }

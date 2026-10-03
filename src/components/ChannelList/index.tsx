@@ -38,7 +38,6 @@ import {
   switchChannelActionAC,
   switchChannelInfoAC
 } from '../../store/channel/actions'
-import { getContactsAC } from '../../store/user/actions'
 import { CONNECTION_STATUS } from '../../store/user/constants'
 // Hooks
 import { useColor, useDidUpdate } from '../../hooks'
@@ -50,7 +49,6 @@ import {
   removeChannelFromMap,
   setUploadImageIcon
 } from '../../helpers/channelHalper'
-import { getShowOnlyContactUsers } from '../../helpers/contacts'
 import { DEFAULT_CHANNEL_TYPE, LOADING_STATE } from '../../helpers/constants'
 import { device, THEME_COLORS } from '../../UIHelper/constants'
 import { IChannel, IContact, IContactsMap, ICreateChannel, IMessage, IUser } from '../../types'
@@ -266,7 +264,6 @@ const ChannelList: React.FC<IChannelListProps> = ({
     [THEME_COLORS.SURFACE_2]: surface2
   } = useColor()
   const dispatch = useDispatch()
-  const getFromContacts = getShowOnlyContactUsers()
   const channelListRef = useRef<HTMLInputElement | null>(null)
   const [searchValue, setSearchValue] = useState('')
   const connectionStatus = useSelector(connectionStatusSelector)
@@ -462,9 +459,6 @@ const ChannelList: React.FC<IChannelListProps> = ({
   useEffect(() => {
     if (uploadPhotoIcon) {
       setUploadImageIcon(uploadPhotoIcon)
-    }
-    if (getFromContacts) {
-      dispatch(getContactsAC())
     }
   }, [])
 

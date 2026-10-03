@@ -59,7 +59,7 @@ import {
   updateMessagesStatusAC
 } from '../message/actions'
 import { CONNECTION_EVENT_TYPES, CONNECTION_STATUS } from '../user/constants'
-import { getContactsAC, setConnectionStatusAC } from '../user/actions'
+import { setConnectionStatusAC } from '../user/actions'
 import {
   applyPinnedMessagesEventAC,
   clearPinnedMessagesAC,
@@ -1169,12 +1169,8 @@ export default function* watchForEvents(): any {
           log.info('CHANNEL_EVENT_CREATE ... ', createdChannel)
           const channelFilterTypes = getChannelTypesFilter()
           if (channelFilterTypes?.length ? channelFilterTypes.includes(createdChannel.type) : true) {
-            const getFromContacts = getShowOnlyContactUsers()
             const channelExists = checkChannelExists(createdChannel.id)
             if (!channelExists) {
-              if (getFromContacts) {
-                yield put(getContactsAC())
-              }
               yield call(setChannelInMap, createdChannel)
               yield put(setChannelToAddAC(JSON.parse(JSON.stringify(createdChannel))))
             }
