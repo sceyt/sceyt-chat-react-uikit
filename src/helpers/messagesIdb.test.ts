@@ -705,51 +705,57 @@ describe('messagesIdb', () => {
       await expect(messagesIdb.restoreDrafts()).resolves.toEqual([])
     })
 
-    // BUG FINDING: dbPromise caches null forever when open fails.
-    // Once the DB fails to open, all subsequent calls will also fail,
-    // even if the underlying issue is resolved (e.g., user grants more storage).
-    // This test documents the bug but is skipped because the bug exists.
-    // To fix: reset dbPromise to null on error so subsequent calls can retry.
-    it.skip('a LATER call can still use the DB after initial failure (BUG: dbPromise caches null forever)', async () => {
-      // First, simulate a failure
-      let shouldFail = true
-      const mockIndexedDB = {
+    it('retries opening the DB on a later call after an initial open failure', async () => {
+      const failingIndexedDB = {
         open: jest.fn().mockImplementation(() => {
-          const request = {
-            result: null,
-            error: shouldFail ? new Error('QuotaExceededError') : null,
-            onupgradeneeded: null as any,
-            onsuccess: null as any,
-            onerror: null as any,
-            onblocked: null as any
-          }
-          setTimeout(() => {
-            if (shouldFail) {
-              if (request.onerror) request.onerror()
-            } else {
-              // On success, we'd need a real DB
-              if (request.onsuccess) request.onsuccess()
-            }
-          }, 0)
+          const request: any = { result: null, error: new Error('QuotaExceededError') }
+          setTimeout(() => request.onerror && request.onerror(), 0)
           return request
         })
       }
       // @ts-expect-error - mock
-      global.indexedDB = mockIndexedDB
+      global.indexedDB = failingIndexedDB
       jest.resetModules()
       messagesIdb = require('./messagesIdb')
 
-      // First call fails
-      await messagesIdb.restoreChannelMessages('ch-1')
+      // First call: open fails, resolves safely
+      await expect(messagesIdb.restoreChannelMessages('ch-1')).resolves.toBeNull()
 
-      // Now the DB is available
-      shouldFail = false
+      // The underlying problem goes away: a working IndexedDB is available again
       global.indexedDB = new IDBFactory()
 
-      // BUG: This still returns null because dbPromise cached the null result
-      // from the first failed attempt. The module never retries opening the DB.
-      const result = await messagesIdb.restoreChannelMessages('ch-1')
-      expect(result).not.toBeNull() // This assertion fails - result is still null
+      // Same module instance must retry and be able to write and read back
+      const message = makeMessage({ id: 'retry-1', channelId: 'ch-1', body: 'after retry' })
+      await messagesIdb.persistChannelMessages('ch-1', [message], [{ startId: 'retry-1', endId: 'retry-1' }])
+      await new Promise((resolve) => setTimeout(resolve, 0))
+
+      const restored = await messagesIdb.restoreChannelMessages('ch-1')
+      expect(restored).not.toBeNull()
+      expect(restored?.messages.map((m: any) => m.id)).toEqual(['retry-1'])
+      expect(failingIndexedDB.open).toHaveBeenCalledTimes(1)
+    })
+
+    it('retries after a blocked open', async () => {
+      const blockedIndexedDB = {
+        open: jest.fn().mockImplementation(() => {
+          const request: any = { result: null }
+          setTimeout(() => request.onblocked && request.onblocked(), 0)
+          return request
+        })
+      }
+      // @ts-expect-error - mock
+      global.indexedDB = blockedIndexedDB
+      jest.resetModules()
+      messagesIdb = require('./messagesIdb')
+
+      await expect(messagesIdb.restoreDrafts()).resolves.toEqual([])
+
+      global.indexedDB = new IDBFactory()
+      await messagesIdb.persistDraft('ch-1', { text: 'hello' })
+      await new Promise((resolve) => setTimeout(resolve, 0))
+
+      const drafts = await messagesIdb.restoreDrafts()
+      expect(drafts.map((d: any) => d.channelId)).toEqual(['ch-1'])
     })
   })
 

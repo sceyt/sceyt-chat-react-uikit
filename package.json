@@ -99,6 +99,10 @@
       "./src/helpers/channelHalper/index.ts": {
         "lines": 85,
         "branches": 85
+      },
+      "./src/helpers/messagesIdb.ts": {
+        "lines": 88,
+        "branches": 86
       }
     }
   },

@@ -56,6 +56,12 @@ const openDb = (): Promise<IDBDatabase | null> => {
   if (dbPromise) {
     return dbPromise
   }
+  // A failed or blocked open must not be cached: reset so a later call retries
+  // (e.g. after another tab releases an old-version connection).
+  const fail = (resolve: (db: IDBDatabase | null) => void) => {
+    dbPromise = null
+    resolve(null)
+  }
   dbPromise = new Promise((resolve) => {
     try {
       const request = indexedDB.open(DB_NAME, DB_VERSION)
@@ -83,12 +89,12 @@ const openDb = (): Promise<IDBDatabase | null> => {
       request.onsuccess = () => resolve(request.result)
       request.onerror = () => {
         log.info('messagesIdb: failed to open database', request.error)
-        resolve(null)
+        fail(resolve)
       }
-      request.onblocked = () => resolve(null)
+      request.onblocked = () => fail(resolve)
     } catch (e) {
       log.info('messagesIdb: indexedDB unavailable', e)
-      resolve(null)
+      fail(resolve)
     }
   })
   return dbPromise
