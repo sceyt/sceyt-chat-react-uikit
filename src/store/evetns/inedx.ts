@@ -300,7 +300,7 @@ export function* handleChannelMessageEvent(args: { channel: IChannel; message: I
 
   const showNotifications = getShowNotifications()
   if (showNotifications && !message.silent && message.user.id !== SceytChatClient.user.id && !channel.muted) {
-    if (Notification.permission === 'granted') {
+    if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
       const tabIsActive = yield select(browserTabIsActiveSelector)
       if (document.visibilityState !== 'visible' || !tabIsActive || channel.id !== activeChannelId) {
         const contactsMap = yield select(contactsMapSelector)
@@ -517,7 +517,9 @@ export function* handleReactionAddedEvent(
 
   yield put(addReactionToMessageAC(message, reaction, isSelf))
   if (message.user.id === SceytChatClient.user.id) {
-    if (!isSelf && Notification.permission === 'granted') {
+    // Notification is undefined on iOS Safari (outside installed web apps) and in many in-app
+    // browsers; accessing it directly would throw and abort the rest of this handler.
+    if (!isSelf && !channel.muted && typeof Notification !== 'undefined' && Notification.permission === 'granted') {
       if (document.visibilityState !== 'visible' || channel.id !== activeChannelId) {
         const contactsMap = yield select(contactsMapSelector)
         const getFromContacts = getShowOnlyContactUsers()

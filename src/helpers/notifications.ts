@@ -35,7 +35,9 @@ export const requestNotificationPermission = async (): Promise<NotificationPermi
 }
 
 // Create a custom notification for Safari fallback
-const createCustomNotification = (title: string, body: string) => {
+const CUSTOM_NOTIFICATION_STYLE_ID = 'sceyt-custom-notification-style'
+
+const createCustomNotification = (title: string, body: string, channel: IChannel) => {
   // Create a custom notification element
   const notificationElement = document.createElement('div')
   notificationElement.style.cssText = `
@@ -53,15 +55,22 @@ const createCustomNotification = (title: string, body: string) => {
     animation: slideIn 0.3s ease-out;
   `
 
-  // Add animation styles
-  const style = document.createElement('style')
-  style.textContent = `
+  // Add animation styles once (not one <style> per notification)
+  if (!document.getElementById(CUSTOM_NOTIFICATION_STYLE_ID)) {
+    const style = document.createElement('style')
+    style.id = CUSTOM_NOTIFICATION_STYLE_ID
+    style.textContent = `
     @keyframes slideIn {
       from { transform: translateX(100%); opacity: 0; }
       to { transform: translateX(0); opacity: 1; }
     }
+    @keyframes slideOut {
+      from { transform: translateX(0); opacity: 1; }
+      to { transform: translateX(100%); opacity: 0; }
+    }
   `
-  document.head.appendChild(style)
+    document.head.appendChild(style)
+  }
 
   // Create notification content
   const titleElement = document.createElement('div')
@@ -99,7 +108,8 @@ const createCustomNotification = (title: string, body: string) => {
   notificationElement.addEventListener('click', (event) => {
     if (event.target !== closeButton) {
       window.focus()
-      store.dispatch(switchChannelActionAC(null))
+      // Open the chat the notification is about (previously dispatched null, which closed the chat)
+      store.dispatch(switchChannelActionAC(channel))
     }
   })
 
@@ -201,19 +211,19 @@ export const setNotification = (
       } catch (error) {
         console.error('Error creating native notification:', error)
         // Fallback to custom notification
-        notification = createCustomNotification(title, notificationBody)
+        notification = createCustomNotification(title, notificationBody, channel)
       }
     } else if (notificationPermission === 'default') {
       // Request permission and show custom notification for now
       requestPermissionOnUserInteraction()
-      notification = createCustomNotification(title, notificationBody)
+      notification = createCustomNotification(title, notificationBody, channel)
     } else {
       // Permission denied, use custom notification
-      notification = createCustomNotification(title, notificationBody)
+      notification = createCustomNotification(title, notificationBody, channel)
     }
   } else {
     // Browser doesn't support notifications, use custom notification
-    notification = createCustomNotification(title, notificationBody)
+    notification = createCustomNotification(title, notificationBody, channel)
   }
 
   // Store reference for cleanup

@@ -61,6 +61,13 @@ import { CONNECTION_STATUS } from '../user/constants'
 import { navigateToLatest } from '../../helpers/messageListNavigator'
 import { __eventsTestables } from './inedx'
 import { createEventHarness, clearDispatched, EventHarness } from '../../testUtils/eventHarness'
+import { setNotification, getShowNotifications } from '../../helpers/notifications'
+
+jest.mock('../../helpers/notifications', () => ({
+  ...jest.requireActual('../../helpers/notifications'),
+  setNotification: jest.fn(),
+  getShowNotifications: jest.fn(() => true)
+}))
 
 jest.mock('../../helpers/messageListNavigator', () => ({
   navigateToLatest: jest.fn()
@@ -2637,6 +2644,178 @@ describe('watchForEvents saga - full event loop tests', () => {
       expect(updateAction.payload.config.newMessageCount).toBe(5)
       expect(updateAction.payload.config.newMentionCount).toBe(2)
       expect(updateAction.payload.config.unread).toBe(true)
+    })
+  })
+})
+
+describe('event notifications (when and whether to notify)', () => {
+  const mockSetNotification = setNotification as jest.Mock
+  const mockGetShowNotifications = getShowNotifications as jest.Mock
+  const storeModule = require('store') as { getState: jest.Mock | (() => any); dispatch: jest.Mock }
+  const originalGetState = storeModule.getState
+  const originalNotification = (global as any).Notification
+  const originalVisibility = Object.getOwnPropertyDescriptor(document, 'visibilityState')
+  const me = makeUser({ id: 'current-user' })
+  const other = makeUser({ id: 'other-user', firstName: 'Ann' })
+
+  const state = (overrides: any = {}) => ({
+    MessageReducer: {
+      pendingPollActions: {},
+      messagesHasNext: false,
+      visibleMessagesMap: {},
+      activeChannelMessages: []
+    },
+    UserReducer: { browserTabIsActive: true, contactsMap: {} },
+    ChannelReducer: { channels: [] },
+    ThemeReducer: { theme: 'light', newTheme: { colors: {} } },
+    ...overrides
+  })
+
+  const setVisibility = (value: 'visible' | 'hidden') =>
+    Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => value })
+
+  const installNotification = (permission: NotificationPermission) => {
+    ;(global as any).Notification = Object.assign(jest.fn(), { permission, requestPermission: jest.fn() })
+  }
+
+  const run = (saga: any, args: any, storeState = state()) =>
+    runSaga({ getState: () => storeState, dispatch: () => undefined }, saga, args, { user: me }).toPromise()
+
+  const incoming = (channelOverrides: any = {}, messageOverrides: any = {}) => {
+    const channel = makeChannel({ id: `notify-${Math.random().toString(36).slice(2)}`, ...channelOverrides })
+    const message = makeMessage({
+      id: '7001',
+      channelId: channel.id,
+      body: 'hello there',
+      user: other,
+      ...messageOverrides
+    })
+    setChannelInMap(channel)
+    addChannelToAllChannels(channel)
+    return { channel: { ...channel, lastMessage: message }, message }
+  }
+
+  beforeEach(() => {
+    clearMessagesMap()
+    mockSetNotification.mockClear()
+    mockGetShowNotifications.mockReturnValue(true)
+    storeModule.getState = jest.fn(() => state())
+    installNotification('granted')
+    setVisibility('hidden')
+  })
+
+  afterEach(() => {
+    storeModule.getState = originalGetState
+    ;(global as any).Notification = originalNotification
+    if (originalVisibility) Object.defineProperty(document, 'visibilityState', originalVisibility)
+    else delete (document as any).visibilityState
+  })
+
+  it('notifies once for an incoming message in an unmuted chat while the tab is hidden', async () => {
+    const { channel, message } = incoming()
+    await run(__eventsTestables.handleChannelMessageEvent, { channel, message })
+
+    expect(mockSetNotification).toHaveBeenCalledTimes(1)
+    const [body, user, notifiedChannel] = mockSetNotification.mock.calls[0]
+    expect(body).toBe('hello there')
+    expect(user.id).toBe('other-user')
+    expect(notifiedChannel.id).toBe(channel.id)
+  })
+
+  it('passes "Self-destructing" as the body for a view-once message', async () => {
+    const { channel, message } = incoming({}, { type: 'view_once' })
+    await run(__eventsTestables.handleChannelMessageEvent, { channel, message })
+    expect(mockSetNotification).toHaveBeenCalledWith(
+      'Self-destructing',
+      expect.anything(),
+      expect.anything(),
+      undefined,
+      undefined
+    )
+  })
+
+  it.each([
+    ['the message is silent', {}, { silent: true }],
+    ['the message is my own', {}, { user: makeUser({ id: 'current-user' }) }],
+    ['the chat is muted', { muted: true }, {}]
+  ])('does not notify when %s', async (_label, channelOverrides, messageOverrides) => {
+    const { channel, message } = incoming(channelOverrides, messageOverrides)
+    await run(__eventsTestables.handleChannelMessageEvent, { channel, message })
+    expect(mockSetNotification).not.toHaveBeenCalled()
+  })
+
+  it('does not notify when notifications are turned off', async () => {
+    mockGetShowNotifications.mockReturnValue(false)
+    const { channel, message } = incoming()
+    await run(__eventsTestables.handleChannelMessageEvent, { channel, message })
+    expect(mockSetNotification).not.toHaveBeenCalled()
+  })
+
+  it('does not notify when permission is not granted', async () => {
+    installNotification('denied')
+    const { channel, message } = incoming()
+    await run(__eventsTestables.handleChannelMessageEvent, { channel, message })
+    expect(mockSetNotification).not.toHaveBeenCalled()
+  })
+
+  it('does not notify for the open chat while the tab is visible and active', async () => {
+    setVisibility('visible')
+    const { channel, message } = incoming()
+    setActiveChannelId(channel.id)
+    try {
+      await run(__eventsTestables.handleChannelMessageEvent, { channel, message })
+      expect(mockSetNotification).not.toHaveBeenCalled()
+    } finally {
+      setActiveChannelId('')
+    }
+  })
+
+  describe('reactions to my messages', () => {
+    const reactionArgs = (channelOverrides: any = {}) => {
+      const channel = makeChannel({ id: `react-${Math.random().toString(36).slice(2)}`, ...channelOverrides })
+      const message = makeMessage({ id: '7100', channelId: channel.id, body: 'my message', user: me })
+      setChannelInMap(channel)
+      const reaction = { id: 'r1', key: '👍', score: 1, reason: '', messageId: message.id, user: other }
+      return { channel, user: other, message, reaction }
+    }
+
+    it('notifies when someone reacts to my message in an unmuted chat', async () => {
+      await run(__eventsTestables.handleReactionAddedEvent, reactionArgs())
+      expect(mockSetNotification).toHaveBeenCalledTimes(1)
+      expect(mockSetNotification.mock.calls[0][3]).toBe('👍')
+    })
+
+    // Regression: the reaction handler did not check channel.muted (the message handler does).
+    it('does not notify for a reaction in a muted chat', async () => {
+      await run(__eventsTestables.handleReactionAddedEvent, reactionArgs({ muted: true }))
+      expect(mockSetNotification).not.toHaveBeenCalled()
+    })
+  })
+
+  // Regression: on iOS Safari (outside installed web apps) and in many in-app browsers there is no
+  // global Notification. The handlers read Notification.permission directly, threw a
+  // ReferenceError and skipped the rest of the handler.
+  describe('browsers without the Notification API', () => {
+    beforeEach(() => {
+      delete (global as any).Notification
+      expect(typeof (global as any).Notification).toBe('undefined')
+    })
+
+    it('still processes an incoming message completely', async () => {
+      const { channel, message } = incoming({}, { attachments: [] })
+      await expect(run(__eventsTestables.handleChannelMessageEvent, { channel, message })).resolves.toBeUndefined()
+      expect(mockSetNotification).not.toHaveBeenCalled()
+    })
+
+    it('still processes a reaction to my message', async () => {
+      const channel = makeChannel({ id: 'react-no-api' })
+      const message = makeMessage({ id: '7200', channelId: channel.id, user: me })
+      setChannelInMap(channel)
+      const reaction = { id: 'r2', key: '❤️', score: 1, reason: '', messageId: message.id, user: other }
+      await expect(
+        run(__eventsTestables.handleReactionAddedEvent, { channel, user: other, message, reaction })
+      ).resolves.toBeUndefined()
+      expect(mockSetNotification).not.toHaveBeenCalled()
     })
   })
 })

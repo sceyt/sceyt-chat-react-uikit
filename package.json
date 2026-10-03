@@ -77,8 +77,8 @@
         "branches": 82
       },
       "./src/store/evetns/inedx.ts": {
-        "lines": 82,
-        "branches": 57
+        "lines": 85,
+        "branches": 63
       },
       "./src/store/pinned/saga.ts": {
         "lines": 88,
@@ -111,6 +111,10 @@
       "./src/helpers/index.tsx": {
         "lines": 49,
         "branches": 46
+      },
+      "./src/helpers/notifications.ts": {
+        "lines": 95,
+        "branches": 80
       }
     }
   },
