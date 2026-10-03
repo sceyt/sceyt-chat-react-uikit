@@ -1514,6 +1514,110 @@ describe('useChatController', () => {
     expect(screen.getByTestId('is-viewing-latest')).toHaveTextContent('true')
   })
 
+  it('marks the latest visible unread message after unread restoration clears without waiting for another scroll', async () => {
+    const channelId = 'channel-unread-clear-scan'
+    const latestUnreadMessage = makeMessage({
+      id: '2102',
+      channelId,
+      body: 'latest-unread',
+      incoming: true
+    })
+    const channel = makeChannel({
+      id: channelId,
+      newMessageCount: 1,
+      lastDisplayedMessageId: '2100',
+      lastMessage: latestUnreadMessage
+    })
+    const messages = [makeMessage({ id: '2101', channelId, body: 'outgoing', incoming: false }), latestUnreadMessage]
+    const dispatch = jest.fn()
+
+    renderController({
+      channel,
+      messages,
+      hasNextMessages: false,
+      connectionStatus: CONNECTION_STATUS.CONNECTED,
+      unreadScrollTo: true,
+      unreadMessageId: '2100',
+      dispatch
+    })
+
+    dispatch.mockClear()
+
+    await act(async () => {
+      flushAnimationFrames()
+      await Promise.resolve()
+    })
+    await flushEffects()
+
+    await act(async () => {
+      flushAnimationFrames()
+      await Promise.resolve()
+    })
+
+    expect(dispatch).toHaveBeenCalledWith(setUnreadScrollToAC(false))
+    expect(dispatch).toHaveBeenCalledWith(markMessagesAsReadAC(channel.id, ['2102']))
+  })
+
+  it('defers a scheduled unread read until the tab becomes active again', async () => {
+    const channelId = 'channel-unread-tab-focus-retry'
+    const unreadMessage = makeMessage({
+      id: '2202',
+      channelId,
+      body: 'unread-after-focus',
+      incoming: true
+    })
+    const channel = makeChannel({
+      id: channelId,
+      newMessageCount: 1,
+      lastDisplayedMessageId: '2200',
+      lastMessage: unreadMessage
+    })
+    const dispatch = jest.fn()
+    const rendered = renderController({
+      channel,
+      messages: [makeMessage({ id: '2201', channelId, incoming: false }), unreadMessage],
+      hasNextMessages: false,
+      connectionStatus: CONNECTION_STATUS.CONNECTED,
+      tabIsActive: true,
+      dispatch
+    })
+
+    dispatch.mockClear()
+    rendered.rerender(
+      <ControllerHarness
+        channel={channel}
+        messages={[makeMessage({ id: '2201', channelId, incoming: false }), unreadMessage]}
+        hasNextMessages={false}
+        connectionStatus={CONNECTION_STATUS.CONNECTED}
+        tabIsActive={false}
+        dispatch={dispatch}
+      />
+    )
+
+    act(() => {
+      flushAnimationFrames()
+    })
+    expect(dispatch).not.toHaveBeenCalledWith(markMessagesAsReadAC(channel.id, [unreadMessage.id]))
+
+    rendered.rerender(
+      <ControllerHarness
+        channel={channel}
+        messages={[makeMessage({ id: '2201', channelId, incoming: false }), unreadMessage]}
+        hasNextMessages={false}
+        connectionStatus={CONNECTION_STATUS.CONNECTED}
+        tabIsActive={true}
+        dispatch={dispatch}
+      />
+    )
+
+    await act(async () => {
+      flushAnimationFrames()
+      await Promise.resolve()
+    })
+
+    expect(dispatch).toHaveBeenCalledWith(markMessagesAsReadAC(channel.id, [unreadMessage.id]))
+  })
+
   it('dispatches loadLatestMessages when jumpToLatest is used while connected and latest is outside the window', () => {
     const channel = makeChannel({
       id: 'channel-connected',
@@ -1531,6 +1635,37 @@ describe('useChatController', () => {
 
     dispatch.mockClear()
 
+    fireEvent.click(screen.getByTestId('jump-to-latest'))
+
+    expect(dispatch).toHaveBeenCalledWith(loadLatestMessagesAC(channel, undefined, undefined, true, true))
+  })
+
+  it('loads the latest window after sending from history when the channel tail is an id-less pending message', () => {
+    const channelId = 'channel-pending-send-from-history'
+    const cachedLatestMessages = ['900', '901'].map((id) =>
+      makeMessage({ id, channelId, body: `cached-latest-${id}`, incoming: true })
+    )
+    cachedLatestMessages.forEach((message) => addMessageToMap(channelId, message))
+    setActiveSegment(channelId, '900', '901')
+
+    const pendingMessage = makePendingMessage({ channelId, body: 'new-pending-message' })
+    const channel = makeChannel({ id: channelId, lastMessage: pendingMessage })
+    const historyWindow = [
+      makeMessage({ id: '800', channelId, body: 'history-800' }),
+      makeMessage({ id: '801', channelId, body: 'history-801' }),
+      pendingMessage
+    ]
+    const dispatch = jest.fn()
+
+    renderController({
+      channel,
+      messages: historyWindow,
+      hasNextMessages: false,
+      connectionStatus: CONNECTION_STATUS.CONNECTED,
+      dispatch
+    })
+
+    dispatch.mockClear()
     fireEvent.click(screen.getByTestId('jump-to-latest'))
 
     expect(dispatch).toHaveBeenCalledWith(loadLatestMessagesAC(channel, undefined, undefined, true, true))

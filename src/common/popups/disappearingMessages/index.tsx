@@ -228,6 +228,7 @@ function DisappearingMessagesPopup({ togglePopup, handleSetTimer, currentTimer }
                         <CustomSelectTriggerStyled color={textPrimary}>{selectedCustomLabel}</CustomSelectTriggerStyled>
                       }
                       watchToggleState={setDropdownOpen}
+                      zIndex='200'
                     >
                       <CustomDropdownOptionsUl accentColor={accentColor}>
                         {CUSTOM_OPTIONS.map((o) => (
@@ -319,6 +320,7 @@ const CustomSelectTriggerStyled = styled(CustomSelectTrigger)`
 
 const CustomDropdownOptionLi = styled(DropdownOptionLi)`
   font-size: 15px;
+  width: 425px;
 `
 
 const CustomDropdownOptionsUl = styled(DropdownOptionsUl)<{ accentColor: string }>`

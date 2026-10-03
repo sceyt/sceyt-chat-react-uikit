@@ -31,6 +31,7 @@ interface MessageReactionsProps {
   reactionsContainerPadding?: string
   reactionsDetailsPopupBorderRadius?: string
   reactionsDetailsPopupHeaderItemsStyle?: 'bubbles' | 'inline'
+  popupZIndex?: number
   onToggleReactionsPopup: () => void
   onReactionAddDelete: (selectedEmoji: string) => void
   onOpenUserProfile: (user?: any) => void
@@ -64,10 +65,13 @@ const MessageReactions: React.FC<MessageReactionsProps> = ({
   reactionsContainerPadding,
   reactionsDetailsPopupBorderRadius,
   reactionsDetailsPopupHeaderItemsStyle,
+  popupZIndex,
   onToggleReactionsPopup,
   onReactionAddDelete,
   onOpenUserProfile
 }) => {
+  const messageId = message.id || message.tid
+
   // Enable height transition only after the first paint so the initial render
   // jumps instantly to the correct height without animating.
   const enableTransitionRef = React.useCallback((el: HTMLDivElement | null) => {
@@ -87,17 +91,19 @@ const MessageReactions: React.FC<MessageReactionsProps> = ({
           anchorTop={reactionsAnchorTop}
           anchorBottom={reactionsAnchorBottom}
           reactionTotals={message.reactionTotals || []}
-          messageId={message.id}
+          messageId={messageId as string}
           handleReactionsPopupClose={onToggleReactionsPopup}
           rtlDirection={rtlDirection}
           handleAddDeleteEmoji={onReactionAddDelete}
           reactionsDetailsPopupBorderRadius={reactionsDetailsPopupBorderRadius}
           reactionsDetailsPopupHeaderItemsStyle={reactionsDetailsPopupHeaderItemsStyle}
+          popupZIndex={popupZIndex}
         />
       )}
       <ReactionsContainer
         ref={enableTransitionRef}
-        id={`${message.id}_reactions_container`}
+        id={`${messageId}_reactions_container`}
+        data-reactions-container
         border={reactionsContainerBorder}
         boxShadow={reactionsContainerBoxShadow}
         borderRadius={reactionsContainerBorderRadius}
@@ -107,7 +113,7 @@ const MessageReactions: React.FC<MessageReactionsProps> = ({
         rtlDirection={rtlDirection}
         isReacted={message.reactionTotals && message.reactionTotals.length > 0}
       >
-        {message.reactionTotals && message.reactionTotals.length && (
+        {message.reactionTotals && message.reactionTotals.length ? (
           <MessageReactionsCont rtlDirection={rtlDirection} onClick={onToggleReactionsPopup}>
             {message.reactionTotals.slice(0, reactionsDisplayCount).map((summery) => (
               <MessageReaction
@@ -128,7 +134,7 @@ const MessageReactions: React.FC<MessageReactionsProps> = ({
                 </MessageReactionKey>
               </MessageReaction>
             ))}
-            {showTotalReactionCount && reactionsCount && reactionsCount > 1 && (
+            {showTotalReactionCount && reactionsCount && reactionsCount > 1 ? (
               <MessageReaction
                 border={reactionItemBorder}
                 color={textPrimary}
@@ -140,8 +146,12 @@ const MessageReactions: React.FC<MessageReactionsProps> = ({
               >
                 {reactionsCount}
               </MessageReaction>
+            ) : (
+              <React.Fragment />
             )}
           </MessageReactionsCont>
+        ) : (
+          <React.Fragment />
         )}
       </ReactionsContainer>
     </React.Fragment>

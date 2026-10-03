@@ -17,7 +17,8 @@ import {
   messagesHasNextSelector,
   messagesHasPrevSelector,
   openedMessageMenuSelector,
-  sendMessageInputHeightSelector,
+  pinnedMessagesListCloseRequestedSelector,
+  // sendMessageInputHeightSelector,
   scrollToMentionedMessageSelector,
   scrollToNewMessageSelector,
   selectedMessagesMapSelector,
@@ -26,6 +27,7 @@ import {
   unreadMessageIdSelector,
   visibleMessagesMapSelector
 } from '../../../store/message/selector'
+import { setPinnedMessagesListOpenAC } from '../../../store/message/actions'
 import { activeChannelSelector, isDraggingSelector } from '../../../store/channel/selector'
 import { browserTabIsActiveSelector, connectionStatusSelector, contactsMapSelector } from '../../../store/user/selector'
 // Hooks
@@ -53,6 +55,8 @@ import { LOADING_STATE, MESSAGE_DELIVERY_STATUS } from '../../../helpers/constan
 import MessageDivider from '../../MessageDivider'
 import SliderPopup from '../../../common/popups/sliderPopup'
 import SystemMessage from '../SystemMessage'
+import PinnedMessagesBanner from '../PinnedMessagesBanner'
+import PinnedMessagesList from '../PinnedMessagesList'
 import Message from '../../Message'
 import { IAttachmentProperties, IMessageStyles } from '../../Message/Message.types'
 import { HiddenMessageProperty, MESSAGE_TYPE } from 'types/enum'
@@ -68,6 +72,7 @@ import {
 } from '../../../helpers/messageListNavigator'
 import { getAudioRecordingFromMap, getMessageLocalRef } from '../../../helpers/messagesHalper'
 import { createMessageMarkerBatcher, DEFAULT_MARKER_BATCH_DEBOUNCE_MS } from '../../../helpers/messageMarkerBatcher'
+import { isDefaultSupportedMediaMimeType } from '../../SendMessageInput/sendMessageUtils'
 
 interface MessagesProps {
   fontFamily?: string
@@ -102,6 +107,9 @@ interface MessagesProps {
     handleReplyMessage?: () => void
     handleRetractVote?: () => void
     handleEndVote?: () => void
+    handleOpenPinMessage?: () => void
+    handleUnpinMessage?: () => void
+    pinnedMessage?: any
 
     isThreadMessage?: boolean
     rtlDirection?: boolean
@@ -130,6 +138,9 @@ interface MessagesProps {
     handleSelectMessage?: () => void
     handleOpenEmojis?: () => void
     handleReplyMessage?: () => void
+    handleOpenPinMessage?: () => void
+    handleUnpinMessage?: () => void
+    pinnedMessage?: any
     handleMouseEnter: () => void
     handleMouseLeave: () => void
     closeMessageActions?: () => void
@@ -166,6 +177,16 @@ interface MessagesProps {
   reportIcon?: JSX.Element
   retractVoteIcon?: JSX.Element
   endVoteIcon?: JSX.Element
+  /** Replaces the default pin icon in the pinned-messages banner. */
+  pinnedMessageIcon?: JSX.Element
+  /**
+   * Replaces the compact pinned-message preview for app-specific message
+   * types. Return null or undefined to use the UIKit preview.
+   */
+  renderPinnedMessagePreview?: (
+    message: IMessage,
+    context: { placement: 'banner' | 'system' }
+  ) => React.ReactNode | null | undefined
   messageStatusSize?: string
   messageStatusColor?: string
   messageReadStatusColor?: string
@@ -316,6 +337,8 @@ const MessageList: React.FC<MessagesProps> = ({
   selectIcon,
   retractVoteIcon,
   endVoteIcon,
+  pinnedMessageIcon,
+  renderPinnedMessagePreview,
   allowEditDeleteIncomingMessage = true,
   starIcon,
   staredIcon,
@@ -440,7 +463,7 @@ const MessageList: React.FC<MessagesProps> = ({
   const channel: IChannel = useSelector(activeChannelSelector)
   const contactsMap: IContactsMap = useSelector(contactsMapSelector, shallowEqual)
   const connectionStatus = useSelector(connectionStatusSelector, shallowEqual)
-  const sendMessageInputHeight: number = useSelector(sendMessageInputHeightSelector)
+  // const sendMessageInputHeight: number = useSelector(sendMessageInputHeightSelector)
   const openedMessageMenuId = useSelector(openedMessageMenuSelector, shallowEqual)
   const selectedMessagesMap = useSelector(selectedMessagesMapSelector)
   const scrollToNewMessage = useSelector(scrollToNewMessageSelector, shallowEqual)
@@ -460,6 +483,9 @@ const MessageList: React.FC<MessagesProps> = ({
   const [isDragging, setIsDragging] = useState<any>(null)
   const [stopScrolling, setStopScrolling] = useState<any>(false)
   const [stickyDate, setStickyDate] = useState<string>('')
+  const [isScrolling, setIsScrolling] = useState(false)
+  const [pinnedMessagesListOpen, setPinnedMessagesListOpen] = useState(false)
+  const pinnedMessagesListCloseRequested = useSelector(pinnedMessagesListCloseRequestedSelector)
   const markerBatcherRef = React.useRef<ReturnType<typeof createMessageMarkerBatcher> | null>(null)
   if (!markerBatcherRef.current) {
     markerBatcherRef.current = createMessageMarkerBatcher({
@@ -474,6 +500,21 @@ const MessageList: React.FC<MessagesProps> = ({
   }
   // const [hideMessages, setHideMessages] = useState<any>(false)
   // const [activeChannel, setActiveChannel] = useState<any>(channel)
+
+  useEffect(() => {
+    setPinnedMessagesListOpen(false)
+    dispatch(setPinnedMessagesListOpenAC(false))
+  }, [channel?.id, dispatch])
+
+  const openPinnedMessagesList = () => {
+    setPinnedMessagesListOpen(true)
+    dispatch(setPinnedMessagesListOpenAC(true))
+  }
+
+  const closePinnedMessagesList = () => {
+    setPinnedMessagesListOpen(false)
+    dispatch(setPinnedMessagesListOpenAC(false))
+  }
 
   const {
     scrollRef,
@@ -651,10 +692,7 @@ const MessageList: React.FC<MessagesProps> = ({
     } else {
       // Browser provides items (Chrome, Firefox) - detect type
       const fileList: DataTransferItem[] = Array.from(e.dataTransfer.items)
-      const hasMedia = fileList.some((item) => {
-        const fileType = item.type.split('/')[0]
-        return fileType === 'image' || fileType === 'video'
-      })
+      const hasMedia = fileList.some((item) => isDefaultSupportedMediaMimeType(item.type))
       filesType = hasMedia ? 'media' : 'file'
     }
 
@@ -766,7 +804,9 @@ const MessageList: React.FC<MessagesProps> = ({
     isUnreadMessage,
     nextMessageStartsUnreadSection,
     isHighlighted,
-    ifLatestAndHasNotPreview
+    ifLatestAndHasNotPreview,
+    registerInMessagesIndex = true,
+    isPinnedMessagesList = false
   }: {
     message: IMessage
     prevMessage: IMessage | null
@@ -776,9 +816,13 @@ const MessageList: React.FC<MessagesProps> = ({
     nextMessageStartsUnreadSection: boolean
     isHighlighted: boolean
     ifLatestAndHasNotPreview: boolean
+    registerInMessagesIndex?: boolean
+    isPinnedMessagesList?: boolean
   }) => {
     const localRef = getMessageLocalRef(message)
-    messagesIndexMapRef.current[localRef] = index
+    if (registerInMessagesIndex) {
+      messagesIndexMapRef.current[localRef] = index
+    }
 
     if (message.type === MESSAGE_TYPE.SYSTEM) {
       return (
@@ -795,6 +839,7 @@ const MessageList: React.FC<MessagesProps> = ({
           backgroundColor={dateDividerBackgroundColor}
           borderRadius={dateDividerBorderRadius}
           setLastVisibleMessageId={setLastVisibleMessageId}
+          renderPinnedMessagePreview={renderPinnedMessagePreview}
         />
       )
     }
@@ -811,6 +856,7 @@ const MessageList: React.FC<MessagesProps> = ({
         <Message
           message={message}
           ifLatestAndHasNotPreview={ifLatestAndHasNotPreview}
+          isPinnedMessagesList={isPinnedMessagesList}
           channel={channel}
           stopScrolling={setStopScrolling}
           handleMediaItemClick={handleMediaItemClickStable}
@@ -847,13 +893,13 @@ const MessageList: React.FC<MessagesProps> = ({
           MessageActionsMenu={MessageActionsMenu}
           CustomMessageItem={CustomMessageItem}
           messageReaction={messageReaction}
-          editMessage={editMessage}
+          editMessage={isPinnedMessagesList ? false : editMessage}
           copyMessage={copyMessage}
-          replyMessage={replyMessage}
-          replyMessageInThread={replyMessageInThread}
+          replyMessage={isPinnedMessagesList ? false : replyMessage}
+          replyMessageInThread={isPinnedMessagesList ? false : replyMessageInThread}
           deleteMessage={deleteMessage}
           selectMessage={selectMessage}
-          showInfoMessage={showInfoMessage}
+          showInfoMessage={isPinnedMessagesList ? false : showInfoMessage}
           allowEditDeleteIncomingMessage={allowEditDeleteIncomingMessage}
           reportMessage={reportMessage}
           reactionIcon={reactionIcon}
@@ -953,7 +999,7 @@ const MessageList: React.FC<MessagesProps> = ({
   }
 
   return (
-    <React.Fragment>
+    <MessageListArea>
       {allowSendAttachment && isDragging && !(attachmentsPreview?.show && mediaFile) && (
         <DragAndDropContainer
           id='draggingContainer'
@@ -1002,6 +1048,14 @@ const MessageList: React.FC<MessagesProps> = ({
       )}
       <React.Fragment>
         {/* {!hideMessages && ( */}
+        {channel?.id && (
+          <PinnedMessagesBanner
+            channelId={channel.id}
+            pinIcon={pinnedMessageIcon}
+            onOpenList={openPinnedMessagesList}
+            renderPinnedMessagePreview={renderPinnedMessagePreview}
+          />
+        )}
         <ScrollViewport>
           {isJumpingToItem && (
             <JumpOverlay>
@@ -1010,10 +1064,12 @@ const MessageList: React.FC<MessagesProps> = ({
           )}
           <Container
             id='scrollableDiv'
-            className={'show-scrollbar'}
+            className={isScrolling ? 'show-scrollbar' : ''}
             ref={scrollRef}
             stopScrolling={stopScrolling}
             onDragEnter={handleDragIn}
+            onMouseEnter={() => setIsScrolling(true)}
+            onMouseLeave={() => setIsScrolling(false)}
             backgroundColor={backgroundColor || themeBackgroundColor}
             thumbColor={surface2}
           >
@@ -1114,7 +1170,7 @@ const MessageList: React.FC<MessagesProps> = ({
         </ScrollViewport>
         <ScrollToBottomButton
           show={!!showScrollToNewMessageButton && messages?.length}
-          bottomOffset={sendMessageInputHeight}
+          bottomOffset={0}
           backgroundColor={surface1}
           badgeBackgroundColor={accentColor}
           count={channel?.newMessageCount}
@@ -1122,7 +1178,7 @@ const MessageList: React.FC<MessagesProps> = ({
         />
         <ScrollToUnreadMentionsButton
           show={!!channel.newMentionCount && messages?.length}
-          bottomOffset={sendMessageInputHeight}
+          bottomOffset={0}
           backgroundColor={surface1}
           badgeBackgroundColor={accentColor}
           count={channel.newMentionCount || 0}
@@ -1130,14 +1186,45 @@ const MessageList: React.FC<MessagesProps> = ({
           onClick={() => handleScrollToMentions(channel.mentionsIds || [])}
         />
       </React.Fragment>
-
-      {/* // )} */}
-    </React.Fragment>
+      {pinnedMessagesListOpen && channel?.id && (
+        <PinnedMessagesList
+          channelId={channel.id}
+          onClose={closePinnedMessagesList}
+          closeRequested={pinnedMessagesListCloseRequested}
+          selectionIsActive={Boolean(selectedMessagesMap?.size)}
+          ScrollContainer={Container}
+          MessagesContainer={MessagesBox}
+          renderMessage={({ message, prevMessage, nextMessage, index }) =>
+            renderTimelineMessage({
+              message,
+              prevMessage,
+              nextMessage,
+              index,
+              isUnreadMessage: false,
+              nextMessageStartsUnreadSection: false,
+              isHighlighted: false,
+              // Start the list with an avatar, then keep the normal
+              // consecutive-sender grouping used by the chat timeline.
+              ifLatestAndHasNotPreview: index === 0,
+              registerInMessagesIndex: false,
+              isPinnedMessagesList: true
+            })
+          }
+        />
+      )}
+    </MessageListArea>
   )
 }
-// const MemoizedMessageList =
 
 export default MessageList
+
+const MessageListArea = styled.div`
+  position: relative;
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+`
 
 export const Container = styled.div<{ stopScrolling?: boolean; backgroundColor?: string; thumbColor: string }>`
   display: flex;
@@ -1147,7 +1234,7 @@ export const Container = styled.div<{ stopScrolling?: boolean; backgroundColor?:
   background-color: ${(props) => props.backgroundColor};
   overflow-y: auto;
   overflow-x: hidden;
-  scrollbar-width: none;
+  scrollbar-width: thin;
   scrollbar-color: transparent transparent;
   overscroll-behavior: none;
 
@@ -1168,7 +1255,6 @@ export const Container = styled.div<{ stopScrolling?: boolean; backgroundColor?:
   }
 
   &.show-scrollbar {
-    scrollbar-width: thin;
     scrollbar-color: ${(props) => props.thumbColor} transparent;
   }
 `
@@ -1200,7 +1286,7 @@ const JumpSpinner = styled.div<{ $color?: string; $size?: number }>`
   }
 `
 
-const MessagesBox = styled.div<{ $isJumping?: boolean }>`
+export const MessagesBox = styled.div<{ $isJumping?: boolean }>`
   display: flex;
   flex-direction: column;
   width: 100%;

@@ -236,6 +236,29 @@ export const compareMessageBodyAttributes = (attributes1: IBodyAttribute[], attr
   return JSON.stringify(attributes1) === JSON.stringify(attributes2)
 }
 
+export const trimMessageBodyWithAttributes = (
+  text: string,
+  attributes: IBodyAttribute[]
+): { body: string; bodyAttributes: IBodyAttribute[] } => {
+  const body = text.trim()
+  const leadingTrim = text.length - text.trimStart().length
+  const bodyAttributes = (attributes || [])
+    .map((att) => {
+      let offset = att.offset - leadingTrim
+      let length = att.length
+      if (offset < 0) {
+        length += offset
+        offset = 0
+      }
+      if (offset + length > body.length) {
+        length = body.length - offset
+      }
+      return { ...att, offset, length }
+    })
+    .filter((att) => att.length > 0 && att.offset >= 0 && att.offset < body.length)
+  return { body, bodyAttributes }
+}
+
 export const bodyAttributesMapByType: { [key: number]: string[] } = {
   1: ['bold'],
   2: ['italic'],

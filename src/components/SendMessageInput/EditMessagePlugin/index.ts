@@ -8,11 +8,13 @@ import { combineMessageAttributes, makeUsername } from '../../../helpers/message
 
 export default function EditMessagePlugin({
   editMessage,
+  draftMessage,
   contactsMap,
   getFromContacts,
   setMentionedMember
 }: {
   editMessage: IMessage
+  draftMessage?: IMessage | null
   contactsMap: any
   getFromContacts: boolean
   // eslint-disable-next-line no-unused-vars
@@ -20,18 +22,19 @@ export default function EditMessagePlugin({
 }): JSX.Element | null {
   const [editor] = useLexicalComposerContext()
   useDidUpdate(() => {
-    if (editMessage) {
-      if (editMessage.mentionedUsers && editMessage.mentionedUsers.length) {
-        setMentionedMember(editMessage.mentionedUsers)
+    const editorMessage = draftMessage || editMessage
+    if (editorMessage) {
+      if (editorMessage.mentionedUsers && editorMessage.mentionedUsers.length) {
+        setMentionedMember(editorMessage.mentionedUsers)
       }
       editor.update(() => {
         const rootNode = $getRoot()
         $getRoot().clear()
         const paragraphNode = $createParagraphNode()
-        const textPart = editMessage.body
+        const textPart = editorMessage.body
         let nextPartIndex: any
-        if (editMessage.bodyAttributes && editMessage.bodyAttributes.length) {
-          const bodyAttributes = JSON.parse(JSON.stringify(editMessage.bodyAttributes))
+        if (editorMessage.bodyAttributes && editorMessage.bodyAttributes.length) {
+          const bodyAttributes = JSON.parse(JSON.stringify(editorMessage.bodyAttributes))
           const modifiedAttributes: IBodyAttribute[] = []
           bodyAttributes
             .sort((a: any, b: any) => a.offset - b.offset)
@@ -69,7 +72,7 @@ export default function EditMessagePlugin({
 
             nextPartIndex = attribute.offset + attribute.length
             if (attribute.type.includes('mention')) {
-              const mentionUser = editMessage.mentionedUsers.find((mention) => mention.id === attribute.metadata)
+              const mentionUser = editorMessage.mentionedUsers.find((mention) => mention.id === attribute.metadata)
               if (mentionUser) {
                 const userDisplayName = makeUsername(contactsMap[mentionUser.id], mentionUser, getFromContacts)
                 const mentionNodeParams = new MentionTypeaheadOption(
@@ -195,13 +198,13 @@ export default function EditMessagePlugin({
           rootNode.append(paragraphNode)
           rootNode.selectEnd()
         } else {
-          paragraphNode.append($createTextNode(editMessage.body))
+          paragraphNode.append($createTextNode(editorMessage.body))
           rootNode.append(paragraphNode)
           rootNode.selectEnd()
         }
       })
     }
-  }, [editMessage])
+  }, [editMessage, draftMessage])
 
   return null
 }

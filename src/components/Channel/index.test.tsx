@@ -1,7 +1,8 @@
 import React from 'react'
 import { act, screen } from '@testing-library/react'
 import Channel from './index'
-import { DEFAULT_CHANNEL_TYPE } from '../../helpers/constants'
+import { attachmentTypes, DEFAULT_CHANNEL_TYPE, MESSAGE_STATUS } from '../../helpers/constants'
+import { MESSAGE_TYPE } from '../../types/enum'
 import { setClient } from '../../common/client'
 import { updateChannelDataAC } from '../../store/channel/actions'
 import { useSelector } from '../../store/hooks'
@@ -14,7 +15,14 @@ import {
   renderWithSceytProvider,
   resetMessageListFixtureIds
 } from '../../testUtils/messageListHarness'
-import { removeDraftMessageFromMap, setDraftMessageToMap } from '../../helpers/messagesHalper'
+import {
+  removeAudioRecordingFromMap,
+  removeDraftMessageFromMap,
+  setAudioRecordingToMap,
+  setDraftMessageToMap
+} from '../../helpers/messagesHalper'
+
+let mockMessageTextFormatArgs: any
 
 jest.mock('../../hooks', () => ({
   useColor: () => {
@@ -49,7 +57,10 @@ jest.mock('../Avatar', () => ({
 
 jest.mock('../../messageUtils', () => ({
   MessageStatusIcon: () => <span data-testid='message-status-icon' />,
-  MessageTextFormat: ({ text }: { text?: string }) => text || null
+  MessageTextFormat: (args: { text?: string }) => {
+    mockMessageTextFormatArgs = args
+    return args.text || null
+  }
 }))
 
 const ConnectedChannel = ({ channelId }: { channelId: string }) => {
@@ -67,6 +78,7 @@ const ConnectedChannel = ({ channelId }: { channelId: string }) => {
 describe('Channel unread badge', () => {
   beforeEach(() => {
     resetMessageListFixtureIds()
+    mockMessageTextFormatArgs = undefined
     setClient({
       user: makeUser({ id: 'current-user', firstName: 'Current' })
     })
@@ -117,6 +129,54 @@ describe('Channel unread badge', () => {
   })
 })
 
+describe('Channel pinned system-message preview', () => {
+  beforeEach(() => {
+    resetMessageListFixtureIds()
+    setClient({ user: makeUser({ id: 'current-user', firstName: 'Current' }) })
+  })
+
+  const renderPinnedSystemMessage = (parentMessage: any) => {
+    const channelId = 'channel-row-pinned-system-message'
+    const remoteUser = makeUser({ id: 'remote-user', firstName: 'Remote' })
+    const pinMessage = makeMessage({
+      id: 'pin-system-message',
+      channelId,
+      body: 'PM',
+      type: MESSAGE_TYPE.SYSTEM,
+      incoming: true,
+      user: remoteUser,
+      parentMessage
+    })
+    const channel = makeChannel({ id: channelId, type: DEFAULT_CHANNEL_TYPE.DIRECT, lastMessage: pinMessage })
+    const store = createMessageListStore({ ChannelReducer: { channels: [channel] } })
+
+    return renderWithSceytProvider(<ConnectedChannel channelId={channelId} />, { store })
+  }
+
+  it('uses the pinned parent body instead of the PM system payload', () => {
+    renderPinnedSystemMessage(makeMessage({ id: 'pinned-parent', body: 'Important pinned message' }))
+
+    expect(screen.getByText('Remote pinned "Important pinned message".')).toBeInTheDocument()
+    expect(screen.queryByText('PM')).not.toBeInTheDocument()
+  })
+
+  it('uses an unquoted pinned parent attachment label when it has no body', () => {
+    const parentMessage = makeMessage({ id: 'pinned-parent-image', attachments: [{ type: attachmentTypes.image }] })
+    parentMessage.body = ''
+    renderPinnedSystemMessage(parentMessage)
+
+    expect(screen.getByText('Remote pinned Photo.')).toBeInTheDocument()
+  })
+
+  it('uses an unquoted deleted-message label for a deleted pinned source', () => {
+    const parentMessage = makeMessage({ id: 'deleted-pinned-parent', body: 'No longer available' })
+    parentMessage.state = MESSAGE_STATUS.DELETE
+    renderPinnedSystemMessage(parentMessage)
+
+    expect(screen.getByText('Remote pinned Deleted message')).toBeInTheDocument()
+  })
+})
+
 describe('Channel draft preview', () => {
   const channelId = 'channel-row-draft'
 
@@ -129,9 +189,10 @@ describe('Channel draft preview', () => {
 
   afterEach(() => {
     removeDraftMessageFromMap(channelId)
+    removeAudioRecordingFromMap(channelId)
   })
 
-  const renderOwnLastMessageChannel = () => {
+  const renderOwnLastMessageChannel = (channelOverrides: Partial<IChannel> = {}) => {
     const currentUser = makeUser({ id: 'current-user', firstName: 'Current' })
     const lastMessage = makeMessage({
       id: '1801',
@@ -145,7 +206,8 @@ describe('Channel draft preview', () => {
       type: DEFAULT_CHANNEL_TYPE.DIRECT,
       lastMessage,
       lastReceivedMsgId: lastMessage.id,
-      lastDisplayedMessageId: lastMessage.id
+      lastDisplayedMessageId: lastMessage.id,
+      ...channelOverrides
     })
     const store = createMessageListStore({
       ChannelReducer: {
@@ -170,5 +232,149 @@ describe('Channel draft preview', () => {
     expect(screen.getByText('Draft')).toBeInTheDocument()
     expect(screen.getByText('unsent draft text')).toBeInTheDocument()
     expect(screen.queryByTestId('message-status-icon')).not.toBeInTheDocument()
+  })
+
+  it('passes the full draft, including mentioned users, to its preview message', () => {
+    const mentionedUser = { id: '+15551234567', firstName: 'Jane', lastName: 'Doe' }
+    setDraftMessageToMap(channelId, {
+      text: 'Hello @+15551234567',
+      mentionedUsers: [mentionedUser],
+      bodyAttributes: [{ type: 'mention', offset: 6, length: 13, metadata: mentionedUser.id }]
+    })
+
+    renderOwnLastMessageChannel()
+
+    expect(mockMessageTextFormatArgs.message).toEqual(
+      expect.objectContaining({
+        body: 'Hello @+15551234567',
+        text: 'Hello @+15551234567',
+        mentionedUsers: [mentionedUser],
+        bodyAttributes: [{ type: 'mention', offset: 6, length: 13, metadata: mentionedUser.id }]
+      })
+    )
+  })
+
+  it('shows the latest message instead of a draft while the channel has unread messages', () => {
+    setDraftMessageToMap(channelId, { text: 'unsent draft text', mentionedUsers: [] })
+
+    renderOwnLastMessageChannel({ unread: true, newMessageCount: 1 })
+
+    expect(screen.queryByText('Draft')).not.toBeInTheDocument()
+    expect(screen.queryByText('unsent draft text')).not.toBeInTheDocument()
+    expect(screen.getByText('my sent message')).toBeInTheDocument()
+  })
+
+  it('does not show an empty reply draft in the channel list', () => {
+    setDraftMessageToMap(channelId, {
+      text: '',
+      mentionedUsers: [],
+      messageForReply: { id: 'reply-target', body: 'Reply target' }
+    })
+
+    renderOwnLastMessageChannel()
+
+    expect(screen.queryByText('Draft')).not.toBeInTheDocument()
+    expect(screen.getByText('my sent message')).toBeInTheDocument()
+  })
+
+  it('does not show an unchanged edit draft in the channel list', () => {
+    const messageToEdit = { id: 'message-to-edit', body: 'Original text', bodyAttributes: [] }
+    setDraftMessageToMap(channelId, {
+      text: 'Original text',
+      mentionedUsers: [],
+      messageToEdit,
+      editMessageText: 'Original text',
+      editBodyAttributes: []
+    })
+
+    renderOwnLastMessageChannel()
+
+    expect(screen.queryByText('Draft')).not.toBeInTheDocument()
+    expect(screen.getByText('my sent message')).toBeInTheDocument()
+  })
+
+  it('renders attachment-only drafts with the same attachment label as a last message', () => {
+    setDraftMessageToMap(channelId, {
+      text: '',
+      mentionedUsers: [],
+      attachments: [{ type: attachmentTypes.image, data: new File(['image'], 'photo.png', { type: 'image/png' }) }]
+    })
+
+    renderOwnLastMessageChannel()
+
+    expect(screen.getByText('Draft')).toBeInTheDocument()
+    expect(screen.getByText('Photo')).toBeInTheDocument()
+    expect(screen.queryByTestId('message-status-icon')).not.toBeInTheDocument()
+  })
+
+  it('renders the attachment label when an attachment-only draft contains editor whitespace', () => {
+    setDraftMessageToMap(channelId, {
+      text: ' ',
+      mentionedUsers: [],
+      attachments: [{ type: attachmentTypes.file, data: new File(['file'], 'report.pdf', { type: 'application/pdf' }) }]
+    })
+
+    renderOwnLastMessageChannel()
+
+    expect(screen.getByText('Draft')).toBeInTheDocument()
+    expect(screen.getByText('choseFile.svg')).toBeInTheDocument()
+    expect(screen.getByText('File')).toBeInTheDocument()
+  })
+
+  it('renders a voice icon and label for an audio recording draft', () => {
+    setAudioRecordingToMap(channelId, {
+      file: new File(['audio'], 'record.mp3', { type: 'audio/mpeg' }),
+      objectUrl: 'blob:recording-preview'
+    })
+
+    renderOwnLastMessageChannel()
+
+    expect(screen.getByText('Draft')).toBeInTheDocument()
+    expect(screen.getByText('voiceIcon.svg')).toBeInTheDocument()
+    expect(screen.getByText('Voice')).toBeInTheDocument()
+  })
+
+  it.each([
+    [attachmentTypes.video, 'Video'],
+    [attachmentTypes.file, 'File'],
+    [attachmentTypes.voice, 'Voice']
+  ])('renders an attachment-only %s draft as %s', (type, expectedLabel) => {
+    setDraftMessageToMap(channelId, {
+      text: '',
+      mentionedUsers: [],
+      attachments: [{ type, data: new File(['attachment'], 'attachment', { type: 'application/octet-stream' }) }]
+    })
+
+    renderOwnLastMessageChannel()
+
+    expect(screen.getByText('Draft')).toBeInTheDocument()
+    expect(screen.getByText(expectedLabel)).toBeInTheDocument()
+  })
+
+  it('shows draft text instead of an attachment label when the draft has both', () => {
+    setDraftMessageToMap(channelId, {
+      text: 'Photo caption draft',
+      mentionedUsers: [],
+      attachments: [{ type: attachmentTypes.image, data: new File(['image'], 'photo.png', { type: 'image/png' }) }]
+    })
+
+    renderOwnLastMessageChannel()
+
+    expect(screen.getByText('Photo caption draft')).toBeInTheDocument()
+    expect(screen.queryByText('Photo')).not.toBeInTheDocument()
+  })
+
+  it('shows an edit draft in the channel list', () => {
+    setDraftMessageToMap(channelId, {
+      text: 'Edited but unsent text',
+      mentionedUsers: [],
+      messageToEdit: { id: 'message-to-edit', body: 'Original text' },
+      editMessageText: 'Edited but unsent text'
+    })
+
+    renderOwnLastMessageChannel()
+
+    expect(screen.getByText('Draft')).toBeInTheDocument()
+    expect(screen.getByText('Edited but unsent text')).toBeInTheDocument()
   })
 })

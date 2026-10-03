@@ -56,6 +56,11 @@ import { copyRichTextToClipboard } from 'helpers/clipboard'
 import { MessageTextFormat } from 'messageUtils'
 import { getShowOnlyContactUsers } from 'helpers/contacts'
 import { useMessageState } from './hooks/useMessageState'
+import { IForwardMessageNote } from 'common/popups/forwardMessage'
+import usePermissions from '../../hooks/usePermissions'
+import { pinnedMessagesSelector } from '../../store/pinned/selector'
+import { pinMessageAC, unpinMessageAC } from '../../store/pinned/actions'
+import { getClient } from 'common/client'
 
 // Constants
 const MESSAGE_ACTIONS_HOVER_DELAY = 450
@@ -65,6 +70,7 @@ const MESSAGE_ACTIONS_HOVER_DELAY = 450
 const MESSAGE_ACTIONS_FLIP_THRESHOLD = 110
 const MAX_SELECTED_MESSAGES = 30
 const EMOJI_POPUP_THRESHOLD = 300
+const PIN_TYPE_PERSONAL = 1
 // Set when any message's media is clicked (the slider is opening). Pending
 // hover timers check it so an actions bar can't pop open behind the slider.
 let lastMediaItemClickTime = 0
@@ -210,7 +216,8 @@ const Message = ({
   showInfoMessageProps = {},
   collapsedLinesLimit,
   createChatOnAvatarTap = true,
-  ifLatestAndHasNotPreview
+  ifLatestAndHasNotPreview,
+  isPinnedMessagesList = false
 }: IMessageProps) => {
   const isTabActive = tabIsActiveRef?.current ?? tabIsActive
   const getComparableUserId = (messageUser?: IUser | null) => (messageUser?.id ? String(messageUser.id) : 'deleted')
@@ -233,6 +240,7 @@ const Message = ({
     deletePopupOpen,
     forwardPopupOpen,
     infoPopupOpen,
+    pinPopupOpen,
     messageActionsShow,
     showEndVoteConfirmPopup,
     emojisPopupOpen,
@@ -248,6 +256,7 @@ const Message = ({
     setDeletePopupOpen,
     setForwardPopupOpen,
     setInfoPopupOpen,
+    setPinPopupOpen,
     setMessageActionsShow,
     setShowEndVoteConfirmPopup,
     setEmojisPopupOpen,
@@ -261,6 +270,21 @@ const Message = ({
     setReportPopupOpen
   } = stateSetters
   const scrollToNewMessage = useSelector(scrollToNewMessageSelector, shallowEqual)
+  const pins = useSelector(pinnedMessagesSelector(channel.id))
+  const [checkActionPermission] = usePermissions(channel.userRole || '')
+  const pinnedMessage = useMemo(
+    () => pins.find((pin: any) => (pin.message?.id || pin.message?.tid) === (message.id || message.tid)),
+    [pins, message.id, message.tid]
+  )
+  const isPinned = !!message.pinDetails?.pinned || !!pinnedMessage
+  const canPinForAll = checkActionPermission('pinMessage')
+  const user = getClient().user
+  const isSelfChannel =
+    channel?.type === DEFAULT_CHANNEL_TYPE.DIRECT &&
+    channel?.memberCount === 1 &&
+    channel?.members?.length > 0 &&
+    channel?.members[0].id === user?.id
+
   const messageItemRef = useRef<HTMLDivElement>(null)
   const isVisible = useOnScreen(messageItemRef)
   // Whether the actions bar should open under the bubble (no room above).
@@ -279,10 +303,11 @@ const Message = ({
   const firstMessageInInterval = useMemo(
     () =>
       ifLatestAndHasNotPreview ||
-      !(prevMessage && current.diff(moment(prevMessage.createdAt).startOf('day'), 'days') === 0) ||
+      (!isPinnedMessagesList &&
+        !(prevMessage && current.diff(moment(prevMessage.createdAt).startOf('day'), 'days') === 0)) ||
       prevMessage?.type === MESSAGE_TYPE.SYSTEM ||
-      unreadMessageId === prevMessage.id,
-    [prevMessage, unreadMessageId, ifLatestAndHasNotPreview]
+      unreadMessageId === prevMessage?.id,
+    [prevMessage, unreadMessageId, ifLatestAndHasNotPreview, isPinnedMessagesList]
   )
 
   const nextMessageUserID = nextMessage ? getComparableUserId(nextMessage.user) : null
@@ -303,6 +328,7 @@ const Message = ({
   const renderAvatar =
     (!!prevMessageUserID || ifLatestAndHasNotPreview) &&
     (prevMessageUserID !== messageUserID || firstMessageInInterval) &&
+    !(isPinnedMessagesList && channel.type === DEFAULT_CHANNEL_TYPE.DIRECT) &&
     !(channel.type === DEFAULT_CHANNEL_TYPE.DIRECT && !showSenderNameOnDirectChannel) &&
     !(!message.incoming && !showOwnAvatar)
 
@@ -358,7 +384,34 @@ const Message = ({
   const handleToggleInfoMessagePopupOpen = useCallback(() => {
     setInfoPopupOpen((prev) => !prev)
     setMessageActionsShow(false)
-  }, [])
+  }, [channel.id, isPinnedMessagesList, message.id, message.tid, setInfoPopupOpen, setMessageActionsShow])
+
+  const handleTogglePinMessagePopup = useCallback(() => {
+    // A self chat has no other participant, therefore pin scope is not a
+    // meaningful choice. Pin it for the current user immediately.
+    if (isSelfChannel) {
+      dispatch(pinMessageAC(channel.id, message, PIN_TYPE_PERSONAL))
+      setMessageActionsShow(false)
+      return
+    }
+    setPinPopupOpen((prev) => !prev)
+    setMessageActionsShow(false)
+  }, [channel.id, dispatch, isSelfChannel, message, setMessageActionsShow, setPinPopupOpen])
+
+  const handlePinMessage = useCallback(
+    (scope: number) => {
+      dispatch(pinMessageAC(channel.id, message, scope))
+      setPinPopupOpen(false)
+    },
+    [channel.id, dispatch, message, setPinPopupOpen]
+  )
+
+  const handleUnpinMessage = useCallback(() => {
+    // pin_details can arrive with message history before the pin list does.
+    // Omitting the type lets the service remove the effective pin for this user.
+    dispatch(unpinMessageAC(channel.id, pinnedMessage || { message }))
+    setMessageActionsShow(false)
+  }, [channel.id, dispatch, message, pinnedMessage, setMessageActionsShow])
 
   const handleReplyMessage = useCallback(
     (threadReply?: boolean) => {
@@ -438,7 +491,7 @@ const Message = ({
   }, [message, contactsMap])
 
   const handleToggleReactionsPopup = useCallback(() => {
-    const reactionsContainer = document.getElementById(`${message.id}_reactions_container`)
+    const reactionsContainer = messageItemRef.current?.querySelector<HTMLElement>('[data-reactions-container]')
     const reactionsContPos = reactionsContainer?.getBoundingClientRect()
     const bottomPos = messageItemRef.current?.getBoundingClientRect().bottom
     const offsetBottom = bottomPos ? window.innerHeight - bottomPos : 0
@@ -451,7 +504,7 @@ const Message = ({
     setReactionsAnchorBottom(reactionsContPos ? reactionsContPos.bottom : 0)
     dispatch(setReactionsListAC([], false))
     setReactionsPopupOpen((prev) => !prev)
-  }, [dispatch, message.id])
+  }, [dispatch, message.id, message.tid])
 
   const handleMouseEnter = useCallback(() => {
     if (message.state !== MESSAGE_STATUS.DELETE && !selectionIsActive && !infoPopupOpen) {
@@ -545,17 +598,17 @@ const Message = ({
       message.userMarkers.length &&
       message.userMarkers.find((marker) => marker.name === MESSAGE_DELIVERY_STATUS.READ)
     )
-
-    if (
+    const shouldSendReadMarker =
       isVisible &&
       message.incoming &&
       !alreadyRead &&
       !disableAutoReadTracking &&
       isTabActive &&
-      channel.newMessageCount &&
+      !!channel.newMessageCount &&
       channel.newMessageCount > 0 &&
       connectionStatus === CONNECTION_STATUS.CONNECTED
-    ) {
+
+    if (shouldSendReadMarker) {
       if (queueReadMarker) {
         queueReadMarker(channel.id, message.id)
       } else {
@@ -578,10 +631,10 @@ const Message = ({
   ])
 
   const handleForwardMessage = useCallback(
-    (channelIds: string[]) => {
+    (channelIds: string[], accompanyingMessage?: IForwardMessageNote) => {
       if (channelIds && channelIds.length) {
         channelIds.forEach((channelId) => {
-          dispatch(forwardMessageAC(message, channelId, connectionStatus))
+          dispatch(forwardMessageAC(message, channelId, connectionStatus, true, accompanyingMessage))
         })
       }
     },
@@ -632,6 +685,12 @@ const Message = ({
   )
 
   useEffect(() => {
+    // Pinned messages are rendered in an overlay. They must not update the
+    // active chat's visibility map: when the overlay closes its rows unmount
+    // and would otherwise remove the real latest message from that map,
+    // causing the scroll-to-bottom control to appear incorrectly.
+    if (isPinnedMessagesList) return
+
     if (isVisible) {
       if (setLastVisibleMessageId) {
         setLastVisibleMessageId(message)
@@ -658,20 +717,44 @@ const Message = ({
     scrollToNewMessage.scrollToBottom,
     dispatch,
     message,
-    isTabActive
+    isTabActive,
+    isPinnedMessagesList
   ])
 
   useEffect(() => {
+    if (isPinnedMessagesList) return undefined
+
     return () => {
       dispatch(removeVisibleMessageAC(message))
     }
-  }, [dispatch, message])
+  }, [dispatch, isPinnedMessagesList, message])
 
   useEffect(() => {
-    if (!isVisible && infoPopupOpen) {
+    if (!isPinnedMessagesList && !isVisible && infoPopupOpen) {
       setInfoPopupOpen(false)
     }
-  }, [isVisible, infoPopupOpen])
+  }, [channel.id, infoPopupOpen, isPinnedMessagesList, isVisible, message.id, message.tid, setInfoPopupOpen])
+
+  // Pinned messages live in their own scrolling overlay. Close the Info popup
+  // once that overlay (or the regular chat list) moves far enough that the
+  // popup could look detached. Tiny trackpad/mouse-wheel jitter should not
+  // dismiss it.
+  useEffect(() => {
+    if (!infoPopupOpen) return undefined
+
+    const scrollContainer = document.getElementById(isPinnedMessagesList ? 'pinnedScrollableDiv' : 'scrollableDiv')
+    if (!scrollContainer) return undefined
+
+    const initialScrollTop = scrollContainer.scrollTop
+    const dismissThreshold = 40
+    const handleScroll = () => {
+      if (Math.abs(scrollContainer.scrollTop - initialScrollTop) >= dismissThreshold) {
+        setInfoPopupOpen(false)
+      }
+    }
+    scrollContainer.addEventListener('scroll', handleScroll, { passive: true })
+    return () => scrollContainer.removeEventListener('scroll', handleScroll)
+  }, [infoPopupOpen, isPinnedMessagesList, setInfoPopupOpen])
 
   useDidUpdate(() => {
     if (connectionStatus === CONNECTION_STATUS.CONNECTED) {
@@ -696,15 +779,14 @@ const Message = ({
     }
   }, [openedMessageMenuId])
 
-  // The reactions details popup is anchored to fixed coordinates captured at
-  // open time — close it when the chat scrolls so it doesn't hang detached
-  // from its message. (Scroll events don't bubble, so scrolling inside the
-  // popup's own list doesn't trigger this.)
+  // The reaction-details popup is anchored to fixed coordinates captured at
+  // open time. Close it when its owning chat or pinned-message list scrolls
+  // so it cannot hang detached from the message.
   useEffect(() => {
     if (!reactionsPopupOpen) {
       return undefined
     }
-    const scrollContainer = document.getElementById('scrollableDiv')
+    const scrollContainer = document.getElementById(isPinnedMessagesList ? 'pinnedScrollableDiv' : 'scrollableDiv')
     if (!scrollContainer) {
       return undefined
     }
@@ -715,7 +797,7 @@ const Message = ({
     return () => {
       scrollContainer.removeEventListener('scroll', handleChatScroll)
     }
-  }, [reactionsPopupOpen])
+  }, [isPinnedMessagesList, reactionsPopupOpen])
 
   useEffect(() => {
     document.addEventListener('mousedown', handleClick)
@@ -769,8 +851,11 @@ const Message = ({
     if (!nextMessage || nextMessage.type === MESSAGE_TYPE.SYSTEM) {
       spacingBottom = ''
     } else if (nextMessageStartsUnreadSection) {
-      spacingBottom = differentUserMessageSpacing || '16px'
-    } else if (nextMessageUserID && (nextMessageUserID !== messageUserID || nextMessageFirstInInterval)) {
+      spacingBottom = isPinnedMessagesList ? '0' : differentUserMessageSpacing || '16px'
+    } else if (
+      nextMessageUserID &&
+      (nextMessageUserID !== messageUserID || (nextMessageFirstInInterval && !isPinnedMessagesList))
+    ) {
       spacingBottom = differentUserMessageSpacing || '16px'
     }
     spacingTop = sameUserMessageSpacing || '6px'
@@ -779,7 +864,13 @@ const Message = ({
     if (spacingBottom && reactionsMargin)
       return { bottom: `calc(${spacingBottom} + ${reactionsMargin})`, top: spacingTop }
     return { bottom: reactionsMargin || spacingBottom, top: spacingTop }
-  }, [nextMessageUserID, messageUserID, nextMessageFirstInInterval, message.reactionTotals?.length])
+  }, [
+    nextMessageUserID,
+    isPinnedMessagesList,
+    messageUserID,
+    nextMessageFirstInInterval,
+    message.reactionTotals?.length
+  ])
 
   return (
     <MessageItem
@@ -826,6 +917,7 @@ const Message = ({
         messageWidthPercent={messageWidthPercent}
         rtl={ownMessageOnRightSide && !message.incoming}
         withAvatar={
+          !(isPinnedMessagesList && channel.type === DEFAULT_CHANNEL_TYPE.DIRECT) &&
           !(channel.type === DEFAULT_CHANNEL_TYPE.DIRECT && !showSenderNameOnDirectChannel) &&
           !(!message.incoming && !showOwnAvatar)
         }
@@ -842,6 +934,7 @@ const Message = ({
             ifLatestAndHasNotPreview={ifLatestAndHasNotPreview}
             channel={channel}
             message={message}
+            isPinnedMessagesList={isPinnedMessagesList}
             prevMessage={prevMessage}
             nextMessage={nextMessage}
             unreadMessageId={unreadMessageId}
@@ -865,6 +958,10 @@ const Message = ({
             handleSelectMessage={handleSelectMessage}
             handleOpenEmojis={handleOpenEmojis}
             handleReplyMessage={handleReplyMessage}
+            handleOpenPinMessage={handleTogglePinMessagePopup}
+            handleUnpinMessage={handleUnpinMessage}
+            pinnedMessage={pinnedMessage}
+            isPinned={isPinned}
             handleMouseEnter={handleMouseEnter}
             handleMouseLeave={handleMouseLeave}
             closeMessageActions={closeMessageActions}
@@ -992,6 +1089,10 @@ const Message = ({
             handleToggleForwardMessagePopup={handleToggleForwardMessagePopup}
             handleToggleInfoMessagePopupOpen={handleToggleInfoMessagePopupOpen}
             handleReplyMessage={handleReplyMessage}
+            handleOpenPinMessage={handleTogglePinMessagePopup}
+            handleUnpinMessage={handleUnpinMessage}
+            pinnedMessage={pinnedMessage}
+            isPinned={isPinned}
             handleToggleDeleteMessagePopup={handleToggleDeleteMessagePopup}
             handleToggleReportPopupOpen={handleToggleReportPopupOpen}
             handleResendMessage={handleResendMessage}
@@ -1066,6 +1167,7 @@ const Message = ({
             reactionsContainerPadding={reactionsContainerPadding}
             reactionsDetailsPopupBorderRadius={reactionsDetailsPopupBorderRadius}
             reactionsDetailsPopupHeaderItemsStyle={reactionsDetailsPopupHeaderItemsStyle}
+            popupZIndex={isPinnedMessagesList ? 30 : undefined}
             onToggleReactionsPopup={handleToggleReactionsPopup}
             onReactionAddDelete={handleReactionAddDelete}
             onOpenUserProfile={handleOpenUserProfile}
@@ -1078,6 +1180,7 @@ const Message = ({
         deletePopupOpen={deletePopupOpen}
         forwardPopupOpen={forwardPopupOpen}
         infoPopupOpen={infoPopupOpen}
+        pinPopupOpen={pinPopupOpen}
         showEndVoteConfirmPopup={showEndVoteConfirmPopup}
         allowEditDeleteIncomingMessage={allowEditDeleteIncomingMessage}
         showInfoMessageProps={showInfoMessageProps}
@@ -1090,6 +1193,9 @@ const Message = ({
         onEndVote={endVote}
         onToggleEndVotePopup={() => setShowEndVoteConfirmPopup(false)}
         onOpenUserProfile={handleOpenUserProfile}
+        onTogglePinPopup={handleTogglePinMessagePopup}
+        onPinMessage={handlePinMessage}
+        canPinForAll={canPinForAll}
         anchorRef={messageItemRef}
       />
     </MessageItem>

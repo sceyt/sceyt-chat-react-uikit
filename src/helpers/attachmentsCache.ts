@@ -14,9 +14,16 @@ if (isBrowser) {
   cacheAvailable = 'caches' in global
 }
 
-export const ATTACHMENT_VERSION = `_1_0_1`
+export const ATTACHMENT_VERSION = `_1_0_2`
+
+const isCacheKey = (value: unknown): value is string => typeof value === 'string' && value.length > 0
 
 export const setAttachmentToCache = async (attachmentUrl: string, attachmentResponse: Response) => {
+  if (!isCacheKey(attachmentUrl)) {
+    log.warn('Skipping attachment cache write with an invalid key')
+    return
+  }
+
   const attachmentURLVersion = attachmentUrl + ATTACHMENT_VERSION
   if (cacheAvailable) {
     await caches.open(ATTACHMENTS_CACHE).then(async (cache) => {
@@ -30,9 +37,8 @@ export const setAttachmentToCache = async (attachmentUrl: string, attachmentResp
 
         const request = new Request(cacheKey)
         await cache.put(request, attachmentResponse)
-        log.info('Cache success')
       } catch (e) {
-        log.info('Error on cache attachment ... ', e)
+        log.error('Error on cache attachment ... ', e)
         // Try to delete using the same key format
         const deleteCacheKey =
           attachmentURLVersion?.startsWith('http://') || attachmentURLVersion?.startsWith('https://')
@@ -45,13 +51,16 @@ export const setAttachmentToCache = async (attachmentUrl: string, attachmentResp
           // Ignore delete errors
         }
       }
-      removeAttachmentFromCache(attachmentUrl)
     })
   } else {
     log.error('Cache is not available')
   }
 }
 export const removeAttachmentFromCache = async (attachmentId: string) => {
+  if (!isCacheKey(attachmentId)) {
+    return
+  }
+
   if (cacheAvailable) {
     const cacheKey =
       attachmentId?.startsWith('http://') || attachmentId?.startsWith('https://')
@@ -64,6 +73,10 @@ export const removeAttachmentFromCache = async (attachmentId: string) => {
 }
 
 export const getAttachmentUrlFromCache = async (attachmentUrl: string): Promise<string | false> => {
+  if (!isCacheKey(attachmentUrl)) {
+    return false
+  }
+
   const attachmentURLVersion = attachmentUrl + ATTACHMENT_VERSION
   // Same key may already hold a live object URL — reuse it instead of pinning
   // another copy of the blob per call.

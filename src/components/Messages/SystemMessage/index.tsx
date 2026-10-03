@@ -15,6 +15,8 @@ import { compareMessagesForList } from 'helpers/messagesHalper'
 import { removeVisibleMessageAC, scrollToNewMessageAC, setVisibleMessageAC } from 'store/message/actions'
 import { scrollToNewMessageSelector, unreadScrollToSelector } from 'store/message/selector'
 import { MESSAGE_TYPE } from 'types/enum'
+import { navigateToMessage } from 'helpers/messageListNavigator'
+import { getPinnedMessagePreview, isPinnedMessageAttachmentOnly, isPinnedMessageDeleted } from 'helpers/pinnedMessage'
 
 interface ISystemMessageProps {
   channel: IChannel
@@ -28,6 +30,11 @@ interface ISystemMessageProps {
   backgroundColor?: string
   borderRadius?: string
   setLastVisibleMessageId?: (message: IMessage) => void
+  /** Replaces a PM source-message preview for app-specific message types. */
+  renderPinnedMessagePreview?: (
+    message: IMessage,
+    context: { placement: 'banner' | 'system' }
+  ) => React.ReactNode | null | undefined
 }
 
 const Message = ({
@@ -41,7 +48,8 @@ const Message = ({
   backgroundColor,
   borderRadius,
   contactsMap,
-  setLastVisibleMessageId
+  setLastVisibleMessageId,
+  renderPinnedMessagePreview
 }: ISystemMessageProps) => {
   const { [THEME_COLORS.TEXT_ON_PRIMARY]: textOnPrimary, [THEME_COLORS.OVERLAY_BACKGROUND]: overlayBackground } =
     useColor()
@@ -57,6 +65,25 @@ const Message = ({
   const messageMetas = useMemo(() => {
     return isJSON(message.metadata) ? JSON.parse(message.metadata) : message.metadata
   }, [message.metadata])
+  const actorName = message.incoming
+    ? makeUsername(message.user && contactsMap[message.user.id], message.user, getFromContacts)
+    : 'You'
+  const parentMessageId =
+    message.parentMessage?.id || message.parentMessage?.tid || message.parentMessageId || message.parentId
+  const pinnedMessagePreview = useMemo(() => {
+    return getPinnedMessagePreview(message.parentMessage, contactsMap, getFromContacts)
+  }, [contactsMap, getFromContacts, message.parentMessage])
+  const pinnedMessageDeleted = isPinnedMessageDeleted(message.parentMessage)
+  const pinnedMessageAttachmentOnly = isPinnedMessageAttachmentOnly(message.parentMessage)
+  const customPinnedMessagePreview =
+    pinnedMessageDeleted || !message.parentMessage
+      ? null
+      : renderPinnedMessagePreview?.(message.parentMessage, { placement: 'system' })
+  const pinnedPreview = customPinnedMessagePreview ?? pinnedMessagePreview
+
+  const navigateToPinnedMessage = () => {
+    if (parentMessageId) navigateToMessage(parentMessageId)
+  }
 
   useEffect(() => {
     if (isVisible && !unreadScrollTo) {
@@ -105,57 +132,82 @@ const Message = ({
       backgroundColor={backgroundColor || overlayBackground}
       borderRadius={borderRadius}
     >
-      <span>
-        {message.incoming
-          ? makeUsername(message.user && contactsMap[message.user.id], message.user, getFromContacts)
-          : 'You'}
-        {message.body === 'CC'
-          ? ' created this channel '
-          : message.body === 'CG'
-            ? ' created this group'
-            : message.body === 'AM'
-              ? ` added ${
-                  !!(messageMetas && messageMetas.m) &&
-                  messageMetas.m
-                    .slice(0, 5)
-                    .map((mem: string) =>
-                      mem === user.id
-                        ? 'You'
-                        : ` ${systemMessageUserName(mem, contactsMap[mem], message.mentionedUsers)}`
-                    )
-                } ${
-                  messageMetas && messageMetas.m && messageMetas.m.length > 5
-                    ? `and ${messageMetas.m.length - 5} more`
-                    : ''
-                }`
-              : message.body === 'RM'
-                ? ` removed ${
-                    messageMetas &&
-                    messageMetas.m &&
-                    messageMetas.m
-                      .slice(0, 5)
-                      .map((mem: string) =>
-                        mem === user.id
-                          ? 'You'
-                          : ` ${systemMessageUserName(mem, contactsMap[mem], message.mentionedUsers)}`
-                      )
-                  } ${
-                    messageMetas && messageMetas.m && messageMetas.m.length > 5
-                      ? `and ${messageMetas.m.length - 5} more`
-                      : ''
-                  }`
-                : message.body === 'LG'
-                  ? ' left the group'
-                  : message.body === 'JL'
-                    ? ` joined via invite link`
-                    : message.body === 'ADM'
-                      ? !Number(messageMetas?.autoDeletePeriod)
-                        ? ' disabled disappearing messages'
-                        : ` set the disappearing messages timer to ${formatDisappearingMessageTime(
-                            messageMetas?.autoDeletePeriod ? Number(messageMetas.autoDeletePeriod) : null
-                          )}`
-                      : ''}
-      </span>
+      {message.body === 'PM' ? (
+        <PinnedSystemMessage
+          type='button'
+          onClick={navigateToPinnedMessage}
+          disabled={!parentMessageId}
+          aria-label={parentMessageId ? 'Go to pinned message' : undefined}
+        >
+          {pinnedPreview ? (
+            <React.Fragment>
+              {`${actorName} pinned `}
+              <PinnedMessagePreview>
+                {pinnedMessageDeleted || customPinnedMessagePreview || pinnedMessageAttachmentOnly ? (
+                  pinnedPreview
+                ) : (
+                  <React.Fragment>"{pinnedPreview}"</React.Fragment>
+                )}
+              </PinnedMessagePreview>
+              {!pinnedMessageDeleted && '.'}
+            </React.Fragment>
+          ) : (
+            `${actorName} pinned a message.`
+          )}
+        </PinnedSystemMessage>
+      ) : (
+        <span>
+          <React.Fragment>
+            {actorName}
+            {message.body === 'CC'
+              ? ' created this channel '
+              : message.body === 'CG'
+                ? ' created this group'
+                : message.body === 'AM'
+                  ? ` added ${
+                      !!(messageMetas && messageMetas.m) &&
+                      messageMetas.m
+                        .slice(0, 5)
+                        .map((mem: string) =>
+                          mem === user.id
+                            ? 'You'
+                            : ` ${systemMessageUserName(mem, contactsMap[mem], message.mentionedUsers)}`
+                        )
+                    } ${
+                      messageMetas && messageMetas.m && messageMetas.m.length > 5
+                        ? `and ${messageMetas.m.length - 5} more`
+                        : ''
+                    }`
+                  : message.body === 'RM'
+                    ? ` removed ${
+                        messageMetas &&
+                        messageMetas.m &&
+                        messageMetas.m
+                          .slice(0, 5)
+                          .map((mem: string) =>
+                            mem === user.id
+                              ? 'You'
+                              : ` ${systemMessageUserName(mem, contactsMap[mem], message.mentionedUsers)}`
+                          )
+                      } ${
+                        messageMetas && messageMetas.m && messageMetas.m.length > 5
+                          ? `and ${messageMetas.m.length - 5} more`
+                          : ''
+                      }`
+                    : message.body === 'LG'
+                      ? ' left the group'
+                      : message.body === 'JL'
+                        ? ` joined via invite link`
+                        : message.body === 'ADM'
+                          ? !Number(messageMetas?.autoDeletePeriod)
+                            ? ' disabled disappearing messages'
+                            : ` set the disappearing messages timer to ${formatDisappearingMessageTime(
+                                messageMetas?.autoDeletePeriod ? Number(messageMetas.autoDeletePeriod) : null
+                              )}`
+                          : ''}
+          </React.Fragment>
+        </span>
+      )}
     </Container>
   )
 }
@@ -164,6 +216,10 @@ export default React.memo(Message, (prevProps, nextProps) => {
   return (
     prevProps.message.deliveryStatus === nextProps.message.deliveryStatus &&
     prevProps.message.state === nextProps.message.state &&
+    prevProps.message.body === nextProps.message.body &&
+    prevProps.message.parentMessage === nextProps.message.parentMessage &&
+    prevProps.message.parentMessageId === nextProps.message.parentMessageId &&
+    prevProps.message.parentId === nextProps.message.parentId &&
     prevProps.message.userMarkers === nextProps.message.userMarkers &&
     prevProps.nextMessage === nextProps.nextMessage
   )
@@ -188,7 +244,8 @@ export const Container = styled.div<{
   text-align: center;
   z-index: 10;
   background: transparent;
-  span {
+  > span,
+  button {
     display: inline-block;
     max-width: 380px;
     font-style: normal;
@@ -206,4 +263,19 @@ export const Container = styled.div<{
     text-overflow: ellipsis;
     overflow: hidden;
   }
+`
+
+const PinnedSystemMessage = styled.button`
+  border: 0;
+  cursor: pointer;
+  font: inherit;
+  white-space: nowrap;
+
+  &:disabled {
+    cursor: default;
+  }
+`
+
+const PinnedMessagePreview = styled.strong`
+  font-weight: 500;
 `

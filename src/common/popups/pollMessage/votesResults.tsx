@@ -192,7 +192,7 @@ const OptionsList = styled.div<{ thumbColor: string; titleHeight: number }>`
   width: calc(100% + 20px);
   padding-right: 14px;
   box-sizing: border-box;
-  scrollbar-width: none;
+  scrollbar-width: thin;
   scrollbar-color: transparent transparent;
   overscroll-behavior: none;
 
@@ -217,7 +217,6 @@ const OptionsList = styled.div<{ thumbColor: string; titleHeight: number }>`
   }
 
   &.show-scrollbar {
-    scrollbar-width: thin;
     scrollbar-color: ${(props) => props.thumbColor} transparent;
   }
 `

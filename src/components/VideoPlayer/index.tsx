@@ -13,13 +13,23 @@ import { THEME_COLORS } from 'UIHelper/constants'
 
 interface IVideoPlayerProps {
   src: string
+  poster?: string
   videoFileId?: string
   activeFileId?: string
   onMouseDown?: (e: React.MouseEvent) => void
   readyToPlay: boolean
+  onMediaEvent?: (event: string, details: Record<string, string | number | boolean | null>) => void
 }
 
-const VideoPlayer = ({ src, videoFileId, activeFileId, onMouseDown, readyToPlay }: IVideoPlayerProps) => {
+const VideoPlayer = ({
+  src,
+  poster,
+  videoFileId,
+  activeFileId,
+  onMouseDown,
+  readyToPlay,
+  onMediaEvent
+}: IVideoPlayerProps) => {
   const { [THEME_COLORS.TEXT_ON_PRIMARY]: textOnPrimary } = useColor()
   const containerRef = useRef<HTMLDivElement>(null)
   const videoRef = useRef<HTMLVideoElement>(null)
@@ -111,6 +121,13 @@ const VideoPlayer = ({ src, videoFileId, activeFileId, onMouseDown, readyToPlay 
   }
   const handleVideoProgress = (e: React.SyntheticEvent<HTMLVideoElement>) => {
     const video = e.currentTarget
+    onMediaEvent?.('ready-state changed', {
+      src,
+      videoFileId: videoFileId || null,
+      activeFileId: activeFileId || null,
+      readyState: video.readyState,
+      duration: Number.isFinite(video.duration) ? video.duration : null
+    })
     if (video.readyState >= 2) {
       setIsLoaded(true)
       if (video.duration && !videoTime) {
@@ -132,6 +149,15 @@ const VideoPlayer = ({ src, videoFileId, activeFileId, onMouseDown, readyToPlay 
   }
 
   const handleVideoError = (e: React.SyntheticEvent<HTMLVideoElement>) => {
+    const video = e.currentTarget
+    onMediaEvent?.('failed to load', {
+      src,
+      videoFileId: videoFileId || null,
+      activeFileId: activeFileId || null,
+      readyState: video.readyState,
+      networkState: video.networkState,
+      errorCode: video.error?.code || null
+    })
     console.error('Video error:', e)
     setIsLoaded(false)
     setPlaying(false)
@@ -186,15 +212,23 @@ const VideoPlayer = ({ src, videoFileId, activeFileId, onMouseDown, readyToPlay 
     }
   }, [activeFileId, videoFileId])
 
-  // Autoplay when the video finishes loading (after a 1-second delay)
+  // Start the media pipeline as soon as an active source is mounted. Waiting
+  // for `loadeddata` first can stall a cached blob URL because a browser using
+  // `preload="metadata"` is not required to decode its first frame yet.
   useEffect(() => {
-    if (!isLoaded) return
     if (!videoRef.current) return
     if (!readyToPlay) return
     if (activeFileId !== videoFileId) return
     videoRef.current
       .play()
-      .then(() => setPlaying(true))
+      .then(() => {
+        onMediaEvent?.('autoplay started', {
+          src,
+          videoFileId: videoFileId || null,
+          activeFileId: activeFileId || null
+        })
+        setPlaying(true)
+      })
       .catch(() => {
         // Browser blocked unmuted autoplay — retry muted
         if (videoRef.current) {
@@ -202,11 +236,24 @@ const VideoPlayer = ({ src, videoFileId, activeFileId, onMouseDown, readyToPlay 
           setIsMuted(true)
           videoRef.current
             .play()
-            .then(() => setPlaying(true))
-            .catch(() => {})
+            .then(() => {
+              onMediaEvent?.('muted autoplay started', {
+                src,
+                videoFileId: videoFileId || null,
+                activeFileId: activeFileId || null
+              })
+              setPlaying(true)
+            })
+            .catch(() => {
+              onMediaEvent?.('autoplay blocked', {
+                src,
+                videoFileId: videoFileId || null,
+                activeFileId: activeFileId || null
+              })
+            })
         }
       })
-  }, [isLoaded, readyToPlay])
+  }, [activeFileId, onMediaEvent, readyToPlay, src, videoFileId])
 
   // Handle fullscreen changes (e.g., user presses ESC)
   useEffect(() => {
@@ -223,6 +270,12 @@ const VideoPlayer = ({ src, videoFileId, activeFileId, onMouseDown, readyToPlay 
   // Initialize video when src changes
   useEffect(() => {
     if (videoRef.current && src) {
+      onMediaEvent?.('source assigned', {
+        src,
+        videoFileId: videoFileId || null,
+        activeFileId: activeFileId || null,
+        readyState: videoRef.current.readyState
+      })
       // Reset state when src changes
       setIsLoaded(false)
       setPlaying(false)
@@ -284,12 +337,14 @@ const VideoPlayer = ({ src, videoFileId, activeFileId, onMouseDown, readyToPlay 
         ref={videoRef}
         className='video'
         src={src}
+        poster={poster}
         onLoadedData={handleVideoProgress}
         onLoadedMetadata={handleVideoProgress}
+        onCanPlay={handleVideoProgress}
         onEnded={handleVideoEnded}
         onError={handleVideoError}
         playsInline
-        preload='metadata'
+        preload='auto'
         controls={isFullScreen}
       />
 
@@ -346,7 +401,7 @@ const VideoPlayer = ({ src, videoFileId, activeFileId, onMouseDown, readyToPlay 
           </FullScreenWrapper>
         </ControlsContainer>
       )}
-      {!isLoaded && (
+      {!isLoaded && !poster && (
         <UploadCont>
           <UploadingIcon />
         </UploadCont>

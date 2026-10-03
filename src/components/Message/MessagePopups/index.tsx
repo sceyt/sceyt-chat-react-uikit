@@ -1,8 +1,9 @@
 import React from 'react'
 import ConfirmPopup from 'common/popups/delete'
-import ForwardMessagePopup from 'common/popups/forwardMessage'
+import ForwardMessagePopup, { IForwardMessageNote } from 'common/popups/forwardMessage'
 import MessageInfo from 'common/popups/messageInfo'
 import ConfirmEndPollPopup from 'common/popups/pollMessage/ConfirmEndPollPopup'
+import PinMessagePopup from 'common/popups/pinMessage'
 import { IChannel, IMessage } from 'types'
 import { DEFAULT_CHANNEL_TYPE } from 'helpers/constants'
 
@@ -12,6 +13,7 @@ interface MessagePopupsProps {
   deletePopupOpen: boolean
   forwardPopupOpen: boolean
   infoPopupOpen: boolean
+  pinPopupOpen: boolean
   showEndVoteConfirmPopup: boolean
   allowEditDeleteIncomingMessage?: boolean
   showInfoMessageProps?: any
@@ -19,12 +21,15 @@ interface MessagePopupsProps {
   anchorRef: React.RefObject<HTMLElement>
   onDeleteMessage: (deleteOption: 'forMe' | 'forEveryone') => void
   onToggleDeletePopup: () => void
-  onForwardMessage: (channelIds: string[]) => void
+  onForwardMessage: (channelIds: string[], accompanyingMessage?: IForwardMessageNote) => void
   onToggleForwardPopup: () => void
   onToggleInfoPopup: () => void
   onEndVote: () => void
   onToggleEndVotePopup: () => void
   onOpenUserProfile: (user?: any) => void
+  onTogglePinPopup: () => void
+  onPinMessage: (scope: number) => void
+  canPinForAll: boolean
 }
 
 const MessagePopups: React.FC<MessagePopupsProps> = ({
@@ -33,6 +38,7 @@ const MessagePopups: React.FC<MessagePopupsProps> = ({
   deletePopupOpen,
   forwardPopupOpen,
   infoPopupOpen,
+  pinPopupOpen,
   showEndVoteConfirmPopup,
   allowEditDeleteIncomingMessage,
   showInfoMessageProps = {},
@@ -45,7 +51,10 @@ const MessagePopups: React.FC<MessagePopupsProps> = ({
   onToggleInfoPopup,
   onEndVote,
   onToggleEndVotePopup,
-  onOpenUserProfile
+  onOpenUserProfile,
+  onTogglePinPopup,
+  onPinMessage,
+  canPinForAll
 }) => {
   return (
     <React.Fragment>
@@ -67,8 +76,8 @@ const MessagePopups: React.FC<MessagePopupsProps> = ({
         <ForwardMessagePopup
           handleForward={onForwardMessage}
           togglePopup={onToggleForwardPopup}
-          buttonText='Forward'
           title='Forward message'
+          forwardMessages={[message]}
         />
       )}
       {infoPopupOpen && (
@@ -91,6 +100,7 @@ const MessagePopups: React.FC<MessagePopupsProps> = ({
           description='Are you sure you want to end this poll? People will no longer be able to vote.'
         />
       )}
+      {pinPopupOpen && <PinMessagePopup canPinForAll={canPinForAll} onClose={onTogglePinPopup} onPin={onPinMessage} />}
     </React.Fragment>
   )
 }

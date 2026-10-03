@@ -49,6 +49,7 @@ export interface IAttachment {
   user?: IUser
   tid?: string
   attachmentUrl: string
+  videoPreviewBlob?: Blob
   data: any
   cachedUrl?: string
 }
@@ -156,6 +157,13 @@ export interface IPollDetails {
   closed: boolean
 }
 
+export interface IPinDetails {
+  pinned: boolean
+  pinnedTill?: Date
+  /** `SHARED` (0) or `PERSONAL` (1), supplied by `Message.pin_details`. */
+  pinType?: number
+}
+
 export interface IMessage {
   id: string
   tid?: string
@@ -181,6 +189,7 @@ export interface IMessage {
   mentionedUsers: IUser[]
   requestedMentionUserIds: string[] | null
   parentMessage: IMessage | null
+  parentMessageId?: string
   bodyAttributes: IBodyAttribute[] | []
   parentId?: string
   repliedInThread?: boolean
@@ -194,6 +203,7 @@ export interface IMessage {
     user: IUser
   }
   pollDetails?: IPollDetails
+  pinDetails?: IPinDetails
   viewOnce?: boolean
 }
 

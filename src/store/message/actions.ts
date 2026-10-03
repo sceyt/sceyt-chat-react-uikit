@@ -77,6 +77,8 @@ import {
   clearActivePaginationIntent,
   setAttachmentsLoadingState,
   setSendMessageInputHeight,
+  setPinnedMessagesListOpen,
+  requestPinnedMessagesListClose,
   setMessageForReply,
   uploadAttachmentCompilation,
   setReactionsList,
@@ -149,10 +151,16 @@ export function resendMessageAC(message: any, channelId: string, connectionState
   }
 }
 
-export function forwardMessageAC(message: any, channelId: string, connectionState: string, isForward: boolean = true) {
+export function forwardMessageAC(
+  message: any,
+  channelId: string,
+  connectionState: string,
+  isForward: boolean = true,
+  accompanyingMessage?: any
+) {
   return {
     type: FORWARD_MESSAGE,
-    payload: { message, channelId, connectionState, isForward }
+    payload: { message, channelId, connectionState, isForward, accompanyingMessage }
   }
 }
 
@@ -614,6 +622,14 @@ export function resumeAttachmentUploadingAC(attachmentId: string) {
 
 export function setSendMessageInputHeightAC(height: number) {
   return setSendMessageInputHeight({ height })
+}
+
+export function setPinnedMessagesListOpenAC(isOpen: boolean) {
+  return setPinnedMessagesListOpen({ isOpen })
+}
+
+export function requestPinnedMessagesListCloseAC() {
+  return requestPinnedMessagesListClose()
 }
 
 export function setMessageMenuOpenedAC(messageId: string) {

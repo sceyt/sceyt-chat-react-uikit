@@ -9,6 +9,7 @@ import {
   MESSAGE_LOAD_DIRECTION,
   MESSAGES_MAX_PAGE_COUNT,
   PendingPollAction,
+  removeReactionFromTotals,
   updateMessageDeliveryStatusAndMarkers,
   shouldSkipDeliveryStatusUpdate
 } from '../../helpers/messagesHalper'
@@ -37,6 +38,17 @@ export type PendingMessageMutation =
       originalMessage: IMessage
       queuedAt: number
     }
+
+export type VisibleMessageEntry = {
+  id?: string
+  localRef: string
+  sortKey: string
+}
+
+export type VisibleMessagesMap = {
+  [key: string]: VisibleMessageEntry
+}
+
 export interface IMessageStore {
   loadingPrevMessagesState: number | null
   loadingNextMessagesState: number | null
@@ -69,6 +81,8 @@ export interface IMessageStore {
     isIncomingMessage: boolean
   }
   showScrollToNewMessageButton: boolean
+  pinnedMessagesListOpen: boolean
+  pinnedMessagesListCloseRequested: boolean
   sendMessageInputHeight: number
   attachmentsUploadingState: { [key: string]: any }
   scrollToMentionedMessage: boolean | null
@@ -104,16 +118,6 @@ export interface IMessageStore {
   visibleMessagesMap: VisibleMessagesMap
 }
 
-export type VisibleMessageEntry = {
-  id?: string
-  localRef: string
-  sortKey: string
-}
-
-export type VisibleMessagesMap = {
-  [key: string]: VisibleMessageEntry
-}
-
 const initialState: IMessageStore = {
   loadingPrevMessagesState: null,
   loadingNextMessagesState: null,
@@ -140,6 +144,8 @@ const initialState: IMessageStore = {
     isIncomingMessage: false
   },
   showScrollToNewMessageButton: false,
+  pinnedMessagesListOpen: false,
+  pinnedMessagesListCloseRequested: false,
   sendMessageInputHeight: 0,
   messageForReply: null,
   attachmentsUploadingState: {},
@@ -377,6 +383,10 @@ const messageSlice = createSlice({
         const beforeMax =
           isForwardMarker && maxMarkerId !== null && !!message.id ? BigInt(message.id) <= maxMarkerId : false
         if (!inMap && !beforeMax) continue
+        // A local queued message can already have an id while its send is
+        // still pending. A delivery marker for an earlier confirmed message
+        // must not make that queued item look delivered before it is sent.
+        if (!inMap && message.deliveryStatus === MESSAGE_DELIVERY_STATUS.PENDING) continue
         if (message.state !== 'Deleted') {
           // For cascade messages (not explicitly in the marker map), skip if already at this status or higher
           if (!inMap && shouldSkipDeliveryStatusUpdate(markerName, message.deliveryStatus)) continue
@@ -417,9 +427,14 @@ const messageSlice = createSlice({
             if (params?.deliveryStatus) {
               statusUpdatedMessage = updateMessageDeliveryStatusAndMarkers(message, params)
             }
+            const forwardingDetails =
+              message.forwardingDetails && params.forwardingDetails
+                ? { ...message.forwardingDetails, ...params.forwardingDetails }
+                : undefined
             const messageOldData: IMessage = {
               ...message,
               ...params,
+              ...(forwardingDetails ? { forwardingDetails } : {}),
               userMarkers: [...(message.userMarkers || []), ...(params.userMarkers || [])],
               ...statusUpdatedMessage
             }
@@ -482,18 +497,12 @@ const messageSlice = createSlice({
       const { message, reaction, isSelf } = action.payload
       state.activeChannelMessages = state.activeChannelMessages.map((msg) => {
         if (msg.id === message.id) {
-          let slfReactions = [...msg.userReactions]
-          if (isSelf) {
-            if (slfReactions) {
-              slfReactions.push(reaction)
-            } else {
-              slfReactions = [reaction]
-            }
-          }
+          const currentUserReactions = msg.userReactions || []
+          const userReactions = isSelf ? [...currentUserReactions, reaction] : currentUserReactions
           return {
             ...msg,
-            userReactions: slfReactions,
-            reactionTotals: message.reactionTotals
+            userReactions,
+            reactionTotals: message.reactionTotals || msg.reactionTotals || []
           }
         }
         return msg
@@ -511,13 +520,13 @@ const messageSlice = createSlice({
       const { reaction, message, isSelf } = action.payload
       state.activeChannelMessages = state.activeChannelMessages.map((msg) => {
         if (msg.id === message.id) {
-          let { userReactions } = msg
+          let userReactions = msg.userReactions || []
           if (isSelf) {
-            userReactions = msg.userReactions.filter((selfReaction: IReaction) => selfReaction.key !== reaction.key)
+            userReactions = userReactions.filter((selfReaction: IReaction) => selfReaction.key !== reaction.key)
           }
           return {
             ...msg,
-            reactionTotals: message.reactionTotals,
+            reactionTotals: removeReactionFromTotals(msg.reactionTotals, reaction.key),
             userReactions
           }
         }
@@ -658,6 +667,22 @@ const messageSlice = createSlice({
 
     setSendMessageInputHeight: (state, action: PayloadAction<{ height: number }>) => {
       state.sendMessageInputHeight = action.payload.height
+    },
+
+    setPinnedMessagesListOpen: (state, action: PayloadAction<{ isOpen: boolean }>) => {
+      state.pinnedMessagesListOpen = action.payload.isOpen
+      state.pinnedMessagesListCloseRequested = false
+    },
+
+    requestPinnedMessagesListClose: (state) => {
+      if (state.pinnedMessagesListOpen) {
+        // Restore the surrounding chat immediately. The locally mounted pinned
+        // list receives the close request and remains only long enough to play
+        // its exit animation.
+        state.pinnedMessagesListOpen = false
+        state.pinnedMessagesListCloseRequested = true
+        state.selectedMessagesMap = null
+      }
     },
 
     setMessageForReply: (state, action: PayloadAction<{ message: IMessage | null }>) => {
@@ -1029,6 +1054,8 @@ export const {
   clearActivePaginationIntent,
   setAttachmentsLoadingState,
   setSendMessageInputHeight,
+  setPinnedMessagesListOpen,
+  requestPinnedMessagesListClose,
   setMessageForReply,
   uploadAttachmentCompilation,
   removeAttachmentUploadingState,

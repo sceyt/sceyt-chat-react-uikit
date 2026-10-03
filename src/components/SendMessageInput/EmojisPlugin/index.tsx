@@ -14,6 +14,8 @@ import { getEmojisCategoryTitle } from '../../../helpers'
 import EMOJIS from '../../Emojis/emojis'
 import { useColor } from '../../../hooks'
 import log from 'loglevel'
+import { themeSelector } from 'store/theme/selector'
+import { useSelector } from 'store/hooks'
 
 interface EmojiCollectionProps {
   activeCollection: boolean
@@ -73,8 +75,11 @@ function EmojisPopup({
     [THEME_COLORS.BACKGROUND_SECTIONS]: backgroundSections,
     [THEME_COLORS.TEXT_SECONDARY]: textSecondary,
     [THEME_COLORS.TEXT_FOOTNOTE]: textFootnote,
-    [THEME_COLORS.BORDER]: border
+    [THEME_COLORS.BORDER]: border,
+    [THEME_COLORS.SURFACE_2]: scrollbarThumbColor,
+    [THEME_COLORS.BACKGROUND]: background
   } = useColor()
+  const theme = useSelector(themeSelector)
 
   let richTextEditor: any
   try {
@@ -144,6 +149,7 @@ function EmojisPopup({
     }, 300)
   }, [])
 
+  console.log(theme, theme === 'dark' ? background : scrollbarThumbColor)
   return (
     <Container
       backgroundColor={backgroundSections}
@@ -177,7 +183,11 @@ function EmojisPopup({
           {getEmojisCategoryTitle(activeCollection)}
         </EmojiHeader>
       )}
-      <EmojiSection ref={emojiContainerRef} onScroll={handleEmojiListScroll}>
+      <EmojiSection
+        ref={emojiContainerRef}
+        onScroll={handleEmojiListScroll}
+        scrollbarThumbColor={theme === 'dark' ? background : scrollbarThumbColor}
+      >
         <AllEmojis>
           {EMOJIS.map((emojiBigCollection, bigColIndex) => {
             const mainCollectionKey = emojiBigCollection.key
@@ -289,9 +299,29 @@ const EmojiHeader = styled.div<{ color: string; padding?: string }>`
   display: flex;
   padding: ${(props) => props.padding || '6px 18px'};
 `
-const EmojiSection = styled.div`
+const EmojiSection = styled.div<{ scrollbarThumbColor: string }>`
   height: 180px;
   overflow-x: hidden;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: ${(props) => props.scrollbarThumbColor} transparent;
+
+  &::-webkit-scrollbar {
+    width: 6px;
+  }
+
+  &::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  &::-webkit-scrollbar-thumb {
+    background: ${(props) => props.scrollbarThumbColor};
+    border-radius: 6px;
+  }
+
+  &::-webkit-scrollbar-thumb:hover {
+    background: ${(props) => props.scrollbarThumbColor};
+  }
 
   & ::selection {
     color: inherit;

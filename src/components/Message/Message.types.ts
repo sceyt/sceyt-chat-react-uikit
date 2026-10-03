@@ -26,6 +26,10 @@ export interface IMessageActions {
   handleOpenEmojis?: () => void
   handleSelectMessage?: (event?: any) => void
   handleReplyMessage?: () => void
+  handleOpenPinMessage?: () => void
+  handleUnpinMessage?: () => void
+  pinnedMessage?: any
+  isPinned?: boolean
   isThreadMessage?: boolean
   rtlDirection?: boolean
   // Render the actions bar under the bubble (set when there is no room above)
@@ -70,6 +74,10 @@ interface ICustomMessageItem {
   handleOpenInfoMessage?: () => void
   handleOpenEmojis?: () => void
   handleReplyMessage?: (threadReply?: boolean) => void
+  handleOpenPinMessage?: () => void
+  handleUnpinMessage?: () => void
+  pinnedMessage?: any
+  isPinned?: boolean
   handleMouseEnter: () => void
   handleMouseLeave: () => void
   closeMessageActions?: () => void
@@ -81,6 +89,7 @@ interface ICustomMessageItem {
   isThreadMessage?: boolean
   handleOpenUserProfile: (user: IUser) => void
   unsupportedMessage: boolean
+  isPinnedMessagesList?: boolean
   onInviteLinkClick?: (key: string) => void
   ifLatestAndHasNotPreview: boolean
 }
@@ -98,6 +107,8 @@ export interface IMessageProps {
   queueReadMarker?: (channelId: string, messageId?: string) => void
   queueDeliveredMarker?: (channelId: string, messageId?: string) => void
   disableAutoReadTracking?: boolean
+  /** The message is rendered inside the pinned-messages overlay, not #scrollableDiv. */
+  isPinnedMessagesList?: boolean
   handleScrollToRepliedMessage: (msgId: string) => void
   handleMediaItemClick?: (attachment: IAttachment) => void
   unreadMessageId: string

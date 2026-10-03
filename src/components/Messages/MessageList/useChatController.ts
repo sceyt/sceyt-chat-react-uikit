@@ -161,7 +161,7 @@ export interface UseChatControllerParams {
   tabIsActive?: boolean
 }
 
-const formatMessageDateLabel = (message: IMessage) => {
+export const formatMessageDateLabel = (message: IMessage) => {
   const current = new Date(message.createdAt)
   const now = new Date()
   const isToday =
@@ -428,6 +428,11 @@ export function useChatController({
   const highlightedItemIdRef = useRef<string | null>(null)
   const highlightTimeoutRef = useRef<NodeJS.Timeout | number | null>(null)
   const unreadRestoreCompletedRef = useRef(false)
+  const previousUnreadScrollToRef = useRef(unreadScrollTo)
+  const unreadScrollToRef = useRef(unreadScrollTo)
+  const tabIsActiveRef = useRef(tabIsActive)
+  const hasNextMessagesRef = useRef(hasNextMessages)
+  const needsVisibleUnreadCheckRef = useRef(false)
   const historyLoadArmedRef = useRef(true)
   const latestLoadArmedRef = useRef(true)
   const pendingNewestCountRef = useRef(0)
@@ -537,6 +542,9 @@ export function useChatController({
     visibleMessagesMapRef.current = visibleMessagesMap
     channelRef.current = channel
     connectionStatusRef.current = connectionStatus
+    unreadScrollToRef.current = unreadScrollTo
+    tabIsActiveRef.current = tabIsActive
+    hasNextMessagesRef.current = hasNext
   })
 
   const oldestConfirmedMessage = getFirstConfirmedMessage(messages)
@@ -573,13 +581,22 @@ export function useChatController({
     const visibleMessageRefs = new Set(messages.map((message) => getMessageLocalRef(message)).filter(Boolean))
     return pendingMessages.some((message) => !visibleMessageRefs.has(getMessageLocalRef(message)))
   }, [channel.id, messages])
+  // An optimistic outgoing message becomes channel.lastMessage before it has a
+  // confirmed id. Keep using the cached confirmed tail to detect that a
+  // history window still has newer content; otherwise jumpToLatest mistakes
+  // the bottom of that history page for the actual chat tail.
+  const cachedLatestConfirmedMessageId = newestConfirmedMessageId ? getLatestCachedConfirmedMessageId(channel.id) : ''
   const hasNext =
     hasNextMessages ||
     (newestConfirmedMessage ? hasNextContiguousInMap(channel.id, newestConfirmedMessage) : false) ||
+    (newestConfirmedMessageId && cachedLatestConfirmedMessageId
+      ? compareMessageIds(cachedLatestConfirmedMessageId, newestConfirmedMessageId) > 0
+      : false) ||
     (newestConfirmedMessageId && channel.lastMessage?.id
       ? compareMessageIds(channel.lastMessage.id, newestConfirmedMessageId) > 0
       : false) ||
     hiddenPendingTailExists
+  hasNextMessagesRef.current = hasNext
   const isScrollInteractionActive = useCallback(() => Date.now() - lastScrollActivityAtRef.current < SCROLL_IDLE_MS, [])
   const clearScrollIdleTimer = useCallback(() => {
     if (scrollIdleTimerRef.current !== null) {
@@ -707,24 +724,46 @@ export function useChatController({
   )
 
   const queueVisibleUnreadCheck = useCallback(() => {
-    if (pendingVisibleUnreadFrameRef.current !== null || unreadScrollTo || !tabIsActive) {
+    if (pendingVisibleUnreadFrameRef.current !== null) {
       return
     }
 
+    if (
+      unreadScrollToRef.current ||
+      !tabIsActiveRef.current ||
+      connectionStatusRef.current !== CONNECTION_STATUS.CONNECTED
+    ) {
+      needsVisibleUnreadCheckRef.current = true
+      return
+    }
+
+    const scheduledChannelId = channel.id
     pendingVisibleUnreadFrameRef.current = requestAnimationFrame(() => {
       pendingVisibleUnreadFrameRef.current = null
+      const currentChannel = channelRef.current
+      if (
+        currentChannel.id !== scheduledChannelId ||
+        unreadScrollToRef.current ||
+        !tabIsActiveRef.current ||
+        connectionStatusRef.current !== CONNECTION_STATUS.CONNECTED
+      ) {
+        needsVisibleUnreadCheckRef.current = true
+        return
+      }
+
       const container = scrollRef.current
       if (!container) {
         return
       }
 
-      const unreadStartIndex = getUnreadTrackingStartIndex(messages)
+      const currentMessages = messagesRef.current
+      const unreadStartIndex = getUnreadTrackingStartIndex(currentMessages)
       if (unreadStartIndex < 0) {
         return
       }
 
-      const candidateUnreadMessages = messages.slice(unreadStartIndex)
-      const pinnedToLatestWithoutMorePages = !hasNext && isPinnedToLatest(container)
+      const candidateUnreadMessages = currentMessages.slice(unreadStartIndex)
+      const pinnedToLatestWithoutMorePages = !hasNextMessagesRef.current && isPinnedToLatest(container)
       const containerRect = pinnedToLatestWithoutMorePages ? null : container.getBoundingClientRect()
       const visibleUnreadMessages = candidateUnreadMessages
         .map((message) => {
@@ -749,27 +788,18 @@ export function useChatController({
         .filter(Boolean) as IMessage[]
 
       const ids = visibleUnreadMessages.filter(isUnreadIncomingMessage).map((message) => message.id)
-      if (!ids.length || !channel.id || !channel.newMessageCount) {
+      if (!ids.length || !currentChannel.id || !currentChannel.newMessageCount) {
         return
       }
 
       ids.forEach((id) => {
         visibleUnreadReportedRef.current.add(id)
       })
+      needsVisibleUnreadCheckRef.current = false
       registerLocallyReadUnreadMessages(ids.length)
-      dispatch(markMessagesAsReadAC(channel.id, ids))
+      dispatch(markMessagesAsReadAC(currentChannel.id, ids))
     })
-  }, [
-    channel.id,
-    channel.lastDisplayedMessageId,
-    channel.newMessageCount,
-    dispatch,
-    hasNext,
-    messages,
-    registerLocallyReadUnreadMessages,
-    unreadScrollTo,
-    tabIsActive
-  ])
+  }, [channel.id, dispatch, registerLocallyReadUnreadMessages])
 
   const timelineItems = useMemo<TimelineItem[]>(() => {
     const unreadStartIndex = getUnreadDividerIndex(messages, unreadMessageId)
@@ -2562,6 +2592,31 @@ export function useChatController({
       cancelAnimationFrame(frameId)
     }
   }, [dispatch, loadingNextMessages, loadingPrevMessages, messages.length, unreadScrollTo])
+
+  useEffect(() => {
+    const previousUnreadScrollTo = previousUnreadScrollToRef.current
+    previousUnreadScrollToRef.current = unreadScrollTo
+
+    if (!previousUnreadScrollTo || unreadScrollTo) {
+      return
+    }
+
+    needsVisibleUnreadCheckRef.current = true
+    queueVisibleUnreadCheck()
+  }, [queueVisibleUnreadCheck, unreadScrollTo])
+
+  useEffect(() => {
+    if (
+      !needsVisibleUnreadCheckRef.current ||
+      unreadScrollTo ||
+      !tabIsActive ||
+      connectionStatus !== CONNECTION_STATUS.CONNECTED
+    ) {
+      return
+    }
+
+    queueVisibleUnreadCheck()
+  }, [connectionStatus, queueVisibleUnreadCheck, tabIsActive, unreadScrollTo])
 
   useEffect(
     () => () => {

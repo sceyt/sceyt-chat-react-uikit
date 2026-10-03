@@ -33,7 +33,15 @@ import {
   updateChannelLastMessageAC,
   updateChannelLastMessageStatusAC
 } from '../channel/actions'
-import { addMessagesAC, resendPendingMessageMutationsAC, updateMessagesMarkersAC, updateMessagesStatusAC } from '../message/actions'
+import {
+  addMessagesAC,
+  addReactionToMessageAC,
+  deleteReactionFromMessageAC,
+  resendPendingMessageMutationsAC,
+  updateMessageAC,
+  updateMessagesMarkersAC,
+  updateMessagesStatusAC
+} from '../message/actions'
 import { getRolesAC } from '../member/actions'
 import { setConnectionStatusAC } from '../user/actions'
 import { CONNECTION_STATUS } from '../user/constants'
@@ -261,6 +269,197 @@ describe('event message last-message handling', () => {
       { name: MESSAGE_DELIVERY_STATUS.READ, count: 1 }
     ])
     expect(getChannelFromMap(channelId)?.lastMessage.userMarkers).toEqual([])
+  })
+
+  it('does not let a late sent message event downgrade the delivered channel-list preview', async () => {
+    const currentUser = makeUser({ id: 'current-user' })
+    const recipient = makeUser({ id: 'recipient-user' })
+    const channelId = 'channel-late-sent-event-after-delivery-marker'
+    const sentMessage = makeMessage({
+      id: '1220',
+      tid: 'late-sent-event-tid',
+      channelId,
+      body: 'resend after packet loss',
+      incoming: false,
+      user: currentUser,
+      deliveryStatus: MESSAGE_DELIVERY_STATUS.SENT
+    })
+    const channel = makeChannel({ id: channelId, lastMessage: sentMessage })
+    const deliveredMarker = {
+      messageIds: [sentMessage.id],
+      user: recipient,
+      name: MESSAGE_DELIVERY_STATUS.DELIVERED,
+      createdAt: new Date('2026-04-02T12:10:00.000Z')
+    } as any
+
+    setActiveChannelId(channelId)
+    setChannelInMap(channel)
+    addChannelToAllChannels(channel)
+    addMessageToMap(channelId, sentMessage)
+
+    await runSaga(
+      { getState: getSagaState, dispatch: () => undefined },
+      __eventsTestables.handleMessageMarkersReceivedEvent,
+      { channelId, markerList: deliveredMarker },
+      { user: currentUser }
+    ).toPromise()
+
+    const deliveredLastMessage = getChannelFromMap(channelId)!.lastMessage
+    expect(deliveredLastMessage.deliveryStatus).toBe(MESSAGE_DELIVERY_STATUS.DELIVERED)
+
+    // The delayed confirmation event is the same message but still carries
+    // the original SENT status. This is the order captured in the browser
+    // trace after a resend under packet loss.
+    const staleSentMessage = { ...sentMessage }
+    const staleChannel = { ...channel, lastMessage: staleSentMessage }
+    mockStore.getState = jest.fn(() => ({
+      ...defaultStoreState,
+      ChannelReducer: { channels: [{ ...channel, lastMessage: deliveredLastMessage }] },
+      MessageReducer: {
+        ...defaultStoreState.MessageReducer,
+        activeChannelMessages: [deliveredLastMessage]
+      }
+    }))
+    const dispatched: any[] = []
+
+    await runSaga(
+      {
+        getState: getSagaState,
+        dispatch: (action) => {
+          dispatched.push(action)
+        }
+      },
+      __eventsTestables.handleChannelMessageEvent,
+      { channel: staleChannel, message: staleSentMessage },
+      { user: currentUser }
+    ).toPromise()
+
+    const lastMessageUpdates = dispatched.filter(
+      (action) =>
+        action.type === updateChannelLastMessageAC(staleSentMessage, staleChannel as any).type ||
+        (action.type === updateChannelDataAC(channelId, {}).type && action.payload?.config?.lastMessage)
+    )
+
+    expect(lastMessageUpdates).toEqual([])
+    expect(
+      lastMessageUpdates.some(
+        (action) =>
+          action.payload?.message?.deliveryStatus === MESSAGE_DELIVERY_STATUS.SENT ||
+          action.payload?.config?.lastMessage?.deliveryStatus === MESSAGE_DELIVERY_STATUS.SENT
+      )
+    ).toBe(false)
+    expect(getChannelFromMap(channelId)?.lastMessage.deliveryStatus).toBe(MESSAGE_DELIVERY_STATUS.DELIVERED)
+  })
+
+  it('keeps cached self reactions untouched for remote reaction-added events and tolerates missing cached messages', async () => {
+    const currentUser = makeUser({ id: 'current-user' })
+    const remoteUser = makeUser({ id: 'remote-user' })
+    const channelId = 'channel-reaction-added-event'
+    const selfReaction = {
+      id: 'self-reaction',
+      key: 'thumbsup',
+      score: 1,
+      reason: '',
+      createdAt: new Date('2026-04-02T12:10:00.000Z'),
+      messageId: '1300',
+      user: currentUser
+    }
+    const cachedMessage = makeMessage({
+      id: '1300',
+      channelId,
+      user: currentUser,
+      userReactions: [selfReaction]
+    })
+    const reaction = {
+      id: 'remote-reaction',
+      key: 'heart',
+      score: 1,
+      reason: '',
+      createdAt: new Date('2026-04-02T12:11:00.000Z'),
+      messageId: cachedMessage.id,
+      user: remoteUser
+    }
+    const missingMessage = makeMessage({
+      id: '1301',
+      channelId,
+      user: currentUser,
+      reactionTotals: [{ key: 'heart', count: 1, score: 1 }]
+    })
+    const channel = makeChannel({ id: channelId, lastMessage: cachedMessage, newReactions: [] })
+    const dispatched: any[] = []
+
+    setActiveChannelId(channelId)
+    addMessageToMap(channelId, cachedMessage)
+
+    await runSaga(
+      {
+        getState: getSagaState,
+        dispatch: (action) => {
+          dispatched.push(action)
+        }
+      },
+      __eventsTestables.handleReactionAddedEvent,
+      { channel, user: remoteUser, message: cachedMessage, reaction },
+      { user: currentUser }
+    ).toPromise()
+
+    await runSaga(
+      {
+        getState: getSagaState,
+        dispatch: (action) => {
+          dispatched.push(action)
+        }
+      },
+      __eventsTestables.handleReactionAddedEvent,
+      { channel, user: remoteUser, message: missingMessage, reaction },
+      { user: currentUser }
+    ).toPromise()
+
+    expect(dispatched).toContainEqual(addReactionToMessageAC(cachedMessage, reaction as any, false))
+    expect(getMessagesFromMap(channelId)[cachedMessage.id].userReactions).toEqual([selfReaction])
+    expect(getMessagesFromMap(channelId)[missingMessage.id]).toBeUndefined()
+  })
+
+  it('keeps cached self reactions untouched for remote reaction-deleted events', async () => {
+    const currentUser = makeUser({ id: 'current-user' })
+    const remoteUser = makeUser({ id: 'remote-user' })
+    const channelId = 'channel-reaction-deleted-event'
+    const reaction = {
+      id: 'self-reaction',
+      key: 'thumbsup',
+      score: 1,
+      reason: '',
+      createdAt: new Date('2026-04-02T12:20:00.000Z'),
+      messageId: '1310',
+      user: currentUser
+    }
+    const cachedMessage = makeMessage({
+      id: '1310',
+      channelId,
+      user: currentUser,
+      userReactions: [reaction]
+    })
+    const channel = makeChannel({ id: channelId, lastMessage: cachedMessage, newReactions: [] })
+    const dispatched: any[] = []
+
+    setActiveChannelId(channelId)
+    addMessageToMap(channelId, cachedMessage)
+    setChannelInMap(channel)
+
+    await runSaga(
+      {
+        getState: getSagaState,
+        dispatch: (action) => {
+          dispatched.push(action)
+        }
+      },
+      __eventsTestables.handleReactionDeletedEvent,
+      { channel, user: remoteUser, message: cachedMessage, reaction },
+      { user: currentUser }
+    ).toPromise()
+
+    expect(dispatched).toContainEqual(deleteReactionFromMessageAC(cachedMessage, reaction as any, false))
+    expect(getMessagesFromMap(channelId)[cachedMessage.id].userReactions).toEqual([reaction])
   })
 
   it(keepsNewestPendingTitle, async () => {
@@ -674,6 +873,129 @@ describe('event message last-message handling', () => {
       '903'
     ])
     expect(getActiveSegment()).toEqual({ startId: '900', endId: '903' })
+  })
+
+  it('reconciles the active thread when a reconnect confirmation replaces its pending last message', async () => {
+    const channelId = 'channel-reconnect-pending-thread'
+    const pendingMessage = makePendingMessage({
+      tid: 'offline-message-tid',
+      channelId,
+      body: 'sent during packet loss',
+      state: MESSAGE_STATUS.PENDING
+    })
+    const confirmedMessage = makeMessage({
+      id: '840827767688048640',
+      tid: pendingMessage.tid,
+      channelId,
+      body: pendingMessage.body,
+      incoming: false,
+      state: MESSAGE_STATUS.UNMODIFIED,
+      deliveryStatus: MESSAGE_DELIVERY_STATUS.SENT
+    })
+    const storedChannel = makeChannel({ id: channelId, lastMessage: pendingMessage })
+
+    setActiveChannelId(channelId)
+    setChannelInMap(storedChannel)
+    addChannelToAllChannels(storedChannel)
+    addMessageToMap(channelId, pendingMessage)
+    // The SDK can update its mutable cache before it emits the confirmation
+    // event, while Redux still contains the pending channel-list preview.
+    setChannelInMap({ ...storedChannel, lastMessage: confirmedMessage })
+    setActiveSegment(channelId, '840827767688048630', '840827767688048639')
+    mockStore.getState = jest.fn(() => ({
+      ...defaultStoreState,
+      ChannelReducer: {
+        channels: [{ ...storedChannel, lastMessage: pendingMessage }]
+      },
+      MessageReducer: {
+        ...defaultStoreState.MessageReducer,
+        // The reconnect event arrives while the active list is a history window.
+        messagesHasNext: true,
+        activeChannelMessages: [pendingMessage]
+      }
+    }))
+
+    const dispatched: any[] = []
+    await runSaga(
+      { getState: getSagaState, dispatch: (action) => dispatched.push(action) },
+      __eventsTestables.handleChannelMessageEvent,
+      { channel: { ...storedChannel, lastMessage: confirmedMessage }, message: confirmedMessage },
+      { user: { id: 'current-user' } }
+    ).toPromise()
+
+    // The channel/list receives the confirmed copy.
+    expect(dispatched).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ type: updateChannelLastMessageAC(confirmedMessage, storedChannel).type }),
+        expect.objectContaining({
+          type: updateChannelDataAC(channelId, {}, true).type,
+          payload: expect.objectContaining({
+            config: expect.objectContaining({ lastMessage: expect.objectContaining({ id: confirmedMessage.id }) })
+          })
+        })
+      ])
+    )
+    // The active thread must receive the same confirmed message, even while a
+    // history window is open, so it does not remain Pending.
+    expect(
+      dispatched.some(
+        (action) =>
+          action.type === updateMessageAC(pendingMessage.tid!, {}).type &&
+          action.payload?.messageId === pendingMessage.tid
+      )
+    ).toBe(true)
+  })
+
+  it('reconciles the active thread in the latest window after an offline pending message is confirmed', async () => {
+    const channelId = 'channel-reconnect-latest-pending-thread'
+    const pendingMessage = makePendingMessage({
+      tid: 'offline-latest-message-tid',
+      channelId,
+      body: 'sent during packet loss',
+      state: MESSAGE_STATUS.PENDING
+    })
+    const confirmedMessage = makeMessage({
+      id: '840827767688048641',
+      tid: pendingMessage.tid,
+      channelId,
+      body: pendingMessage.body,
+      incoming: false,
+      state: MESSAGE_STATUS.UNMODIFIED,
+      deliveryStatus: MESSAGE_DELIVERY_STATUS.SENT
+    })
+    const storedChannel = makeChannel({ id: channelId, lastMessage: pendingMessage })
+
+    setActiveChannelId(channelId)
+    setChannelInMap(storedChannel)
+    addChannelToAllChannels(storedChannel)
+    addMessageToMap(channelId, pendingMessage)
+    mockStore.getState = jest.fn(() => ({
+      ...defaultStoreState,
+      MessageReducer: {
+        ...defaultStoreState.MessageReducer,
+        messagesHasNext: false,
+        activeChannelMessages: [pendingMessage]
+      }
+    }))
+
+    const dispatched: any[] = []
+    await runSaga(
+      { getState: getSagaState, dispatch: (action) => dispatched.push(action) },
+      __eventsTestables.handleChannelMessageEvent,
+      { channel: { ...storedChannel, lastMessage: confirmedMessage }, message: confirmedMessage },
+      { user: { id: 'current-user' } }
+    ).toPromise()
+
+    expect(dispatched).toContainEqual(
+      updateMessageAC(
+        pendingMessage.tid!,
+        expect.objectContaining({
+          id: confirmedMessage.id,
+          state: MESSAGE_STATUS.UNMODIFIED,
+          deliveryStatus: MESSAGE_DELIVERY_STATUS.SENT
+        })
+      )
+    )
   })
 
   it('extends an inactive channel cached latest segment when a background message arrives after the cached latest edge', async () => {

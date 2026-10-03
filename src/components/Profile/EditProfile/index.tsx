@@ -218,7 +218,7 @@ const EditProfileContainer = styled.div<{ thumbColor: string }>`
   overflow-y: auto;
   margin-right: -25px;
   padding-right: 25px;
-  scrollbar-width: none;
+  scrollbar-width: thin;
   scrollbar-color: transparent transparent;
   overscroll-behavior: none;
 
@@ -243,7 +243,6 @@ const EditProfileContainer = styled.div<{ thumbColor: string }>`
   }
 
   &.show-scrollbar {
-    scrollbar-width: thin;
     scrollbar-color: ${(props) => props.thumbColor} transparent;
   }
 `

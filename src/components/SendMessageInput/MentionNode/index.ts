@@ -13,9 +13,15 @@ import { $applyNodeReplacement, TextNode } from 'lexical'
 export type SerializedMentionNode = Spread<
   {
     mentionName: string
+    /** The label inserted into the editor, used to detect later text edits. */
+    mentionText?: string
   },
   SerializedTextNode
 >
+
+export function isMentionTextUnchanged(originalText: string | null | undefined, currentText: string): boolean {
+  return originalText == null || originalText === currentText
+}
 
 function convertMentionElement(domNode: HTMLElement): DOMConversionOutput | null {
   const textContent = domNode.textContent
@@ -41,7 +47,13 @@ export class MentionNode extends TextNode {
   }
 
   static importJSON(serializedNode: SerializedMentionNode): MentionNode {
-    const node = $createMentionNode(serializedNode.mentionName)
+    // `mentionText` was added after mentions were already persisted in drafts.
+    // Falling back to `text` keeps those existing drafts functional and gives
+    // the node a stable label to compare against after it is edited.
+    const node = $createMentionNode({
+      id: serializedNode.mentionName,
+      name: serializedNode.mentionText ?? serializedNode.text
+    })
     node.setTextContent(serializedNode.text)
     node.setFormat(serializedNode.format)
     node.setDetail(serializedNode.detail)
@@ -60,6 +72,7 @@ export class MentionNode extends TextNode {
     return {
       ...super.exportJSON(),
       mentionName: this.__mention.id,
+      mentionText: this.__mention.name,
       type: 'mention',
       version: 1
     }
@@ -67,8 +80,23 @@ export class MentionNode extends TextNode {
 
   createDOM(config: EditorConfig): HTMLElement {
     const dom = super.createDOM(config)
-    dom.className = 'mention'
+    if (this.isUnchangedMention()) {
+      dom.className = 'mention'
+    }
     return dom
+  }
+
+  updateDOM(prevNode: MentionNode, dom: HTMLElement, config: EditorConfig): boolean {
+    const wasUnchangedMention = prevNode.isUnchangedMention()
+    const isUnchangedMention = this.isUnchangedMention()
+    if (wasUnchangedMention !== isUnchangedMention) {
+      dom.classList.toggle('mention', isUnchangedMention)
+    }
+    return super.updateDOM(prevNode, dom, config)
+  }
+
+  private isUnchangedMention(): boolean {
+    return isMentionTextUnchanged(this.__mention.name, this.__text)
   }
 
   exportDOM(): DOMExportOutput {

@@ -1,4 +1,4 @@
-import React, { FC, useEffect, useMemo, useRef, useState } from 'react'
+import React, { FC, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { shallowEqual } from 'react-redux'
 import { useSelector, useDispatch } from 'store/hooks'
 import { v4 as uuidv4 } from 'uuid'
@@ -15,7 +15,7 @@ import LexicalErrorBoundary from '@lexical/react/LexicalErrorBoundary'
 import { OnChangePlugin } from '@lexical/react/LexicalOnChangePlugin'
 import MentionsPlugin from './MentionsPlugin'
 import FloatingTextFormatToolbarPlugin from './FloatingTextFormatToolbarPlugin'
-import { MentionNode } from './MentionNode'
+import { $createMentionNode, MentionNode } from './MentionNode'
 import EditMessagePlugin from './EditMessagePlugin'
 import FormatMessagePlugin from './FormatMessagePlugin'
 import EmojisPopup from './EmojisPlugin'
@@ -48,6 +48,7 @@ import {
 import {
   messageForReplySelector,
   messageToEditSelector,
+  pinnedMessagesListOpenSelector,
   selectedMessagesMapSelector
 } from '../../store/message/selector'
 import {
@@ -65,16 +66,18 @@ import {
   compareMessageBodyAttributes,
   EditorTheme,
   getAllowEditDeleteIncomingMessage,
-  makeUsername
+  makeUsername,
+  trimMessageBodyWithAttributes
 } from '../../helpers/message'
 import { DropdownOptionLi, DropdownOptionsUl, TextInOneLine, UploadFile, ViewOnceToggleCont } from '../../UIHelper'
 import { THEME_COLORS } from '../../UIHelper/constants'
 import { createImageThumbnail, resizeImage } from '../../helpers/resizeImage'
-import { calculateRenderedImageWidth, detectBrowser, detectOS } from '../../helpers'
+import { detectBrowser, detectOS } from '../../helpers'
 import { IMember, IMessage, IUser } from '../../types'
 import { getCustomUploader, getSendAttachmentsAsSeparateMessages } from '../../helpers/customUploader'
 import {
   checkDraftMessagesIsEmpty,
+  areDraftMessagesHydrated,
   deleteVideoThumb,
   draftMessagesMap,
   getAudioRecordingFromMap,
@@ -82,14 +85,23 @@ import {
   removeDraftMessageFromMap,
   setDraftMessageToMap,
   setPendingAttachment,
-  setSendMessageHandler
+  setSendMessageHandler,
+  subscribeToDraftMessages
 } from '../../helpers/messagesHalper'
 import { registerBlobUrl, releaseBlobUrls } from '../../helpers/attachmentBlobUrls'
+import { getOutgoingAttachmentType, mergePreparedAttachmentPatches } from '../../helpers/attachmentSendPreparation'
 import { attachmentTypes, DEFAULT_CHANNEL_TYPE, MESSAGE_DELIVERY_STATUS, USER_STATE } from '../../helpers/constants'
 import { hideUserPresence } from '../../helpers/userHelper'
+import { getReplyLinkPreviewImage, shouldShowLinkPreviewErrorFallback } from '../../helpers/replyPreview'
 import { getShowOnlyContactUsers } from '../../helpers/contacts'
-import { getFrame, getVideoFirstFrame } from '../../helpers/getVideoFrame'
+import { getFrame, VideoThumbnailFrame } from '../../helpers/getVideoFrame'
 import { remuxVideoFileForUpload } from '../../helpers/videoConversion'
+import {
+  beginAttachmentPreparation,
+  clearAttachmentPreparation,
+  completeAttachmentPreparation,
+  failAttachmentPreparation
+} from '../../helpers/attachmentPreparation'
 import { CAN_USE_DOM } from '../../helpers/canUseDOM'
 
 // Hooks
@@ -120,7 +132,7 @@ import { ReactComponent as LinkIcon } from '../../assets/svg/linkIcon.svg'
 import Attachment, { AttachmentFile, AttachmentImg } from '../Attachment'
 import DropDown from '../../common/dropdown'
 import ConfirmPopup from '../../common/popups/delete'
-import ForwardMessagePopup from '../../common/popups/forwardMessage'
+import ForwardMessagePopup, { IForwardMessageNote } from '../../common/popups/forwardMessage'
 import AudioRecord from '../AudioRecord'
 
 import { getClient } from '../../common/client'
@@ -130,6 +142,9 @@ import RecordingAnimation from './RecordingAnimation'
 import CreatePollPopup from './Poll/CreatePollPopup'
 import { MESSAGE_TYPE } from 'types/enum'
 import { getMembersAC } from 'store/member/actions'
+import { getClipboardFiles, getMediaAttachmentValidationError, hasSendableTextOrPoll } from './sendMessageUtils'
+import { getDraftHandoff } from './draftOwnership'
+import { getDraftMentionSegments } from './draftMentions'
 
 function AutoFocusPlugin({ messageForReply }: any) {
   const [editor] = useLexicalComposerContext()
@@ -142,17 +157,33 @@ function AutoFocusPlugin({ messageForReply }: any) {
   return null
 }
 
-function ClearEditorPlugin({ shouldClearEditor, setEditorCleared }: any) {
+function ClearEditorPlugin({ shouldClearEditor, setEditorCleared, contactsMap, getFromContacts }: any) {
   const [editor] = useLexicalComposerContext()
   useDidUpdate(() => {
     if (shouldClearEditor.clear) {
       editor.update(() => {
         const rootNode = $getRoot()
         rootNode.clear()
-        if (shouldClearEditor.draftMessage) {
-          const paragraphNode = $createParagraphNode()
-          paragraphNode.append($createTextNode(shouldClearEditor.draftMessage.text))
+        if (shouldClearEditor.draftMessage?.editorState) {
           editor.setEditorState(shouldClearEditor.draftMessage.editorState)
+        } else if (shouldClearEditor.draftMessage) {
+          const paragraphNode = $createParagraphNode()
+          const draftMessage = shouldClearEditor.draftMessage
+          const segments = getDraftMentionSegments(
+            draftMessage.text || '',
+            draftMessage.bodyAttributes,
+            draftMessage.mentionedUsers
+          )
+          segments.forEach(({ text, mentionId, mentionedUser }) => {
+            if (mentionId && mentionedUser) {
+              const mentionName = makeUsername(contactsMap?.[mentionId], mentionedUser, getFromContacts)
+              paragraphNode.append($createMentionNode({ ...mentionedUser, id: mentionId, name: `@${mentionName}` }))
+            } else if (text) {
+              paragraphNode.append($createTextNode(text))
+            }
+          })
+          rootNode.append(paragraphNode)
+          rootNode.selectEnd()
         } else {
           const paragraphNode = $createParagraphNode()
           rootNode.append(paragraphNode)
@@ -183,7 +214,7 @@ function ClearEditorPlugin({ shouldClearEditor, setEditorCleared }: any) {
         setEditorCleared()
       })
     }
-  }, [shouldClearEditor])
+  }, [shouldClearEditor, contactsMap, getFromContacts])
 
   return null
 }
@@ -195,8 +226,9 @@ function onError(error: any) {
   log.error(error)
 }
 
-let prevActiveChannelId: any
 let attachmentsUpdate: any = []
+const UNSUPPORTED_PASTED_FILE_MESSAGE = 'This file format is not supported.'
+const useComposerLayoutEffect = CAN_USE_DOM ? useLayoutEffect : useEffect
 
 export interface SendMessageProps {
   draggedAttachments?: boolean
@@ -373,6 +405,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
     [THEME_COLORS.TOOLTIP_BACKGROUND]: tooltipBackground,
     [THEME_COLORS.BORDER]: borderColor
   } = useColor()
+  const pinnedMessagesListOpen = useSelector(pinnedMessagesListOpenSelector)
 
   const dispatch = useDispatch()
   const ChatClient = getClient()
@@ -411,10 +444,19 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
 
   // Voice recording
   const [showRecording, setShowRecording] = useState<boolean>(false)
+  // Audio drafts are stored outside Redux. Incrementing this local revision
+  // makes their removal observable to this component, so the text editor is
+  // rendered again immediately after a returned recording is cleared.
+  const [, setAudioRecordingRevision] = useState(0)
+  const handleShowRecording = useCallback((start: boolean) => {
+    setShowRecording(start)
+    setAudioRecordingRevision((revision) => revision + 1)
+  }, [])
   const [checkActionPermission] = usePermissions(activeChannel.userRole)
   const [listenerIsAdded, setListenerIsAdded] = useState(false)
   const [messageText, setMessageText] = useState('')
   const [editMessageText, setEditMessageText] = useState('')
+  const [restoredEditMessage, setRestoredEditMessage] = useState<IMessage | null>(null)
   const [readyVideoAttachments, setReadyVideoAttachments] = useState<{ [key: string]: boolean }>({})
   const [showChooseAttachmentType, setShowChooseAttachmentType] = useState(false)
   const [isEmojisOpened, setIsEmojisOpened] = useState(false)
@@ -427,7 +469,6 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
   const [messageBodyAttributes, setMessageBodyAttributes] = useState<any>([])
   const [mentionedUsers, setMentionedUsers] = useState<any>([])
   const [browser, setBrowser] = useState<any>('')
-  const [mentionsIsOpen, setMentionsIsOpen] = useState<any>(false)
 
   const [inputContainerHeight, setInputContainerHeight] = useState<any>()
 
@@ -437,7 +478,12 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
   const [inTypingStateTimout, setInTypingStateTimout] = useState<any>()
   const [inTypingState, setInTypingState] = useState(false)
   const [sendMessageIsActive, setSendMessageIsActive] = useState(false)
+  const [isSendMessageInFlight, setIsSendMessageInFlight] = useState(false)
   const [attachments, setAttachments]: any = useState([])
+  // Native paste/drop handlers can queue a React state update immediately
+  // before Send is clicked. Keep the latest attachment snapshot synchronously
+  // so Send never reads the previous render's empty array.
+  const attachmentsRef = useRef<any[]>([])
 
   const [forwardPopupOpen, setForwardPopupOpen] = useState(false)
   const [deletePopupOpen, setDeletePopupOpen] = useState(false)
@@ -445,6 +491,11 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
   const [mediaExtensions, setMediaExtensions] = useState('.jpg,.jpeg,.png,.gif,.mp4,.mov,.avi,.wmv,.flv,.webm,.jfif')
   const [uploadErrorMessage, setUploadErrorMessage] = useState('')
   const [viewOnce, setViewOnce] = useState(false)
+  const [draftsHydrated, setDraftsHydrated] = useState(areDraftMessagesHydrated())
+  // The compose state lives in this component while drafts are keyed by
+  // channel. Keep the owner alongside the local state so a channel switch
+  // cannot persist the previous channel's values under the new channel ID.
+  const [composerChannelId, setComposerChannelId] = useState(activeChannel.id || '')
 
   const typingOrRecordingIndicator = useSelector(typingOrRecordingIndicatorArraySelector(activeChannel.id))
   const contactsMap = useSelector(contactsMapSelector)
@@ -457,7 +508,28 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
   const emojiBtnRef = useRef<any>(null)
   const addAttachmentsBtnRef = useRef<any>(null)
   const metadataDebounceRef = useRef<NodeJS.Timeout | null>(null)
+  // Image/video metadata is prepared after the preview has been painted. Keep
+  // its promise and latest patch outside React state so a fast Send can await
+  // it without racing a pending state update.
+  const attachmentPreparationPromisesRef = useRef(new Map<string, Promise<void>>())
+  const preparedAttachmentPatchesRef = useRef(new Map<string, any>())
+  // This must be a ref instead of state: a second tap can arrive before React
+  // has rendered a disabled button, while media preparation is still awaited.
+  const isSendMessageInFlightRef = useRef(false)
   const sendMessageWrapperRef = useRef<HTMLDivElement | null>(null)
+  const restoringDraftRef = useRef(false)
+  const restoredDraftChannelIdRef = useRef<string | null>(null)
+  const isNavigatingChannelRef = useRef(false)
+
+  const releaseSendMessageLock = () => {
+    // Keep the synchronous lock through the current event turn. React then
+    // commits the cleared compose state before a second user action can send
+    // the same attachment snapshot, without waiting for network/upload work.
+    Promise.resolve().then(() => {
+      isSendMessageInFlightRef.current = false
+      setIsSendMessageInFlight(false)
+    })
+  }
 
   const [realEditorState, setRealEditorState] = useState()
   const [floatingAnchorElem, setFloatingAnchorElem] = useState<HTMLDivElement | null>(null)
@@ -467,9 +539,140 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
   const [detectedUrl, setDetectedUrl] = useState<string | null>(null)
   const [dismissedUrls, setDismissedUrls] = useState<Set<string>>(new Set())
   const [isClosingPreview, setIsClosingPreview] = useState(false)
+  const [replyLinkPreviewImageFailed, setReplyLinkPreviewImageFailed] = useState(false)
+  const [linkPreviewImageFailed, setLinkPreviewImageFailed] = useState(false)
   const addAttachmentByMenu = showChooseFileAttachment && showChooseMediaAttachment
   const linkify = new LinkifyIt()
   const oGMetadata = useSelector((state: any) => state.MessageReducer.oGMetadata)
+
+  useEffect(() => subscribeToDraftMessages(() => setDraftsHydrated(areDraftMessagesHydrated())), [])
+
+  useComposerLayoutEffect(() => {
+    const nextChannelId = activeChannel.id || ''
+    if (composerChannelId === nextChannelId) {
+      return
+    }
+
+    // Persist the final local value for the channel being left. This also
+    // covers a quick navigation before React has run the normal draft effect.
+    if (draftsHydrated) {
+      const handoff = getDraftHandoff({
+        channelId: composerChannelId,
+        nextChannelId,
+        text: messageText,
+        mentionedUsers,
+        messageForReply,
+        editorState: realEditorState,
+        bodyAttributes: messageBodyAttributes,
+        attachments,
+        viewOnce
+      })
+      if (handoff) {
+        setDraftMessageToMap(handoff.channelId, handoff.draft, { persist: handoff.persist })
+      }
+    }
+
+    // Reset the previous channel's values before the new channel is painted.
+    // The draft restore effect below then fills these values only from the
+    // destination channel's entry.
+    restoringDraftRef.current = false
+    restoredDraftChannelIdRef.current = null
+    isNavigatingChannelRef.current = !!messageForReply
+    setComposerChannelId(nextChannelId)
+    setMessageText('')
+    setEditMessageText('')
+    setRestoredEditMessage(null)
+    setMessageBodyAttributes([])
+    setMentionedUsers([])
+    setAttachments([])
+    attachmentsRef.current = []
+    setViewOnce(false)
+    setSendMessageIsActive(false)
+    setShouldClearEditor({ clear: true })
+    attachmentsUpdate = []
+    clearTimeout(typingTimout)
+    dispatch(setMessageForReplyAC(null))
+    dispatch(setMessageToEditAC(null))
+  }, [activeChannel.id, composerChannelId])
+
+  useEffect(() => {
+    if (!draftsHydrated || !activeChannel.id || composerChannelId !== activeChannel.id) {
+      return
+    }
+    const draftMessage = getDraftMessageFromMap(activeChannel.id)
+    if (!draftMessage) {
+      return
+    }
+    restoringDraftRef.current = true
+    if (draftMessage.messageToEdit) {
+      const restoredText = draftMessage.editMessageText ?? draftMessage.messageToEdit.body ?? ''
+      const restoredEdit = {
+        ...draftMessage.messageToEdit,
+        body: restoredText,
+        bodyAttributes: draftMessage.editBodyAttributes ?? draftMessage.messageToEdit.bodyAttributes,
+        mentionedUsers: draftMessage.mentionedUsers ?? draftMessage.messageToEdit.mentionedUsers
+      }
+      setEditMessageText(restoredText)
+      setMessageBodyAttributes(restoredEdit.bodyAttributes || [])
+      setMentionedUsers(restoredEdit.mentionedUsers || [])
+      setRestoredEditMessage(restoredEdit)
+      dispatch(setMessageToEditAC(draftMessage.messageToEdit))
+      restoredDraftChannelIdRef.current = activeChannel.id
+      return
+    }
+    setMessageText(draftMessage.text || '')
+    setMentionedUsers(draftMessage.mentionedUsers || [])
+    setAttachments(draftMessage.attachments || [])
+    attachmentsRef.current = draftMessage.attachments || []
+    setViewOnce(!!draftMessage.viewOnce)
+    if (draftMessage.messageForReply) dispatch(setMessageForReplyAC(draftMessage.messageForReply))
+    setShouldClearEditor({ clear: true, draftMessage })
+    restoredDraftChannelIdRef.current = activeChannel.id
+  }, [draftsHydrated, activeChannel.id, composerChannelId])
+
+  const setComposerMessageText = useCallback(
+    (text: string) => {
+      if (composerChannelId === activeChannel.id) {
+        setMessageText(text)
+      }
+    },
+    [activeChannel.id, composerChannelId]
+  )
+
+  const setComposerEditMessageText = useCallback(
+    (text: string) => {
+      if (composerChannelId === activeChannel.id) {
+        setEditMessageText(text)
+      }
+    },
+    [activeChannel.id, composerChannelId]
+  )
+
+  const setComposerMessageBodyAttributes = useCallback(
+    (attributes: any) => {
+      if (composerChannelId === activeChannel.id) {
+        setMessageBodyAttributes(attributes)
+      }
+    },
+    [activeChannel.id, composerChannelId]
+  )
+
+  const setComposerMentionedUsers = useCallback(
+    (users: any) => {
+      if (composerChannelId === activeChannel.id) {
+        setMentionedUsers(users)
+      }
+    },
+    [activeChannel.id, composerChannelId]
+  )
+
+  useEffect(() => {
+    setReplyLinkPreviewImageFailed(false)
+  }, [messageForReply?.id, messageForReply?.tid])
+
+  useEffect(() => {
+    setLinkPreviewImageFailed(false)
+  }, [linkPreview?.url])
 
   const closePreviewWithAnimation = (callback?: () => void) => {
     if (linkPreview) {
@@ -614,7 +817,12 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
     }
   }
 
-  const handleCloseReply = () => {
+  const handleCloseReply = (preserveDraft = false) => {
+    const shouldPreserveDraft = preserveDraft === true
+    if (!shouldPreserveDraft && !messageText.trim() && !attachments.length) {
+      removeDraftMessageFromMap(activeChannel.id)
+      dispatch(setChannelDraftMessageIsRemovedAC(activeChannel.id))
+    }
     dispatch(setMessageForReplyAC(null))
   }
 
@@ -630,7 +838,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
     }
   }
 
-  const handleSendEditMessage = (
+  const handleSendEditMessage = async (
     event?: any,
     pollDetails?: {
       name: string
@@ -643,37 +851,52 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
   ) => {
     const { shiftKey, type, code } = event
     const isEnter: boolean = (code === 'Enter' || code === 'NumpadEnter') && shiftKey === false
-    const isPoll = pollDetails && pollDetails.options.length > 0 && pollDetails.name.trim()
+    const isPoll = Boolean(pollDetails && pollDetails.options.length > 0 && pollDetails.name.trim())
     const messageTextForSend = isPoll ? pollDetails?.name.trim() : messageText.trim()
+    const composerAttachments = attachmentsRef.current
     const shouldSend =
       (isEnter || type === 'click') &&
-      (messageToEdit || messageTextForSend || (attachments.length && attachments.length > 0))
+      (messageToEdit || messageTextForSend || (composerAttachments.length && composerAttachments.length > 0))
     if (isEnter) {
       event.preventDefault()
-      if (!messageTextForSend?.trim() && !attachments.length && !messageToEdit) {
+      if (!messageTextForSend?.trim() && !composerAttachments.length && !messageToEdit) {
         setShouldClearEditor({ clear: true })
       }
     }
 
-    if (shouldSend && !mentionsIsOpen) {
+    // Cutting part of a mention can leave an `@…` prefix and reopen the
+    // typeahead. A visible suggestion menu must not prevent the explicit Send
+    // action from sending the text currently in the editor.
+    if (shouldSend) {
+      if (isSendMessageInFlightRef.current) {
+        event.preventDefault()
+        event.stopPropagation()
+        return
+      }
+      isSendMessageInFlightRef.current = true
+      setIsSendMessageInFlight(true)
+
       event.preventDefault()
       event.stopPropagation()
       if (messageToEdit) {
         handleEditMessage()
-      } else if (messageTextForSend?.trim() || (attachments.length && attachments.length > 0)) {
-        const messageTexToSend = messageTextForSend?.trim()
+      } else if (messageTextForSend?.trim() || (composerAttachments.length && composerAttachments.length > 0)) {
+        const { body: messageTexToSend, bodyAttributes: adjustedBodyAttributes } = trimMessageBodyWithAttributes(
+          messageText,
+          messageBodyAttributes
+        )
         const messageToSend: any = {
           // metadata: mentionedUsersPositions,
           body: messageTexToSend,
           // body: 'test message',
-          bodyAttributes: messageBodyAttributes,
+          bodyAttributes: adjustedBodyAttributes,
           mentionedUsers: [],
           attachments: [],
           type: 'text'
         }
         const mentionUsersToSend: any = []
-        if (messageBodyAttributes && messageBodyAttributes.length) {
-          messageBodyAttributes.forEach((att: any) => {
+        if (adjustedBodyAttributes && adjustedBodyAttributes.length) {
+          adjustedBodyAttributes.forEach((att: any) => {
             if (att.type === 'mention') {
               let mentionsToFind = [...mentionedUsers]
               const draftMessage = getDraftMessageFromMap(activeChannel.id)
@@ -726,7 +949,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
             }
           }
         }
-        if (messageTexToSend?.trim() && !attachments.length) {
+        if (hasSendableTextOrPoll(messageTexToSend, isPoll) && !composerAttachments.length) {
           if (linkAttachment) {
             messageToSend.attachments = [linkAttachment]
           }
@@ -737,18 +960,29 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
           }
           dispatch(sendTextMessageAC(messageToSend, activeChannel.id, connectionStatus))
         }
-        if (attachments.length) {
+        if (composerAttachments.length) {
+          // The send saga owns the shared video-preparation registry. Dispatch
+          // now so the optimistic message appears immediately and this composer
+          // can accept another message while metadata/upload work continues.
           const sendAsSeparateMessage = getSendAttachmentsAsSeparateMessages()
-          messageToSend.attachments = attachments.map((attachment: any) => {
+          messageToSend.attachments = mergePreparedAttachmentPatches(
+            composerAttachments,
+            preparedAttachmentPatchesRef.current
+          ).map((preparedAttachment: any) => {
             return {
-              name: attachment.data.name,
-              data: attachment.data,
-              tid: attachment.tid,
-              cachedUrl: attachment.cachedUrl,
-              upload: attachment.upload,
-              metadata: attachment.metadata,
-              type: attachment.type,
-              size: attachment.size
+              name: preparedAttachment.data.name,
+              data: preparedAttachment.data,
+              // Keep the restored object URL on the local optimistic attachment.
+              // The server upload still uses `data`; this only prevents the message
+              // list from falling back to the 6px thumbnail hash after a reload.
+              attachmentUrl: preparedAttachment.attachmentUrl,
+              tid: preparedAttachment.tid,
+              cachedUrl: preparedAttachment.cachedUrl,
+              upload: preparedAttachment.upload,
+              metadata: preparedAttachment.metadata,
+              type: getOutgoingAttachmentType(preparedAttachment),
+              size: preparedAttachment.size,
+              thumbnailState: preparedAttachment.thumbnailState
             }
           })
           // Add viewOnce flag if enabled and valid
@@ -768,6 +1002,10 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
               sendAsSeparateMessage
             )
           )
+          composerAttachments.forEach((attachment: any) => {
+            attachmentPreparationPromisesRef.current.delete(attachment.tid)
+            preparedAttachmentPatchesRef.current.delete(attachment.tid)
+          })
           // }
         }
         setMessageText('')
@@ -780,7 +1018,10 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
         setTypingTimout(undefined)
       }
       setAttachments([])
+      attachmentsRef.current = []
       attachmentsUpdate = []
+      removeDraftMessageFromMap(activeChannel.id)
+      dispatch(setChannelDraftMessageIsRemovedAC(activeChannel.id))
       setViewOnce(false)
       handleCloseReply()
       setShouldClearEditor({ clear: true })
@@ -791,6 +1032,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
         setDismissedUrls(new Set())
       })
       dispatch(setCloseSearchChannelsAC(true))
+      releaseSendMessageLock()
     } else {
       if (typingTimout) {
         if (!inTypingStateTimout) {
@@ -810,11 +1052,14 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
   }
 
   const handleEditMessage = () => {
-    const messageTexToSend = editMessageText.trim()
+    const { body: messageTexToSend, bodyAttributes: adjustedBodyAttributes } = trimMessageBodyWithAttributes(
+      editMessageText,
+      messageBodyAttributes
+    )
     const hasTextChanged = messageTexToSend !== messageToEdit.body
     const normalizeAttrs = (attrs: any) => (!attrs || attrs.length === 0 ? [] : attrs)
     const hasAttributesChanged = !compareMessageBodyAttributes(
-      normalizeAttrs(messageBodyAttributes),
+      normalizeAttrs(adjustedBodyAttributes),
       normalizeAttrs(messageToEdit.bodyAttributes)
     )
     if (!hasTextChanged && !hasAttributesChanged) {
@@ -861,8 +1106,8 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
       const mentionedUsersPositions: any = []
       const mentionUsersToSend: any = []
       if (mentionedUsers && mentionedUsers.length) {
-        if (messageBodyAttributes && messageBodyAttributes.length) {
-          messageBodyAttributes.forEach((att: any) => {
+        if (adjustedBodyAttributes && adjustedBodyAttributes.length) {
+          adjustedBodyAttributes.forEach((att: any) => {
             if (att.type === 'mention') {
               let mentionsToFind = [...mentionedUsers]
               const draftMessage = getDraftMessageFromMap(activeChannel.id)
@@ -885,7 +1130,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
         ...messageToEdit,
         attachments: updatedAttachments,
         metadata: mentionedUsersPositions,
-        bodyAttributes: messageBodyAttributes,
+        bodyAttributes: adjustedBodyAttributes,
         mentionedUsers: mentionUsersToSend,
         body: messageTexToSend
       }
@@ -895,22 +1140,39 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
     handleCloseEditMode()
   }
 
-  const handleCloseEditMode = () => {
+  const handleCloseEditMode = (preserveDraft = false) => {
+    // This handler also resets editor state during channel navigation. Only an
+    // actual, explicitly cancelled edit may delete a draft; otherwise switching
+    // into a channel with a normal compose draft would remove that destination
+    // draft before its restore effect runs.
+    if (!preserveDraft && messageToEdit) {
+      removeDraftMessageFromMap(activeChannel.id)
+      dispatch(setChannelDraftMessageIsRemovedAC(activeChannel.id))
+    }
     setEditMessageText('')
+    setRestoredEditMessage(null)
     setMentionedUsers([])
     dispatch(setMessageToEditAC(null))
   }
 
   const removeUpload = (attachmentId: string) => {
     if (attachmentId) {
-      const updatedAttachments = attachmentsUpdate.filter((item: any) => item.tid !== attachmentId)
+      const updatedAttachments = attachmentsRef.current.filter((item: any) => item.tid !== attachmentId)
       deleteVideoThumb(attachmentId)
+      clearAttachmentPreparation(attachmentId)
+      attachmentPreparationPromisesRef.current.delete(attachmentId)
+      preparedAttachmentPatchesRef.current.delete(attachmentId)
       releaseBlobUrls([`compose_${attachmentId}`])
       setAttachments(updatedAttachments)
+      attachmentsRef.current = updatedAttachments
       attachmentsUpdate = updatedAttachments
     } else {
-      releaseBlobUrls(attachmentsUpdate.map((item: any) => `compose_${item.tid}`))
+      attachmentsRef.current.forEach((attachment: any) => clearAttachmentPreparation(attachment.tid))
+      attachmentPreparationPromisesRef.current.clear()
+      preparedAttachmentPatchesRef.current.clear()
+      releaseBlobUrls(attachmentsRef.current.map((item: any) => `compose_${item.tid}`))
       setAttachments([])
+      attachmentsRef.current = []
       attachmentsUpdate = []
     }
     // Reset viewOnce when all attachments are removed
@@ -962,6 +1224,14 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
     }, 3000)
   }
 
+  const validateMediaAttachment = (file: File) =>
+    getMediaAttachmentValidationError(file, {
+      allowedExtensions: allowedMediaExtensions,
+      sizeLimitKb: mediaAttachmentSizeLimit,
+      invalidTypeMessage: allowedMediaExtensionsErrorMessage,
+      sizeLimitMessage: attachmentSizeLimitErrorMessage
+    })
+
   const handleFileUpload = (e: any) => {
     const isMediaAttachment = e.target.accept === mediaExtensions
     const fileList = Object.values(e.target.files)
@@ -986,30 +1256,11 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
     }
 
     filesToProcess.forEach(async (file: any) => {
-      let allowUpload = true
-      let errorMessage = ''
-      if (isMediaAttachment) {
-        if (mediaAttachmentSizeLimit && file.size / 1024 > mediaAttachmentSizeLimit) {
-          allowUpload = false
-          errorMessage =
-            attachmentSizeLimitErrorMessage ?? `File size exceeds the limit of ${mediaAttachmentSizeLimit} KB.`
-        }
-        if (allowedMediaExtensions?.length) {
-          const fileName = file.name
-          const fileExtension = fileName.split('.').pop().toLowerCase()
-
-          if (!allowedMediaExtensions.includes(fileExtension)) {
-            allowUpload = false
-            errorMessage =
-              allowedMediaExtensionsErrorMessage ??
-              `Invalid file type. Allowed extensions are: ${allowedMediaExtensions.join(', ')}.`
-          }
-        }
-      }
-      if (allowUpload) {
+      const validationError = isMediaAttachment ? validateMediaAttachment(file) : null
+      if (!validationError) {
         await handleAddAttachmentWithViewOnceCheck(file, isMediaAttachment)
       } else {
-        showFileUploadError(errorMessage)
+        showFileUploadError(validationError)
       }
     })
 
@@ -1034,9 +1285,9 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
     }
     const os = detectOS()
     if (!(os === 'Windows' && browser === 'Firefox')) {
-      if (e.clipboardData.files && e.clipboardData.files.length > 0) {
+      const fileList = getClipboardFiles(e.clipboardData)
+      if (fileList.length > 0) {
         e.preventDefault()
-        const fileList: File[] = Object.values(e.clipboardData.files)
         const remainingSlots = MAX_ATTACHMENTS - attachments.length
 
         if (remainingSlots <= 0) {
@@ -1057,39 +1308,25 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
         }
 
         filesToProcess.forEach(async (file: any) => {
-          let allowUpload = true
-          let errorMessage = ''
-          if (mediaAttachmentSizeLimit && file.size / 1024 > mediaAttachmentSizeLimit) {
-            allowUpload = false
-            errorMessage =
-              attachmentSizeLimitErrorMessage ?? `File size exceeds the limit of ${mediaAttachmentSizeLimit} KB.`
-          }
-          if (allowedMediaExtensions?.length) {
-            const fileName = file.name
-            const fileExtension = fileName.split('.').pop().toLowerCase()
+          const mediaValidationError = validateMediaAttachment(file)
+          const canAddAsMedia = showChooseMediaAttachment && !mediaValidationError
 
-            if (!allowedMediaExtensions.includes(fileExtension)) {
-              allowUpload = false
-              errorMessage =
-                allowedMediaExtensionsErrorMessage ??
-                `Invalid file type. Allowed extensions are: ${allowedMediaExtensions.join(', ')}.`
-            }
-          }
-          if (allowUpload) {
+          // Match the attachment picker: supported media is added as media, while every
+          // other file (including spreadsheets and documents) is added as a file card.
+          if (canAddAsMedia) {
             await handleAddAttachmentWithViewOnceCheck(file, true)
+          } else if (showChooseFileAttachment) {
+            await handleAddAttachmentWithViewOnceCheck(file, false)
           } else {
-            showFileUploadError(errorMessage)
+            showFileUploadError(
+              mediaValidationError || allowedMediaExtensionsErrorMessage || UNSUPPORTED_PASTED_FILE_MESSAGE
+            )
           }
         })
       } else {
         e.preventDefault()
       }
     }
-  }
-
-  const handleCut = () => {
-    setMessageText('')
-    setMentionedUsers([])
   }
 
   const handleEmojiPopupToggle = (bool: boolean) => {
@@ -1120,14 +1357,18 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
     setForwardPopupOpen(!forwardPopupOpen)
   }
 
-  const handleForwardMessage = (channelIds: string[]) => {
+  const handleForwardMessage = (channelIds: string[], accompanyingMessage?: IForwardMessageNote) => {
     const messagesArray = Array.from(selectedMessagesMap.values())
     // @ts-ignore
     messagesArray.sort((a: any, b: any) => new Date(a.createdAt) - new Date(b.createdAt))
     if (channelIds && channelIds.length) {
       channelIds.forEach((channelId) => {
-        messagesArray.forEach((message) => {
-          dispatch(forwardMessageAC(message, channelId, connectionStatus))
+        messagesArray.forEach((message, index) => {
+          // A bulk forward still has one accompanying note per destination,
+          // rather than duplicating it for every selected source message.
+          dispatch(
+            forwardMessageAC(message, channelId, connectionStatus, true, index === 0 ? accompanyingMessage : undefined)
+          )
         })
       })
     }
@@ -1167,9 +1408,14 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
     dispatch(clearSelectedMessagesAC())
   }
 
-  const handleSetMentionMember = (mentionMember: any) => {
-    setMentionedUsers((prevState: any[]) => [...prevState, mentionMember])
-  }
+  const handleSetMentionMember = useCallback(
+    (mentionMember: any) => {
+      if (composerChannelId === activeChannel.id) {
+        setMentionedUsers((prevState: any[]) => [...prevState, mentionMember])
+      }
+    },
+    [activeChannel.id, composerChannelId]
+  )
 
   // Compose preview URLs are tracked in the blob-URL registry under a
   // compose_<tid> key; they're released when the attachment is removed from
@@ -1182,180 +1428,176 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
 
   const handleAddAttachment = async (file: File, isMediaAttachment: boolean) => {
     const customUploader = getCustomUploader()
-    if (file.type.split('/')[0] === 'video') {
-      // QuickTime .mov containers are unplayable in Firefox even when the codec
-      // is H.264 — remux to standard MP4 (stream copy, no re-encoding) before
-      // upload so every recipient can play the file and render thumbnails.
-      file = await remuxVideoFileForUpload(file)
-    }
     const fileType = file.type.split('/')[0]
     const tid = uuidv4()
-    const reader = new FileReader()
 
     const handleAttachmentImageForCache = async (attachment: any) => {
       const url = URL.createObjectURL(attachment.data)
       dispatch(setUpdateMessageAttachmentAC(attachment?.metadata?.tmb || '', url))
     }
-    const handleAttachmentVideoForCache = async (attachment: any) => {
-      const [newWidth, newHeight] = calculateRenderedImageWidth(
-        attachment.metadata.szh || 400,
-        attachment.metadata.szh || 400
-      )
-      // Pass the raw File/Blob so getVideoFirstFrame can sniff and correct the
-      // MIME type — an object URL string locks in the original (possibly
-      // Firefox-unsupported) type like video/quicktime.
-      const result = await getVideoFirstFrame(attachment.data, newWidth, newHeight, 0.8)
-      if (result) {
-        const { frameBlobUrl } = result
-        dispatch(setUpdateMessageAttachmentAC(attachment?.metadata?.tmb || '', frameBlobUrl))
-      }
+    // A File is already a Blob. Reading a multi-GB file into a binary string before
+    // rendering duplicates it in memory and blocks the preview on slower devices.
+    // Object URLs are supported by Chrome, Safari, Firefox, and Edge, and let the
+    // browser decode directly from the selected file.
+    setPendingAttachment(tid, { file })
+    if (fileType === 'image' || fileType === 'video') {
+      beginAttachmentPreparation(tid, file)
     }
-    reader.onload = async () => {
-      // @ts-ignore
-      setPendingAttachment(tid, { file })
-      if (customUploader) {
-        if (fileType === 'image') {
-          resizeImage(file).then(async (resizedFile: any) => {
-            const { thumbnail, imageWidth, imageHeight } = await createImageThumbnail(file)
-            const attachment = {
-              data: file,
-              upload: false,
-              type: isMediaAttachment ? fileType : 'file',
-              attachmentUrl: createComposePreviewUrl(tid, resizedFile.blob as any),
-              tid,
-              size: isMediaAttachment ? (resizedFile?.blob ? resizedFile?.blob?.size : file.size) : file.size,
-              metadata: {
-                szw: imageWidth,
-                szh: imageHeight,
-                tmb: thumbnail
-              }
-            }
-            handleAttachmentImageForCache(attachment)
-            setAttachments((prevState: any[]) => [...prevState, attachment])
-          })
-        } else if (fileType === 'video') {
-          // Pass the File itself, not an object URL — lets getFrame correct a
-          // Firefox-unsupported MIME type (e.g. video/quicktime) via byte sniffing.
-          const { thumb, width, height, duration } = await getFrame(file, 0)
-          const attachment = {
-            data: file,
-            upload: false,
-            type: isMediaAttachment ? fileType : 'file',
+    // Keep videos chosen from the generic file picker as file cards. Once their
+    // background thumbnail is ready, AttachmentFile renders it like an ordinary
+    // document preview rather than switching the composer to an inline video tile.
+    const type =
+      isMediaAttachment && fileType === 'video'
+        ? attachmentTypes.video
+        : isMediaAttachment && fileType === 'image'
+          ? attachmentTypes.image
+          : attachmentTypes.file
+    const attachment: any = {
+      data: file,
+      // Keep this separately from File.name. IndexedDB implementations may restore
+      // a persisted File as a Blob, and the explicit name lets hydration rebuild a
+      // real File without changing the image bytes.
+      name: file.name,
+      upload: !customUploader,
+      type,
+      tid,
+      size: file.size,
+      ...(fileType === 'video' && !isMediaAttachment ? { thumbnailState: 'loading' } : {}),
+      ...(fileType === 'image' || fileType === 'video'
+        ? {
             attachmentUrl: createComposePreviewUrl(tid, file),
-            tid,
-            size: file.size,
-            metadata: {
-              szw: width,
-              szh: height,
-              tmb: thumb,
-              dur: duration
-            }
+            // Keep the send payload valid even if the user clicks Send before the
+            // background metadata task has finished.
+            metadata: customUploader ? {} : '{}'
           }
-          handleAttachmentVideoForCache(attachment)
-          setAttachments((prevState: any[]) => [...prevState, attachment])
-        } else {
-          setAttachments((prevState: any[]) => [
-            ...prevState,
-            {
-              data: file,
-              upload: false,
-              type: 'file',
-              tid,
-              size: file.size
-            }
-          ])
-        }
-      } else {
-        if (fileType === 'image') {
-          if (isMediaAttachment) {
-            const { thumbnail, imageWidth, imageHeight } = await createImageThumbnail(file)
-            const metas = { thumbnail, imageWidth, imageHeight }
-            if (file.type === 'image/gif') {
-              setAttachments((prevState: any[]) => [
-                ...prevState,
-                {
-                  data: file,
-                  upload: true,
-                  attachmentUrl: createComposePreviewUrl(tid, file),
-                  tid,
-                  type: fileType,
-                  size: file.size,
-                  metadata: JSON.stringify({
-                    tmb: metas.thumbnail,
-                    szw: metas.imageWidth,
-                    szh: metas.imageHeight
-                  })
+        : {})
+    }
+    const nextAttachments = [...attachmentsRef.current, attachment]
+    attachmentsRef.current = nextAttachments
+    setAttachments(nextAttachments)
+
+    const updateAttachment = (patch: any) => {
+      preparedAttachmentPatchesRef.current.set(tid, {
+        ...preparedAttachmentPatchesRef.current.get(tid),
+        ...patch
+      })
+      const nextAttachments = attachmentsRef.current.map((current: any) =>
+        current.tid === tid ? { ...current, ...patch } : current
+      )
+      attachmentsRef.current = nextAttachments
+      setAttachments(nextAttachments)
+    }
+
+    // Yield once so React can paint the object-URL preview before optional CPU-heavy
+    // resizing, thumbnail generation, or QuickTime remuxing begins.
+    const preparationPromise = new Promise<void>((resolve) =>
+      setTimeout(async () => {
+        try {
+          if (fileType === 'image') {
+            try {
+              const { thumbnail, imageWidth, imageHeight } = await createImageThumbnail(file)
+              let preparedFile = file
+              let metadata: any
+              if (customUploader) {
+                const resizedFile = await resizeImage(file)
+                const patch = {
+                  size: isMediaAttachment && resizedFile?.blob ? resizedFile.blob.size : file.size,
+                  metadata: { szw: imageWidth, szh: imageHeight, tmb: thumbnail }
                 }
-              ])
-            } else {
-              resizeImage(file).then(async (resizedFileData: any) => {
-                const resizedFile = new File([resizedFileData.blob], resizedFileData.file.name)
-                const attachment = {
+                if (isMediaAttachment && resizedFile?.blob) {
+                  preparedFile = new File([resizedFile.blob], resizedFile.file.name, { type: file.type })
+                  patch.size = preparedFile.size
+                  updateAttachment({ ...patch, data: preparedFile })
+                  setPendingAttachment(tid, { file: preparedFile })
+                } else {
+                  updateAttachment(patch)
+                }
+                metadata = patch.metadata
+                handleAttachmentImageForCache({ ...attachment, ...patch })
+              } else if (isMediaAttachment && file.type !== 'image/gif') {
+                const resizedFileData = await resizeImage(file)
+                // canvas.toBlob may return null (for example when memory is constrained).
+                // Keep the original file usable rather than failing the attachment flow.
+                const resizedFile = resizedFileData.blob
+                  ? new File([resizedFileData.blob], resizedFileData.file.name, { type: file.type })
+                  : file
+                const patch = {
                   data: resizedFile,
-                  upload: true,
-                  attachmentUrl: createComposePreviewUrl(tid, resizedFile),
-                  tid,
-                  type: fileType,
                   size: resizedFile.size,
                   metadata: JSON.stringify({
-                    tmb: metas.thumbnail,
+                    tmb: thumbnail,
                     szw: resizedFileData.newWidth,
                     szh: resizedFileData.newHeight
                   })
                 }
-                handleAttachmentImageForCache(attachment)
-                setAttachments((prevState: any[]) => [...prevState, attachment])
-              })
-            }
-          } else {
-            const { thumbnail } = await createImageThumbnail(file, undefined, 50, 50)
-            setAttachments((prevState: any[]) => [
-              ...prevState,
-              {
-                data: file,
-                type: 'file',
-                upload: true,
-                attachmentUrl: createComposePreviewUrl(tid, file),
-                tid,
-                size: file.size,
-                metadata: JSON.stringify({
-                  tmb: thumbnail
-                })
+                updateAttachment(patch)
+                setPendingAttachment(tid, { file: resizedFile })
+                handleAttachmentImageForCache({ ...attachment, ...patch })
+                preparedFile = resizedFile
+                metadata = patch.metadata
+              } else {
+                metadata = JSON.stringify({ tmb: thumbnail, szw: imageWidth, szh: imageHeight })
+                updateAttachment({ metadata })
               }
-            ])
-          }
-        } else if (fileType === 'video') {
-          const { thumb, width, height, duration } = await getFrame(file, 0)
-          const metas = JSON.stringify({ tmb: thumb, width, height, dur: duration })
-          const attachment = {
-            data: file,
-            type: 'video',
-            upload: true,
-            size: file.size,
-            attachmentUrl: createComposePreviewUrl(tid, file),
-            tid,
-            metadata: metas
-          }
-          handleAttachmentVideoForCache(attachment)
-          setAttachments((prevState: any[]) => [...prevState, attachment])
-        } else {
-          setAttachments((prevState: any[]) => [
-            ...prevState,
-            {
-              data: file,
-              upload: true,
-              type: 'file',
-              size: file.size,
-              tid
+              completeAttachmentPreparation(tid, { file: preparedFile, metadata })
+            } catch (error) {
+              // The original file preview/upload remains usable if optional optimization fails.
+              log.warn('Unable to prepare image attachment preview:', error)
+              failAttachmentPreparation(tid)
             }
-          ])
+          } else if (fileType === 'video') {
+            const remuxPromise = remuxVideoFileForUpload(file)
+            let thumbnailSource = file
+            let metadata: any
+            let frame: VideoThumbnailFrame | undefined
+            try {
+              // Do not make preview visibility depend on metadata extraction. VideoPreview
+              // can use the object URL immediately while this fills in dimensions/thumb.
+              try {
+                frame = await getFrame(thumbnailSource, 0)
+              } catch (error) {
+                // A MOV may play in Safari but not be decodable in Firefox. Retry from
+                // the normalized MP4 rather than sending a video without a thumbnail.
+                thumbnailSource = await remuxPromise
+                frame = await getFrame(thumbnailSource, 0)
+              }
+              const { thumb, width, height, duration } = frame
+              metadata = customUploader
+                ? { szw: width, szh: height, tmb: thumb, dur: duration }
+                : JSON.stringify({ tmb: thumb, szw: width, szh: height, dur: duration })
+              updateAttachment({ metadata, thumbnailState: 'ready' })
+              dispatch(setUpdateMessageAttachmentAC(thumb, frame.frameBlobUrl))
+              setVideoIsReadyToSend(tid)
+            } catch (error) {
+              log.warn('Unable to generate video thumbnail:', error)
+            }
+
+            // Preserve the Firefox-compatible QuickTime remux, but perform it only after
+            // the local preview has been painted. The compose preview intentionally keeps
+            // its original object URL, avoiding a second decode and visual flicker.
+            // Sending does not depend on optional local conversion. It can take a long
+            // time (or be unavailable for some codecs), while the SDK can upload the
+            // original file immediately.
+            const uploadFile = await remuxPromise
+            if (uploadFile !== file) {
+              updateAttachment({ data: uploadFile, size: uploadFile.size })
+              setPendingAttachment(tid, { file: uploadFile })
+            }
+            if (metadata) {
+              completeAttachmentPreparation(tid, { file: uploadFile, metadata, videoPreviewBlob: frame?.blob })
+            } else {
+              failAttachmentPreparation(tid)
+              updateAttachment({ thumbnailState: 'failed' })
+            }
+          }
+        } finally {
+          resolve()
         }
-      }
+      }, 0)
+    )
+    if (fileType === 'image' || fileType === 'video') {
+      attachmentPreparationPromisesRef.current.set(tid, preparationPromise)
     }
-    reader.onerror = (e: any) => {
-      log.info(' error on read file onError', e)
-    }
-    reader.readAsBinaryString(file)
   }
 
   useEffect(() => {
@@ -1405,32 +1647,11 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
 
       const isMediaAttachment = draggedAttachments[0].attachmentType === 'media'
       filesToProcess.forEach(async (file: any) => {
-        let allowUpload = true
-        let errorMessage = ''
-
-        if (isMediaAttachment) {
-          if (mediaAttachmentSizeLimit && file.size / 1024 > mediaAttachmentSizeLimit) {
-            allowUpload = false
-            errorMessage =
-              attachmentSizeLimitErrorMessage ?? `File size exceeds the limit of ${mediaAttachmentSizeLimit} KB.`
-          }
-          if (allowedMediaExtensions?.length) {
-            const fileName = file.name
-            const fileExtension = fileName.split('.').pop().toLowerCase()
-
-            if (!allowedMediaExtensions.includes(fileExtension)) {
-              allowUpload = false
-              errorMessage =
-                allowedMediaExtensionsErrorMessage ??
-                `Invalid file type. Allowed extensions are: ${allowedMediaExtensions.join(', ')}.`
-            }
-          }
-        }
-
-        if (allowUpload) {
+        const validationError = isMediaAttachment ? validateMediaAttachment(file) : null
+        if (!validationError) {
           await handleAddAttachmentWithViewOnceCheck(file, isMediaAttachment)
         } else {
-          showFileUploadError(errorMessage)
+          showFileUploadError(validationError)
         }
       })
       dispatch(setDraggedAttachmentsAC([], ''))
@@ -1499,28 +1720,6 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
   }, [isSmallWidthViewport])
 
   useEffect(() => {
-    if (prevActiveChannelId && activeChannel.id && prevActiveChannelId !== activeChannel.id) {
-      setMessageText('')
-      handleCloseReply()
-      setAttachments([])
-      attachmentsUpdate = []
-      handleCloseEditMode()
-      clearTimeout(typingTimout)
-
-      const draftMessage = getDraftMessageFromMap(activeChannel.id)
-      if (draftMessage) {
-        if (draftMessage.messageForReply) {
-          dispatch(setMessageForReplyAC(draftMessage.messageForReply))
-        }
-        setMessageText(draftMessage.text)
-        setMentionedUsers(draftMessage.mentionedUsers)
-      }
-      setShouldClearEditor({ clear: true, draftMessage })
-    }
-    if (activeChannel.id) {
-      prevActiveChannelId = activeChannel.id
-    }
-
     if (
       activeChannel.id &&
       membersHasNext === undefined &&
@@ -1528,28 +1727,62 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
     ) {
       dispatch(getMembersAC(activeChannel.id))
     }
-    setMentionedUsers([])
   }, [activeChannel.id])
 
   useEffect(() => {
+    // The parent hydrates IndexedDB asynchronously. Until this input has seen
+    // that result, an empty local editor must not delete a restored draft.
+    if (!draftsHydrated) {
+      return
+    }
+    if (!activeChannel.id || composerChannelId !== activeChannel.id) {
+      return
+    }
+    if (restoringDraftRef.current) {
+      restoringDraftRef.current = false
+      return
+    }
+    if (messageToEdit) {
+      // Edit drafts are independent from compose drafts: retain the original
+      // target message for the edit request and persist only the replacement
+      // text/attributes the user has entered.
+      // Entering edit mode is itself a draft. The editor plugin fills
+      // editMessageText asynchronously, so fall back to the target body to
+      // preserve an immediate channel switch before that update arrives.
+      const persistedEditText = editMessageText || messageToEdit.body || ''
+      const normalizeAttrs = (attrs: any) => (!attrs || attrs.length === 0 ? [] : attrs)
+      const hasTextChanged = editMessageText !== messageToEdit.body
+      const hasAttributesChanged = !compareMessageBodyAttributes(
+        normalizeAttrs(messageBodyAttributes),
+        normalizeAttrs(messageToEdit.bodyAttributes)
+      )
+      const canSubmitEdit = !!editMessageText.trim() && (hasTextChanged || hasAttributesChanged)
+      setSendMessageIsActive(canSubmitEdit)
+      setDraftMessageToMap(
+        activeChannel.id,
+        {
+          // This is used only for restoration. The channel list suppresses an
+          // unchanged or empty edit so it does not appear as a visible Draft.
+          text: persistedEditText || 'Edit message',
+          mentionedUsers,
+          messageToEdit,
+          editMessageText: persistedEditText,
+          editBodyAttributes: messageBodyAttributes
+        },
+        { persist: canSubmitEdit }
+      )
+      return
+    }
     if (
       messageText.trim() ||
       (editMessageText?.trim() && editMessageText && editMessageText?.trim() !== messageToEdit?.body) ||
       attachments.length
     ) {
       if (attachments.length) {
-        let videoAttachment = false
-        attachments.forEach((att: any) => {
-          if ((att.type === 'video' || att.data.type.split('/')[0] === 'video') && att.type !== 'file') {
-            videoAttachment = true
-            if (readyVideoAttachments[att.tid]) {
-              setSendMessageIsActive(true)
-            }
-          }
-        })
-        if (!videoAttachment) {
-          setSendMessageIsActive(true)
-        }
+        // A local File is already a valid upload source. Do not require the browser
+        // to decode a playable frame before enabling Send: Safari/Firefox may not
+        // decode some video codecs or containers, but they can still upload them.
+        setSendMessageIsActive(true)
       } else {
         setSendMessageIsActive(true)
       }
@@ -1561,15 +1794,17 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
       }
     }
 
-    if (messageText.trim()) {
-      const draftMessage = getDraftMessageFromMap(activeChannel.id)
+    const draftMessage = getDraftMessageFromMap(activeChannel.id)
+    if (messageText.trim() || attachments.length) {
       if (draftMessage && draftMessage.mentionedUsers && draftMessage.mentionedUsers.length) {
         setDraftMessageToMap(activeChannel.id, {
           text: messageText,
           mentionedUsers: draftMessage.mentionedUsers,
           messageForReply,
           editorState: realEditorState,
-          bodyAttributes: messageBodyAttributes
+          bodyAttributes: messageBodyAttributes,
+          attachments,
+          viewOnce
         })
       } else {
         setDraftMessageToMap(activeChannel.id, {
@@ -1577,7 +1812,9 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
           mentionedUsers,
           messageForReply,
           editorState: realEditorState,
-          bodyAttributes: messageBodyAttributes
+          bodyAttributes: messageBodyAttributes,
+          attachments,
+          viewOnce
         })
       }
 
@@ -1585,7 +1822,27 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
         setListenerIsAdded(true)
         document.body.setAttribute('onbeforeunload', "return () => 'reload?'")
       }
-    } else if (getDraftMessageFromMap(activeChannel.id)) {
+    } else if (messageForReply || draftMessage?.messageForReply) {
+      setDraftMessageToMap(
+        activeChannel.id,
+        {
+          text: '',
+          mentionedUsers: draftMessage?.mentionedUsers || mentionedUsers,
+          messageForReply: messageForReply || draftMessage?.messageForReply,
+          bodyAttributes: messageBodyAttributes,
+          attachments: [],
+          viewOnce: false
+        },
+        { persist: false }
+      )
+    } else if (draftMessage) {
+      // Delay only while another channel's restore is genuinely in flight. A
+      // newly composed draft has no restored channel id, so deleting its final
+      // character must remove it immediately instead of leaving its last saved
+      // character visible in the channel list.
+      if (restoredDraftChannelIdRef.current && restoredDraftChannelIdRef.current !== activeChannel.id) {
+        return
+      }
       removeDraftMessageFromMap(activeChannel.id)
       dispatch(setChannelDraftMessageIsRemovedAC(activeChannel.id))
       if (checkDraftMessagesIsEmpty() && listenerIsAdded) {
@@ -1593,18 +1850,35 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
         document.body.removeAttribute('onbeforeunload')
       }
     }
-  }, [messageText, attachments, editMessageText, readyVideoAttachments, messageBodyAttributes, messageToEdit])
+  }, [
+    messageText,
+    attachments,
+    editMessageText,
+    readyVideoAttachments,
+    messageBodyAttributes,
+    messageToEdit,
+    viewOnce,
+    draftsHydrated,
+    activeChannel.id,
+    composerChannelId
+  ])
 
   useDidUpdate(() => {
-    if (mentionedUsers && mentionedUsers.length) {
-      setDraftMessageToMap(activeChannel.id, {
-        text: messageText,
-        mentionedUsers,
-        messageForReply,
-        bodyAttributes: messageBodyAttributes
-      })
+    if (composerChannelId === activeChannel.id && !messageToEdit && mentionedUsers && mentionedUsers.length) {
+      setDraftMessageToMap(
+        activeChannel.id,
+        {
+          text: messageText,
+          mentionedUsers,
+          messageForReply,
+          bodyAttributes: messageBodyAttributes,
+          attachments,
+          viewOnce
+        },
+        { persist: !!(messageText.trim() || attachments.length) }
+      )
     }
-  }, [mentionedUsers])
+  }, [mentionedUsers, activeChannel.id, composerChannelId])
 
   useDidUpdate(() => {
     if (handleAttachmentSelected) {
@@ -1618,6 +1892,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
       }
     }
     attachmentsUpdate = attachments
+    attachmentsRef.current = attachments
 
     // Check if there's an active audio recording
     const hasAudioRecording = showRecording || getAudioRecordingFromMap(activeChannel?.id)?.file
@@ -1659,13 +1934,31 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
   })
 
   useDidUpdate(() => {
-    if (draftMessagesMap[activeChannel.id]) {
-      setDraftMessageToMap(activeChannel.id, {
-        text: messageText,
-        mentionedUsers,
-        messageForReply,
-        bodyAttributes: messageBodyAttributes
-      })
+    if (composerChannelId !== activeChannel.id) {
+      return
+    }
+    const persistedReply = draftMessagesMap[activeChannel.id]?.messageForReply
+    if (isNavigatingChannelRef.current) {
+      isNavigatingChannelRef.current = false
+      return
+    }
+    const hasDraftContent = !!(messageText.trim() || attachments.length || messageForReply || persistedReply)
+    if (hasDraftContent) {
+      setDraftMessageToMap(
+        activeChannel.id,
+        {
+          text: messageText,
+          mentionedUsers,
+          messageForReply: messageForReply || persistedReply,
+          bodyAttributes: messageBodyAttributes,
+          attachments,
+          viewOnce
+        },
+        { persist: !!(messageText.trim() || attachments.length) }
+      )
+    } else if (draftMessagesMap[activeChannel.id]) {
+      removeDraftMessageFromMap(activeChannel.id)
+      dispatch(setChannelDraftMessageIsRemovedAC(activeChannel.id))
     }
     if (messageForReply && messageToEdit) {
       handleCloseEditMode()
@@ -1674,7 +1967,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
     if (messageContRef && messageContRef.current) {
       dispatch(setSendMessageInputHeightAC(messageContRef.current.getBoundingClientRect().height))
     }
-  }, [messageForReply])
+  }, [messageForReply, activeChannel.id, composerChannelId])
 
   useDidUpdate(() => {
     if (messageToEdit) {
@@ -1702,18 +1995,15 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
       }, 800)
     }
     messageContRef.current.addEventListener('paste', handlePastAttachments)
-    messageContRef.current.addEventListener('cut', handleCut)
     document.addEventListener('mousedown', handleClick)
     return () => {
       if (inputHeightTimeout) {
         clearTimeout(inputHeightTimeout)
       }
-      prevActiveChannelId = undefined
       document.removeEventListener('mousedown', handleClick)
 
       if (messageContRef && messageContRef.current) {
         messageContRef.current.removeEventListener('paste', handlePastAttachments)
-        messageContRef.current.removeEventListener('cut', handleCut)
       }
     }
   }, [])
@@ -1767,8 +2057,10 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
     }
   }
 
-  const isPollMessageSelected = useMemo(() => {
-    return selectedMessagesMap?.values()?.some((message: IMessage) => message.type === MESSAGE_TYPE.POLL)
+  const canForwardMessage = useMemo(() => {
+    return selectedMessagesMap
+      ?.values()
+      ?.some((message: IMessage) => message.type === MESSAGE_TYPE.POLL || message.type === 'call')
   }, [selectedMessagesMap])
 
   const showLinkPreview = useMemo(
@@ -1784,15 +2076,26 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
   )
 
   useEffect(() => {
-    if (messageContRef && messageContRef.current) {
-      setTimeout(() => {
-        dispatch(setSendMessageInputHeightAC(messageContRef.current.getBoundingClientRect().height))
-      }, 301)
-    }
+    if (!messageContRef.current) return undefined
+
+    const timeout = setTimeout(() => {
+      const messageContainer = messageContRef.current
+      if (messageContainer) {
+        dispatch(setSendMessageInputHeightAC(messageContainer.getBoundingClientRect().height))
+      }
+    }, 301)
+
+    return () => clearTimeout(timeout)
   }, [showLinkPreview])
 
   return (
-    <SendMessageWrapper ref={sendMessageWrapperRef} backgroundColor={backgroundColor || background}>
+    <SendMessageWrapper
+      ref={sendMessageWrapperRef}
+      backgroundColor={backgroundColor || background}
+      // Keep the composer area as reserved empty space while browsing pins.
+      // Edit/reply state is preserved and becomes visible again when the list closes.
+      $hidden={pinnedMessagesListOpen && !(selectedMessagesMap && selectedMessagesMap.size > 0)}
+    >
       <Container
         margin={margin}
         padding={padding}
@@ -1808,7 +2111,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
             <MessageCountWrapper color={textPrimary}>
               {selectedMessagesMap.size} {selectedMessagesMap.size > 1 ? ' messages selected' : ' message selected'}
             </MessageCountWrapper>
-            {!isPollMessageSelected && (
+            {!canForwardMessage && (
               <CustomButton
                 onClick={handleToggleForwardMessagePopup}
                 backgroundColor={backgroundHovered}
@@ -1835,8 +2138,8 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
               <ForwardMessagePopup
                 handleForward={handleForwardMessage}
                 togglePopup={handleToggleForwardMessagePopup}
-                buttonText='Forward'
                 title='Forward message'
+                forwardMessages={Array.from(selectedMessagesMap.values())}
               />
             )}
             {deletePopupOpen && (
@@ -1938,7 +2241,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
                     borderBottom={linkPreview && linkPreview.metadata}
                     borderColor={borderColor}
                   >
-                    <CloseEditMode color={textSecondary} onClick={handleCloseEditMode}>
+                    <CloseEditMode color={textSecondary} onClick={() => handleCloseEditMode()}>
                       <CloseIcon />
                     </CloseEditMode>
                     <EditReplyMessageHeader color={accentColor}>
@@ -1970,7 +2273,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
                     borderBottom={linkPreview && linkPreview.metadata}
                     borderColor={borderColor}
                   >
-                    <CloseEditMode color={textSecondary} onClick={handleCloseReply}>
+                    <CloseEditMode color={textSecondary} onClick={() => handleCloseReply()}>
                       <CloseIcon />
                     </CloseEditMode>
                     {CustomReplyMessageContainer && customReplyMessageTypes?.includes(messageForReply.type) ? (
@@ -1986,27 +2289,45 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
                               backgroundColor={selectedFileAttachmentsBoxBackground || ''}
                               isRepliedMessage
                             />
+                          ) : messageForReply.attachments[0].type === attachmentTypes.file ? (
+                            <ReplyIconWrapper backgroundColor={accentColor} iconColor={textOnPrimary}>
+                              <ChooseFileIcon />
+                            </ReplyIconWrapper>
+                          ) : getReplyLinkPreviewImage(messageForReply.attachments) &&
+                            !shouldShowLinkPreviewErrorFallback(
+                              getReplyLinkPreviewImage(messageForReply.attachments),
+                              replyLinkPreviewImageFailed
+                            ) ? (
+                            <LinkPreviewImage
+                              bg={background}
+                              src={getReplyLinkPreviewImage(messageForReply.attachments) as string}
+                              alt='Link preview'
+                              onError={() => setReplyLinkPreviewImageFailed(true)}
+                            />
                           ) : (
-                            messageForReply.attachments[0].type === attachmentTypes.file && (
-                              <ReplyIconWrapper backgroundColor={accentColor} iconColor={textOnPrimary}>
-                                <ChooseFileIcon />
-                              </ReplyIconWrapper>
+                            messageForReply.attachments[0].type === attachmentTypes.link && (
+                              <LinkPreviewIconWrapper bg={background}>
+                                <LinkPreviewIcon color={accentColor} bg={background} />
+                              </LinkPreviewIconWrapper>
                             )
                           ))}
                         <ReplyMessageBody linkColor={accentColor}>
                           <EditReplyMessageHeader color={accentColor}>
-                            {replyMessageIcon || <ReplyIcon />} Reply to
-                            <UserName>
-                              {user.id === messageForReply.user.id
-                                ? user.firstName
-                                  ? `${user.firstName} ${user.lastName}`
-                                  : user.id
-                                : makeUsername(
+                            {replyMessageIcon || <ReplyIcon />}
+                            {user.id === messageForReply.user.id ? (
+                              ' Reply You'
+                            ) : (
+                              <span>
+                                {' Reply to'}
+                                <UserName>
+                                  {makeUsername(
                                     contactsMap[messageForReply.user.id],
                                     messageForReply.user,
                                     getFromContacts
                                   )}
-                            </UserName>
+                                </UserName>
+                              </span>
+                            )}
                           </EditReplyMessageHeader>
                           {messageForReply.attachments && messageForReply.attachments.length ? (
                             messageForReply.attachments[0].type === attachmentTypes.voice ? (
@@ -2090,7 +2411,11 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
                       <CloseIcon />
                     </CloseEditMode>
                     <LinkPreviewContent>
-                      {linkPreview.metadata.og?.image?.[0]?.url ? (
+                      {linkPreview.metadata.og?.image?.[0]?.url &&
+                      !shouldShowLinkPreviewErrorFallback(
+                        linkPreview.metadata.og.image[0].url,
+                        linkPreviewImageFailed
+                      ) ? (
                         <LinkPreviewImage
                           onLoad={(e: any) => {
                             if (e.target?.naturalHeight && e.target?.naturalWidth) {
@@ -2105,7 +2430,13 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
                           }}
                           src={linkPreview.metadata.og.image[0].url}
                           alt='Link preview'
+                          onError={() => setLinkPreviewImageFailed(true)}
                         />
+                      ) : shouldShowLinkPreviewErrorFallback(
+                          linkPreview.metadata.og?.image?.[0]?.url,
+                          linkPreviewImageFailed
+                        ) ? (
+                        <LinkPreviewIcon color={accentColor} bg={background} />
                       ) : linkPreview.metadata.og?.favicon?.url ? (
                         <LinkPreviewImage src={linkPreview.metadata.og.favicon.url} alt='Favicon' />
                       ) : (
@@ -2293,19 +2624,22 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
                           <ClearEditorPlugin
                             shouldClearEditor={shouldClearEditor}
                             setEditorCleared={() => setShouldClearEditor({ clear: false })}
+                            contactsMap={contactsMap}
+                            getFromContacts={getFromContacts}
                           />
                           {/* eslint-disable-next-line react/jsx-no-bind */}
                           <OnChangePlugin onChange={onChange} />
                           <EditMessagePlugin
                             editMessage={messageToEdit}
+                            draftMessage={restoredEditMessage?.id === messageToEdit?.id ? restoredEditMessage : null}
                             contactsMap={contactsMap}
                             getFromContacts={getFromContacts}
-                            setMentionedMember={setMentionedUsers}
+                            setMentionedMember={setComposerMentionedUsers}
                           />
                           <FormatMessagePlugin
                             editorState={realEditorState}
-                            setMessageBodyAttributes={setMessageBodyAttributes}
-                            setMessageText={messageToEdit ? setEditMessageText : setMessageText}
+                            setMessageBodyAttributes={setComposerMessageBodyAttributes}
+                            setMessageText={messageToEdit ? setComposerEditMessageText : setComposerMessageText}
                             messageToEdit={messageToEdit}
                             activeChannelMembers={activeChannelMembers}
                             contactsMap={contactsMap}
@@ -2331,7 +2665,6 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
                                 userId={user.id}
                                 getFromContacts={getFromContacts}
                                 members={activeChannelMembers}
-                                setMentionsIsOpen={setMentionsIsOpen}
                                 channelId={activeChannel?.id}
                               />
                             )}
@@ -2375,11 +2708,11 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
                   messageToEdit ? (
                     <SendMessageButton
                       isCustomButton={CustomSendMessageButton}
-                      isActive={sendMessageIsActive}
+                      isActive={sendMessageIsActive && !isSendMessageInFlight}
                       order={sendIconOrder}
                       color={backgroundSections}
                       height={inputContainerHeight || minHeight}
-                      onClick={sendMessageIsActive ? handleSendEditMessage : null}
+                      onClick={sendMessageIsActive && !isSendMessageInFlight ? handleSendEditMessage : null}
                       iconColor={accentColor}
                       activeColor={accentColor}
                     >
@@ -2396,7 +2729,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
                     >
                       <AudioRecord
                         sendRecordedFile={sendRecordedFile}
-                        setShowRecording={setShowRecording}
+                        setShowRecording={handleShowRecording}
                         showRecording={showRecording}
                         channelId={activeChannel.id}
                         maxRecordingDuration={audioRecordingMaxDuration}
@@ -2419,7 +2752,11 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
   )
 }
 
-const SendMessageWrapper = styled.div<{ backgroundColor: string }>`
+const SendMessageWrapper = styled.div<{ backgroundColor: string; $hidden?: boolean }>`
+  visibility: ${(props) => (props.$hidden ? 'hidden' : 'visible')};
+  pointer-events: ${(props) => (props.$hidden ? 'none' : 'auto')};
+  max-height: ${(props) => (props.$hidden ? '40px' : 'none')};
+  overflow: ${(props) => (props.$hidden ? 'hidden' : 'visible')};
   background-color: ${(props) => props.backgroundColor};
   position: relative;
   z-index: 10;
@@ -2692,7 +3029,7 @@ const LexicalWrapper = styled.div<{
     order: ${(props) => (props.order === 0 || props.order ? props.order : 1)};
     overflow-y: auto;
     overflow-x: hidden;
-    scrollbar-width: none;
+    scrollbar-width: thin;
     scrollbar-color: transparent transparent;
     overscroll-behavior: none;
 
@@ -2717,7 +3054,6 @@ const LexicalWrapper = styled.div<{
     }
 
     &.show-scrollbar {
-      scrollbar-width: thin;
       scrollbar-color: ${(props) => props.thumbColor} transparent;
     }
 
@@ -2751,7 +3087,8 @@ const LexicalWrapper = styled.div<{
     & .mention {
       color: ${(props) => props.mentionColor};
       background-color: inherit !important;
-      user-modify: read-only;
+      user-select: text;
+      -webkit-user-select: text;
     }
 
     & span.bold {
@@ -2881,7 +3218,7 @@ const ChosenAttachments = styled.div<{ fileBoxWidth?: string }>`
 
   & ${AttachmentFile} {
     width: 240px;
-    padding: 5px 12px;
+    padding: 5px;
     border-radius: 8px;
     height: 50px;
   }
@@ -3142,17 +3479,18 @@ const LinkPreviewContainer = styled.div<{
 
 const LinkPreviewContent = styled.div`
   display: flex;
-  gap: 12px;
   flex: 1;
   overflow: hidden;
 `
 
-const LinkPreviewImage = styled.img`
+const LinkPreviewImage = styled.img<{ bg?: string }>`
   width: 40px;
   height: 40px;
   object-fit: cover;
-  border-radius: 8px;
+  border-radius: 4px;
   flex-shrink: 0;
+  margin-right: 8px;
+  background: ${(props) => props.bg};
 `
 
 const LinkPreviewIcon = styled(LinkIcon)<{ color: string; bg: string }>`
@@ -3161,6 +3499,14 @@ const LinkPreviewIcon = styled(LinkIcon)<{ color: string; bg: string }>`
     fill: ${(props) => props.bg};
     fill-opacity: 1;
   }
+`
+
+const LinkPreviewIconWrapper = styled.div<{ bg?: string }>`
+  width: 40px;
+  height: 40px;
+  border-radius: 4px;
+  margin-right: 8px;
+  background: ${(props) => props.bg};
 `
 
 const LinkPreviewTextContent = styled.div<{ hasImage: boolean }>`

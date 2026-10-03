@@ -11,8 +11,12 @@ import MessageReducer, {
   setMessageMarkers,
   removeChannelMarkers,
   setOGMetadata,
+  setPinnedMessagesListOpen,
+  requestPinnedMessagesListClose,
+  addSelectedMessage,
   OG_METADATA_MAX
 } from './reducers'
+import { addReactionToMessageAC, deleteReactionFromMessageAC } from './actions'
 import {
   addMessageToMap,
   clearMessagesMap,
@@ -24,7 +28,7 @@ import {
   updateMessageDeliveryStatusAndMarkers,
   updateMessageStatusOnMap
 } from '../../helpers/messagesHalper'
-import { makeMessage, makePendingMessage, resetMessageListFixtureIds } from '../../testUtils/messageFixtures'
+import { makeMessage, makePendingMessage, makeUser, resetMessageListFixtureIds } from '../../testUtils/messageFixtures'
 import { MESSAGE_DELIVERY_STATUS, MESSAGE_STATUS } from '../../helpers/constants'
 
 describe('message pending ordering', () => {
@@ -216,6 +220,49 @@ describe('message pending ordering', () => {
     ])
   })
 
+  it('retains forwarding attribution when a partial server update only includes the source message ID', () => {
+    const channelId = 'channel-forwarding-details'
+    const sourceUser = makeUser({ id: 'source-user' })
+    const forwardedMessage = makeMessage({
+      id: '41',
+      channelId,
+      body: 'forwarded message',
+      forwardingDetails: {
+        messageId: 'source-message',
+        channelId: 'source-channel',
+        hops: 1,
+        user: sourceUser
+      } as any
+    })
+    const partialForwardingDetails = { messageId: 'source-message' } as any
+
+    const state = MessageReducer(undefined, setMessages({ messages: [forwardedMessage] }))
+    const updatedState = MessageReducer(
+      state,
+      updateMessage({ messageId: forwardedMessage.id, params: { forwardingDetails: partialForwardingDetails } as any })
+    )
+
+    expect(updatedState.activeChannelMessages[0].forwardingDetails).toEqual(
+      expect.objectContaining({
+        messageId: 'source-message',
+        user: expect.objectContaining({ id: sourceUser.id })
+      })
+    )
+
+    addMessageToMap(channelId, forwardedMessage)
+    updateMessageOnMap(channelId, {
+      messageId: forwardedMessage.id,
+      params: { forwardingDetails: partialForwardingDetails }
+    })
+
+    expect(getMessagesFromMap(channelId)[forwardedMessage.id].forwardingDetails).toEqual(
+      expect.objectContaining({
+        messageId: 'source-message',
+        user: expect.objectContaining({ id: sourceUser.id })
+      })
+    )
+  })
+
   it('updates reply parent snapshots when the source message is edited', () => {
     const channelId = 'channel-reply-edit-reducer'
     const sourceMessage = makeMessage({
@@ -342,6 +389,88 @@ describe('message pending ordering', () => {
     )
   })
 
+  it('adds self reactions even when the active message has no hydrated userReactions array yet', () => {
+    const channelId = 'channel-reaction-add'
+    const currentUser = makeUser({ id: 'current-user' })
+    const message = {
+      ...makeMessage({ id: '5001', channelId, user: currentUser }),
+      userReactions: undefined as any
+    }
+    const reaction = {
+      id: 'reaction-1',
+      key: 'fire',
+      score: 1,
+      reason: '',
+      createdAt: new Date('2026-04-01T12:30:00.000Z'),
+      messageId: message.id,
+      user: currentUser
+    }
+
+    const initialState = MessageReducer(undefined, setMessages({ messages: [message as any] }))
+    const nextState = MessageReducer(initialState, addReactionToMessageAC(message as any, reaction as any, true))
+
+    expect(nextState.activeChannelMessages[0].userReactions).toEqual([reaction])
+    expect(nextState.activeChannelMessages[0].reactionTotals).toEqual(message.reactionTotals)
+  })
+
+  it('removes self reactions safely when the active message has no hydrated userReactions array yet', () => {
+    const channelId = 'channel-reaction-delete'
+    const currentUser = makeUser({ id: 'current-user' })
+    const message = {
+      ...makeMessage({ id: '5002', channelId, user: currentUser }),
+      userReactions: undefined as any
+    }
+    const reaction = {
+      id: 'reaction-2',
+      key: 'smile',
+      score: 1,
+      reason: '',
+      createdAt: new Date('2026-04-01T12:31:00.000Z'),
+      messageId: message.id,
+      user: currentUser
+    }
+
+    const initialState = MessageReducer(undefined, setMessages({ messages: [message as any] }))
+    const nextState = MessageReducer(initialState, deleteReactionFromMessageAC(message as any, reaction as any, true))
+
+    expect(nextState.activeChannelMessages[0].userReactions).toEqual([])
+    expect(nextState.activeChannelMessages[0].reactionTotals).toEqual(message.reactionTotals)
+  })
+
+  it('removes the final reaction from the rendered totals even if the delete response is stale', () => {
+    const channelId = 'channel-reaction-stale-delete'
+    const currentUser = makeUser({ id: 'current-user' })
+    const reaction = {
+      id: 'reaction-3',
+      key: '👍',
+      score: 1,
+      reason: '',
+      createdAt: new Date('2026-04-01T12:32:00.000Z'),
+      messageId: '5003',
+      user: currentUser
+    }
+    const cachedMessage = makeMessage({
+      id: reaction.messageId,
+      channelId,
+      user: currentUser,
+      userReactions: [reaction],
+      reactionTotals: [{ key: reaction.key, count: 1, score: 1 }]
+    })
+    const staleDeleteResponse = {
+      ...cachedMessage,
+      reactionTotals: [{ key: reaction.key, count: 1, score: 1 }]
+    }
+
+    const initialState = MessageReducer(undefined, setMessages({ messages: [cachedMessage] }))
+    const nextState = MessageReducer(
+      initialState,
+      deleteReactionFromMessageAC(staleDeleteResponse as any, reaction as any, true)
+    )
+
+    expect(nextState.activeChannelMessages[0].userReactions).toEqual([])
+    expect(nextState.activeChannelMessages[0].reactionTotals).toEqual([])
+  })
+
   it('keeps pending messages at the tail after paginating to older and newer pages around them', () => {
     const channelId = 'channel-window-pagination'
     const confirmedMiddle = makeMessage({
@@ -463,6 +592,28 @@ describe('message pending ordering', () => {
   })
 })
 
+describe('pinned messages list close', () => {
+  it('restores chat UI state immediately while retaining the overlay close request', () => {
+    const openState = MessageReducer(undefined, setPinnedMessagesListOpen({ isOpen: true }))
+    const closingState = MessageReducer(openState, requestPinnedMessagesListClose())
+
+    expect(closingState.pinnedMessagesListOpen).toBe(false)
+    expect(closingState.pinnedMessagesListCloseRequested).toBe(true)
+  })
+
+  it('clears pinned-list message selection before restoring the chat', () => {
+    const selectedMessage = makeMessage({ id: 'selected-pinned-message', body: 'Selected pinned message' })
+    const selectedState = MessageReducer(
+      MessageReducer(undefined, addSelectedMessage({ message: selectedMessage })),
+      setPinnedMessagesListOpen({ isOpen: true })
+    )
+
+    const closingState = MessageReducer(selectedState, requestPinnedMessagesListClose())
+
+    expect(closingState.selectedMessagesMap).toBeNull()
+  })
+})
+
 describe('message marker status updates', () => {
   beforeEach(() => {
     resetMessageListFixtureIds()
@@ -558,6 +709,61 @@ describe('message marker status updates', () => {
 
     expect(updatedMessage.deliveryStatus).toBe(MESSAGE_DELIVERY_STATUS.READ)
     expect(updatedMessage.markerTotals).toEqual([{ name: MESSAGE_DELIVERY_STATUS.DELIVERED, count: 1 }])
+  })
+
+  it('does not advance queued messages when a delivered marker cascades across earlier ids', () => {
+    const channelId = 'marker-cascade-pending-queue'
+    const sentMessage = makeMessage({
+      id: '200',
+      channelId,
+      deliveryStatus: MESSAGE_DELIVERY_STATUS.SENT
+    })
+    // A queued message can receive an id from an SDK event before its own
+    // send promise resolves. It is still pending and must not inherit the
+    // earlier message's delivery marker.
+    const queuedMessage = makePendingMessage({
+      id: '199',
+      tid: 'queued-message-tid',
+      channelId,
+      deliveryStatus: MESSAGE_DELIVERY_STATUS.PENDING
+    })
+    const marker = {
+      messageIds: [sentMessage.id],
+      user: { id: 'recipient-user' },
+      name: MESSAGE_DELIVERY_STATUS.DELIVERED,
+      createdAt: new Date('2026-04-01T12:32:00.000Z')
+    } as any
+
+    const nextState = MessageReducer(
+      MessageReducer(undefined, setMessages({ messages: [queuedMessage, sentMessage] })),
+      updateMessagesStatus({
+        name: MESSAGE_DELIVERY_STATUS.DELIVERED,
+        markersMap: { [sentMessage.id]: marker },
+        isOwnMarker: false,
+        marker
+      })
+    )
+
+    addMessageToMap(channelId, queuedMessage)
+    addMessageToMap(channelId, sentMessage)
+    updateMessageStatusOnMap(
+      channelId,
+      {
+        name: MESSAGE_DELIVERY_STATUS.DELIVERED,
+        markersMap: { [sentMessage.id]: marker },
+        marker
+      },
+      false
+    )
+
+    expect(nextState.activeChannelMessages.find((message) => message.tid === queuedMessage.tid)?.deliveryStatus).toBe(
+      MESSAGE_DELIVERY_STATUS.PENDING
+    )
+    expect(nextState.activeChannelMessages.find((message) => message.id === sentMessage.id)?.deliveryStatus).toBe(
+      MESSAGE_DELIVERY_STATUS.DELIVERED
+    )
+    expect(getMessagesFromMap(channelId)[queuedMessage.id].deliveryStatus).toBe(MESSAGE_DELIVERY_STATUS.PENDING)
+    expect(getMessagesFromMap(channelId)[sentMessage.id].deliveryStatus).toBe(MESSAGE_DELIVERY_STATUS.DELIVERED)
   })
 
   it('does not duplicate same-status own markers', () => {

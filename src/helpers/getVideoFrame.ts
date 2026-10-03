@@ -19,6 +19,81 @@ export interface VideoFirstFrameResult {
   duration: number
 }
 
+export interface VideoThumbnailFrame {
+  thumb: string
+  width: number
+  height: number
+  duration: number
+  blob: Blob
+  frameBlobUrl: string
+}
+
+interface VideoFrameExtractionOptions {
+  applyDevicePixelRatio?: boolean
+  preserveAspectRatio?: boolean
+  maxOutputBytes?: number
+  fallbackMaxDimension?: number
+}
+
+// 1280px keeps video previews sharp enough for modern high-density displays
+// while still being far smaller than the original video frame.
+export const VIDEO_PREVIEW_MAX_DIMENSION = 1280
+export const VIDEO_PREVIEW_FALLBACK_MAX_DIMENSION = 960
+export const VIDEO_PREVIEW_JPEG_QUALITY = 0.85
+export const VIDEO_PREVIEW_MIN_JPEG_QUALITY = 0.65
+export const VIDEO_PREVIEW_MAX_BYTES = 500 * 1024
+
+export interface DownloadProgress {
+  loaded: number
+  total: number
+}
+
+/** Reads a fetch response while reporting byte progress when streaming is available. */
+export const readResponseBlobWithProgress = async (
+  response: Response,
+  onProgress?: (progress: DownloadProgress) => void,
+  fallbackTotal: number = 0
+): Promise<Blob> => {
+  const contentLength = Number(response.headers?.get?.('content-length'))
+  const total = Number.isFinite(contentLength) && contentLength > 0 ? contentLength : fallbackTotal
+  const reportProgress = (loaded: number) => {
+    onProgress?.({ loaded, total: total || loaded })
+  }
+
+  if (!response.body || typeof response.body.getReader !== 'function') {
+    const blob = await response.blob()
+    reportProgress(blob.size)
+    return blob
+  }
+
+  const reader = response.body.getReader()
+  const chunks: BlobPart[] = []
+  let loaded = 0
+  while (true) {
+    const { done, value } = await reader.read()
+    if (done) break
+    if (value) {
+      chunks.push(value)
+      loaded += value.byteLength
+      reportProgress(loaded)
+    }
+  }
+
+  return new Blob(chunks, { type: response.headers?.get?.('content-type') || '' })
+}
+
+// Callers pass maxWidth/maxHeight as CSS render sizes. Scaling by
+// devicePixelRatio (capped to avoid oversized payloads on 3x+ screens) gives
+// the output enough native pixels to stay sharp on Retina/HiDPI displays —
+// `quality` alone can't fix this, it only controls compression artifacts.
+export const scaleForDevicePixelRatio = (value?: number, cap: number = 2): number | undefined => {
+  if (!value) {
+    return value
+  }
+  const dpr = Math.min(window.devicePixelRatio || 1, cap)
+  return value * dpr
+}
+
 // Return a blob whose declared type a video element can trust in all browsers,
 // along with what the bytes revealed about the container.
 const normalizeVideoBlob = async (blob: Blob): Promise<{ safeBlob: Blob; info: VideoContainerInfo }> => {
@@ -36,13 +111,64 @@ const normalizeVideoBlob = async (blob: Blob): Promise<{ safeBlob: Blob; info: V
 
 const FRAME_LOAD_TIMEOUT_MS = 8000
 
+export const calculateVideoPreviewFrameSize = (width: number, height: number, maxDimension: number) => {
+  const scale = Math.min(1, maxDimension / Math.max(width, height))
+  return {
+    width: Math.max(1, Math.round(width * scale)),
+    height: Math.max(1, Math.round(height * scale))
+  }
+}
+
+const canvasToJpegBlob = (canvas: HTMLCanvasElement, quality: number): Promise<Blob | null> =>
+  new Promise((resolve) => canvas.toBlob(resolve, 'image/jpeg', quality))
+
+const encodeFrameForPreview = async (
+  canvas: HTMLCanvasElement,
+  quality: number,
+  maxOutputBytes?: number,
+  fallbackMaxDimension?: number
+): Promise<Blob | null> => {
+  let encoded = await canvasToJpegBlob(canvas, quality)
+  if (!encoded || !maxOutputBytes || encoded.size <= maxOutputBytes) return encoded
+
+  for (const retryQuality of [
+    Math.max(VIDEO_PREVIEW_MIN_JPEG_QUALITY, quality - 0.1),
+    VIDEO_PREVIEW_MIN_JPEG_QUALITY
+  ]) {
+    encoded = await canvasToJpegBlob(canvas, retryQuality)
+    if (!encoded || encoded.size <= maxOutputBytes) return encoded
+  }
+
+  const maxDimension = fallbackMaxDimension || VIDEO_PREVIEW_FALLBACK_MAX_DIMENSION
+  if (Math.max(canvas.width, canvas.height) <= maxDimension) return encoded
+
+  const size = calculateVideoPreviewFrameSize(canvas.width, canvas.height, maxDimension)
+  const smallerCanvas = document.createElement('canvas')
+  smallerCanvas.width = size.width
+  smallerCanvas.height = size.height
+  const smallerContext = smallerCanvas.getContext('2d')
+  if (!smallerContext) return encoded
+  smallerContext.drawImage(canvas, 0, 0, smallerCanvas.width, smallerCanvas.height)
+
+  for (const retryQuality of [
+    Math.max(VIDEO_PREVIEW_MIN_JPEG_QUALITY, quality - 0.1),
+    VIDEO_PREVIEW_MIN_JPEG_QUALITY
+  ]) {
+    encoded = await canvasToJpegBlob(smallerCanvas, retryQuality)
+    if (!encoded || encoded.size <= maxOutputBytes) return encoded
+  }
+
+  return encoded
+}
+
 // Core extractor: works on a ready-to-use src URL. The caller owns object-URL
 // lifetime; this function only manages the temporary <video> element.
 const extractFrameFromUrl = (
   srcUrl: string,
   maxWidth?: number,
   maxHeight?: number,
-  quality: number = 0.8
+  quality: number = 1,
+  options: VideoFrameExtractionOptions = {}
 ): Promise<VideoFirstFrameResult | null> => {
   return new Promise((resolve) => {
     try {
@@ -99,8 +225,12 @@ const extractFrameFromUrl = (
           const width = video.videoWidth
           const height = video.videoHeight
           const duration = Number.isFinite(video.duration) ? video.duration : 0
-          const canvasWidth = maxWidth || width / 2
-          const canvasHeight = maxHeight || height / 2
+          const boundedFrame =
+            options.preserveAspectRatio && maxWidth && maxHeight
+              ? calculateVideoPreviewFrameSize(width, height, Math.min(maxWidth, maxHeight))
+              : null
+          const canvasWidth = boundedFrame?.width || maxWidth || width / 2
+          const canvasHeight = boundedFrame?.height || maxHeight || height / 2
           const canvas = document.createElement('canvas')
           canvas.width = canvasWidth
           canvas.height = canvasHeight
@@ -112,18 +242,16 @@ const extractFrameFromUrl = (
 
           ctx.drawImage(video, 0, 0, canvas.width, canvas.height)
 
-          canvas.toBlob(
-            (blob) => {
+          encodeFrameForPreview(canvas, quality, options.maxOutputBytes, options.fallbackMaxDimension)
+            .then((blob) => {
               if (!blob) {
                 finishOnce(null)
                 return
               }
               const frameBlobUrl = URL.createObjectURL(blob)
               finishOnce({ frameBlobUrl, blob, width, height, duration })
-            },
-            'image/jpeg',
-            quality
-          )
+            })
+            .catch(() => finishOnce(null))
         } catch (error) {
           log.error('Error extracting video frame:', error)
           finishOnce(null)
@@ -196,8 +324,9 @@ const extractFrameFromBlob = async (
   blob: Blob,
   maxWidth?: number,
   maxHeight?: number,
-  quality: number = 0.8,
-  allowRemux: boolean = true
+  quality: number = 1,
+  allowRemux: boolean = true,
+  options: VideoFrameExtractionOptions = {}
 ): Promise<VideoFirstFrameResult | null> => {
   const { safeBlob, info } = await normalizeVideoBlob(blob)
 
@@ -215,12 +344,12 @@ const extractFrameFromBlob = async (
       log.warn('getVideoFirstFrame: QuickTime container is not supported by Firefox and remux failed')
       return null
     }
-    return extractFrameFromBlob(remuxed, maxWidth, maxHeight, quality, false)
+    return extractFrameFromBlob(remuxed, maxWidth, maxHeight, quality, false, options)
   }
 
   const url = URL.createObjectURL(safeBlob)
   try {
-    const result = await extractFrameFromUrl(url, maxWidth, maxHeight, quality)
+    const result = await extractFrameFromUrl(url, maxWidth, maxHeight, quality, options)
     if (result) {
       return result
     }
@@ -236,7 +365,7 @@ const extractFrameFromBlob = async (
   }
   try {
     const dataUrl = await blobToDataUrl(safeBlob)
-    return await extractFrameFromUrl(dataUrl, maxWidth, maxHeight, quality)
+    return await extractFrameFromUrl(dataUrl, maxWidth, maxHeight, quality, options)
   } catch (error) {
     log.error('getVideoFirstFrame: data URL fallback failed:', error)
     return null
@@ -254,18 +383,22 @@ const extractFrameFromBlob = async (
  * @param videoSrc - Video source (URL string or Blob)
  * @param maxWidth - Maximum width for the extracted frame (default: original width / 2)
  * @param maxHeight - Maximum height for the extracted frame (default: original height / 2)
- * @param quality - JPEG quality 0-1 (default: 0.8)
+ * @param quality - JPEG quality 0-1 (default: 1)
  * @returns Promise resolving to the frame blob/url plus video dimensions and duration, or null
  */
 export async function getVideoFirstFrame(
   videoSrc: string | Blob,
   maxWidth?: number,
   maxHeight?: number,
-  quality: number = 0.8
+  quality: number = 1,
+  options: VideoFrameExtractionOptions = {}
 ): Promise<VideoFirstFrameResult | null> {
   try {
+    const scaledMaxWidth = options.applyDevicePixelRatio === false ? maxWidth : scaleForDevicePixelRatio(maxWidth)
+    const scaledMaxHeight = options.applyDevicePixelRatio === false ? maxHeight : scaleForDevicePixelRatio(maxHeight)
+
     if (videoSrc instanceof Blob) {
-      return await extractFrameFromBlob(videoSrc, maxWidth, maxHeight, quality)
+      return await extractFrameFromBlob(videoSrc, scaledMaxWidth, scaledMaxHeight, quality, true, options)
     }
 
     // A blob: URL string carries a locked-in MIME type we cannot see or fix.
@@ -273,15 +406,15 @@ export async function getVideoFirstFrame(
     if (videoSrc.startsWith('blob:')) {
       try {
         const blob = await (await fetch(videoSrc)).blob()
-        return await extractFrameFromBlob(blob, maxWidth, maxHeight, quality)
+        return await extractFrameFromBlob(blob, scaledMaxWidth, scaledMaxHeight, quality, true, options)
       } catch (error) {
         log.warn('getVideoFirstFrame: failed to re-fetch blob url, trying directly', error)
-        return await extractFrameFromUrl(videoSrc, maxWidth, maxHeight, quality)
+        return await extractFrameFromUrl(videoSrc, scaledMaxWidth, scaledMaxHeight, quality, options)
       }
     }
 
     // Remote URL: try direct playback first (streams, no full download).
-    const direct = await extractFrameFromUrl(videoSrc, maxWidth, maxHeight, quality)
+    const direct = await extractFrameFromUrl(videoSrc, scaledMaxWidth, scaledMaxHeight, quality, options)
     if (direct) {
       return direct
     }
@@ -291,7 +424,7 @@ export async function getVideoFirstFrame(
     try {
       const response = await fetch(videoSrc)
       const blob = await response.blob()
-      return await extractFrameFromBlob(blob, maxWidth, maxHeight, quality)
+      return await extractFrameFromBlob(blob, scaledMaxWidth, scaledMaxHeight, quality, true, options)
     } catch (error) {
       log.error('getVideoFirstFrame: fetch retry failed:', error)
       return null
@@ -302,17 +435,23 @@ export async function getVideoFirstFrame(
   }
 }
 
-export async function getFrame(
-  videoSrc: any,
-  _time?: number
-): Promise<{ thumb: string; width: number; height: number; duration: number }> {
+/** Generates the compact JPEG uploaded as attachment metadata.video_thumb. */
+export const getVideoPreviewFrame = (videoSrc: string | Blob) =>
+  getVideoFirstFrame(videoSrc, VIDEO_PREVIEW_MAX_DIMENSION, VIDEO_PREVIEW_MAX_DIMENSION, VIDEO_PREVIEW_JPEG_QUALITY, {
+    applyDevicePixelRatio: false,
+    preserveAspectRatio: true,
+    maxOutputBytes: VIDEO_PREVIEW_MAX_BYTES,
+    fallbackMaxDimension: VIDEO_PREVIEW_FALLBACK_MAX_DIMENSION
+  })
+
+export async function getFrame(videoSrc: any, _time?: number): Promise<VideoThumbnailFrame> {
   if (!videoSrc) {
     throw new Error('src not found')
   }
 
   // getVideoFirstFrame handles MIME normalization, Safari seek quirks and
   // timeouts — no separate metadata-only video element that can hang forever.
-  const frameResult = await getVideoFirstFrame(videoSrc)
+  const frameResult = await getVideoPreviewFrame(videoSrc)
   if (!frameResult) {
     throw new Error('Failed to extract video frame')
   }
@@ -337,8 +476,7 @@ export async function getFrame(
       const pixels = ctx.getImageData(0, 0, canvas.width, canvas.height)
       const binaryThumbHash = rgbaToThumbHash(pixels.width, pixels.height, pixels.data)
       const thumb = binaryToBase64(binaryThumbHash)
-      URL.revokeObjectURL(frameBlobUrl)
-      resolve({ thumb, width: origWidth, height: origHeight, duration })
+      resolve({ thumb, width: origWidth, height: origHeight, duration, blob: frameResult.blob, frameBlobUrl })
     }
     img.onerror = () => {
       URL.revokeObjectURL(frameBlobUrl)
@@ -354,14 +492,16 @@ export const compressAndCacheImage = async (
   cacheKey: string,
   maxWidth?: number,
   maxHeight?: number,
-  quality?: number
+  quality?: number,
+  onProgress?: (progress: DownloadProgress) => void,
+  fallbackTotal?: number
 ): Promise<string> => {
   try {
     const response = await fetch(url)
     if (!response.ok) {
       return ''
     }
-    const blob = await response.blob()
+    const blob = await readResponseBlobWithProgress(response, onProgress, fallbackTotal)
     // Only compress if it's an image
     if (blob.type.startsWith('image/')) {
       // Convert blob to File for resizeImageWithPica function
@@ -370,8 +510,8 @@ export const compressAndCacheImage = async (
       // Compress the image with Pica (high-quality resizing)
       const { blob: compressedBlob } = await resizeImageWithPica(
         file,
-        maxWidth || 1280,
-        maxHeight || 1080,
+        scaleForDevicePixelRatio(maxWidth || 1280)!,
+        scaleForDevicePixelRatio(maxHeight || 1080)!,
         quality || 1
       )
       const returningUrl = compressedBlob ? URL.createObjectURL(compressedBlob) : ''

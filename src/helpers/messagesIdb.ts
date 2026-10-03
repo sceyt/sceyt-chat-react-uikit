@@ -7,9 +7,12 @@ import { IMessage } from '../types'
 // Every operation degrades to a no-op when IndexedDB is unavailable.
 
 const DB_NAME = 'sceyt-uikit-messages'
-const DB_VERSION = 1
+const DB_VERSION = 3
 const CHANNELS_STORE = 'channels'
+const DRAFTS_STORE = 'drafts'
 const META_STORE = 'meta'
+const PINS_STORE = 'pins'
+const PIN_MUTATIONS_STORE = 'pinMutations'
 const USER_META_KEY = 'userId'
 export const IDB_MAX_STORED_CHANNELS = 200
 export const IDB_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000
@@ -19,6 +22,29 @@ export type PersistedChannelCache = {
   messages: IMessage[]
   segments: Array<{ startId: string; endId: string }>
   savedAt: number
+}
+
+export type PersistedDraft = {
+  channelId: string
+  draft: any
+  savedAt: number
+}
+
+export type PersistedPinnedMessages = {
+  channelId: string
+  pins: any[]
+  nextToken?: string
+  savedAt: number
+}
+
+export type PersistedPinMutation = {
+  id: string
+  channelId: string
+  operation: 'PIN' | 'UNPIN'
+  messageId: string
+  message?: any
+  pinType?: number
+  queuedAt: number
 }
 
 let dbPromise: Promise<IDBDatabase | null> | null = null
@@ -39,8 +65,19 @@ const openDb = (): Promise<IDBDatabase | null> => {
           const store = db.createObjectStore(CHANNELS_STORE, { keyPath: 'channelId' })
           store.createIndex('savedAt', 'savedAt')
         }
+        if (!db.objectStoreNames.contains(DRAFTS_STORE)) {
+          db.createObjectStore(DRAFTS_STORE, { keyPath: 'channelId' })
+        }
         if (!db.objectStoreNames.contains(META_STORE)) {
           db.createObjectStore(META_STORE)
+        }
+        if (!db.objectStoreNames.contains(PINS_STORE)) {
+          const store = db.createObjectStore(PINS_STORE, { keyPath: 'channelId' })
+          store.createIndex('savedAt', 'savedAt')
+        }
+        if (!db.objectStoreNames.contains(PIN_MUTATIONS_STORE)) {
+          const store = db.createObjectStore(PIN_MUTATIONS_STORE, { keyPath: 'id' })
+          store.createIndex('channelId', 'channelId')
         }
       }
       request.onsuccess = () => resolve(request.result)
@@ -63,16 +100,44 @@ const requestToPromise = <T>(request: IDBRequest<T>): Promise<T> =>
     request.onerror = () => reject(request.error)
   })
 
+// Messages can contain SDK model instances. Besides Files and blob URLs, those
+// instances may expose helper functions as own properties, which IndexedDB's
+// structured clone algorithm rejects. Persist a plain data snapshot instead.
+const toStructuredCloneSafeValue = (value: any, seen = new WeakSet<object>()): any => {
+  if (value === null || typeof value !== 'object') {
+    return typeof value === 'function' || typeof value === 'symbol' ? undefined : value
+  }
+  if (value instanceof Date) {
+    return new Date(value.getTime())
+  }
+  if (seen.has(value)) {
+    return undefined
+  }
+  seen.add(value)
+  if (Array.isArray(value)) {
+    return value.map((item) => toStructuredCloneSafeValue(item, seen))
+  }
+  return Object.keys(value).reduce<Record<string, any>>((snapshot, key) => {
+    const safeValue = toStructuredCloneSafeValue(value[key], seen)
+    if (safeValue !== undefined) {
+      snapshot[key] = safeValue
+    }
+    return snapshot
+  }, {})
+}
+
 // Files and blob: URLs must never be persisted — Files aren't valid after a
 // reload and blob URLs are revoked with the session.
-const sanitizeMessageForPersist = (message: IMessage): IMessage => {
-  if (!message?.attachments?.length) {
-    return message
+export const sanitizeMessageForPersist = (message: IMessage): IMessage => {
+  const sanitizedMessage = toStructuredCloneSafeValue(message) as IMessage
+  if (!sanitizedMessage?.attachments?.length) {
+    return sanitizedMessage
   }
   return {
-    ...message,
-    attachments: message.attachments.map((attachment: any) => {
-      const { data, ...rest } = attachment || {}
+    ...sanitizedMessage,
+    attachments: sanitizedMessage.attachments.map((attachment: any) => {
+      const rest = { ...(attachment || {}) }
+      delete rest.data
       if (rest.attachmentUrl && String(rest.attachmentUrl).startsWith('blob:')) {
         rest.attachmentUrl = undefined
       }
@@ -127,6 +192,57 @@ export const restoreChannelMessages = async (channelId: string): Promise<Persist
   }
 }
 
+export const persistDraft = async (channelId: string, draft: any): Promise<void> => {
+  const db = await openDb()
+  if (!db || !channelId) return
+  try {
+    // Lexical EditorState is session-bound and not structured-cloneable. Text,
+    // attributes and mentions are enough to rebuild the compose editor on reload.
+    const persistedDraft = { ...(draft || {}) }
+    delete persistedDraft.editorState
+    db.transaction(DRAFTS_STORE, 'readwrite').objectStore(DRAFTS_STORE).put({
+      channelId,
+      draft: persistedDraft,
+      savedAt: Date.now()
+    })
+  } catch (e) {
+    log.info('messagesIdb: failed to persist draft', e)
+  }
+}
+
+export const restoreDrafts = async (): Promise<PersistedDraft[]> => {
+  const db = await openDb()
+  if (!db) return []
+  try {
+    return await requestToPromise<PersistedDraft[]>(
+      db.transaction(DRAFTS_STORE, 'readonly').objectStore(DRAFTS_STORE).getAll()
+    )
+  } catch (e) {
+    log.info('messagesIdb: failed to restore drafts', e)
+    return []
+  }
+}
+
+export const removePersistedDraft = async (channelId: string): Promise<void> => {
+  const db = await openDb()
+  if (!db || !channelId) return
+  try {
+    db.transaction(DRAFTS_STORE, 'readwrite').objectStore(DRAFTS_STORE).delete(channelId)
+  } catch (e) {
+    log.info('messagesIdb: failed to remove draft', e)
+  }
+}
+
+export const clearPersistedDrafts = async (): Promise<void> => {
+  const db = await openDb()
+  if (!db) return
+  try {
+    db.transaction(DRAFTS_STORE, 'readwrite').objectStore(DRAFTS_STORE).clear()
+  } catch (e) {
+    log.info('messagesIdb: failed to clear drafts', e)
+  }
+}
+
 export const removePersistedChannel = async (channelId: string): Promise<void> => {
   const db = await openDb()
   if (!db) {
@@ -151,6 +267,108 @@ export const clearPersistedChannels = async (): Promise<void> => {
   }
 }
 
+export const persistPinnedMessages = async (channelId: string, pins: any[], nextToken?: string): Promise<void> => {
+  if (!channelId) return
+  const db = await openDb()
+  if (!db) return
+  try {
+    db.transaction(PINS_STORE, 'readwrite')
+      .objectStore(PINS_STORE)
+      .put({
+        channelId,
+        pins: toStructuredCloneSafeValue(pins),
+        nextToken,
+        savedAt: Date.now()
+      } as PersistedPinnedMessages)
+  } catch (e) {
+    log.info('messagesIdb: failed to persist pins', e)
+  }
+}
+
+export const restorePinnedMessages = async (channelId: string): Promise<PersistedPinnedMessages | null> => {
+  if (!channelId) return null
+  const db = await openDb()
+  if (!db) return null
+  try {
+    return (
+      (await requestToPromise<PersistedPinnedMessages | undefined>(
+        db.transaction(PINS_STORE, 'readonly').objectStore(PINS_STORE).get(channelId)
+      )) || null
+    )
+  } catch (e) {
+    log.info('messagesIdb: failed to restore pins', e)
+    return null
+  }
+}
+
+export const removePersistedPinsForChannel = async (channelId: string): Promise<void> => {
+  if (!channelId) return
+  const db = await openDb()
+  if (!db) return
+  try {
+    db.transaction(PINS_STORE, 'readwrite').objectStore(PINS_STORE).delete(channelId)
+
+    const mutations = await requestToPromise<PersistedPinMutation[]>(
+      db
+        .transaction(PIN_MUTATIONS_STORE, 'readonly')
+        .objectStore(PIN_MUTATIONS_STORE)
+        .index('channelId')
+        .getAll(channelId)
+    )
+    if (!mutations.length) return
+
+    const mutationsStore = db.transaction(PIN_MUTATIONS_STORE, 'readwrite').objectStore(PIN_MUTATIONS_STORE)
+    mutations.forEach((mutation) => mutationsStore.delete(mutation.id))
+  } catch (e) {
+    log.info('messagesIdb: failed to remove channel pins', e)
+  }
+}
+
+export const persistPinMutation = async (mutation: PersistedPinMutation): Promise<void> => {
+  const db = await openDb()
+  if (!db) return
+  try {
+    db.transaction(PIN_MUTATIONS_STORE, 'readwrite').objectStore(PIN_MUTATIONS_STORE).put(mutation)
+  } catch (e) {
+    log.info('messagesIdb: failed to persist pin mutation', e)
+  }
+}
+
+export const removePersistedPinMutation = async (id: string): Promise<void> => {
+  const db = await openDb()
+  if (!db || !id) return
+  try {
+    db.transaction(PIN_MUTATIONS_STORE, 'readwrite').objectStore(PIN_MUTATIONS_STORE).delete(id)
+  } catch (_) {
+    // A retry on next reconnect is safe.
+  }
+}
+
+export const restorePinnedMutations = async (): Promise<PersistedPinMutation[]> => {
+  const db = await openDb()
+  if (!db) return []
+  try {
+    return await requestToPromise<PersistedPinMutation[]>(
+      db.transaction(PIN_MUTATIONS_STORE, 'readonly').objectStore(PIN_MUTATIONS_STORE).getAll()
+    )
+  } catch (e) {
+    log.info('messagesIdb: failed to restore pin mutations', e)
+    return []
+  }
+}
+
+export const clearPersistedPins = async (): Promise<void> => {
+  const db = await openDb()
+  if (!db) return
+  try {
+    const tx = db.transaction([PINS_STORE, PIN_MUTATIONS_STORE], 'readwrite')
+    tx.objectStore(PINS_STORE).clear()
+    tx.objectStore(PIN_MUTATIONS_STORE).clear()
+  } catch (_) {
+    // ignore
+  }
+}
+
 // Wipes the spilled caches when a different user connects (multi-account
 // safety) and prunes stale/overflowing entries.
 export const initMessagesIdbForUser = async (userId: string): Promise<void> => {
@@ -166,6 +384,8 @@ export const initMessagesIdbForUser = async (userId: string): Promise<void> => {
     const storedUserId = await requestToPromise<string | undefined>(metaTx.objectStore(META_STORE).get(USER_META_KEY))
     if (storedUserId !== userId) {
       await clearPersistedChannels()
+      await clearPersistedDrafts()
+      await clearPersistedPins()
       db.transaction(META_STORE, 'readwrite').objectStore(META_STORE).put(userId, USER_META_KEY)
       return
     }

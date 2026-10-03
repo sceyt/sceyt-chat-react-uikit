@@ -172,7 +172,7 @@ const VotesList = styled.div<{ thumbColor: string }>`
   overflow-y: auto;
   overflow-x: hidden;
   padding-right: 14px;
-  scrollbar-width: none;
+  scrollbar-width: thin;
   scrollbar-color: transparent transparent;
   overscroll-behavior: none;
 
@@ -197,7 +197,6 @@ const VotesList = styled.div<{ thumbColor: string }>`
   }
 
   &.show-scrollbar {
-    scrollbar-width: thin;
     scrollbar-color: ${(props) => props.thumbColor} transparent;
   }
 `

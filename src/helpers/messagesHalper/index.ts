@@ -1,12 +1,19 @@
 import { IAttachment, IMarker, IMessage, IPollVote, IReaction } from '../../types'
 import { checkArraysEqual } from '../index'
-import { MESSAGE_DELIVERY_STATUS, MESSAGE_STATUS } from '../constants'
+import { attachmentTypes, MESSAGE_DELIVERY_STATUS, MESSAGE_STATUS } from '../constants'
 import { cancelUpload, getCustomUploader } from '../customUploader'
 import { releaseBlobUrls } from '../attachmentBlobUrls'
+import { clearVideoPreparation } from '../attachmentPreparation'
 import { handleVoteDetails } from '../message'
 import store from 'store'
 import { removeChannelMarkersAC, removePendingPollActionAC, setPendingPollActionsMapAC } from 'store/message/actions'
-import { persistChannelMessages, restoreChannelMessages } from '../messagesIdb'
+import {
+  persistChannelMessages,
+  restoreChannelMessages,
+  persistDraft,
+  removePersistedDraft,
+  restoreDrafts
+} from '../messagesIdb'
 export const MESSAGES_MAX_PAGE_COUNT = 60
 export const MESSAGES_MAX_LENGTH = 40
 export const LOAD_MAX_MESSAGE_COUNT = 20
@@ -170,7 +177,18 @@ export type IAttachmentMeta = {
 }
 
 type draftMessagesMap = {
-  [key: string]: { text: string; mentionedUsers: any; messageForReply?: IMessage; bodyAttributes?: any }
+  [key: string]: {
+    text: string
+    mentionedUsers: any
+    messageForReply?: IMessage
+    bodyAttributes?: any
+    editorState?: any
+    attachments?: any[]
+    viewOnce?: boolean
+    messageToEdit?: IMessage
+    editMessageText?: string
+    editBodyAttributes?: any
+  }
 }
 type audioRecordingMap = { [key: string]: any }
 type messagesMap = {
@@ -185,7 +203,14 @@ export const setSendMessageHandler = (handler: (message: IMessage, channelId: st
   sendMessageHandler = handler
 }
 
-const pendingAttachments: { [key: string]: { file: File; messageTid?: string; channelId: string } } = {}
+type PendingAttachment = {
+  file?: File
+  messageTid?: string
+  channelId?: string
+}
+
+const pendingAttachments: { [key: string]: PendingAttachment } = {}
+const deletedPendingMessageTids = new Set<string>()
 let messagesMap: messagesMap = {}
 let activeSegment: { startId: string; endId: string } | null = null
 let activeSegmentChannelId: string | null = null
@@ -698,6 +723,24 @@ export function getLatestMessagesFromMap(channelId: string, limit: number): IMes
     .slice(-limit)
 }
 
+// Latest-window variant of getLatestMessagesFromMap that respects segment
+// contiguity: the map can hold disjoint windows for one channel (e.g. an old
+// jump-to-message window plus the newest messages), and flattening them would
+// produce a list with a silent gap. Confirmed messages outside the latest
+// segment are excluded; pending messages (no id yet) are kept.
+export function getLatestContiguousMessagesFromMap(channelId: string, limit: number): IMessage[] {
+  const latestSegment = loadedSegmentsMap[channelId]?.at(-1)
+  const messages = Object.values(messagesMap[channelId] || {}).filter((m) => !!m.id || m.tid)
+  const contiguousMessages = latestSegment
+    ? messages.filter(
+        (m) =>
+          !m.id ||
+          (compareMessageIds(m.id, latestSegment.startId) >= 0 && compareMessageIds(m.id, latestSegment.endId) <= 0)
+      )
+    : messages
+  return contiguousMessages.sort(compareMessagesForList).slice(-limit)
+}
+
 export function getLatestCachedConfirmedMessageId(channelId: string): string {
   const latestSegment = loadedSegmentsMap[channelId]?.at(-1)
   if (latestSegment?.endId) {
@@ -841,9 +884,14 @@ export function updateMessageOnMap(
           const statusUpdatedMessage = updatedMessage.params?.deliveryStatus
             ? updateMessageDeliveryStatusAndMarkers(mes, updatedMessage.params)
             : {}
+          const forwardingDetails =
+            mes.forwardingDetails && updatedMessage.params?.forwardingDetails
+              ? { ...mes.forwardingDetails, ...updatedMessage.params.forwardingDetails }
+              : undefined
           updatedMessageData = {
             ...mes,
             ...updatedMessage.params,
+            ...(forwardingDetails ? { forwardingDetails } : {}),
             ...statusUpdatedMessage
           }
           let voteDetailsData = mes?.pollDetails
@@ -877,25 +925,31 @@ export function updateMessageOnMap(
 export function addReactionToMessageOnMap(channelId: string, message: IMessage, reaction: IReaction, isSelf: boolean) {
   if (messagesMap[channelId]) {
     const messageShouldBeUpdated = messagesMap[channelId][message.id]
-
-    let slfReactions = [...messageShouldBeUpdated.userReactions]
-    if (isSelf) {
-      if (slfReactions) {
-        slfReactions.push(reaction)
-      } else {
-        slfReactions = [reaction]
-      }
+    if (!messageShouldBeUpdated) {
+      return
     }
+    const currentUserReactions = messageShouldBeUpdated.userReactions || []
+    const userReactions = isSelf ? [...currentUserReactions, reaction] : currentUserReactions
     if (message.tid && messagesMap[channelId][message.tid]) {
       delete messagesMap[channelId][message.tid]
     }
     messagesMap[channelId][message.id || message.tid!] = {
       ...messageShouldBeUpdated,
-      userReactions: slfReactions,
-      reactionTotals: message.reactionTotals
+      userReactions,
+      reactionTotals: message.reactionTotals || messageShouldBeUpdated.reactionTotals || []
     }
   }
 }
+
+export const removeReactionFromTotals = (reactionTotals: IMessage['reactionTotals'] = [], reactionKey: string) =>
+  reactionTotals.reduce<IMessage['reactionTotals']>((totals, reactionTotal) => {
+    if (reactionTotal.key !== reactionKey) {
+      totals.push(reactionTotal)
+    } else if (reactionTotal.count > 1) {
+      totals.push({ ...reactionTotal, count: reactionTotal.count - 1 })
+    }
+    return totals
+  }, [])
 
 export function removeReactionToMessageOnMap(
   channelId: string,
@@ -905,18 +959,19 @@ export function removeReactionToMessageOnMap(
 ) {
   if (messagesMap[channelId]) {
     const messageShouldBeUpdated = messagesMap[channelId][message.id]
-    let { userReactions } = messageShouldBeUpdated
+    if (!messageShouldBeUpdated) {
+      return
+    }
+    let userReactions = messageShouldBeUpdated.userReactions || []
     if (isSelf) {
-      userReactions = messageShouldBeUpdated.userReactions.filter(
-        (selfReaction: IReaction) => selfReaction.key !== reaction.key
-      )
+      userReactions = userReactions.filter((selfReaction: IReaction) => selfReaction.key !== reaction.key)
     }
     if (message.tid && messagesMap[channelId][message.tid]) {
       delete messagesMap[channelId][message.tid]
     }
     messagesMap[channelId][message.id || message.tid!] = {
       ...messageShouldBeUpdated,
-      reactionTotals: message.reactionTotals,
+      reactionTotals: removeReactionFromTotals(messageShouldBeUpdated.reactionTotals, reaction.key),
       userReactions
     }
   }
@@ -962,6 +1017,7 @@ export function updateMessageStatusOnMap(
     if (messageShouldBeUpdated) {
       // For cascade messages (not explicitly in the marker map), skip if already at this status or higher
       const isExplicit = explicitIds.includes(messageId)
+      if (!isExplicit && messageShouldBeUpdated.deliveryStatus === MESSAGE_DELIVERY_STATUS.PENDING) return
       if (!isExplicit && shouldSkipDeliveryStatusUpdate(newMarkers.name, messageShouldBeUpdated.deliveryStatus)) return
       const statusUpdatedMessage = updateMessageDeliveryStatusAndMarkers(
         messageShouldBeUpdated,
@@ -1102,6 +1158,7 @@ export function clearMessagesMap() {
   messagesMap = {}
   loadedSegmentsMap = {}
   channelVisitOrder = []
+  deletedPendingMessageTids.clear()
   clearActiveSegment()
 }
 
@@ -1138,22 +1195,36 @@ export const deleteVideoThumb = (attachmentId: string) => {
   delete pendingVideoAttachmentsThumbs[attachmentId]
 }
 
-export const setPendingAttachment = (attachmentId: string, data: { file?: File }) => {
+export const setPendingAttachment = (attachmentId: string, data: PendingAttachment) => {
   pendingAttachments[attachmentId] = { ...pendingAttachments[attachmentId], ...data }
 }
+
+const deletedPendingMessageKey = (channelId: string, messageTid: string) => `${channelId}:${messageTid}`
+
+export const markPendingMessageDeleted = (channelId: string, messageTid: string) => {
+  deletedPendingMessageTids.add(deletedPendingMessageKey(channelId, messageTid))
+}
+
+export const isPendingMessageDeleted = (channelId: string, messageTid: string) =>
+  deletedPendingMessageTids.has(deletedPendingMessageKey(channelId, messageTid))
 
 export const getPendingAttachment = (attachmentId: string) => pendingAttachments[attachmentId]
 
 export const deletePendingAttachment = (attachmentId: string) => delete pendingAttachments[attachmentId]
 
 export const deletePendingMessage = (channelId: string, message: IMessage) => {
+  const messageTid = message.tid || message.id
+  if (messageTid) {
+    markPendingMessageDeleted(channelId, messageTid)
+  }
   if (message.attachments && message.attachments.length) {
     const customUploader = getCustomUploader()
     message.attachments.forEach((att: IAttachment) => {
       if (customUploader) {
         cancelUpload(att.tid!)
-        deletePendingAttachment(att.tid!)
       }
+      deletePendingAttachment(att.tid!)
+      clearVideoPreparation(att.tid!)
       releaseBlobUrls([`compose_${att.tid}`])
     })
   }
@@ -1196,6 +1267,16 @@ export function getLatestPendingMessageFromMap(
 }
 
 export const draftMessagesMap: draftMessagesMap = {}
+const draftListeners = new Set<() => void>()
+let draftMessagesHydrated = false
+const notifyDraftListeners = () => draftListeners.forEach((listener) => listener())
+export const subscribeToDraftMessages = (listener: () => void) => {
+  draftListeners.add(listener)
+  return () => {
+    draftListeners.delete(listener)
+  }
+}
+export const areDraftMessagesHydrated = () => draftMessagesHydrated
 export const audioRecordingMap: audioRecordingMap = {}
 export const getDraftMessageFromMap = (channelId: string) => draftMessagesMap[channelId]
 export const getAudioRecordingFromMap = (channelId: string) => audioRecordingMap[channelId]
@@ -1208,6 +1289,13 @@ export const setAudioRecordingToMap = (channelId: string, audioRecording: any) =
 
 export const removeDraftMessageFromMap = (channelId: string) => {
   delete draftMessagesMap[channelId]
+  Promise.resolve(removePersistedDraft(channelId)).catch(() => undefined)
+  notifyDraftListeners()
+}
+
+export const clearDraftMessagesMap = () => {
+  Object.keys(draftMessagesMap).forEach((channelId) => delete draftMessagesMap[channelId])
+  notifyDraftListeners()
 }
 
 // Note: the recording's objectUrl is intentionally NOT revoked here — on send
@@ -1226,9 +1314,61 @@ export const setDraftMessageToMap = (
     messageForReply?: IMessage
     editorState?: any
     bodyAttributes?: any
-  }
+    attachments?: any[]
+    viewOnce?: boolean
+    messageToEdit?: IMessage
+    editMessageText?: string
+    editBodyAttributes?: any
+  },
+  options: { persist?: boolean } = {}
 ) => {
   draftMessagesMap[channelId] = draftMessage
+  if (options.persist === false) {
+    // Reply/edit context with no sendable content is useful while navigating in
+    // the current session, but should not survive a browser restart.
+    Promise.resolve(removePersistedDraft(channelId)).catch(() => undefined)
+  } else {
+    Promise.resolve(persistDraft(channelId, draftMessage)).catch(() => undefined)
+  }
+  notifyDraftListeners()
+}
+
+export const hydrateDraftMessages = async (): Promise<void> => {
+  const persistedDrafts = await restoreDrafts()
+  persistedDrafts.forEach(({ channelId, draft }) => {
+    const attachments = (draft.attachments || []).map((attachment: any) => {
+      const data = attachment.data
+      // Structured cloning normally preserves File, but Safari and older IndexedDB
+      // implementations can restore it as a Blob. Recreate the File from the exact
+      // stored bytes so uploaders retain its filename and MIME type. Do not run image
+      // resizing here: a draft must upload the same already-prepared file it had
+      // before the reload.
+      const restoredData =
+        data instanceof Blob && typeof File !== 'undefined' && !(data instanceof File)
+          ? new File([data], attachment.name || 'attachment', {
+              type: data.type || attachment.mimeType || 'application/octet-stream',
+              lastModified: attachment.lastModified || Date.now()
+            })
+          : data
+      const canRestorePreviewUrl =
+        attachment.type === attachmentTypes.image ||
+        attachment.type === attachmentTypes.video ||
+        attachment.type === attachmentTypes.voice
+      return {
+        ...attachment,
+        data: restoredData,
+        // Generic files use the file-card icon. Recreating an object URL for
+        // them makes Attachment treat the file as a thumbnail after reload.
+        attachmentUrl:
+          canRestorePreviewUrl && restoredData instanceof Blob && typeof URL !== 'undefined'
+            ? URL.createObjectURL(restoredData)
+            : undefined
+      }
+    })
+    draftMessagesMap[channelId] = { ...draft, attachments }
+  })
+  draftMessagesHydrated = true
+  notifyDraftListeners()
 }
 
 export type PendingPollAction = {

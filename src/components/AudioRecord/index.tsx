@@ -14,13 +14,22 @@ import { ReactComponent as ViewOnceSelectedIcon } from '../../assets/svg/view_on
 // Helpers
 import { THEME_COLORS } from '../../UIHelper/constants'
 import { formatAudioVideoTime } from '../../helpers'
-import log from 'loglevel'
 import MicRecorder from 'mic-recorder-to-mp3'
 import { useDispatch } from 'store/hooks'
 import { sendRecordingAC, setChannelDraftMessageIsRemovedAC } from '../../store/channel/actions'
 import { getAudioRecordingFromMap, removeAudioRecordingFromMap, setAudioRecordingToMap } from 'helpers/messagesHalper'
-import { ViewOnceToggleCont } from 'UIHelper'
+import {
+  Button,
+  CloseIcon,
+  Popup,
+  PopupBody,
+  PopupDescription,
+  PopupFooter,
+  PopupName,
+  ViewOnceToggleCont
+} from 'UIHelper'
 import AudioVisualizationComponent from '../AudioPlayer/AudioVisualization'
+import PopupContainer from '../../common/popups/popupContainer'
 
 const fieldsObject = {
   channelId: '',
@@ -67,8 +76,10 @@ const AudioRecord: React.FC<AudioPlayerProps> = ({
     [THEME_COLORS.WARNING]: warningColor,
     [THEME_COLORS.ICON_PRIMARY]: iconPrimary,
     [THEME_COLORS.SURFACE_1]: surface1,
+    [THEME_COLORS.TEXT_PRIMARY]: textPrimary,
     [THEME_COLORS.ICON_INACTIVE]: iconInactive,
-    [THEME_COLORS.TEXT_ON_PRIMARY]: textOnPrimary
+    [THEME_COLORS.TEXT_ON_PRIMARY]: textOnPrimary,
+    [THEME_COLORS.BACKGROUND]: background
   } = useColor()
 
   const [recording, setStartRecording] = useState<any>(null)
@@ -80,9 +91,16 @@ const AudioRecord: React.FC<AudioPlayerProps> = ({
   const [sendingInterval, setSendingInterval] = useState<any>(null)
   const [currentChannelId, setCurrentChannelId] = useState<string>('')
   const [playAudio, setPlayAudio] = useState<any>(false)
+  const [microphonePermissionDenied, setMicrophonePermissionDenied] = useState(false)
   const recordButtonRef = useRef<any>(null)
   const audioElements = useRef<Record<string, HTMLAudioElement>>({})
   const intervalRef = useRef<any>({})
+  // `MicRecorder.stop().getMp3()` is asynchronous. Keep this outside React
+  // state so consecutive click events cannot start a second stop operation
+  // before the recording state has had a chance to re-render.
+  const isStoppingRef = useRef(false)
+  const isStartingRef = useRef(false)
+  const isRecordingRef = useRef(false)
 
   const currentRecordedFile = useMemo(() => {
     const current = getAudioRecordingFromMap(currentChannelId) || recordedFile
@@ -178,25 +196,21 @@ const AudioRecord: React.FC<AudioPlayerProps> = ({
       clearInterval(intervalRef.current[id])
     })
 
-    audio.addEventListener('error', () => {
-      log.error('Audio playback error:', audio.error?.message)
-    })
-
     audio.src = fileData.objectUrl
   }
 
   const startRecording = async (cId?: string) => {
     const id = cId || currentChannelId
     try {
-      const permissionStatus = await navigator.permissions.query({ name: 'microphone' } as any)
-      if (permissionStatus.state === 'granted') {
-        setShowRecording(true)
-      } else {
-        recordButtonRef.current.style.pointerEvents = 'none'
-      }
-      if (recording) {
+      if (recording || isRecordingRef.current) {
         stopRecording(true, id, false, recorder)
       } else if (currentRecordedFile) {
+        // A 0-duration recording (e.g. an accidental tap) isn't a meaningful voice
+        // message — discard it instead of sending.
+        if (!currentRecordedFile.dur) {
+          cancelRecording()
+          return
+        }
         removeAudioRecordingFromMap(id)
         setRecordedFile(null)
         setPlayAudio(false)
@@ -206,17 +220,27 @@ const AudioRecord: React.FC<AudioPlayerProps> = ({
         dispatch(setChannelDraftMessageIsRemovedAC(id))
         sendRecordedFile(currentRecordedFile, id)
       } else {
-        handleStartRecording()
-        setAudioRecordingToMap(id, {
-          file: null,
-          objectUrl: null,
-          thumb: null,
-          dur: 0
-        })
+        if (!recorder) {
+          return
+        }
+        if (isStartingRef.current) {
+          return
+        }
+        isStartingRef.current = true
         recorder
           .start()
           .then(() => {
-            recordButtonRef.current.style.pointerEvents = 'initial'
+            isStartingRef.current = false
+            isRecordingRef.current = true
+            // Do not tell other participants that recording started until the
+            // browser has granted microphone access and the recorder is active.
+            handleStartRecording()
+            setAudioRecordingToMap(id, {
+              file: null,
+              objectUrl: null,
+              thumb: null,
+              dur: 0
+            })
             setShowRecording(true)
             setStartRecording(true)
             shouldDraw = true
@@ -226,7 +250,11 @@ const AudioRecord: React.FC<AudioPlayerProps> = ({
             const init = () => {
               obj.canvas = document.getElementById(`waveform-${id}`)
               obj.ctx = obj.canvas.getContext('2d')
-              obj.width = 360
+              // Match the canvas's own rendered (CSS-clipped) width so new bars spawn where they're
+              // actually visible. The previous hardcoded 360 spawned bars ~86px past AudioWrapper's
+              // clipped edge, so nothing appeared to draw for the first ~1.4s of any recording.
+              const renderedWidth = Math.round(obj.canvas.getBoundingClientRect().width)
+              obj.width = renderedWidth > 0 ? renderedWidth : 300
               obj.height = 28
               obj.canvas.width = obj.width
               obj.canvas.height = obj.height
@@ -303,25 +331,43 @@ const AudioRecord: React.FC<AudioPlayerProps> = ({
               streamSource.connect(obj.analyser)
               obj.analyser.fftSize = 512
               obj.frequencyArray = new Float32Array(obj.analyser.fftSize)
-              init()
-              loop()
+              // Defer until the "recording" layout (AudioWrapper/Canvas widths) has painted,
+              // so init() measures the canvas's real rendered width, not its pre-expansion size.
+              requestAnimationFrame(() => {
+                init()
+                loop()
+              })
             }
 
             soundAllowed(stream)
           })
           .catch((e: any) => {
-            handleStopRecording()
-            log.error(e)
+            isStartingRef.current = false
+            isRecordingRef.current = false
+            if (e?.name === 'NotAllowedError' || e?.name === 'PermissionDeniedError') {
+              setMicrophonePermissionDenied(true)
+            }
           })
       }
     } catch (e) {
-      handleStopRecording()
-      log.error(e)
+      isStartingRef.current = false
+      isRecordingRef.current = false
+      if ((e as any)?.name === 'NotAllowedError' || (e as any)?.name === 'PermissionDeniedError') {
+        setMicrophonePermissionDenied(true)
+      }
     }
   }
 
   const cancelRecording = useCallback(() => {
+    // A send is already finalizing this recording. Cancelling here would remove
+    // its draft entry while the first stop operation is still producing the file.
+    if (isStoppingRef.current) {
+      return
+    }
+
     handleStopRecording()
+    isStartingRef.current = false
+    isRecordingRef.current = false
     if (currentRecordedFile) {
       dispatch(setChannelDraftMessageIsRemovedAC(currentChannelId))
       if (currentRecordedFile.objectUrl && currentRecordedFile.objectUrl.startsWith('blob:')) {
@@ -344,12 +390,21 @@ const AudioRecord: React.FC<AudioPlayerProps> = ({
 
   const stopRecording = useCallback(
     (send?: boolean, cId?: string, draft?: boolean, recorder?: any) => {
+      const id = cId || channelId
+      if (isStoppingRef.current) {
+        return
+      }
+      if (!recorder) {
+        return
+      }
+
+      isStoppingRef.current = true
+      isStartingRef.current = false
+      isRecordingRef.current = false
       handleStopRecording()
       shouldDraw = false
-      const id = cId || channelId
-      recorder
-        ?.stop()
-        .getMp3()
+      Promise.resolve()
+        .then(() => recorder.stop().getMp3())
         .then(([buffer, blob]: any) => {
           const file = new File(buffer, 'record.mp3', {
             type: blob.type,
@@ -361,71 +416,109 @@ const AudioRecord: React.FC<AudioPlayerProps> = ({
           const reader = new FileReader()
 
           reader.onload = (event: any) => {
+            const audioData = event.target?.result
             const closeDecodeContext = () => {
               if (audioContext.state !== 'closed') {
                 audioContext.close().catch(() => undefined)
               }
             }
-            audioContext.decodeAudioData(
-              // @ts-ignore
-              event.target.result,
-              (audioBuffer: any) => {
-                closeDecodeContext()
-                const numberOfSegments = 50
-                const segmentSize = Math.floor(audioBuffer.length / numberOfSegments)
-                const waveform = []
+            const handleDecodeError = () => {
+              closeDecodeContext()
+              // A decoded duration is the source of truth for the one-second
+              // minimum. Do not send or retain audio when it cannot be
+              // decoded; only clear the UI so this failure cannot get stuck.
+              setStartRecording(false)
+              setShowRecording(false)
+              removeAudioRecordingFromMap(id)
+              dispatch(setChannelDraftMessageIsRemovedAC(id))
+              isStoppingRef.current = false
+            }
+            try {
+              const decodeResult = audioContext.decodeAudioData(
+                // @ts-ignore
+                audioData,
+                (audioBuffer: any) => {
+                  try {
+                    closeDecodeContext()
+                    const numberOfSegments = 50
+                    const segmentSize = Math.floor(audioBuffer.length / numberOfSegments)
+                    const waveform = []
 
-                for (let i = 0; i < numberOfSegments; i++) {
-                  const start = i * segmentSize
-                  const end = start + segmentSize
-                  const segment = audioBuffer.getChannelData(0).slice(start, end)
+                    for (let i = 0; i < numberOfSegments; i++) {
+                      const start = i * segmentSize
+                      const end = start + segmentSize
+                      const segment = audioBuffer.getChannelData(0).slice(start, end)
 
-                  let maxAmplitude = 0
-                  for (let j = 0; j < segment.length; j++) {
-                    const val = segment[j]
-                    const absVal = val < 0 ? -val : val
-                    if (absVal > maxAmplitude) {
-                      maxAmplitude = absVal
+                      let maxAmplitude = 0
+                      for (let j = 0; j < segment.length; j++) {
+                        const val = segment[j]
+                        const absVal = val < 0 ? -val : val
+                        if (absVal > maxAmplitude) {
+                          maxAmplitude = absVal
+                        }
+                      }
+
+                      waveform.push(Math.floor(maxAmplitude * 1000))
                     }
-                  }
-
-                  waveform.push(Math.floor(maxAmplitude * 1000))
-                }
-                setStartRecording(false)
-                const objectUrl = URL.createObjectURL(blob)
-                const durationInt = Math.round(audioBuffer.duration)
-                if (send) {
-                  sendRecordedFile({ file, objectUrl, thumb: waveform, dur: durationInt }, id)
-                  setShowRecording(false)
-                  removeAudioRecordingFromMap(id)
-                  dispatch(setChannelDraftMessageIsRemovedAC(id))
-                } else {
-                  if (!draft) {
-                    setRecordedFile({ file, objectUrl, thumb: waveform, dur: durationInt })
-                  }
-                  const audioRecording = {
-                    file,
-                    objectUrl,
-                    thumb: waveform,
-                    dur: durationInt
-                  }
-                  setAudioRecordingToMap(id, audioRecording)
-                  if (draft) {
-                    initAudioPlayback(draft, id, audioRecording)
-                  }
-                }
-              },
-              (e: any) => {
-                closeDecodeContext()
-                log.info('Error decoding audio data: ' + e.err)
+                    setStartRecording(false)
+                    const objectUrl = URL.createObjectURL(blob)
+                    const durationInt = Math.round(audioBuffer.duration)
+                    if (send) {
+                      // A 0-duration recording (e.g. an accidental tap) isn't a meaningful voice
+                      // message — discard it instead of sending.
+                      if (!durationInt) {
+                        if (objectUrl.startsWith('blob:')) {
+                          URL.revokeObjectURL(objectUrl)
+                        }
+                        setShowRecording(false)
+                        removeAudioRecordingFromMap(id)
+                        dispatch(setChannelDraftMessageIsRemovedAC(id))
+                        isStoppingRef.current = false
+                        return
+                      }
+                      sendRecordedFile({ file, objectUrl, thumb: waveform, dur: durationInt }, id)
+                      setShowRecording(false)
+                      removeAudioRecordingFromMap(id)
+                      dispatch(setChannelDraftMessageIsRemovedAC(id))
+                    } else {
+                      if (!draft) {
+                        setRecordedFile({ file, objectUrl, thumb: waveform, dur: durationInt })
+                      }
+                      const audioRecording = {
+                        file,
+                        objectUrl,
+                        thumb: waveform,
+                        dur: durationInt
+                      }
+                      setAudioRecordingToMap(id, audioRecording)
+                      if (draft) {
+                        initAudioPlayback(draft, id, audioRecording)
+                      }
+                    }
+                    isStoppingRef.current = false
+                  } catch {}
+                },
+                handleDecodeError
+              )
+              // Chromium returns a rejected Promise even when the legacy error
+              // callback is supplied. Consume that duplicate rejection so it
+              // cannot surface as an uncaught EncodingError.
+              if (decodeResult && typeof decodeResult.catch === 'function') {
+                decodeResult.catch(() => undefined)
               }
-            )
+            } catch {}
+          }
+          reader.onerror = () => {
+            if (audioContext.state !== 'closed') {
+              audioContext.close().catch(() => undefined)
+            }
+            isStoppingRef.current = false
           }
           reader.readAsArrayBuffer(blob)
         })
-        .catch((e: any) => {
+        .catch(() => {
+          isStoppingRef.current = false
           handleStopRecording()
-          log.error(e)
         })
     },
     [sendRecordedFile, setShowRecording, setAudioRecordingToMap, setRecordedFile, handleStopRecording, channelId]
@@ -445,8 +538,7 @@ const AudioRecord: React.FC<AudioPlayerProps> = ({
           setCurrentTimeSeconds(time)
         }
       }, 10)
-      audio.play().catch((e) => {
-        log.error('Audio play failed:', e)
+      audio.play().catch(() => {
         setPlayAudio(false)
       })
     } else {
@@ -559,9 +651,7 @@ const AudioRecord: React.FC<AudioPlayerProps> = ({
               bitRate: 128
             })
             setRecorder(newRecorder)
-          } catch (e) {
-            log.error('Failed to init mic-recorder-to-mp3', e)
-          }
+          } catch {}
         }
       })()
     }
@@ -572,8 +662,11 @@ const AudioRecord: React.FC<AudioPlayerProps> = ({
       setCurrentTime(0)
       setCurrentTimeSeconds(0)
     }
+    // Note: this cleanup used to also call handleStopRecording(), but a cleanup runs on
+    // EVERY change of showRecording — including the false→true transition that starts a
+    // recording — which killed shouldDraw (and the live waveform loop) within one frame of
+    // it being set to true. Actual unmount-time stopping is handled by the effect below.
     return () => {
-      handleStopRecording()
       setCurrentTime(0)
       setCurrentTimeSeconds(0)
     }
@@ -669,6 +762,33 @@ const AudioRecord: React.FC<AudioPlayerProps> = ({
       <RecordIconWrapper ref={recordButtonRef} onClick={() => startRecording(currentChannelId)} iconColor={accentColor}>
         {showRecording || currentRecordedFile ? <SendIcon /> : <RecordIcon />}
       </RecordIconWrapper>
+      {microphonePermissionDenied && (
+        <PopupContainer>
+          <Popup backgroundColor={background} maxWidth='520px' minWidth='520px' padding='0'>
+            <PopupBody paddingH='24px' paddingV='24px'>
+              <CloseIcon color={iconPrimary} onClick={() => setMicrophonePermissionDenied(false)} />
+              <PopupName color={textPrimary} marginBottom='20px'>
+                Microphone Permission Denied
+              </PopupName>
+              <PopupDescription color={textPrimary} highlightColor={textSecondary}>
+                We can&apos;t access your microphone. Enable microphone permission in your browser settings and try
+                again.
+              </PopupDescription>
+            </PopupBody>
+            <PopupFooter backgroundColor={surface1}>
+              <Button
+                type='button'
+                backgroundColor={accentColor}
+                color={textOnPrimary}
+                borderRadius='8px'
+                onClick={() => setMicrophonePermissionDenied(false)}
+              >
+                Close
+              </Button>
+            </PopupFooter>
+          </Popup>
+        </PopupContainer>
+      )}
     </Container>
   )
 }

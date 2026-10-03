@@ -28,7 +28,11 @@ import Avatar from '../Avatar'
 import { systemMessageUserName, formatDisappearingMessageTime } from '../../helpers'
 import { isJSON, isMessageUnsupported, lastMessageDateFormat, makeUsername } from '../../helpers/message'
 import { hideUserPresence } from '../../helpers/userHelper'
-import { getAudioRecordingFromMap, getDraftMessageFromMap } from '../../helpers/messagesHalper'
+import {
+  getAudioRecordingFromMap,
+  getDraftMessageFromMap,
+  subscribeToDraftMessages
+} from '../../helpers/messagesHalper'
 import { updateChannelOnAllChannels } from '../../helpers/channelHalper'
 import { attachmentTypes, DEFAULT_CHANNEL_TYPE, MESSAGE_STATUS, USER_PRESENCE_STATUS } from '../../helpers/constants'
 import { THEME_COLORS } from '../../UIHelper/constants'
@@ -38,6 +42,11 @@ import { IChannel, IContact, IMessage, IUser } from '../../types'
 import { MessageStatusIcon, MessageTextFormat } from '../../messageUtils'
 import { useColor } from '../../hooks'
 import { MESSAGE_TYPE } from '../../types/enum'
+import {
+  getPinnedMessagePreview,
+  isPinnedMessageAttachmentOnly,
+  isPinnedMessageDeleted
+} from '../../helpers/pinnedMessage'
 
 interface IChannelProps {
   channel: IChannel
@@ -155,9 +164,16 @@ const ChannelMessageText = ({
   unsupportedMessage?: boolean
 }) => {
   const isViewOnce = lastMessage?.type === MESSAGE_TYPE.VIEW_ONCE && lastMessage?.viewOnce
-  const audioRecording = useMemo(() => {
-    return getAudioRecordingFromMap(channel.id)
-  }, [channel.id, draftMessageText])
+  const systemMessageActor = lastMessage.user
+    ? lastMessage.user.id === user.id
+      ? 'You'
+      : makeUsername(
+          lastMessage.user && contactsMap && contactsMap[lastMessage.user.id],
+          lastMessage.user,
+          getFromContacts,
+          true
+        )
+    : ''
 
   return (
     <MessageTextContainer>
@@ -170,59 +186,46 @@ const ChannelMessageText = ({
       )}
       {!isTypingOrRecording &&
         (draftMessageText ? (
-          <DraftMessageText color={textSecondary}>
-            {audioRecording && <VoiceIcon />}
-            {MessageTextFormat({
-              text: draftMessageText,
-              message: lastMessage,
-              contactsMap,
-              getFromContacts,
-              isLastMessage: true,
-              accentColor,
-              textSecondary,
-              unsupportedMessage
-            })}
+          <DraftMessageText color={textSecondary} flex={!!(!lastMessage.body && lastMessage.attachments?.length)}>
+            {!lastMessage.body && lastMessage.attachments?.length ? LastMessageAttachments({ lastMessage }) : null}
+            {(!lastMessage.attachments?.length || lastMessage.body) &&
+              MessageTextFormat({
+                // Attachment-only drafts already get their label from
+                // LastMessageAttachments (Photo, Video, File, or Voice).
+                text: lastMessage.attachments?.length ? lastMessage.body : draftMessageText,
+                message: lastMessage,
+                contactsMap,
+                getFromContacts,
+                isLastMessage: true,
+                accentColor,
+                textSecondary,
+                unsupportedMessage
+              })}
           </DraftMessageText>
         ) : lastMessage.state === MESSAGE_STATUS.DELETE ? (
           'Message was deleted.'
         ) : lastMessage.type === MESSAGE_TYPE.SYSTEM ? (
-          `${
-            lastMessage.user &&
-            (lastMessage.user.id === user.id
-              ? 'You '
-              : makeUsername(
-                  lastMessage.user && contactsMap && contactsMap[lastMessage.user.id],
-                  lastMessage.user,
-                  getFromContacts,
-                  true
-                ))
-          } ${
-            lastMessage.body === 'CC'
-              ? 'created this channel'
-              : lastMessage.body === 'CG'
-                ? 'created this group'
-                : lastMessage.body === 'AM'
-                  ? ` added ${
-                      lastMessageMetas &&
-                      lastMessageMetas.m &&
-                      lastMessageMetas.m
-                        .slice(0, 5)
-                        .map((mem: string) =>
-                          mem === user.id
-                            ? ' You'
-                            : ` ${systemMessageUserName(
-                                mem,
-                                contactsMap && contactsMap[mem],
-                                lastMessage.mentionedUsers
-                              )}`
-                        )
-                    } ${
-                      lastMessageMetas && lastMessageMetas.m && lastMessageMetas.m.length > 5
-                        ? `and ${lastMessageMetas.m.length - 5} more`
-                        : ''
-                    }`
-                  : lastMessage.body === 'RM'
-                    ? ` removed ${
+          lastMessage.body === 'PM' ? (
+            (() => {
+              const pinnedMessagePreview = getPinnedMessagePreview(lastMessage.parentMessage)
+              const pinnedMessageDeleted = isPinnedMessageDeleted(lastMessage.parentMessage)
+              const pinnedMessageAttachmentOnly = isPinnedMessageAttachmentOnly(lastMessage.parentMessage)
+              return pinnedMessagePreview
+                ? `${systemMessageActor} pinned ${
+                    pinnedMessageDeleted || pinnedMessageAttachmentOnly
+                      ? pinnedMessagePreview
+                      : `"${pinnedMessagePreview}"`
+                  }${pinnedMessageDeleted ? '' : '.'}`
+                : `${systemMessageActor} pinned a message.`
+            })()
+          ) : (
+            `${systemMessageActor} ${
+              lastMessage.body === 'CC'
+                ? 'created this channel'
+                : lastMessage.body === 'CG'
+                  ? 'created this group'
+                  : lastMessage.body === 'AM'
+                    ? ` added ${
                         lastMessageMetas &&
                         lastMessageMetas.m &&
                         lastMessageMetas.m
@@ -241,18 +244,39 @@ const ChannelMessageText = ({
                           ? `and ${lastMessageMetas.m.length - 5} more`
                           : ''
                       }`
-                    : lastMessage.body === 'LG'
-                      ? 'Left this group'
-                      : lastMessage.body === 'JL'
-                        ? 'joined via invite link'
-                        : lastMessage.body === 'ADM'
-                          ? !Number(lastMessageMetas?.autoDeletePeriod)
-                            ? 'disabled disappearing messages'
-                            : `set the disappearing messages timer to ${formatDisappearingMessageTime(
-                                lastMessageMetas?.autoDeletePeriod ? Number(lastMessageMetas.autoDeletePeriod) : null
-                              )}`
-                          : ''
-          }`
+                    : lastMessage.body === 'RM'
+                      ? ` removed ${
+                          lastMessageMetas &&
+                          lastMessageMetas.m &&
+                          lastMessageMetas.m
+                            .slice(0, 5)
+                            .map((mem: string) =>
+                              mem === user.id
+                                ? ' You'
+                                : ` ${systemMessageUserName(
+                                    mem,
+                                    contactsMap && contactsMap[mem],
+                                    lastMessage.mentionedUsers
+                                  )}`
+                            )
+                        } ${
+                          lastMessageMetas && lastMessageMetas.m && lastMessageMetas.m.length > 5
+                            ? `and ${lastMessageMetas.m.length - 5} more`
+                            : ''
+                        }`
+                      : lastMessage.body === 'LG'
+                        ? 'Left this group'
+                        : lastMessage.body === 'JL'
+                          ? 'joined via invite link'
+                          : lastMessage.body === 'ADM'
+                            ? !Number(lastMessageMetas?.autoDeletePeriod)
+                              ? 'disabled disappearing messages'
+                              : `set the disappearing messages timer to ${formatDisappearingMessageTime(
+                                  lastMessageMetas?.autoDeletePeriod ? Number(lastMessageMetas.autoDeletePeriod) : null
+                                )}`
+                            : ''
+            }`
+          )
         ) : (
           <React.Fragment>
             <LastMessageDescription poll={lastMessage?.pollDetails && lastMessage?.type === MESSAGE_TYPE.POLL}>
@@ -344,6 +368,9 @@ const Channel: React.FC<IChannelProps> = ({
   const typingOrRecordingIndicator = useSelector(typingOrRecordingIndicatorArraySelector(channel.id))
   const [draftMessageText, setDraftMessageText] = useState<any>()
   const [draftMessage, setDraftMessage] = useState<any>()
+  const [draftRevision, setDraftRevision] = useState(0)
+
+  useEffect(() => subscribeToDraftMessages(() => setDraftRevision((revision) => revision + 1)), [])
   const lastMessage = useMemo(
     () => channel.lastReactedMessage || channel.lastMessage,
     [channel.lastReactedMessage, channel.lastMessage]
@@ -379,22 +406,62 @@ const Channel: React.FC<IChannelProps> = ({
       const draftAudioRecording = getAudioRecordingFromMap(channel.id)
       if (channelDraftMessage || draftAudioRecording) {
         if (channelDraftMessage) {
-          setDraftMessageText(channelDraftMessage.text)
-          setDraftMessage({
-            mentionedUsers: channelDraftMessage.mentionedUsers,
-            body: channelDraftMessage.text,
-            bodyAttributes: channelDraftMessage.bodyAttributes
-          })
+          const attachment = channelDraftMessage.attachments?.[0]
+          const editText = channelDraftMessage.editMessageText ?? channelDraftMessage.messageToEdit?.body ?? ''
+          const hasChangedEdit =
+            !!channelDraftMessage.messageToEdit &&
+            !!editText.trim() &&
+            (editText !== channelDraftMessage.messageToEdit.body ||
+              JSON.stringify(channelDraftMessage.editBodyAttributes || []) !==
+                JSON.stringify(channelDraftMessage.messageToEdit.bodyAttributes || []))
+          const mediaLabel =
+            attachment?.type === attachmentTypes.image
+              ? 'Photo'
+              : attachment?.type === attachmentTypes.video
+                ? 'Video'
+                : attachment?.type === attachmentTypes.voice
+                  ? 'Voice'
+                  : attachment
+                    ? 'File'
+                    : ''
+          const draftText = channelDraftMessage.text?.trim() || mediaLabel
+          const isContextOnlyDraft =
+            (!!channelDraftMessage.messageForReply && !draftText) ||
+            (!!channelDraftMessage.messageToEdit && !hasChangedEdit)
+
+          if (isContextOnlyDraft) {
+            setDraftMessageText(undefined)
+            setDraftMessage(undefined)
+          } else {
+            setDraftMessageText(draftText)
+            setDraftMessage({
+              ...channelDraftMessage,
+              // Lexical can leave whitespace in an otherwise attachment-only
+              // composer. Keep real text untouched, but normalize that empty
+              // editor value so the existing attachment preview is used.
+              body: channelDraftMessage.text?.trim() ? channelDraftMessage.text : '',
+              type: channelDraftMessage.viewOnce ? MESSAGE_TYPE.VIEW_ONCE : undefined
+            })
+          }
         } else if (draftAudioRecording) {
           setDraftMessageText('Voice')
-          setDraftMessage(undefined)
+          setDraftMessage({
+            body: '',
+            attachments: [
+              {
+                type: attachmentTypes.voice,
+                data: draftAudioRecording.file,
+                attachmentUrl: draftAudioRecording.objectUrl
+              }
+            ]
+          })
         }
       } else if (draftMessageText) {
         setDraftMessageText(undefined)
         setDraftMessage(undefined)
       }
     }
-  }, [activeChannel.id])
+  }, [activeChannel.id, draftRevision])
 
   useEffect(() => {
     if (channelDraftIsRemoved && channelDraftIsRemoved === channel.id) {
@@ -426,6 +493,10 @@ const Channel: React.FC<IChannelProps> = ({
   const unsupportedMessage = useMemo(() => {
     return isMessageUnsupported(lastMessage)
   }, [lastMessage?.type])
+  // Incoming unread messages take priority over a local draft: the row should
+  // describe the newest channel activity until those messages are read.
+  const shouldShowDraft = !!draftMessageText && !(channel.newMessageCount > 0)
+  const displayedLastMessage = shouldShowDraft ? draftMessage || lastMessage : lastMessage
 
   const MessageText = useMemo(() => {
     return (
@@ -440,8 +511,8 @@ const Channel: React.FC<IChannelProps> = ({
         channel={channel}
         textPrimary={textPrimary}
         textSecondary={textSecondary}
-        draftMessageText={draftMessageText}
-        lastMessage={draftMessage || lastMessage}
+        draftMessageText={shouldShowDraft ? draftMessageText : ''}
+        lastMessage={displayedLastMessage}
         isDirectChannel={isDirectChannel}
         unsupportedMessage={unsupportedMessage && !getCustomLatestMessage}
       />
@@ -450,6 +521,8 @@ const Channel: React.FC<IChannelProps> = ({
     typingOrRecording?.isTyping,
     typingOrRecording?.isRecording,
     draftMessageText,
+    shouldShowDraft,
+    displayedLastMessage,
     lastMessage,
     user,
     contactsMap,
@@ -634,7 +707,7 @@ const Channel: React.FC<IChannelProps> = ({
               ? getCustomLatestMessageComponent({
                   lastMessage,
                   typingOrRecording,
-                  draftMessageText,
+                  draftMessageText: shouldShowDraft ? draftMessageText : undefined,
                   textSecondary,
                   channel,
                   channelLastMessageFontSize: channelLastMessageFontSize || '14px',
@@ -649,7 +722,7 @@ const Channel: React.FC<IChannelProps> = ({
                   MessageText,
                   unsupportedMessage
                 })
-              : (lastMessage || typingOrRecording.items.length > 0 || draftMessageText) && (
+              : (lastMessage || typingOrRecording.items.length > 0 || shouldShowDraft) && (
                   <LastMessage
                     color={textSecondary}
                     markedAsUnread={!!(channel.unread || (channel.newMessageCount && channel.newMessageCount > 0))}
@@ -679,7 +752,7 @@ const Channel: React.FC<IChannelProps> = ({
                           </span>
                         </LastMessageAuthor>
                       ) : null
-                    ) : draftMessageText ? (
+                    ) : shouldShowDraft ? (
                       <DraftMessageTitle color={warningColor}>Draft</DraftMessageTitle>
                     ) : channel.lastReactedMessage && channel.newReactions && channel.newReactions[0] ? (
                       lastMessage.state !== MESSAGE_STATUS.DELETE &&
@@ -723,17 +796,17 @@ const Channel: React.FC<IChannelProps> = ({
                       (isDirectChannel
                         ? !typingOrRecording?.isTyping &&
                           !typingOrRecording?.isRecording &&
-                          (draftMessageText ||
+                          (shouldShowDraft ||
                             (lastMessage.user &&
                               lastMessage.state !== MESSAGE_STATUS.DELETE &&
                               (channel.lastReactedMessage && channel.newReactions && channel.newReactions[0]
                                 ? channel.newReactions[0].user && channel.newReactions[0].user.id === user.id
                                 : lastMessage.user.id === user.id && lastMessage.type !== MESSAGE_TYPE.SYSTEM)))
-                        : draftMessageText ||
+                        : shouldShowDraft ||
                           (lastMessage &&
                             lastMessage.state !== MESSAGE_STATUS.DELETE &&
                             lastMessage.type !== MESSAGE_TYPE.SYSTEM)) && (
-                        <Points color={(draftMessageText && warningColor) || textPrimary}>: </Points>
+                        <Points color={(shouldShowDraft && warningColor) || textPrimary}>: </Points>
                       )}
                     <LastMessageText
                       color={textSecondary}
@@ -758,7 +831,7 @@ const Channel: React.FC<IChannelProps> = ({
           <ChannelStatus color={iconInactive} ref={messageTimeAndStatusRef}>
             {/* While a draft is previewed, the last message's delivery status is
                 not what the row describes — show the draft alone. */}
-            {lastMessage && lastMessage.state !== MESSAGE_STATUS.DELETE && !draftMessageText && (
+            {lastMessage && lastMessage.state !== MESSAGE_STATUS.DELETE && !shouldShowDraft && (
               <DeliveryIconCont>
                 {lastMessage &&
                   lastMessage.user &&
@@ -781,7 +854,7 @@ const Channel: React.FC<IChannelProps> = ({
             moment(lastMessage.createdAt).format('HH:mm')} */}
             </LastMessageDate>
           </ChannelStatus>
-          <UnreadInfo bottom={!(lastMessage || typingOrRecording.items.length > 0 || draftMessageText) ? '5px' : ''}>
+          <UnreadInfo bottom={!(lastMessage || typingOrRecording.items.length > 0 || shouldShowDraft) ? '5px' : ''}>
             {channel.pinnedAt && (
               <PinnedIconWrapper
                 color={iconInactive}
@@ -1017,9 +1090,9 @@ export const DraftMessageTitle = styled.span<{ color: string }>`
   color: ${(props) => props.color};
   margin-right: 4px;
 `
-export const DraftMessageText = styled.span<{ color: string }>`
+export const DraftMessageText = styled.span<{ color: string; flex: boolean }>`
   color: ${(props) => props.color};
-  display: flex;
+  ${(props) => props.flex && `display: flex;`}
   align-items: flex-end;
   gap: 4px;
 `

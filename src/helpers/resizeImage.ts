@@ -6,7 +6,7 @@ import Pica from 'pica'
 const MAX_WIDTH = 1280
 const MAX_HEIGHT = 1080
 const MIME_TYPE = 'image/jpeg'
-const QUALITY = 0.9
+const QUALITY = 1
 const THUMBNAIL_MAX_WIDTH = 6
 const THUMBNAIL_MAX_HEIGHT = 6
 const THUMBNAIL_MIME_TYPE = 'image/jpeg'
@@ -254,7 +254,7 @@ export async function resizeImageWithPica(
   file: File | Blob,
   maxWidth: number = 1600,
   maxHeight: number = 1600,
-  quality: number = 0.82,
+  quality: number = 1,
   type?: string
 ): Promise<{ file: File; blob: Blob | null; newWidth: number; newHeight: number }> {
   try {

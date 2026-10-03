@@ -1,22 +1,115 @@
-import React, { useEffect, useMemo, useState } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 import styled, { keyframes } from 'styled-components'
 import { shallowEqual } from 'react-redux'
 import { useSelector, useDispatch } from 'store/hooks'
 // Store
-import { getAttachmentsAC, setAttachmentsAC } from '../../../../store/message/actions'
+import {
+  getAttachmentsAC,
+  setAttachmentsAC,
+  setAttachmentsForPopupAC,
+  setUpdateMessageAttachmentAC
+} from '../../../../store/message/actions'
 import { activeTabAttachmentsSelector, attachmentLoadingStateSelector } from '../../../../store/message/selector'
 // Helpers
 import { isJSON } from '../../../../helpers/message'
 import { channelDetailsTabs, LOADING_STATE } from '../../../../helpers/constants'
+import { getVideoAttachmentCacheKeys } from '../../../../helpers/videoPreview'
+import { getMediaDownloadSnapshot, requestMediaDownload } from '../../../../helpers/mediaDownloadCoordinator'
 import { IAttachment, IChannel } from '../../../../types'
 // Components
 import Attachment from '../../../Attachment'
 import SliderPopup from '../../../../common/popups/sliderPopup'
 import { useColor } from '../../../../hooks'
 import { THEME_COLORS } from '../../../../UIHelper/constants'
+import log from 'loglevel'
 
 interface IProps {
   channel: IChannel
+}
+
+const startMediaVideoDownload = (file: IAttachment) => {
+  if (file.type !== 'video' || !file.url) return
+
+  const { originalVideo } = getVideoAttachmentCacheKeys(file.url, file.metadata)
+  return requestMediaDownload({
+    key: `original-video:${file.url}`,
+    url: file.url,
+    cacheKey: originalVideo,
+    kind: 'original-video',
+    size: Number(file.size) || 0
+  })
+}
+
+interface IMediaTileProps {
+  file: IAttachment
+  background: string
+  onOpen: (file: IAttachment) => void
+}
+
+const MediaTile = ({ file, background, onOpen }: IMediaTileProps) => {
+  const elementRef = useRef<HTMLDivElement>(null)
+  const downloadStartedRef = useRef(false)
+  const dispatch = useDispatch()
+
+  useEffect(() => {
+    if (file.type !== 'video' || !file.url || downloadStartedRef.current) return
+
+    const startDownload = () => {
+      if (downloadStartedRef.current) return
+      // A cancel is global for this attachment. Opening the Media tab later
+      // must retain its Download control rather than silently restarting it.
+      if (getMediaDownloadSnapshot(`original-video:${file.url}`).state === 'cancelled') return
+      downloadStartedRef.current = true
+      const { originalVideo } = getVideoAttachmentCacheKeys(file.url!, file.metadata)
+      startMediaVideoDownload(file)
+        ?.then(({ objectUrl }) => {
+          // Make the completed original available to this tile immediately.
+          // VideoPreview then extracts/caches a first frame when no server
+          // preview image exists.
+          dispatch(setUpdateMessageAttachmentAC(originalVideo, objectUrl))
+        })
+        .catch((error) => {
+          log.error('Failed to start media-tab video download:', error)
+        })
+    }
+    const element = elementRef.current
+    if (!element) return
+
+    // Download only video tiles that enter (or are close to) the viewport.
+    // IntersectionObserver is supported by current Chrome, Safari, and
+    // Firefox; the fallback preserves the expected behavior in older browsers.
+    if (typeof IntersectionObserver === 'undefined') {
+      startDownload()
+      return
+    }
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((entry) => entry.isIntersecting)) {
+          startDownload()
+          observer.disconnect()
+        }
+      },
+      { rootMargin: '200px 0px' }
+    )
+    observer.observe(element)
+    return () => observer.disconnect()
+  }, [dispatch, file.id, file.type, file.url, file.metadata, file.size])
+
+  return (
+    <MediaItem ref={elementRef}>
+      <Attachment
+        attachment={{
+          ...file,
+          metadata: isJSON(file.metadata) ? JSON.parse(file.metadata) : file.metadata
+        }}
+        handleMediaItemClick={onOpen}
+        backgroundColor={background}
+        borderRadius='8px'
+        isDetailsView
+      />
+    </MediaItem>
+  )
 }
 
 const Media = ({ channel }: IProps) => {
@@ -31,8 +124,32 @@ const Media = ({ channel }: IProps) => {
   const dispatch = useDispatch()
 
   const handleMediaItemClick = (file: IAttachment) => {
+    log.info(
+      '[MEDIA_IMAGE_SLIDER] media tab item clicked ' +
+        JSON.stringify({
+          channelId: channel.id,
+          fileId: file?.id || null,
+          type: file?.type || null,
+          resource: typeof file?.url === 'string' ? file.url.split(/[?#]/)[0] : null
+        })
+    )
     if (file?.id) {
+      // The visible-tile observer normally started this already. Retain this
+      // call for a tap that happens before the observer callback runs; the
+      // coordinator deduplicates both paths into one transfer.
+      startMediaVideoDownload(file)?.catch((error) => {
+        log.error('Failed to start media-tab video download:', error)
+      })
+
+      // The popup attachment list is shared across channels. Seed it with the
+      // clicked item before mounting the slider so stale items cannot render
+      // while the near-item query is in flight.
+      dispatch(setAttachmentsForPopupAC([file]))
       setMediaFile(file)
+      log.info(
+        '[MEDIA_IMAGE_SLIDER] slider state requested ' +
+          JSON.stringify({ channelId: channel.id, fileId: file.id, type: file.type || null })
+      )
     }
   }
 
@@ -75,18 +192,12 @@ const Media = ({ channel }: IProps) => {
               </StickyMonthHeader>
               <ItemsGrid>
                 {group.items.map((file: IAttachment, index: number) => (
-                  <MediaItem key={`${file.id}_${index}`}>
-                    <Attachment
-                      attachment={{
-                        ...file,
-                        metadata: isJSON(file.metadata) ? JSON.parse(file.metadata) : file.metadata
-                      }}
-                      handleMediaItemClick={handleMediaItemClick}
-                      backgroundColor={background}
-                      borderRadius='8px'
-                      isDetailsView
-                    />
-                  </MediaItem>
+                  <MediaTile
+                    key={file.id || `${file.messageId}_${index}`}
+                    file={file}
+                    background={background}
+                    onOpen={handleMediaItemClick}
+                  />
                 ))}
               </ItemsGrid>
             </MonthSection>

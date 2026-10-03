@@ -6,6 +6,7 @@ import MessageReducer from './message/reducers'
 import MembersReducer from './member/reducers'
 import UserReducer from './user/reducers'
 import ThemeReducer from './theme/reducers'
+import PinnedReducer from './pinned/reducers'
 import rootSaga from './saga'
 // Enable Immer support for Map/Set structures used in state
 enableMapSet()
@@ -17,6 +18,7 @@ const store = configureStore({
     MessageReducer,
     MembersReducer,
     ThemeReducer,
+    PinnedReducer,
     UserReducer
   },
   // middleware: [...getDefaultMiddleware({ thunk: false, serializableCheck: false }), sagaMiddleware],

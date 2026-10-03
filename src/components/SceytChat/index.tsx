@@ -59,12 +59,11 @@ import { IChannel, IContactsMap } from '../../types'
 import { setCustomUploader, setSendAttachmentsAsSeparateMessages } from '../../helpers/customUploader'
 import { IChatClientProps } from '../ChatContainer'
 import { defaultTheme, THEME_COLORS } from '../../UIHelper/constants'
-import { setHideUserPresence } from '../../helpers/userHelper'
-import { clearMessagesMap } from '../../helpers/messagesHalper'
+import { clearUsersMap, setHideUserPresence } from '../../helpers/userHelper'
+import { clearDraftMessagesMap, clearMessagesMap, hydrateDraftMessages } from '../../helpers/messagesHalper'
 import { releaseAllBlobUrls, setBlobUrlEvictListener } from '../../helpers/attachmentBlobUrls'
 import { removeAttachmentUpdatedEntriesAC } from '../../store/message/actions'
-import { initMessagesIdbForUser } from '../../helpers/messagesIdb'
-import { clearUsersMap } from '../../helpers/userHelper'
+import { clearPersistedDrafts, initMessagesIdbForUser } from '../../helpers/messagesIdb'
 import { setTheme, setThemeAC } from '../../store/theme/actions'
 import { SceytChatUIKitTheme, ThemeMode } from '../../components'
 import log from 'loglevel'
@@ -136,26 +135,25 @@ const SceytChat = ({
       dispatch(setIsDraggingAC(true))
     }
   }
+  const handleDragLeave = (e: React.DragEvent<HTMLDivElement>) => {
+    const nextTarget = e.relatedTarget
+
+    // `dragleave` bubbles when moving between children. Only clear the state
+    // after the drag has actually left the chat container (including the page).
+    if (!nextTarget || !(nextTarget instanceof Node) || !e.currentTarget.contains(nextTarget)) {
+      dispatch(setIsDraggingAC(false))
+    }
+  }
 
   const handleUserInteraction = () => {
     // Request notification permission on first user interaction
     requestPermissionOnUserInteraction()
   }
 
-  const handleVisibilityChange = () => {
-    if (document[hidden as keyof Document]) {
-      dispatch(browserTabIsActiveAC(false))
-    } else {
-      dispatch(browserTabIsActiveAC(true))
-    }
-  }
-
-  const handleFocusChange = (focus: boolean) => {
-    if (focus) {
-      dispatch(browserTabIsActiveAC(true))
-    } else {
-      dispatch(browserTabIsActiveAC(false))
-    }
+  const syncBrowserTabIsActive = () => {
+    const isVisible = hidden ? !document[hidden as keyof Document] : document.visibilityState !== 'hidden'
+    const isFocused = typeof document.hasFocus === 'function' ? document.hasFocus() : true
+    dispatch(browserTabIsActiveAC(isVisible && isFocused))
   }
 
   useEffect(() => {
@@ -166,7 +164,7 @@ const SceytChat = ({
       // Scope the IndexedDB message spill to the connected user (wipes it on
       // account switch) and prune stale entries.
       if (client.user && client.user.id) {
-        initMessagesIdbForUser(client.user.id)
+        initMessagesIdbForUser(client.user.id).then(() => hydrateDraftMessages())
       }
 
       setClient(client)
@@ -182,6 +180,8 @@ const SceytChat = ({
       setActiveChannelId('')
       destroyChannelsMap()
       clearUsersMap()
+      clearDraftMessagesMap()
+      clearPersistedDrafts()
       releaseAllBlobUrls()
       dispatch(destroySession())
     }
@@ -256,23 +256,25 @@ const SceytChat = ({
     // to the attachments cache instead of rendering a revoked URL.
     setBlobUrlEvictListener((keys) => dispatch(removeAttachmentUpdatedEntriesAC(keys)))
 
-    const handleWindowFocus = () => handleFocusChange(true)
-    const handleWindowBlur = () => handleFocusChange(false)
     if (showNotifications) {
       // Initialize notifications with cross-browser support
       initializeNotifications()
       window.sceytTabNotifications = null
       window.sceytTabUrl = window.location.href
-
-      window.addEventListener('focus', handleWindowFocus)
-      window.addEventListener('blur', handleWindowBlur)
     }
 
-    document.addEventListener(visibilityChange, handleVisibilityChange, false)
+    window.addEventListener('focus', syncBrowserTabIsActive)
+    window.addEventListener('blur', syncBrowserTabIsActive)
+    if (visibilityChange) {
+      document.addEventListener(visibilityChange, syncBrowserTabIsActive, false)
+    }
+    syncBrowserTabIsActive()
     return () => {
-      window.removeEventListener('focus', handleWindowFocus)
-      window.removeEventListener('blur', handleWindowBlur)
-      document.removeEventListener(visibilityChange, handleVisibilityChange)
+      window.removeEventListener('focus', syncBrowserTabIsActive)
+      window.removeEventListener('blur', syncBrowserTabIsActive)
+      if (visibilityChange) {
+        document.removeEventListener(visibilityChange, syncBrowserTabIsActive)
+      }
       clearMessagesMap()
       setActiveChannelId('')
       destroyChannelsMap()
@@ -389,6 +391,7 @@ const SceytChat = ({
         <ChatContainer
           onDrop={handleDropFile}
           onDragOver={handleDragOver}
+          onDragLeave={handleDragLeave}
           onClick={handleUserInteraction}
           withChannelsList={channelsListWidth && channelsListWidth > 0}
           backgroundColor={backgroundColor}

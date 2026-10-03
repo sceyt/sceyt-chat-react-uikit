@@ -1,4 +1,4 @@
-import styled from 'styled-components'
+import styled, { css, keyframes } from 'styled-components'
 import React, { memo, useEffect, useMemo, useRef } from 'react'
 import { ReactComponent as PlayIcon } from '../../assets/svg/playVideo.svg'
 import { ReactComponent as VideoPlayerPlay } from '../../assets/svg/videoPlayerPlay.svg'
@@ -13,11 +13,14 @@ import {
 import { base64ToDataURL } from '../../helpers/resizeImage'
 import { getVideoFirstFrame } from '../../helpers/getVideoFrame'
 import { useColor } from 'hooks'
+import useProgressiveMediaSource from '../../hooks/basic/useProgressiveMediaSource'
 import { THEME_COLORS } from 'UIHelper/constants'
 import { setUpdateMessageAttachmentAC } from 'store/message/actions'
 import { useDispatch, useSelector } from 'store/hooks'
 import { calculateRenderedImageWidth } from 'helpers'
 import { isJSON } from 'helpers/message'
+import { getCustomDownloader } from '../../helpers/customUploader'
+import { downloadVideoThumb, getVideoThumb, shouldExtractVideoFirstFrame } from '../../helpers/videoPreview'
 
 interface IVideoPreviewProps {
   width: string
@@ -34,6 +37,7 @@ interface IVideoPreviewProps {
   setVideoIsReadyToSend?: (attachmentId: string) => void
   downloading: boolean
   onlyVideoImage?: boolean
+  messageType?: string | null
 }
 
 const VideoPreview = memo(
@@ -50,7 +54,8 @@ const VideoPreview = memo(
     isDetailsView,
     downloading,
     setVideoIsReadyToSend,
-    onlyVideoImage
+    onlyVideoImage,
+    messageType
   }: IVideoPreviewProps) {
     const {
       [THEME_COLORS.BORDER]: border,
@@ -59,17 +64,22 @@ const VideoPreview = memo(
     } = useColor()
     const dispatch = useDispatch()
 
-    const attachmentVideoFirstFrame = useSelector((store: any) => {
-      const map = store.MessageReducer.attachmentUpdatedMap
-      return (
-        map[getAttachmentURLWithVersion(file.metadata?.tmb)] || map[getAttachmentURLWithVersion(file.url)] || undefined
-      )
-    })
-
     const parsedMetadata = useMemo(() => {
       if (!file.metadata) return null
       return isJSON(file.metadata) ? JSON.parse(file.metadata) : file.metadata
     }, [file.metadata])
+    const attachmentVideoFirstFrame = useSelector((store: any) => {
+      const map = store.MessageReducer.attachmentUpdatedMap
+      return (
+        map[getAttachmentURLWithVersion(parsedMetadata?.tmb || '')] ||
+        (typeof file.url === 'string' ? map[getAttachmentURLWithVersion(file.url)] : undefined)
+      )
+    })
+    const videoThumb = useMemo(() => getVideoThumb(file.metadata), [file.metadata])
+    const downloadedPreviewImage = useSelector((store: any) => {
+      if (!videoThumb) return undefined
+      return store.MessageReducer.attachmentUpdatedMap[getAttachmentURLWithVersion(videoThumb)]
+    })
 
     // Calculate initial duration from metadata
     const videoCurrentTime = useMemo(() => {
@@ -92,23 +102,64 @@ const VideoPreview = memo(
       }
       return { thumbnail: undefined, withPrefix: false }
     }, [parsedMetadata])
+    const fallbackPreviewSource = attachmentThumb?.thumbnail
+      ? attachmentThumb.withPrefix
+        ? `data:image/jpeg;base64,${attachmentThumb.thumbnail}`
+        : attachmentThumb.thumbnail
+      : undefined
+    const {
+      displayedSource: displayedPreviewSource,
+      previousSource: previousPreviewSource,
+      pendingSource,
+      markPreferredSourceLoaded
+    } = useProgressiveMediaSource(downloadedPreviewImage || attachmentVideoFirstFrame, fallbackPreviewSource)
 
     const isExtractingRef = useRef(false)
     const hasExtractionFailedRef = useRef(false)
+    const previousVideoSourceRef = useRef<string | undefined>(undefined)
+
+    useEffect(() => {
+      if (!videoThumb || downloadedPreviewImage) return
+
+      let cancelled = false
+      downloadVideoThumb(videoThumb, getCustomDownloader(), messageType)
+        .then((localPreviewUrl) => {
+          if (!cancelled) {
+            dispatch(setUpdateMessageAttachmentAC(videoThumb, localPreviewUrl))
+          }
+        })
+        .catch((error) => {
+          // Keep the existing thumbnail/placeholder visible. Do not download the
+          // video merely to recover a failed preview-image request.
+          console.error('Error downloading video preview image:', error)
+        })
+
+      return () => {
+        cancelled = true
+      }
+    }, [videoThumb, downloadedPreviewImage, dispatch, messageType])
 
     useEffect(() => {
       const videoSource = src
-      if (!videoSource || isExtractingRef.current || hasExtractionFailedRef.current) return
+      const canExtractFirstFrame = shouldExtractVideoFirstFrame(file.metadata)
+
+      if (previousVideoSourceRef.current !== videoSource) {
+        previousVideoSourceRef.current = videoSource
+        hasExtractionFailedRef.current = false
+      }
+
+      if (!videoSource || !canExtractFirstFrame || isExtractingRef.current || hasExtractionFailedRef.current) {
+        return
+      }
 
       // If we already have a cached frame from store, skip extraction
-      if (attachmentVideoFirstFrame && !isPreview) return
+      if (attachmentVideoFirstFrame || (isPreview && setVideoIsReadyToSend)) return
 
-      const frameCacheKey = file.url
-
-      // Reset extraction failed flag when source changes
-      hasExtractionFailedRef.current = false
+      const frameCacheKey = typeof file.url === 'string' ? file.url : undefined
 
       const checkCache = async (): Promise<boolean> => {
+        if (!frameCacheKey) return false
+
         try {
           const cachedUrl = await getAttachmentUrlFromCache(frameCacheKey)
           if (cachedUrl) {
@@ -134,7 +185,7 @@ const VideoPreview = memo(
             parsedMetadata?.szh || 1080
           )
           // Use getVideoFirstFrame helper function - it handles everything internally
-          const result = await getVideoFirstFrame(videoSource, newWidth, newHeight, 0.8)
+          const result = await getVideoFirstFrame(videoSource, newWidth, newHeight)
 
           if (!result) {
             isExtractingRef.current = false
@@ -151,11 +202,11 @@ const VideoPreview = memo(
             const response = new Response(blob, {
               headers: { 'Content-Type': 'image/jpeg' }
             })
-            if (!isPreview) {
+            if (!isPreview && frameCacheKey) {
               setAttachmentToCache(frameCacheKey, response)
             }
 
-            if (!isPreview) {
+            if (!isPreview && frameCacheKey) {
               dispatch(setUpdateMessageAttachmentAC(file.url, frameBlobUrl))
             }
           } catch (error) {
@@ -179,8 +230,16 @@ const VideoPreview = memo(
           extractFirstFrame()
         }
       })
-    }, [file.attachmentUrl, file.url, src, dispatch, attachmentVideoFirstFrame, isPreview, setVideoIsReadyToSend])
-
+    }, [
+      file.attachmentUrl,
+      file.url,
+      src,
+      videoThumb,
+      dispatch,
+      attachmentVideoFirstFrame,
+      isPreview,
+      setVideoIsReadyToSend
+    ])
     return (
       <Component
         width={width}
@@ -193,12 +252,7 @@ const VideoPreview = memo(
       >
         <UploadInProgress
           isRepliedMessage={isRepliedMessage}
-          src={
-            attachmentVideoFirstFrame ||
-            (attachmentThumb?.withPrefix
-              ? `data:image/jpeg;base64,${attachmentThumb.thumbnail}`
-              : attachmentThumb?.thumbnail)
-          }
+          src={previousPreviewSource || displayedPreviewSource}
           width={parseInt(width)}
           height={parseInt(height)}
           withBorder={!isPreview && !isDetailsView}
@@ -211,12 +265,31 @@ const VideoPreview = memo(
           isPreview={isPreview}
           borderRadius={borderRadius}
         />
+        {previousPreviewSource && displayedPreviewSource && (
+          <UploadInProgress
+            key={displayedPreviewSource}
+            $fadeIn
+            src={displayedPreviewSource}
+            isRepliedMessage={isRepliedMessage}
+            width={parseInt(width)}
+            height={parseInt(height)}
+            withBorder={!isPreview && !isDetailsView}
+            backgroundColor={backgroundColor && backgroundColor !== 'inherit' ? backgroundColor : overlayBackground2}
+            isDetailsView={isDetailsView}
+            borderColor={border}
+            isPreview={isPreview}
+            borderRadius={borderRadius}
+          />
+        )}
+        {pendingSource && (
+          <img aria-hidden alt='' src={pendingSource} style={{ display: 'none' }} onLoad={markPreferredSourceLoaded} />
+        )}
         {onlyVideoImage && (
           <VideoIcon bg={overlayBackground2}>
             <VideoPlayerPlay />
           </VideoIcon>
         )}
-        {!isRepliedMessage && !downloading && !onlyVideoImage && (
+        {!isRepliedMessage && !downloading && !uploading && !onlyVideoImage && (
           <VideoControls className='video-controls'>
             {!isPreview && !isRepliedMessage && !uploading && !isDetailsView && (
               <VideoPlayButton>
@@ -247,7 +320,8 @@ const VideoPreview = memo(
     prev.width === next.width &&
     prev.height === next.height &&
     prev.borderRadius === next.borderRadius &&
-    prev.isRepliedMessage === next.isRepliedMessage
+    prev.isRepliedMessage === next.isRepliedMessage &&
+    prev.isDetailsView === next.isDetailsView
 )
 
 export default VideoPreview
@@ -294,7 +368,7 @@ const VideoPlayButton = styled.div<{ showOnHover?: boolean }>`
   visibility: ${(props) => props.showOnHover && 'hidden'};
 `
 
-const Component = styled.div<{
+export const Component = styled.div<{
   isPreview?: boolean
   isRepliedMessage?: boolean
   isDetailsView?: boolean
@@ -380,6 +454,11 @@ export const AttachmentFile = styled.div<{
   }
 `
 
+const videoPreviewCrossFade = keyframes`
+  from { opacity: 0; }
+  to { opacity: 1; }
+`
+
 const UploadInProgress = styled.img<{
   withPrefix?: boolean
   width?: number
@@ -394,7 +473,9 @@ const UploadInProgress = styled.img<{
   fileAttachment?: boolean
   imageMinWidth?: string
   fetchpriority?: string
+  $fadeIn?: boolean
 }>`
+  position: ${(props) => props.$fadeIn && 'absolute'};
   width: ${(props) =>
     props.fileAttachment || props.isRepliedMessage ? '40px' : props.width ? `${props.width}px` : '100%'};
   height: ${(props) =>
@@ -424,6 +505,12 @@ const UploadInProgress = styled.img<{
     min-width: inherit;
   `}
   object-fit: cover;
+  ${(props) =>
+    props.$fadeIn &&
+    css`
+      opacity: 0;
+      animation: ${videoPreviewCrossFade} 100ms ease-in-out forwards;
+    `}
 `
 
 const VideoIcon = styled.div<{ bg: string }>`

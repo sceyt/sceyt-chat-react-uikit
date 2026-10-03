@@ -224,7 +224,7 @@ const ChannelsList = styled.div<{ thumbColor: string }>`
   max-height: 400px;
   overflow-y: auto;
   overflow-x: hidden;
-  scrollbar-width: none;
+  scrollbar-width: thin;
   scrollbar-color: transparent transparent;
   overscroll-behavior: none;
 
@@ -249,7 +249,6 @@ const ChannelsList = styled.div<{ thumbColor: string }>`
   }
 
   &.show-scrollbar {
-    scrollbar-width: thin;
     scrollbar-color: ${(props) => props.thumbColor} transparent;
   }
 `

@@ -654,6 +654,9 @@ export const StyledText = styled.span<{
     color: ${(props) => props.color};
     font-weight: ${(props) => props.isLastMessage && '500'};
     cursor: ${(props) => props.shouldOpenUserProfileForMention && 'pointer'};
+    display: inline;
+    user-select: text;
+    -webkit-user-select: text;
   }
   &.bold {
     font-weight: 600;
@@ -943,6 +946,7 @@ export const UploadProgress = styled.div<{
   justify-content: center;
   background-image: url(${(props) =>
     props.backgroundImage && `${props.withPrefix ? 'data:image/jpeg;base64,' : ''}${props.backgroundImage}`});
+  background-clip: border-area;
   background-size: cover;
   background-position: center;
   border-radius: ${(props) =>

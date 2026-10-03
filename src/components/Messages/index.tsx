@@ -110,6 +110,16 @@ interface MessagesProps {
   reportIcon?: JSX.Element
   retractVoteIcon?: JSX.Element
   endVoteIcon?: JSX.Element
+  /** Replaces the default pin icon in the pinned-messages banner. */
+  pinnedMessageIcon?: JSX.Element
+  /**
+   * Replaces the compact pinned-message preview for app-specific message
+   * types. Return null or undefined to use the UIKit preview.
+   */
+  renderPinnedMessagePreview?: (
+    message: IMessage,
+    context: { placement: 'banner' | 'system' }
+  ) => React.ReactNode | null | undefined
   openFrequentlyUsedReactions?: boolean
   fixEmojiCategoriesTitleOnTop?: boolean
   emojisCategoryIconsPosition?: 'top' | 'bottom'
@@ -263,6 +273,8 @@ const MessagesContainer: React.FC<MessagesProps> = ({
   reportIcon,
   retractVoteIcon,
   endVoteIcon,
+  pinnedMessageIcon,
+  renderPinnedMessagePreview,
   reactionIconOrder,
   openFrequentlyUsedReactions,
   fixEmojiCategoriesTitleOnTop,
@@ -419,6 +431,8 @@ const MessagesContainer: React.FC<MessagesProps> = ({
         reportIcon={reportIcon}
         retractVoteIcon={retractVoteIcon}
         endVoteIcon={endVoteIcon}
+        pinnedMessageIcon={pinnedMessageIcon}
+        renderPinnedMessagePreview={renderPinnedMessagePreview}
         reactionIconOrder={reactionIconOrder}
         openFrequentlyUsedReactions={openFrequentlyUsedReactions}
         fixEmojiCategoriesTitleOnTop={fixEmojiCategoriesTitleOnTop}

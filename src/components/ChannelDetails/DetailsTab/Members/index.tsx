@@ -377,7 +377,7 @@ const Members = ({
                                 toggleMakeAdminPopup(e, member.role === 'admin')
                                 setCloseMenu('1')
                               }}
-                              textColor={member.role === 'admin' ? errorColor : ''}
+                              textColor={member.role === 'admin' ? errorColor : textPrimary}
                               key={2}
                               hoverBackground={backgroundHovered}
                             >

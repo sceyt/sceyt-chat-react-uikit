@@ -1,5 +1,5 @@
 import React from 'react'
-import { screen } from '@testing-library/react'
+import { fireEvent, screen } from '@testing-library/react'
 import Message from './index'
 import { DEFAULT_CHANNEL_TYPE, MESSAGE_DELIVERY_STATUS } from '../../helpers/constants'
 import { CONNECTION_STATUS } from '../../store/user/constants'
@@ -47,7 +47,37 @@ jest.mock('./MessageSelection', () => ({
 
 jest.mock('./MessageReactions', () => ({
   __esModule: true,
-  default: () => null
+  default: ({
+    message,
+    popupZIndex,
+    reactionsPopupOpen,
+    reactionsPopupPosition,
+    reactionsPopupHorizontalPosition,
+    reactionsAnchorTop,
+    reactionsAnchorBottom,
+    onToggleReactionsPopup
+  }: any) => (
+    <div
+      id={`${message.id || message.tid}_reactions_container`}
+      data-reactions-container
+      data-testid='message-reactions'
+      data-popup-z-index={popupZIndex}
+    >
+      <button type='button' data-testid='message-reactions-toggle' onClick={onToggleReactionsPopup}>
+        Open reactions
+      </button>
+      {reactionsPopupOpen && (
+        <div
+          data-testid='reactions-popup'
+          data-bottom={reactionsPopupPosition}
+          data-left={reactionsPopupHorizontalPosition.left}
+          data-right={reactionsPopupHorizontalPosition.right}
+          data-anchor-top={reactionsAnchorTop}
+          data-anchor-bottom={reactionsAnchorBottom}
+        />
+      )}
+    </div>
+  )
 }))
 
 jest.mock('./MessageStatusAndTime', () => ({
@@ -139,6 +169,62 @@ describe('Message', () => {
     expect(screen.getAllByTestId('avatar')).toHaveLength(1)
     expect(screen.getByText('first-unread')).toBeInTheDocument()
     expect(screen.getByText('second-unread')).toBeInTheDocument()
+  })
+
+  it('keeps same-sender pinned messages grouped across different days', () => {
+    const channelId = 'channel-pinned-avatar-grouping'
+    const remoteUser = makeUser({ id: 'remote-user-pinned', firstName: 'Waffi' })
+    const firstPinnedMessage = makeMessage({
+      id: '1503',
+      channelId,
+      body: 'first pinned',
+      incoming: true,
+      user: remoteUser,
+      createdAt: new Date('2026-04-01T12:00:00.000Z')
+    })
+    const secondPinnedMessage = makeMessage({
+      id: '1504',
+      channelId,
+      body: 'second pinned',
+      incoming: true,
+      user: remoteUser,
+      createdAt: new Date('2026-04-02T12:00:00.000Z')
+    })
+    const channel = makeChannel({
+      id: channelId,
+      type: DEFAULT_CHANNEL_TYPE.GROUP,
+      lastMessage: secondPinnedMessage
+    })
+    const store = createMessageListStore({ ChannelReducer: { activeChannel: channel } })
+
+    renderWithSceytProvider(
+      <>
+        <Message
+          message={firstPinnedMessage}
+          channel={channel}
+          stopScrolling={() => undefined}
+          handleScrollToRepliedMessage={() => undefined}
+          prevMessage={undefined as any}
+          nextMessage={secondPinnedMessage}
+          isThreadMessage={false}
+          isPinnedMessagesList
+          ifLatestAndHasNotPreview
+        />
+        <Message
+          message={secondPinnedMessage}
+          channel={channel}
+          stopScrolling={() => undefined}
+          handleScrollToRepliedMessage={() => undefined}
+          prevMessage={firstPinnedMessage}
+          nextMessage={undefined as any}
+          isThreadMessage={false}
+          isPinnedMessagesList
+        />
+      </>,
+      { store }
+    )
+
+    expect(screen.getAllByTestId('avatar')).toHaveLength(1)
   })
 
   it('keeps same-user grouping when neighboring messages use different id shapes for the same user', () => {
@@ -296,6 +382,166 @@ describe('Message', () => {
     )
 
     expect(queueReadMarker).not.toHaveBeenCalled()
+  })
+
+  it('does not add pinned-list rows to the active chat visibility map', () => {
+    const channelId = 'channel-pinned-list-visibility'
+    const pinnedMessage = makeMessage({
+      id: '1604',
+      channelId,
+      body: 'pinned overlay message',
+      incoming: true
+    })
+    const channel = makeChannel({ id: channelId, lastMessage: pinnedMessage })
+    const store = createMessageListStore({
+      ChannelReducer: { activeChannel: channel },
+      MessageReducer: { unreadScrollTo: false }
+    })
+
+    const { unmount } = renderWithSceytProvider(
+      <Message
+        message={pinnedMessage}
+        channel={channel}
+        stopScrolling={() => undefined}
+        handleScrollToRepliedMessage={() => undefined}
+        prevMessage={undefined as any}
+        nextMessage={undefined as any}
+        isThreadMessage={false}
+        isPinnedMessagesList
+      />,
+      { store }
+    )
+
+    expect(store.getState().MessageReducer.visibleMessagesMap[pinnedMessage.id!]).toBeUndefined()
+
+    unmount()
+
+    expect(store.getState().MessageReducer.visibleMessagesMap[pinnedMessage.id!]).toBeUndefined()
+  })
+
+  it('renders pinned-list reaction details above the pinned-list overlay', () => {
+    const channelId = 'channel-pinned-list-reactions'
+    const pinnedMessage = makeMessage({
+      id: '1605',
+      channelId,
+      body: 'pinned reaction message',
+      reactionTotals: [{ key: '👍', count: 1, score: 1 }]
+    })
+    const channel = makeChannel({ id: channelId, lastMessage: pinnedMessage })
+    const store = createMessageListStore({
+      ChannelReducer: { activeChannel: channel },
+      MessageReducer: { unreadScrollTo: false }
+    })
+
+    renderWithSceytProvider(
+      <Message
+        message={pinnedMessage}
+        channel={channel}
+        stopScrolling={() => undefined}
+        handleScrollToRepliedMessage={() => undefined}
+        prevMessage={undefined as any}
+        nextMessage={undefined as any}
+        isThreadMessage={false}
+        isPinnedMessagesList
+      />,
+      { store }
+    )
+
+    expect(screen.getByTestId('message-reactions')).toHaveAttribute('data-popup-z-index', '30')
+  })
+
+  it('opens pinned-list reaction details at the reaction bar coordinates', () => {
+    const channelId = 'channel-pinned-list-reaction-position'
+    const pinnedMessage = makeMessage({
+      id: '1606',
+      channelId,
+      body: 'pinned reaction position message',
+      reactionTotals: [{ key: '👍', count: 1, score: 1 }]
+    })
+    const channel = makeChannel({ id: channelId, lastMessage: pinnedMessage })
+    const store = createMessageListStore({
+      ChannelReducer: { activeChannel: channel },
+      MessageReducer: { unreadScrollTo: false }
+    })
+    const innerHeight = window.innerHeight
+    const staleReactionContainer = document.createElement('div')
+    staleReactionContainer.id = `${pinnedMessage.id}_reactions_container`
+    Object.defineProperty(staleReactionContainer, 'getBoundingClientRect', {
+      configurable: true,
+      value: () =>
+        ({
+          top: -200,
+          bottom: -176,
+          left: 12,
+          right: 44,
+          width: 32,
+          height: 24,
+          x: 12,
+          y: -200,
+          toJSON: () => ({})
+        }) as DOMRect
+    })
+    document.body.appendChild(staleReactionContainer)
+    Object.defineProperty(window, 'innerHeight', { configurable: true, value: 900 })
+
+    try {
+      renderWithSceytProvider(
+        <Message
+          message={pinnedMessage}
+          channel={channel}
+          stopScrolling={() => undefined}
+          handleScrollToRepliedMessage={() => undefined}
+          prevMessage={undefined as any}
+          nextMessage={undefined as any}
+          isThreadMessage={false}
+          isPinnedMessagesList
+        />,
+        { store }
+      )
+
+      Object.defineProperty(screen.getByTestId('message-reactions'), 'getBoundingClientRect', {
+        configurable: true,
+        value: () =>
+          ({
+            top: 420,
+            bottom: 444,
+            left: 120,
+            right: 208,
+            width: 88,
+            height: 24,
+            x: 120,
+            y: 420,
+            toJSON: () => ({})
+          }) as DOMRect
+      })
+      Object.defineProperty(document.querySelector('.message_item'), 'getBoundingClientRect', {
+        configurable: true,
+        value: () =>
+          ({
+            top: 360,
+            bottom: 460,
+            left: 80,
+            right: 400,
+            width: 320,
+            height: 100,
+            x: 80,
+            y: 360,
+            toJSON: () => ({})
+          }) as DOMRect
+      })
+
+      fireEvent.click(screen.getByTestId('message-reactions-toggle'))
+
+      const popup = screen.getByTestId('reactions-popup')
+      expect(popup).toHaveAttribute('data-bottom', '440')
+      expect(popup).toHaveAttribute('data-left', '120')
+      expect(popup).toHaveAttribute('data-right', `${window.innerWidth - 208}`)
+      expect(popup).toHaveAttribute('data-anchor-top', '420')
+      expect(popup).toHaveAttribute('data-anchor-bottom', '444')
+    } finally {
+      staleReactionContainer.remove()
+      Object.defineProperty(window, 'innerHeight', { configurable: true, value: innerHeight })
+    }
   })
 
   it('does not queue read markers when browser tab is inactive', () => {

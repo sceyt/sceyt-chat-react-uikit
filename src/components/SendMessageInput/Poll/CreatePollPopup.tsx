@@ -441,7 +441,7 @@ const OptionsList = styled.div<{ thumbColor: string }>`
   overflow-y: auto;
   margin-top: 8px;
   padding-right: 6px;
-  scrollbar-width: none;
+  scrollbar-width: thin;
   scrollbar-color: transparent transparent;
   overscroll-behavior: none;
 
@@ -466,7 +466,6 @@ const OptionsList = styled.div<{ thumbColor: string }>`
   }
 
   &.show-scrollbar {
-    scrollbar-width: thin;
     scrollbar-color: ${(props) => props.thumbColor} transparent;
   }
 `
