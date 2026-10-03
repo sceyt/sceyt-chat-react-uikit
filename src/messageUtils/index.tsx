@@ -107,13 +107,38 @@ const MessageStatusIcon = ({
 
 // linkify-it balances parentheses and truncates complex URLs (e.g. Kibana rison fragments).
 // Use regex for protocol-based URLs; fall back to linkify-it only for bare-domain URLs.
+// \S+ also captures sentence punctuation after a URL ("see https://x.com." / "(https://x.com)").
+// Strip trailing . , ; : ! ? ' " and closing brackets that have no matching opener inside the
+// URL, so balanced brackets (e.g. Kibana rison fragments ending in ")))") are kept.
+const URL_TRAILING_PUNCTUATION = '.,;:!?\'"'
+const URL_BRACKET_PAIRS: Record<string, string> = { ')': '(', ']': '[', '}': '{' }
+const countChar = (value: string, char: string) => value.split(char).length - 1
+const trimTrailingUrlPunctuation = (url: string): string => {
+  let result = url
+  while (result.length) {
+    const last = result[result.length - 1]
+    if (URL_TRAILING_PUNCTUATION.includes(last)) {
+      result = result.slice(0, -1)
+      continue
+    }
+    const opener = URL_BRACKET_PAIRS[last]
+    if (opener && countChar(result, last) > countChar(result, opener)) {
+      result = result.slice(0, -1)
+      continue
+    }
+    break
+  }
+  return result
+}
+
 function extractUrlMatches(text: string): Array<{ text: string; url: string }> | null {
   const results: Array<{ text: string; url: string; index: number }> = []
 
   const protocolRegex = /https?:\/\/\S+/g
   let m: RegExpExecArray | null
   while ((m = protocolRegex.exec(text)) !== null) {
-    results.push({ text: m[0], url: m[0], index: m.index })
+    const url = trimTrailingUrlPunctuation(m[0])
+    results.push({ text: url, url, index: m.index })
   }
 
   const linkifyResults = new LinkifyIt().match(text)
@@ -140,46 +165,40 @@ const linkifyTextPart = (
   let prevMatchEnd = 0
   let lastFoundIndex = 0
 
+  // Every link gets the same props. Previously only the first link in a text got the invite
+  // onClick (and pointer cursor), so a second invite link in the same message did nothing.
+  const renderLink = (matchItem: any, index: number) => (
+    <a
+      draggable={false}
+      key={index}
+      href={isInviteLink ? undefined : matchItem.url}
+      target={target}
+      rel='noreferrer'
+      style={{ cursor: 'pointer' }}
+      {...(isInviteLink
+        ? {
+            onClick: () => {
+              const splitedKey = matchItem.url.split('/')
+              let key = splitedKey[splitedKey.length - 1]
+              if (!key) {
+                key = splitedKey[splitedKey.length - 2]
+              }
+              if (key) {
+                onInviteLinkClick?.(key)
+              }
+            }
+          }
+        : {})}
+    >{`${matchItem.text}`}</a>
+  )
+
   match.forEach((matchItem: any, index: number) => {
     const matchIndex = textPart.indexOf(matchItem.text, lastFoundIndex)
     lastFoundIndex = matchIndex + matchItem.text.length
     if (index === 0) {
-      newMessageText = [
-        textPart.substring(0, matchIndex),
-        <a
-          draggable={false}
-          key={index}
-          href={isInviteLink ? undefined : matchItem.url}
-          target={target}
-          rel='noreferrer'
-          style={{ cursor: 'pointer' }}
-          {...(isInviteLink
-            ? {
-                onClick: () => {
-                  const splitedKey = matchItem.url.split('/')
-                  let key = splitedKey[splitedKey.length - 1]
-                  if (!key) {
-                    key = splitedKey[splitedKey.length - 2]
-                  }
-                  if (key) {
-                    onInviteLinkClick?.(key)
-                  }
-                }
-              }
-            : {})}
-        >{`${matchItem.text}`}</a>
-      ]
+      newMessageText = [textPart.substring(0, matchIndex), renderLink(matchItem, index)]
     } else {
-      newMessageText.push(
-        textPart.substring(prevMatchEnd, matchIndex),
-        <a
-          draggable={false}
-          key={index}
-          href={isInviteLink ? undefined : matchItem.url}
-          target={target}
-          rel='noreferrer'
-        >{`${matchItem.text}`}</a>
-      )
+      newMessageText.push(textPart.substring(prevMatchEnd, matchIndex), renderLink(matchItem, index))
     }
 
     prevMatchEnd = matchIndex + matchItem.text.length
