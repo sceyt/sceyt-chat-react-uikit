@@ -103,6 +103,14 @@
       "./src/helpers/messagesIdb.ts": {
         "lines": 88,
         "branches": 86
+      },
+      "./src/helpers/message.tsx": {
+        "lines": 85,
+        "branches": 78
+      },
+      "./src/helpers/index.tsx": {
+        "lines": 49,
+        "branches": 46
       }
     }
   },
