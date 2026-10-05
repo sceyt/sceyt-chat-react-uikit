@@ -2059,8 +2059,10 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
 
   const canForwardMessage = useMemo(() => {
     return selectedMessagesMap
-      ?.values()
-      ?.some((message: IMessage) => message.type === MESSAGE_TYPE.POLL || message.type === 'call')
+      ? Array.from<IMessage>(selectedMessagesMap.values()).some(
+          (message) => message.type === MESSAGE_TYPE.POLL || message.type === 'call'
+        )
+      : false
   }, [selectedMessagesMap])
 
   const showLinkPreview = useMemo(

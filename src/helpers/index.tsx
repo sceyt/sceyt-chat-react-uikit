@@ -638,6 +638,9 @@ export const getEmojisCategoryTitle = (categoryKey: string) => {
 }
 
 export const hashString = async (str: string) => {
+  if (!crypto?.subtle) {
+    return ''
+  }
   const encoder = new TextEncoder()
   const encodedData = encoder.encode(str)
   let hashBuffer: any
