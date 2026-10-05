@@ -1277,7 +1277,6 @@ const ForwardMentionList = styled.div<{ backgroundColor: string; borderColor: st
   max-height: 180px;
   overflow-y: auto;
   background: ${(props) => props.backgroundColor};
-  border: 1px solid ${(props) => props.borderColor};
   border-radius: 8px;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
 `
