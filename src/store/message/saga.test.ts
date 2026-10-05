@@ -3576,6 +3576,48 @@ describe('message saga message-list flows', () => {
     )
   })
 
+  it.each([
+    [CONNECTION_STATUS.CONNECTED, true],
+    [CONNECTION_STATUS.CONNECTING, false]
+  ])(
+    'updates the reacted preview on edit while %s (reacted message is last: %s)',
+    async (connectionStatus, reactedIsLast) => {
+      const channelId = `channel-edit-reacted-${connectionStatus}`
+      const reactedMessage = makeMessage({ id: '7402', channelId, body: 'before edit' })
+      const latestMessage = reactedIsLast
+        ? reactedMessage
+        : makeMessage({ id: '7403', channelId, body: 'newer message' })
+      const channel = makeChannel({
+        id: channelId,
+        lastMessage: latestMessage,
+        lastReactedMessage: reactedMessage,
+        newReactions: [{ id: 'reaction-1' } as any]
+      })
+      channel.editMessage = jest.fn(() => resolveWithMockServerDelay({ ...reactedMessage, body: 'after edit' }))
+
+      mockStoreState.UserReducer.connectionStatus = connectionStatus
+      setChannelInMap(channel)
+      addChannelToAllChannels(channel)
+      addMessageToMap(channelId, reactedMessage)
+      if (!reactedIsLast) addMessageToMap(channelId, latestMessage)
+
+      const dispatched = await runMessageSaga(
+        __messageSagaTestables.editMessage,
+        editMessageAC(channelId, { ...reactedMessage, body: 'after edit' })
+      )
+
+      expect(dispatched).toContainEqual(
+        updateChannelDataAC(channelId, {
+          lastReactedMessage: expect.objectContaining({ id: reactedMessage.id, body: 'after edit' })
+        })
+      )
+      expect(getChannelFromMap(channelId)?.lastReactedMessage?.body).toBe('after edit')
+      expect(getChannelFromAllChannels(channelId)?.lastReactedMessage?.body).toBe('after edit')
+      expect(getChannelFromMap(channelId)?.newReactions).toEqual(channel.newReactions)
+      expect(getChannelFromMap(channelId)?.lastMessage.id).toBe(latestMessage.id)
+    }
+  )
+
   it('queues a delete while reconnecting, applies an optimistic tombstone, and does not call the SDK immediately', async () => {
     const currentUser = makeUser({ id: 'current-user' })
     const message = makeMessage({

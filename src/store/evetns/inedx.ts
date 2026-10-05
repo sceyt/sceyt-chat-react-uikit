@@ -483,6 +483,17 @@ export function* handleDeleteMessageEvent(args: { channel: IChannel; deletedMess
 export function* handleEditMessageEvent(args: { channel: IChannel; message: IMessage }): any {
   const { channel, message } = args
   const channelExists = checkChannelExists(channel.id)
+  const storedChannel = getStoredChannel(channel.id)
+  const reduxChannel = (store.getState().ChannelReducer?.channels || []).find(
+    (stored: IChannel) => stored.id === channel.id
+  )
+  const isLastMessage = channel.lastMessage?.id === message.id
+  const isLastReactedMessage =
+    storedChannel?.lastReactedMessage?.id === message.id || reduxChannel?.lastReactedMessage?.id === message.id
+  const channelUpdateParams = {
+    ...(isLastMessage ? { lastMessage: message } : {}),
+    ...(isLastReactedMessage ? { lastReactedMessage: message } : {})
+  }
 
   yield put(
     updateMessageAC(message.id, {
@@ -496,7 +507,10 @@ export function* handleEditMessageEvent(args: { channel: IChannel; message: IMes
     })
   )
   if (channelExists) {
-    if (channel.lastMessage.id === message.id) {
+    if (isLastReactedMessage) {
+      yield put(updateChannelDataAC(channel.id, channelUpdateParams))
+    }
+    if (isLastMessage) {
       yield put(updateChannelLastMessageAC(message, channel))
     }
   }
@@ -506,7 +520,7 @@ export function* handleEditMessageEvent(args: { channel: IChannel; message: IMes
       params: message
     })
   }
-  updateChannelOnAllChannels(channel.id, {}, message)
+  updateChannelOnAllChannels(channel.id, channelUpdateParams, message)
   yield put(removePendingMessageMutationAC(message.id))
 }
 

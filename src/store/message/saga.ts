@@ -883,15 +883,11 @@ function* applyLocalMessageUpdate(channelId: string, messageId: string, params: 
   const reduxChannel = (store.getState().ChannelReducer?.channels || []).find(
     (channel: IChannel) => channel.id === channelId
   )
-  if (
-    params.state === MESSAGE_STATUS.DELETE &&
-    (storedChannel?.lastReactedMessage?.id === messageId || reduxChannel?.lastReactedMessage?.id === messageId)
-  ) {
-    const reactionPreviewUpdate = {
-      lastReactedMessage: null,
-      newReactions: [],
-      userMessageReactions: []
-    }
+  if (storedChannel?.lastReactedMessage?.id === messageId || reduxChannel?.lastReactedMessage?.id === messageId) {
+    const reactionPreviewUpdate =
+      params.state === MESSAGE_STATUS.DELETE
+        ? { lastReactedMessage: null, newReactions: [], userMessageReactions: [] }
+        : { lastReactedMessage: cloneSerializable(params) }
     updateChannelOnAllChannels(channelId, reactionPreviewUpdate)
     yield put(updateChannelDataAC(channelId, reactionPreviewUpdate))
   }

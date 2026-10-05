@@ -2496,6 +2496,42 @@ describe('watchForEvents saga - full event loop tests', () => {
       // Should dispatch updateChannelLastMessageAC
       expect(harness.dispatched.some((a) => a.type === updateChannelLastMessageAC({}, {}).type)).toBe(true)
     })
+
+    it.each([true, false])(
+      'EDIT_MESSAGE refreshes the reacted preview (reacted message is last: %s)',
+      async (reactedIsLast) => {
+        const channelId = `edit-reacted-message-${reactedIsLast}`
+        const reactedMessage = makeMessage({ id: '7002', channelId, body: 'before edit' })
+        const latestMessage = reactedIsLast
+          ? reactedMessage
+          : makeMessage({ id: '7003', channelId, body: 'newer message' })
+        const channel = makeChannel({
+          id: channelId,
+          lastMessage: latestMessage,
+          lastReactedMessage: reactedMessage,
+          newReactions: [{ id: 'reaction-1' } as any]
+        })
+        const editedMessage = { ...reactedMessage, body: 'after edit', state: MESSAGE_STATUS.EDIT }
+
+        setChannelInMap(channel)
+        addChannelToAllChannels(channel)
+        addMessageToMap(channelId, reactedMessage)
+
+        await harness.emit('onMessageEdited', channel, makeUser({ id: 'editor' }), editedMessage)
+
+        expect(harness.dispatched).toContainEqual(
+          updateChannelDataAC(
+            channelId,
+            expect.objectContaining({
+              lastReactedMessage: expect.objectContaining({ id: reactedMessage.id, body: 'after edit' })
+            })
+          )
+        )
+        expect(getChannelFromMap(channelId)?.lastReactedMessage?.body).toBe('after edit')
+        expect(getChannelFromMap(channelId)?.newReactions).toEqual(channel.newReactions)
+        expect(getChannelFromMap(channelId)?.lastMessage.id).toBe(latestMessage.id)
+      }
+    )
   })
 
   describe('Strengthened DELETE_MESSAGE tests', () => {
