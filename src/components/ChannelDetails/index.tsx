@@ -114,6 +114,7 @@ const Details = ({
   voicePreviewPlayHoverIcon,
   voicePreviewPauseIcon,
   voicePreviewPauseHoverIcon,
+  CustomLoadErrorState,
   voicePreviewTitleColor,
   voicePreviewDateAndTimeColor,
   voicePreviewHoverBackgroundColor,
@@ -520,6 +521,7 @@ const Details = ({
             voicePreviewPlayIcon={voicePreviewPlayHoverIcon}
             voicePreviewPauseIcon={voicePreviewPauseIcon}
             voicePreviewPauseHoverIcon={voicePreviewPauseHoverIcon}
+            CustomLoadErrorState={CustomLoadErrorState}
             voicePreviewTitleColor={voicePreviewTitleColor}
             voicePreviewDateAndTimeColor={voicePreviewDateAndTimeColor}
             voicePreviewHoverBackgroundColor={voicePreviewHoverBackgroundColor}

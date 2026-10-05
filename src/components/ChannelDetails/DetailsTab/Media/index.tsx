@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
+import { CustomLoadErrorStateComponent, renderLoadErrorState } from '../../../../common/LoadErrorState'
 import styled, { keyframes } from 'styled-components'
 import { shallowEqual } from 'react-redux'
 import { useSelector, useDispatch } from 'store/hooks'
@@ -24,6 +25,8 @@ import { THEME_COLORS } from '../../../../UIHelper/constants'
 import log from 'loglevel'
 
 interface IProps {
+  /** Replaces the default "Unable to load media" view shown when the first load times out. */
+  CustomLoadErrorState?: CustomLoadErrorStateComponent
   channel: IChannel
 }
 
@@ -112,7 +115,7 @@ const MediaTile = ({ file, background, onOpen }: IMediaTileProps) => {
   )
 }
 
-const Media = ({ channel }: IProps) => {
+const Media = ({ channel, CustomLoadErrorState }: IProps) => {
   const {
     [THEME_COLORS.BACKGROUND]: background,
     [THEME_COLORS.TEXT_SECONDARY]: textSecondary,
@@ -181,6 +184,15 @@ const Media = ({ channel }: IProps) => {
             <SkeletonTile key={i} color={surface1} />
           ))}
         </SkeletonGrid>
+      ) : loadingState === LOADING_STATE.FAILED && attachments.length === 0 ? (
+        renderLoadErrorState(
+          {
+            title: 'Unable to load media',
+            description: "We couldn't load media. Please try again.",
+            onRetry: () => dispatch(getAttachmentsAC(channel.id, channelDetailsTabs.media, 35))
+          },
+          CustomLoadErrorState
+        )
       ) : loadingState === LOADING_STATE.LOADED && attachments.length === 0 ? (
         <EmptyState color={textSecondary}>No shared media.</EmptyState>
       ) : (

@@ -2405,6 +2405,24 @@ export function useChatController({
     })
   }, [messages])
 
+  // First load of a chat: newest (forwarded chats), near the unread separator, or the default window.
+  // Also used by Retry after that load timed out ("Unable to load messages").
+  const dispatchInitialLoad = useCallback(() => {
+    if (!channel?.id) {
+      return
+    }
+    // A forwarded chat opens at its newest message, even when unread history exists.
+    dispatch(clearVisibleMessagesMapAC())
+    suppressNextMessageChange()
+    if (openAtLatest) {
+      dispatch(loadLatestMessagesAC(channel, undefined, undefined, true, true))
+    } else if (channel.newMessageCount && channel.lastDisplayedMessageId) {
+      dispatch(loadNearUnreadAC(channel))
+    } else {
+      dispatch(loadDefaultMessagesAC(channel))
+    }
+  }, [dispatch, channel, openAtLatest, suppressNextMessageChange])
+
   useEffect(() => {
     messagesIndexMapRef.current = {}
     pendingWindowLoadRef.current?.resolve({ items: [] })
@@ -2458,18 +2476,7 @@ export function useChatController({
       return
     }
 
-    // A forwarded chat opens at its newest message, even when unread history exists.
-    dispatch(clearVisibleMessagesMapAC())
-    if (openAtLatest) {
-      suppressNextMessageChange()
-      dispatch(loadLatestMessagesAC(channel, undefined, undefined, true, true))
-    } else if (channel.newMessageCount && channel.lastDisplayedMessageId) {
-      suppressNextMessageChange()
-      dispatch(loadNearUnreadAC(channel))
-    } else {
-      suppressNextMessageChange()
-      dispatch(loadDefaultMessagesAC(channel))
-    }
+    dispatchInitialLoad()
   }, [dispatch, channel?.id, channel.backToLinkedChannel, openAtLatest, suppressNextMessageChange])
 
   useEffect(() => {
@@ -2678,6 +2685,7 @@ export function useChatController({
   )
 
   return {
+    retryInitialLoad: dispatchInitialLoad,
     scrollRef,
     setLastVisibleMessageId,
     handleScrollToRepliedMessage: jumpToItem,

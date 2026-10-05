@@ -221,6 +221,27 @@ describe('member saga', () => {
       expect(dispatched[1].type).toBe('members/setMembersLoadingState')
     })
 
+    it('sets FAILED when the first members request times out', async () => {
+      const mockMembersQuery = {
+        loadNextPage: jest.fn().mockRejectedValue({ code: 9902, message: 'Request timeout' })
+      }
+      mockClient.MemberListQueryBuilder = jest.fn().mockImplementation(() => ({
+        all: jest.fn().mockReturnThis(),
+        byAffiliationOrder: jest.fn().mockReturnThis(),
+        orderKeyByUsername: jest.fn().mockReturnThis(),
+        limit: jest.fn().mockReturnThis(),
+        build: jest.fn().mockResolvedValue(mockMembersQuery)
+      }))
+      setChannelInMap(makeChannel({ id: 'channel-timeout', members: [] }))
+
+      const dispatched = await runMemberSaga(__memberSagaTestables.getMembers, getMembersAC('channel-timeout'))
+
+      const states = dispatched
+        .filter((a) => a.type === 'members/setMembersLoadingState')
+        .map((a) => a.payload.loadingState)
+      expect(states).toEqual([LOADING_STATE.LOADING, LOADING_STATE.FAILED])
+    })
+
     it('handles SDK error gracefully without crashing', async () => {
       const mockMembersQuery = {
         loadNextPage: jest.fn().mockRejectedValue({ code: 5000, message: 'Network error' })

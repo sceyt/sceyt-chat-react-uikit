@@ -36,12 +36,15 @@ import { getClient } from '../../common/client'
 import { sendTextMessageAC } from '../message/actions'
 import { CONNECTION_STATUS } from '../user/constants'
 import log from 'loglevel'
+import { isRetryableLoadError } from '../../helpers/error'
 import { updateActiveChannelMembersAdd, updateActiveChannelMembersRemove } from './helpers'
 import store from 'store'
 
 function* getMembers(action: IAction): any {
   const { payload } = action
   const { channelId } = payload
+  // The first load timed out -> Members tab shows "Unable to load members" with a Retry
+  let loadFailed = false
   try {
     yield put(setMembersHasNextAC(true, channelId))
     if (!channelId || store.getState().MembersReducer.channelsMembersHasNextMap[channelId] === false) {
@@ -76,11 +79,12 @@ function* getMembers(action: IAction): any {
     yield put(updateChannelDataAC(channelId, updateChannelData))
   } catch (e) {
     log.error('ERROR in get members - ', e.message)
+    loadFailed = isRetryableLoadError(e)
     if (e.code !== 10008) {
       // yield put(setErrorNotification(e.message))
     }
   } finally {
-    yield put(setMembersLoadingStateAC(LOADING_STATE.LOADED, channelId))
+    yield put(setMembersLoadingStateAC(loadFailed ? LOADING_STATE.FAILED : LOADING_STATE.LOADED, channelId))
   }
 }
 

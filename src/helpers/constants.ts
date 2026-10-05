@@ -31,7 +31,9 @@ export const UPLOAD_STATE = {
 
 export const LOADING_STATE = {
   LOADING: 1,
-  LOADED: 2
+  LOADED: 2,
+  // The first load timed out and nothing could be shown; the UI offers a Retry.
+  FAILED: 3
 }
 
 export const DEFAULT_CHANNEL_TYPE = {

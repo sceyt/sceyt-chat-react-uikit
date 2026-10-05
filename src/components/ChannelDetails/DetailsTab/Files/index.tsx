@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react'
+import { CustomLoadErrorStateComponent, renderLoadErrorState } from '../../../../common/LoadErrorState'
 import { shallowEqual } from 'react-redux'
 import { useSelector, useDispatch } from 'store/hooks'
 import styled, { keyframes } from 'styled-components'
@@ -20,6 +21,8 @@ import { THEME_COLORS } from '../../../../UIHelper/constants'
 import { useColor } from '../../../../hooks'
 
 interface IProps {
+  /** Replaces the default "Unable to load files" view shown when the first load times out. */
+  CustomLoadErrorState?: CustomLoadErrorStateComponent
   channelId: string
   filePreviewIcon?: JSX.Element
   filePreviewHoverIcon?: JSX.Element
@@ -35,6 +38,7 @@ interface IProps {
 
 const Files = ({
   channelId,
+  CustomLoadErrorState,
   filePreviewIcon,
   filePreviewHoverIcon,
   filePreviewTitleColor,
@@ -113,6 +117,15 @@ const Files = ({
             </SkeletonRow>
           ))}
         </React.Fragment>
+      ) : loadingState === LOADING_STATE.FAILED && attachments.length === 0 ? (
+        renderLoadErrorState(
+          {
+            title: 'Unable to load files',
+            description: "We couldn't load files. Please try again.",
+            onRetry: () => dispatch(getAttachmentsAC(channelId, channelDetailsTabs.file, 35))
+          },
+          CustomLoadErrorState
+        )
       ) : loadingState === LOADING_STATE.LOADED && attachments.length === 0 ? (
         <EmptyState color={textSecondary}>No shared files.</EmptyState>
       ) : (

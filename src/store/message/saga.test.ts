@@ -50,6 +50,7 @@ import {
   deleteReactionAC,
   deleteMessageAC,
   getAttachmentsAC,
+  setAttachmentsLoadingStateAC,
   deleteMessageFromListAC,
   editMessageAC,
   forwardMessageAC,
@@ -57,6 +58,7 @@ import {
   loadAroundMessageAC,
   loadDefaultMessagesAC,
   loadLatestMessagesAC,
+  setMessagesLoadFailedAC,
   loadMoreMessagesAC,
   loadNearUnreadAC,
   patchMessagesAC,
@@ -5758,5 +5760,174 @@ describe('loadAroundMessage cache-first restore (restoreWindow)', () => {
     const setMessagesAction = dispatched.find((a) => a.type === setMessagesAC([], channel.id).type)
     expect(setMessagesAction).toBeDefined()
     expect(setMessagesAction.payload.messages.map((m: IMessage) => m.id)).toEqual(['603', '604'])
+  })
+})
+
+describe('message first-load failure (Unable to load messages)', () => {
+  const timeoutError = Object.assign(new Error('Request timeout'), { code: 9902 })
+  const failedActions = (dispatched: any[]) =>
+    dispatched.filter((a) => a.type === setMessagesLoadFailedAC(null).type).map((a) => a.payload.channelId)
+
+  beforeEach(() => {
+    jest.spyOn(log, 'error').mockImplementation(() => undefined)
+    resetMessageListFixtureIds()
+    resetMockServerDelay()
+    clearMessagesMap()
+    destroyChannelsMap()
+    setActiveChannelId('')
+    __resetMessageSagaTestState()
+    mockStore.getState.mockImplementation(() => mockStoreState)
+    mockStoreState.UserReducer = { connectionStatus: CONNECTION_STATUS.CONNECTED, waitToSendPendingMessages: false }
+    mockStoreState.ChannelReducer = { channelsLoadingState: LOADING_STATE.LOADED, activeChannel: {} }
+    mockStoreState.MessageReducer = {
+      activeChannelMessages: [],
+      activePaginationIntent: null,
+      tabAttachmentsCache: {},
+      pendingPollActions: {},
+      pendingMessageMutations: {},
+      oGMetadata: {},
+      messagesLoadFailedChannelId: null
+    }
+  })
+
+  const failingQuery = (error: any) =>
+    createMessageQuery({
+      loadPrevious: jest.fn(() => Promise.reject(error)),
+      loadPreviousMessageId: jest.fn(() => Promise.reject(error)),
+      loadNearMessageId: jest.fn(() => Promise.reject(error)),
+      loadNextMessageId: jest.fn(() => Promise.reject(error))
+    })
+
+  const sagas: Array<[string, any, (channel: any) => any]> = [
+    ['loadDefaultMessages', () => __messageSagaTestables.loadDefaultMessages, (c) => loadDefaultMessagesAC(c)],
+    ['loadNearUnread', () => __messageSagaTestables.loadNearUnread, (c) => loadNearUnreadAC(c)],
+    ['getMessagesQuery', () => __messageSagaTestables.getMessagesQuery, (c) => loadLatestMessagesAC(c)]
+  ]
+
+  it.each(sagas)('%s: a timeout with nothing shown marks the open chat as failed', async (_n, saga, action) => {
+    const channel = makeChannel({ id: `failed-${_n}`, newMessageCount: 3, lastDisplayedMessageId: '10' })
+    setActiveChannelId(channel.id)
+    setChannelInMap(channel)
+    setClient(createClient(failingQuery(timeoutError), channel))
+
+    const dispatched = await runMessageSaga(saga(), action(channel))
+
+    expect(failedActions(dispatched)).toEqual([channel.id])
+    // the list never stays stuck in LOADING
+    expect(dispatched).toEqual(expect.arrayContaining(bothDirectionLoadingActions(LOADING_STATE.LOADED)))
+  })
+
+  it.each([
+    ['unknown error 9900', Object.assign(new Error('x'), { code: 9900 })],
+    ['service unavailable 503', Object.assign(new Error('x'), { code: 503 })],
+    ['server internal error', { type: 'InternalError', message: 'Internal error' }]
+  ])('loadDefaultMessages: %s with nothing shown also marks the open chat as failed', async (label, error) => {
+    const channel = makeChannel({ id: `failed-${label}`, newMessageCount: 0 })
+    setActiveChannelId(channel.id)
+    setChannelInMap(channel)
+    setClient(createClient(failingQuery(error), channel))
+
+    const dispatched = await runMessageSaga(__messageSagaTestables.loadDefaultMessages, loadDefaultMessagesAC(channel))
+    expect(failedActions(dispatched)).toEqual([channel.id])
+  })
+
+  it.each(sagas)('%s: other errors do not show the error view', async (_n, saga, action) => {
+    const channel = makeChannel({ id: `other-${_n}`, newMessageCount: 3, lastDisplayedMessageId: '10' })
+    setActiveChannelId(channel.id)
+    setChannelInMap(channel)
+    setClient(createClient(failingQuery(Object.assign(new Error('x'), { code: 9904 })), channel))
+
+    const dispatched = await runMessageSaga(saga(), action(channel))
+    expect(failedActions(dispatched)).toEqual([])
+  })
+
+  it('does not mark a chat that is no longer open', async () => {
+    const channel = makeChannel({ id: 'switched-away' })
+    setActiveChannelId('another-chat')
+    setChannelInMap(channel)
+    setClient(createClient(failingQuery(timeoutError), channel))
+
+    const dispatched = await runMessageSaga(__messageSagaTestables.loadDefaultMessages, loadDefaultMessagesAC(channel))
+    expect(failedActions(dispatched)).toEqual([])
+  })
+
+  it('does not show the error when messages are already on screen', async () => {
+    const channel = makeChannel({ id: 'has-messages' })
+    setActiveChannelId(channel.id)
+    setChannelInMap(channel)
+    mockStoreState.MessageReducer.activeChannelMessages = [makeMessage({ id: '1', channelId: channel.id })]
+    setClient(createClient(failingQuery(timeoutError), channel))
+
+    const dispatched = await runMessageSaga(__messageSagaTestables.getMessagesQuery, loadLatestMessagesAC(channel))
+    expect(failedActions(dispatched)).toEqual([])
+  })
+
+  it('clears a previous failure when the load starts again (Retry)', async () => {
+    const channel = makeChannel({ id: 'retry-ok' })
+    setActiveChannelId(channel.id)
+    setChannelInMap(channel)
+    mockStoreState.MessageReducer.messagesLoadFailedChannelId = channel.id
+    setClient(createClient(createMessageQuery(), channel))
+
+    const dispatched = await runMessageSaga(__messageSagaTestables.loadDefaultMessages, loadDefaultMessagesAC(channel))
+    expect(failedActions(dispatched)).toEqual([null])
+  })
+})
+
+describe('attachments first-load timeout (details tabs)', () => {
+  const timeoutError = Object.assign(new Error('Request timeout'), { code: 9902 })
+  const loadingStates = (dispatched: any[]) =>
+    dispatched.filter((a) => a.type === setAttachmentsLoadingStateAC(0).type).map((a) => a.payload.state)
+
+  beforeEach(() => {
+    jest.spyOn(log, 'error').mockImplementation(() => undefined)
+    __resetMessageSagaTestState()
+    mockStore.getState.mockImplementation(() => mockStoreState)
+    mockStoreState.MessageReducer = {
+      activeChannelMessages: [],
+      activePaginationIntent: null,
+      tabAttachmentsCache: {},
+      pendingPollActions: {},
+      pendingMessageMutations: {},
+      oGMetadata: {}
+    }
+  })
+
+  const clientWithAttachmentQuery = (loadPrevious: jest.Mock) => ({
+    user: { id: 'current-user' },
+    AttachmentListQueryBuilder: class {
+      limit = jest.fn().mockReturnThis()
+      build = jest.fn(async () => ({ loadPrevious, loadNext: loadPrevious, loadNearMessageId: loadPrevious }))
+    }
+  })
+
+  it('sets FAILED when a tab with nothing cached times out', async () => {
+    setClient(clientWithAttachmentQuery(jest.fn().mockRejectedValue(timeoutError)) as any)
+    const dispatched = await runMessageSaga(
+      __messageSagaTestables.getMessageAttachments,
+      getAttachmentsAC('channel-media', channelDetailsTabs.media, 35)
+    )
+    expect(loadingStates(dispatched).pop()).toBe(LOADING_STATE.FAILED)
+  })
+
+  it('keeps LOADED when cached attachments are shown', async () => {
+    mockStoreState.MessageReducer.tabAttachmentsCache = {
+      [`channel-cached_${channelDetailsTabs.media}`]: [{ id: 'a1', type: 'image' }]
+    }
+    setClient(clientWithAttachmentQuery(jest.fn().mockRejectedValue(timeoutError)) as any)
+    const dispatched = await runMessageSaga(
+      __messageSagaTestables.getMessageAttachments,
+      getAttachmentsAC('channel-cached', channelDetailsTabs.media, 35)
+    )
+    expect(loadingStates(dispatched)).not.toContain(LOADING_STATE.FAILED)
+  })
+
+  it('keeps LOADED for other errors', async () => {
+    setClient(clientWithAttachmentQuery(jest.fn().mockRejectedValue({ code: 9904 })) as any)
+    const dispatched = await runMessageSaga(
+      __messageSagaTestables.getMessageAttachments,
+      getAttachmentsAC('channel-other', channelDetailsTabs.file, 35)
+    )
+    expect(loadingStates(dispatched).pop()).toBe(LOADING_STATE.LOADED)
   })
 })

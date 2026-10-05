@@ -108,7 +108,8 @@ import {
   setOGMetadataAC,
   fetchOGMetadataForLinkAC,
   setUnreadMessageIdAC,
-  deleteMessageFromListAC
+  deleteMessageFromListAC,
+  setMessagesLoadFailedAC
 } from './actions'
 import {
   attachmentTypes,
@@ -186,6 +187,7 @@ import store from '../index'
 import { IProgress } from '../../components/ChatContainer'
 import { canBeViewOnce, isJSON } from '../../helpers/message'
 import log from 'loglevel'
+import { isRetryableLoadError } from '../../helpers/error'
 import { getVideoFirstFrame, getVideoPreviewFrame } from 'helpers/getVideoFrame'
 import { MESSAGE_TYPE } from 'types/enum'
 import { setWaitToSendPendingMessagesAC } from 'store/user/actions'
@@ -3004,8 +3006,28 @@ function* loadAroundMessage(action: IAction): any {
   }
 }
 
+// The first load of a chat timed out and there is nothing on screen -> MessageList shows
+// "Unable to load messages" with a Retry. Cached messages, a chat that is no longer open, or
+// other errors keep today's behavior.
+function* markMessagesLoadFailedIfEmpty(channelId: string | undefined, error: unknown): any {
+  if (!channelId || !isRetryableLoadError(error) || getActiveChannelId() !== channelId) {
+    return
+  }
+  const shownMessages = store.getState().MessageReducer?.activeChannelMessages || []
+  if (!shownMessages.length) {
+    yield put(setMessagesLoadFailedAC(channelId))
+  }
+}
+
+function* clearMessagesLoadFailed(): any {
+  if (store.getState().MessageReducer?.messagesLoadFailedChannelId) {
+    yield put(setMessagesLoadFailedAC(null))
+  }
+}
+
 function* loadNearUnread(action: IAction): any {
   try {
+    yield call(clearMessagesLoadFailed)
     const { channel } = action.payload
     const connectionState = store.getState().UserReducer.connectionStatus
 
@@ -3124,6 +3146,7 @@ function* loadNearUnread(action: IAction): any {
     }
   } catch (e) {
     log.error('error in loadNearUnread', e)
+    yield call(markMessagesLoadFailedIfEmpty, action.payload?.channel?.id, e)
   } finally {
     yield call(setMessageListLoading, 'both', LOADING_STATE.LOADED)
   }
@@ -3131,6 +3154,7 @@ function* loadNearUnread(action: IAction): any {
 
 function* loadDefaultMessages(action: IAction): any {
   try {
+    yield call(clearMessagesLoadFailed)
     const { channel } = action.payload
     const connectionState = store.getState().UserReducer.connectionStatus
 
@@ -3234,6 +3258,7 @@ function* loadDefaultMessages(action: IAction): any {
     }
   } catch (e) {
     log.error('error in loadDefaultMessages', e)
+    yield call(markMessagesLoadFailedIfEmpty, action.payload?.channel?.id, e)
   } finally {
     yield call(setMessageListLoading, 'both', LOADING_STATE.LOADED)
   }
@@ -3241,6 +3266,7 @@ function* loadDefaultMessages(action: IAction): any {
 
 function* getMessagesQuery(action: IAction): any {
   try {
+    yield call(clearMessagesLoadFailed)
     yield call(setMessageListLoading, 'both', LOADING_STATE.LOADING)
     const { channel, limit, networkChanged, applyVisibleWindow = true, forceLatestWindow = false } = action.payload
     const channelNewMessageCount = channel?.newMessageCount || 0
@@ -3385,6 +3411,7 @@ function* getMessagesQuery(action: IAction): any {
     }
   } catch (e) {
     log.error('error in message query', e)
+    yield call(markMessagesLoadFailedIfEmpty, action.payload?.channel?.id, e)
     /* if (e.code !== 10008) {
       yield put(setErrorNotification(e.message));
     } */
@@ -3872,6 +3899,8 @@ function* getMessageAttachments(action: IAction): any {
   const cachedAttachmentIdsAtRequestStart = new Set(
     (cachedAttachments || []).map((attachment: IAttachment) => attachment.id)
   )
+  // The first load of this tab timed out with nothing cached -> the tab shows "Unable to load ..."
+  let loadFailed = false
   if (!forPopup) {
     activeDisplayedCacheKey = cacheKey
     activeDisplayedAttachmentScope = { channelId, attachmentType }
@@ -3953,9 +3982,10 @@ function* getMessageAttachments(action: IAction): any {
     }
   } catch (e) {
     log.error('error in message attachment query', e)
+    loadFailed = !forPopup && isRetryableLoadError(e) && !cachedAttachments?.length
     // yield put(setErrorNotification(e.message))
   } finally {
-    yield put(setAttachmentsLoadingStateAC(LOADING_STATE.LOADED, forPopup))
+    yield put(setAttachmentsLoadingStateAC(loadFailed ? LOADING_STATE.FAILED : LOADING_STATE.LOADED, forPopup))
   }
 }
 

@@ -3064,3 +3064,85 @@ describe('MessageList', () => {
     ])
   })
 })
+
+describe('MessageList first-load timeout', () => {
+  const failedStore = (channel: any, failedId: string | null = channel.id) =>
+    createMessageListStore({
+      ChannelReducer: { activeChannel: channel },
+      UserReducer: { connectionStatus: CONNECTION_STATUS.CONNECTED },
+      MessageReducer: {
+        messagesLoadFailedChannelId: failedId,
+        loadingPrevMessagesState: LOADING_STATE.LOADED,
+        loadingNextMessagesState: LOADING_STATE.LOADED
+      }
+    } as any)
+
+  it('shows "Unable to load messages" instead of "No Messages yet"', () => {
+    const channel = makeChannel({ id: 'channel-load-failed' })
+    renderMessageList(failedStore(channel))
+
+    expect(screen.getByText('Unable to load messages')).toBeInTheDocument()
+    expect(screen.getByText("We couldn't load messages. Please try again.")).toBeInTheDocument()
+    expect(screen.queryByText('No Messages yet')).not.toBeInTheDocument()
+  })
+
+  it('Retry repeats the default first load', () => {
+    const channel = makeChannel({ id: 'channel-retry-default' })
+    const store = failedStore(channel)
+    const dispatchSpy = jest.spyOn(store, 'dispatch')
+    renderMessageList(store)
+    dispatchSpy.mockClear()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Retry' }))
+
+    expect(dispatchSpy).toHaveBeenCalledWith(loadDefaultMessagesAC(channel))
+  })
+
+  it('Retry repeats the near-unread first load for a chat with unread messages', () => {
+    const unreadAnchor = makeMessage({ id: '240', channelId: 'channel-retry-unread' })
+    const channel = makeChannel({
+      id: 'channel-retry-unread',
+      lastMessage: unreadAnchor,
+      newMessageCount: 4,
+      lastDisplayedMessageId: unreadAnchor.id
+    })
+    const store = failedStore(channel)
+    const dispatchSpy = jest.spyOn(store, 'dispatch')
+    renderMessageList(store)
+    dispatchSpy.mockClear()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Retry' }))
+
+    expect(dispatchSpy).toHaveBeenCalledWith(loadNearUnreadAC(channel))
+  })
+
+  it('does not show the error for a different chat', () => {
+    const channel = makeChannel({ id: 'channel-ok' })
+    renderMessageList(failedStore(channel, 'another-channel'))
+    expect(screen.queryByText('Unable to load messages')).not.toBeInTheDocument()
+  })
+
+  it('shows messages (not the error) once there are any', () => {
+    const channel = makeChannel({ id: 'channel-has-msgs' })
+    const store = createMessageListStore({
+      ChannelReducer: { activeChannel: channel },
+      UserReducer: { connectionStatus: CONNECTION_STATUS.CONNECTED },
+      MessageReducer: {
+        messagesLoadFailedChannelId: channel.id,
+        activeChannelMessages: [makeMessage({ id: '1', channelId: channel.id, body: 'hello there' })]
+      }
+    } as any)
+    renderMessageList(store)
+    expect(screen.queryByText('Unable to load messages')).not.toBeInTheDocument()
+  })
+
+  it('uses CustomLoadErrorState when provided', () => {
+    const channel = makeChannel({ id: 'channel-custom-error' })
+    const Custom = ({ title }: any) => React.createElement('div', { 'data-testid': 'custom-error' }, title)
+    renderWithSceytProvider(React.createElement(MessageList as any, { CustomLoadErrorState: Custom }), {
+      store: failedStore(channel)
+    })
+    expect(screen.getByTestId('custom-error')).toHaveTextContent('Unable to load messages')
+    expect(screen.queryByTestId('load-error-state')).not.toBeInTheDocument()
+  })
+})

@@ -138,6 +138,7 @@ import { isJSON, makeUsername } from '../../helpers/message'
 import { getShowOnlyContactUsers } from '../../helpers/contacts'
 import { updateUserOnMap, usersMap, hideUserPresence } from '../../helpers/userHelper'
 import log from 'loglevel'
+import { isRetryableLoadError } from '../../helpers/error'
 import { queryDirection } from 'store/message/constants'
 import store from 'store'
 import { isResendableError } from 'helpers/error'
@@ -436,6 +437,7 @@ function* createChannel(action: IAction): any {
 
 function* getChannels(action: IAction): any {
   log.info(`${new Date().toISOString()} [getChannels] start get channels`)
+  let mainListLoaded = false
   try {
     const { payload } = action
     const { params } = payload
@@ -607,6 +609,7 @@ function* getChannels(action: IAction): any {
       yield put(switchChannelActionAC(JSON.parse(JSON.stringify(activeChannel))))
     }
     yield put(setChannelsLoadingStateAC(LOADING_STATE.LOADED))
+    mainListLoaded = true
     const hiddenList = store.getState().ChannelReducer.hideChannelList
     log.info(`${new Date().toISOString()} [getChannels] hiddenList state: ${hiddenList}`)
     if (!hiddenList) {
@@ -686,6 +689,12 @@ function* getChannels(action: IAction): any {
     )
     if (e.code !== 10008) {
       // yield put(setErrorNotification(e.message));
+    }
+    // Never leave the list in LOADING after a failure (the skeleton would spin forever).
+    // A timeout gets FAILED so ChannelList can offer a Retry.
+    // (Errors after the main list was shown -- e.g. the all-channels query -- leave the list as is.)
+    if (!mainListLoaded) {
+      yield put(setChannelsLoadingStateAC(isRetryableLoadError(e) ? LOADING_STATE.FAILED : LOADING_STATE.LOADED))
     }
   }
 }
@@ -1148,6 +1157,8 @@ function* channelsLoadMore(action: IAction): any {
     /* if (error.code !== 10008) {
       yield put(setErrorNotification(error.message));
     } */
+    // Reset so the bottom skeleton disappears and scrolling can try again.
+    yield put(setChannelsLoadingStateAC(LOADING_STATE.LOADED))
   }
 }
 
@@ -2344,6 +2355,7 @@ export const __channelSagaTestables = {
   markChannelAsRead,
   resendPendingChannelReads,
   getChannels,
+  channelsLoadMore,
   setWaitForReadMarkerRetry: (waitFn: typeof waitForReadMarkerRetry) => {
     waitForReadMarkerRetry = waitFn
   },

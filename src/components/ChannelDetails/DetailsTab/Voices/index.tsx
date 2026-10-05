@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo } from 'react'
+import { CustomLoadErrorStateComponent, renderLoadErrorState } from '../../../../common/LoadErrorState'
 import styled, { keyframes } from 'styled-components'
 import { shallowEqual } from 'react-redux'
 import { useDispatch, useSelector } from 'store/hooks'
@@ -12,6 +13,8 @@ import { THEME_COLORS } from '../../../../UIHelper/constants'
 import { useColor } from '../../../../hooks'
 
 interface IProps {
+  /** Replaces the default "Unable to load voice messages" view shown when the first load times out. */
+  CustomLoadErrorState?: CustomLoadErrorStateComponent
   channelId: string
   voicePreviewPlayIcon?: JSX.Element
   voicePreviewPlayHoverIcon?: JSX.Element
@@ -24,6 +27,7 @@ interface IProps {
 
 const Voices = ({
   channelId,
+  CustomLoadErrorState,
   voicePreviewPlayIcon,
   voicePreviewPlayHoverIcon,
   voicePreviewPauseIcon,
@@ -74,6 +78,15 @@ const Voices = ({
             </SkeletonRow>
           ))}
         </React.Fragment>
+      ) : loadingState === LOADING_STATE.FAILED && attachments.length === 0 ? (
+        renderLoadErrorState(
+          {
+            title: 'Unable to load voice messages',
+            description: "We couldn't load voice messages. Please try again.",
+            onRetry: () => dispatch(getAttachmentsAC(channelId, channelDetailsTabs.voice, 35))
+          },
+          CustomLoadErrorState
+        )
       ) : loadingState === LOADING_STATE.LOADED && attachments.length === 0 ? (
         <EmptyState color={textSecondary}>No shared voice messages.</EmptyState>
       ) : (

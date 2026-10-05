@@ -81,3 +81,27 @@ export const createAttachmentUnavailableError = (message: string): Error => {
   error.type = SDKErrorTypeEnum.AttachmentUnavailable.value
   return error
 }
+
+// SDK clientErrors codes that mean "the load failed, retrying may help".
+export const UNKNOWN_ERROR_CODE = 9900
+export const REQUEST_TIMEOUT_ERROR_CODE = 9902
+export const SERVICE_UNAVAILABLE_ERROR_CODE = 503
+
+const RETRYABLE_LOAD_ERROR_CODES: readonly unknown[] = [
+  UNKNOWN_ERROR_CODE,
+  REQUEST_TIMEOUT_ERROR_CODE,
+  SERVICE_UNAVAILABLE_ERROR_CODE
+]
+
+/**
+ * Whether a failed initial load should show the "Unable to load" view with Retry.
+ * True for unknown errors (9900), request timeouts (9902), service unavailable (503)
+ * and server internal errors (type 'InternalError').
+ * Offline (9903), network (9904), invalid initialization (9901) and
+ * query-in-progress (9908) errors are excluded on purpose.
+ */
+export const isRetryableLoadError = (error: unknown): boolean => {
+  if (!error || typeof error !== 'object') return false
+  const { code, type } = error as { code?: unknown; type?: unknown }
+  return RETRYABLE_LOAD_ERROR_CODES.includes(code) || type === SDKErrorTypeEnum.InternalError.value
+}

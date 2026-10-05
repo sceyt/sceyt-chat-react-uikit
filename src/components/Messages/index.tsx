@@ -1,4 +1,5 @@
 import React, { FC } from 'react'
+import { CustomLoadErrorStateComponent } from '../../common/LoadErrorState'
 import MessageList from './MessageList'
 import {
   IAttachment,
@@ -120,6 +121,8 @@ interface MessagesProps {
     message: IMessage,
     context: { placement: 'banner' | 'system' }
   ) => React.ReactNode | null | undefined
+  /** Replaces the default "Unable to load messages" view shown when the first load times out. */
+  CustomLoadErrorState?: CustomLoadErrorStateComponent
   openFrequentlyUsedReactions?: boolean
   fixEmojiCategoriesTitleOnTop?: boolean
   emojisCategoryIconsPosition?: 'top' | 'bottom'
@@ -275,6 +278,7 @@ const MessagesContainer: React.FC<MessagesProps> = ({
   endVoteIcon,
   pinnedMessageIcon,
   renderPinnedMessagePreview,
+  CustomLoadErrorState,
   reactionIconOrder,
   openFrequentlyUsedReactions,
   fixEmojiCategoriesTitleOnTop,
@@ -433,6 +437,7 @@ const MessagesContainer: React.FC<MessagesProps> = ({
         endVoteIcon={endVoteIcon}
         pinnedMessageIcon={pinnedMessageIcon}
         renderPinnedMessagePreview={renderPinnedMessagePreview}
+        CustomLoadErrorState={CustomLoadErrorState}
         reactionIconOrder={reactionIconOrder}
         openFrequentlyUsedReactions={openFrequentlyUsedReactions}
         fixEmojiCategoriesTitleOnTop={fixEmojiCategoriesTitleOnTop}

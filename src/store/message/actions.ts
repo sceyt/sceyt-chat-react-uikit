@@ -72,6 +72,7 @@ import {
   removeUploadProgress,
   setMessageToEdit,
   setLoadingPrevMessagesState,
+  setMessagesLoadFailed,
   setLoadingNextMessagesState,
   setActivePaginationIntent,
   clearActivePaginationIntent,
@@ -266,6 +267,10 @@ export function getMessageAC(channelId: string, messageId?: string, limit?: numb
 
 export function setScrollToMentionedMessageAC(isScrollToMentionedMessage: boolean | null) {
   return setScrollToMentionedMessage({ isScrollToMentionedMessage: !!isScrollToMentionedMessage })
+}
+
+export function setMessagesLoadFailedAC(channelId: string | null) {
+  return setMessagesLoadFailed({ channelId })
 }
 
 export function setLoadingPrevMessagesStateAC(state: number | null) {

@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo } from 'react'
+import { CustomLoadErrorStateComponent, renderLoadErrorState } from '../../../../common/LoadErrorState'
 import styled, { keyframes } from 'styled-components'
 import { shallowEqual } from 'react-redux'
 import { useSelector, useDispatch } from 'store/hooks'
@@ -14,6 +15,8 @@ import { THEME_COLORS } from '../../../../UIHelper/constants'
 import { useColor } from '../../../../hooks'
 
 interface IProps {
+  /** Replaces the default "Unable to load links" view shown when the first load times out. */
+  CustomLoadErrorState?: CustomLoadErrorStateComponent
   channelId: string
   linkPreviewIcon?: JSX.Element
   linkPreviewHoverIcon?: JSX.Element
@@ -24,6 +27,7 @@ interface IProps {
 
 const Links = ({
   channelId,
+  CustomLoadErrorState,
   linkPreviewIcon,
   linkPreviewHoverIcon,
   linkPreviewTitleColor,
@@ -69,6 +73,15 @@ const Links = ({
             </SkeletonRow>
           ))}
         </React.Fragment>
+      ) : loadingState === LOADING_STATE.FAILED && attachments.length === 0 ? (
+        renderLoadErrorState(
+          {
+            title: 'Unable to load links',
+            description: "We couldn't load links. Please try again.",
+            onRetry: () => dispatch(getAttachmentsAC(channelId, channelDetailsTabs.link, 35))
+          },
+          CustomLoadErrorState
+        )
       ) : loadingState === LOADING_STATE.LOADED && attachments.length === 0 ? (
         <EmptyState color={textSecondary}>No shared links.</EmptyState>
       ) : (

@@ -739,6 +739,88 @@ describe('ChannelList', () => {
     })
   })
 
+  // ─── Load timeout ─────────────────────────────────────────────────────────
+
+  describe('First load timed out (FAILED)', () => {
+    it('shows "Unable to load channels" with the description and Retry', () => {
+      const store = createTestStore({ channels: [], channelsLoadingState: LOADING_STATE.FAILED })
+      renderWithSceytProvider(<ChannelList />, { store })
+
+      expect(screen.getByText('Unable to load channels')).toBeInTheDocument()
+      expect(screen.getByText("We couldn't load your channels. Please try again.")).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Retry' })).toBeInTheDocument()
+      expect(screen.queryByTestId('channel-row')).not.toBeInTheDocument()
+    })
+
+    it('Retry dispatches getChannelsAC with the same params as the initial load', () => {
+      const store = createTestStore({ channels: [], channelsLoadingState: LOADING_STATE.FAILED })
+      const dispatchSpy = jest.spyOn(store, 'dispatch')
+      const filter = { channelType: 'group' } as any
+      renderWithSceytProvider(<ChannelList filter={filter} limit={15} />, { store })
+      const initial = dispatchSpy.mock.calls
+        .map((c) => c[0])
+        .filter((a: any) => a?.type === getChannelsAC({} as any).type)
+      dispatchSpy.mockClear()
+
+      fireEvent.click(screen.getByRole('button', { name: 'Retry' }))
+
+      const retried = dispatchSpy.mock.calls
+        .map((c) => c[0])
+        .filter((a: any) => a?.type === getChannelsAC({} as any).type)
+      expect(retried).toHaveLength(1)
+      expect(retried[0].payload).toEqual(initial[0].payload)
+      expect(retried[0].payload.params).toEqual(expect.objectContaining({ filter, limit: 15, search: '' }))
+    })
+
+    it('keeps showing the channels when some are already loaded', () => {
+      const store = createTestStore({
+        channels: [makeChannel({ id: 'a', subject: 'Kept' })],
+        channelsLoadingState: LOADING_STATE.FAILED
+      })
+      renderWithSceytProvider(<ChannelList />, { store })
+
+      expect(screen.getByText('Kept')).toBeInTheDocument()
+      expect(screen.queryByText('Unable to load channels')).not.toBeInTheDocument()
+    })
+
+    it('shows the skeleton (not the error) while loading', () => {
+      const store = createTestStore({ channels: [], channelsLoadingState: LOADING_STATE.LOADING })
+      renderWithSceytProvider(<ChannelList />, { store })
+      expect(screen.queryByText('Unable to load channels')).not.toBeInTheDocument()
+    })
+
+    it('does not show the error while searching', () => {
+      const store = createTestStore({ channels: [], channelsLoadingState: LOADING_STATE.FAILED })
+      renderWithSceytProvider(<ChannelList />, { store })
+      fireEvent.change(screen.getByTestId('search-input'), { target: { value: 'abc' } })
+      expect(screen.queryByText('Unable to load channels')).not.toBeInTheDocument()
+    })
+
+    it('uses CustomLoadErrorState when provided and passes a working onRetry', () => {
+      const store = createTestStore({ channels: [], channelsLoadingState: LOADING_STATE.FAILED })
+      const dispatchSpy = jest.spyOn(store, 'dispatch')
+      const Custom = ({ title, onRetry }: any) => (
+        <button type='button' onClick={onRetry}>
+          my view: {title}
+        </button>
+      )
+      renderWithSceytProvider(<ChannelList CustomLoadErrorState={Custom} />, { store })
+      dispatchSpy.mockClear()
+
+      fireEvent.click(screen.getByText('my view: Unable to load channels'))
+
+      expect(screen.queryByTestId('load-error-state')).not.toBeInTheDocument()
+      expect(dispatchSpy.mock.calls.some((c) => (c[0] as any)?.type === getChannelsAC({} as any).type)).toBe(true)
+    })
+
+    it('shows the error inside a custom List too', () => {
+      const store = createTestStore({ channels: [], channelsLoadingState: LOADING_STATE.FAILED })
+      const List = ({ children }: any) => <div data-testid='custom-list'>{children}</div>
+      renderWithSceytProvider(<ChannelList List={List} />, { store })
+      expect(screen.getByTestId('custom-list')).toHaveTextContent('Unable to load channels')
+    })
+  })
+
   // ─── Edge Cases ────────────────────────────────────────────────────────────
 
   describe('Edge Cases', () => {
