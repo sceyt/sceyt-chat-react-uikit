@@ -8,7 +8,6 @@ import {
   systemMessageUserName,
   getEmojisCategoryTitle,
   formatDisappearingMessageTime,
-  hashString,
   detectOS,
   detectBrowser,
   calculateRenderedImageWidth
@@ -270,43 +269,6 @@ describe('formatDisappearingMessageTime', () => {
     expect(result).toContain('d')
     expect(result).toContain('h')
     expect(result).toContain('m')
-  })
-})
-
-describe('hashString', () => {
-  // jsdom lacks TextEncoder and crypto.subtle; Node provides both.
-  const originalTextEncoder = (global as any).TextEncoder
-  const originalCrypto = (global as any).crypto
-
-  beforeAll(() => {
-    ;(global as any).TextEncoder = require('util').TextEncoder
-    Object.defineProperty(global, 'crypto', {
-      configurable: true,
-      value: require('crypto').webcrypto
-    })
-  })
-
-  afterAll(() => {
-    ;(global as any).TextEncoder = originalTextEncoder
-    Object.defineProperty(global, 'crypto', { configurable: true, value: originalCrypto })
-  })
-
-  it('returns the SHA-256 hex digest', async () => {
-    await expect(hashString('hello')).resolves.toBe('2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824')
-  })
-
-  it('is stable for the same input and differs for different input', async () => {
-    const a1 = await hashString('test')
-    const a2 = await hashString('test')
-    const b = await hashString('other')
-    expect(a1).toBe(a2)
-    expect(a1).not.toBe(b)
-  })
-
-  it('returns an empty string when crypto.subtle is unavailable', async () => {
-    Object.defineProperty(global, 'crypto', { configurable: true, value: {} })
-    await expect(hashString('hello')).resolves.toBe('')
-    Object.defineProperty(global, 'crypto', { configurable: true, value: require('crypto').webcrypto })
   })
 })
 

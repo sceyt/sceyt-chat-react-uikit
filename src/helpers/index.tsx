@@ -637,26 +637,6 @@ export const getEmojisCategoryTitle = (categoryKey: string) => {
   return category
 }
 
-export const hashString = async (str: string) => {
-  // Use globalThis to ensure we're checking the global crypto object that can be mocked in tests
-  const cryptoObj = typeof globalThis !== 'undefined' ? globalThis.crypto : crypto
-  if (!cryptoObj?.subtle) {
-    return ''
-  }
-  const encoder = new TextEncoder()
-  const encodedData = encoder.encode(str)
-  let hashBuffer: any
-  try {
-    hashBuffer = await cryptoObj.subtle.digest('SHA-256', encodedData)
-  } catch (e) {
-    // const crypto = await import('crypto')
-    // hashBuffer = await crypto.subtle.digest('SHA-256', encodedData)
-    return ''
-  }
-  const hashArray = Array.from(new Uint8Array(hashBuffer))
-  return hashArray.map((byte) => byte.toString(16).padStart(2, '0')).join('')
-}
-
 /**
  * Formats disappearing message period from milliseconds to human-readable string
  * @param periodInMilliseconds - Period in milliseconds (or 0/null for "Off")
