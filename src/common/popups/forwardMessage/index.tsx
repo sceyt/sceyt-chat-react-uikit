@@ -229,6 +229,7 @@ function ForwardMessagePopup({
     [THEME_COLORS.SURFACE_1]: surface1,
     [THEME_COLORS.TEXT_SECONDARY]: textSecondary,
     [THEME_COLORS.BACKGROUND]: background,
+    [THEME_COLORS.BACKGROUND_SECTIONS]: backgroundSections,
     [THEME_COLORS.ICON_INACTIVE]: iconInactive,
     [THEME_COLORS.TEXT_ON_PRIMARY]: textOnPrimary,
     [THEME_COLORS.ICON_PRIMARY]: iconPrimary,
@@ -966,7 +967,7 @@ function ForwardMessagePopup({
                     thumbColor={surface2}
                   />
                   {mentionQuery && visibleMentionCandidates.length > 0 && (
-                    <ForwardMentionList backgroundColor={background} borderColor={tooltipBackground}>
+                    <ForwardMentionList backgroundColor={backgroundSections}>
                       {visibleMentionCandidates.map((member, index) => {
                         const displayName = makeUsername(contactsMap[member.id], member, getFromContacts)
                         return (
@@ -1268,7 +1269,7 @@ const SendNoteButton = styled.button<{ iconColor: string }>`
   }
 `
 
-const ForwardMentionList = styled.div<{ backgroundColor: string; borderColor: string }>`
+const ForwardMentionList = styled.div<{ backgroundColor: string }>`
   position: absolute;
   z-index: 10;
   bottom: calc(100% + 4px);
@@ -1278,7 +1279,7 @@ const ForwardMentionList = styled.div<{ backgroundColor: string; borderColor: st
   overflow-y: auto;
   background: ${(props) => props.backgroundColor};
   border-radius: 8px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+  box-shadow: 0px 0px 24px 0px #11153929;
 `
 
 const ForwardMentionOption = styled.button<{ color: string; isActive?: boolean }>`
