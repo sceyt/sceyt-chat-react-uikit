@@ -638,14 +638,16 @@ export const getEmojisCategoryTitle = (categoryKey: string) => {
 }
 
 export const hashString = async (str: string) => {
-  if (!crypto?.subtle) {
+  // Use globalThis to ensure we're checking the global crypto object that can be mocked in tests
+  const cryptoObj = typeof globalThis !== 'undefined' ? globalThis.crypto : crypto
+  if (!cryptoObj?.subtle) {
     return ''
   }
   const encoder = new TextEncoder()
   const encodedData = encoder.encode(str)
   let hashBuffer: any
   try {
-    hashBuffer = await crypto.subtle.digest('SHA-256', encodedData)
+    hashBuffer = await cryptoObj.subtle.digest('SHA-256', encodedData)
   } catch (e) {
     // const crypto = await import('crypto')
     // hashBuffer = await crypto.subtle.digest('SHA-256', encodedData)
