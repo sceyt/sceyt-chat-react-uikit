@@ -3647,6 +3647,43 @@ describe('message saga message-list flows', () => {
     )
   })
 
+  it.each([CONNECTION_STATUS.CONNECTED, CONNECTION_STATUS.CONNECTING])(
+    'clears the reacted message preview when deleting the latest message while %s',
+    async (connectionStatus) => {
+      const channelId = `channel-delete-reacted-${connectionStatus}`
+      const message = makeMessage({ id: '7502', channelId, body: 'reacted message' })
+      const channel = makeChannel({
+        id: channelId,
+        lastMessage: message,
+        lastReactedMessage: message,
+        newReactions: [{ id: 'reaction-1' } as any]
+      })
+      const deletedMessage = { ...message, state: MESSAGE_STATUS.DELETE, body: '', attachments: [] }
+      channel.deleteMessageById = jest.fn(() => resolveWithMockServerDelay(deletedMessage))
+
+      mockStoreState.UserReducer.connectionStatus = connectionStatus
+      setChannelInMap(channel)
+      addChannelToAllChannels(channel)
+      addMessageToMap(channelId, message)
+
+      const dispatched = await runMessageSaga(
+        __messageSagaTestables.deleteMessage,
+        deleteMessageAC(channelId, message.id, 'forEveryone')
+      )
+
+      expect(dispatched).toContainEqual(
+        updateChannelDataAC(channelId, {
+          lastReactedMessage: null,
+          newReactions: [],
+          userMessageReactions: []
+        })
+      )
+      expect(getChannelFromMap(channelId)?.lastReactedMessage).toBeNull()
+      expect(getChannelFromAllChannels(channelId)?.lastReactedMessage).toBeNull()
+      expect(getChannelFromMap(channelId)?.lastMessage.state).toBe(MESSAGE_STATUS.DELETE)
+    }
+  )
+
   it('deletes a local pending latest message and restores the previous cached channel preview', async () => {
     const currentUser = makeUser({ id: 'current-user' })
     const previousMessage = makeMessage({

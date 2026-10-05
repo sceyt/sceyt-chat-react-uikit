@@ -2566,6 +2566,36 @@ describe('watchForEvents saga - full event loop tests', () => {
       expect(harness.dispatched.some((a) => a.type === updateChannelLastMessageAC({}, {}).type)).toBe(true)
     })
 
+    it('DELETE_MESSAGE clears the reaction preview for the deleted message', async () => {
+      const channelId = 'delete-reacted-message-channel'
+      const lastMessage = makeMessage({ id: '7103', channelId, body: 'reacted message' })
+      const channel = makeChannel({
+        id: channelId,
+        lastMessage,
+        lastReactedMessage: lastMessage,
+        newReactions: [{ id: 'reaction-1' } as any]
+      })
+      const deletedMessage = { ...lastMessage, state: MESSAGE_STATUS.DELETE, body: '', attachments: [] }
+
+      setChannelInMap(channel)
+      addChannelToAllChannels(channel)
+
+      await harness.emit('onMessageDeleted', channel, makeUser({ id: 'deleter' }), deletedMessage)
+
+      expect(harness.dispatched).toContainEqual(
+        updateChannelDataAC(
+          channelId,
+          expect.objectContaining({
+            lastReactedMessage: null,
+            newReactions: [],
+            userMessageReactions: []
+          })
+        )
+      )
+      expect(getChannelFromMap(channelId)?.lastReactedMessage).toBeNull()
+      expect(getChannelFromMap(channelId)?.lastMessage.state).toBe(MESSAGE_STATUS.DELETE)
+    })
+
     it('DELETE_MESSAGE removes from pinned messages', async () => {
       const channelId = 'delete-pinned-channel'
       const pinnedMessage = makeMessage({ id: '7102', channelId })

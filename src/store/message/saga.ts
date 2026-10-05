@@ -879,6 +879,22 @@ function* applyLocalMessageUpdate(channelId: string, messageId: string, params: 
     updateChannelLastMessageOnAllChannels(channelId, nextLastMessage)
     yield put(updateChannelLastMessageAC(nextLastMessage, storedChannel))
   }
+
+  const reduxChannel = (store.getState().ChannelReducer?.channels || []).find(
+    (channel: IChannel) => channel.id === channelId
+  )
+  if (
+    params.state === MESSAGE_STATUS.DELETE &&
+    (storedChannel?.lastReactedMessage?.id === messageId || reduxChannel?.lastReactedMessage?.id === messageId)
+  ) {
+    const reactionPreviewUpdate = {
+      lastReactedMessage: null,
+      newReactions: [],
+      userMessageReactions: []
+    }
+    updateChannelOnAllChannels(channelId, reactionPreviewUpdate)
+    yield put(updateChannelDataAC(channelId, reactionPreviewUpdate))
+  }
 }
 
 function* applyOptimisticDeleteMessage(channelId: string, messageId: string, originalMessage: IMessage): any {

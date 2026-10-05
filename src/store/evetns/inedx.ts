@@ -445,6 +445,23 @@ export function* handleDeleteMessageEvent(args: { channel: IChannel; deletedMess
   const { channel, deletedMessage } = args
   const activeChannelId = yield call(getActiveChannelId)
   const channelExists = checkChannelExists(channel.id)
+  const storedChannel = getStoredChannel(channel.id)
+  const reduxChannel = (store.getState().ChannelReducer?.channels || []).find(
+    (stored: IChannel) => stored.id === channel.id
+  )
+  const deletedReactionPreview =
+    storedChannel?.lastReactedMessage?.id === deletedMessage.id ||
+    reduxChannel?.lastReactedMessage?.id === deletedMessage.id
+      ? { lastReactedMessage: null, newReactions: [], userMessageReactions: [] }
+      : {}
+  const isLastMessage = channel.lastMessage?.id === deletedMessage.id
+  const channelUpdateParams = {
+    newMessageCount: channel.newMessageCount,
+    muted: channel.muted,
+    mutedTill: channel.mutedTill,
+    ...(isLastMessage ? { lastMessage: deletedMessage } : {}),
+    ...deletedReactionPreview
+  }
 
   if (channel.id === activeChannelId) {
     yield put(updateMessageAC(deletedMessage.id, deletedMessage))
@@ -454,26 +471,12 @@ export function* handleDeleteMessageEvent(args: { channel: IChannel; deletedMess
     params: deletedMessage
   })
   if (channelExists) {
-    yield put(
-      updateChannelDataAC(channel.id, {
-        newMessageCount: channel.newMessageCount,
-        muted: channel.muted,
-        mutedTill: channel.mutedTill
-      })
-    )
-    if (channel.lastMessage.id === deletedMessage.id) {
+    yield put(updateChannelDataAC(channel.id, channelUpdateParams))
+    if (isLastMessage) {
       yield put(updateChannelLastMessageAC(deletedMessage, channel))
     }
   }
-  updateChannelOnAllChannels(
-    channel.id,
-    {
-      newMessageCount: channel.newMessageCount,
-      muted: channel.muted,
-      mutedTill: channel.mutedTill
-    },
-    deletedMessage
-  )
+  updateChannelOnAllChannels(channel.id, channelUpdateParams)
   yield put(removePendingMessageMutationAC(deletedMessage.id))
 }
 
