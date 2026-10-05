@@ -26,6 +26,7 @@ export interface IChannelState {
   closeSearchChannel: boolean
   channelsForForward: IChannel[]
   activeChannel: IChannel | {}
+  activeChannelOpenAtLatest: boolean
   roles: []
   users: []
   errorNotification: string
@@ -74,6 +75,7 @@ const initialState: IChannelState = {
   closeSearchChannel: false,
   channelsForForward: [],
   activeChannel: {},
+  activeChannelOpenAtLatest: false,
   roles: [],
   users: [],
   errorNotification: '',
@@ -249,8 +251,14 @@ const channelSlice = createSlice({
       }
     },
 
-    setActiveChannel: (state, action: PayloadAction<{ channel: IChannel | {} }>) => {
-      state.activeChannel = action.payload.channel || {}
+    setActiveChannel: (state, action: PayloadAction<{ channel: IChannel | {}; openAtLatest?: boolean }>) => {
+      const nextChannel = action.payload.channel || {}
+      const isSameChannel =
+        !!(nextChannel as IChannel).id && (nextChannel as IChannel).id === (state.activeChannel as IChannel).id
+      if (action.payload.openAtLatest !== undefined || !isSameChannel) {
+        state.activeChannelOpenAtLatest = !!action.payload.openAtLatest
+      }
+      state.activeChannel = nextChannel
       state.messageSearchIsOpen = false
       if ((action.payload.channel as IChannel).type === DEFAULT_CHANNEL_TYPE.DIRECT) {
         const ChatClient = getClient()

@@ -29,6 +29,7 @@ import {
   setChannelListWithAC,
   setChannelsAC,
   setChannelToAddAC,
+  setAddedToChannelAC,
   setChannelToHideAC,
   setChannelToRemoveAC,
   setChannelToUnHideAC,
@@ -37,7 +38,6 @@ import {
   switchChannelActionAC,
   switchChannelInfoAC
 } from '../../store/channel/actions'
-import { getContactsAC } from '../../store/user/actions'
 import { CONNECTION_STATUS } from '../../store/user/constants'
 // Hooks
 import { useColor, useDidUpdate } from '../../hooks'
@@ -49,7 +49,6 @@ import {
   removeChannelFromMap,
   setUploadImageIcon
 } from '../../helpers/channelHalper'
-import { getShowOnlyContactUsers } from '../../helpers/contacts'
 import { DEFAULT_CHANNEL_TYPE, LOADING_STATE } from '../../helpers/constants'
 import { device, THEME_COLORS } from '../../UIHelper/constants'
 import { IChannel, IContact, IContactsMap, ICreateChannel, IMessage, IUser } from '../../types'
@@ -59,6 +58,7 @@ import ChannelSearch from './ChannelSearch'
 import ContactItem from './ContactItem'
 import CreateChannelButton from './CreateChannelButton'
 import ProfileSettings from './ProfileSettings'
+import { useChannelReorderAnimation } from './useChannelReorderAnimation'
 import { clearMessagesAC } from 'store/message/actions'
 import { getClient } from 'common/client'
 
@@ -264,12 +264,11 @@ const ChannelList: React.FC<IChannelListProps> = ({
     [THEME_COLORS.SURFACE_2]: surface2
   } = useColor()
   const dispatch = useDispatch()
-  const getFromContacts = getShowOnlyContactUsers()
   const channelListRef = useRef<HTMLInputElement | null>(null)
-  const channelsScrollRef = useRef<HTMLInputElement | null>(null)
   const [searchValue, setSearchValue] = useState('')
   const connectionStatus = useSelector(connectionStatusSelector)
   const channels = useSelector(channelsSelector, shallowEqual) || []
+  const channelsScrollRef = useChannelReorderAnimation(channels)
   const contactsMap: IContactsMap = useSelector(contactsMapSelector)
   const addedChannel = useSelector(addedChannelSelector)
   const closeSearchChannels = useSelector(closeSearchChannelSelector)
@@ -358,7 +357,8 @@ const ChannelList: React.FC<IChannelListProps> = ({
         removeChannelFromMap(deletedChannel.id)
         dispatch(removeChannelAC(deletedChannel.id))
         if (activeChannel.id === deletedChannel.id) {
-          const activeChannel = getLastChannelFromMap()
+          // Skip chats that are themselves pending delete
+          const activeChannel = getLastChannelFromMap(true)
           dispatch(switchChannelActionAC(activeChannel ? JSON.parse(JSON.stringify(activeChannel)) : {}))
           if (!activeChannel) {
             dispatch(switchChannelInfoAC(false))
@@ -396,7 +396,7 @@ const ChannelList: React.FC<IChannelListProps> = ({
       } else {
         dispatch(addChannelAC(addedToChannel))
       }
-      dispatch(setChannelToAddAC(null))
+      dispatch(setAddedToChannelAC(null))
     }
   }, [addedToChannel])
 
@@ -416,7 +416,7 @@ const ChannelList: React.FC<IChannelListProps> = ({
       if (onChannelVisible) {
         onChannelVisible(channels, visibleChannel, (updatedChannels) => handleSetChannelList(updatedChannels, true))
       } else {
-        dispatch(addChannelAC(hiddenChannel))
+        dispatch(addChannelAC(visibleChannel))
       }
       dispatch(setChannelToUnHideAC(null))
     }
@@ -459,9 +459,6 @@ const ChannelList: React.FC<IChannelListProps> = ({
   useEffect(() => {
     if (uploadPhotoIcon) {
       setUploadImageIcon(uploadPhotoIcon)
-    }
-    if (getFromContacts) {
-      dispatch(getContactsAC())
     }
   }, [])
 
@@ -796,42 +793,47 @@ const ChannelList: React.FC<IChannelListProps> = ({
                 className={isScrolling ? 'show-scrollbar' : ''}
                 thumbColor={surface2}
               >
-                {channels.map((channel: IChannel) =>
-                  ListItem ? (
-                    <ListItem channel={channel} setSelectedChannel={setSelectedChannel} key={channel.id} />
-                  ) : (
-                    <Channel
-                      selectedChannelLeftBorder={selectedChannelLeftBorder}
-                      selectedChannelBackground={selectedChannelBackground}
-                      selectedChannelBorderRadius={selectedChannelBorderRadius}
-                      selectedChannelPaddings={selectedChannelPaddings}
-                      channelHoverBackground={channelHoverBackground}
-                      channelSubjectFontSize={channelSubjectFontSize}
-                      channelSubjectLineHeight={channelSubjectLineHeight}
-                      channelSubjectColor={channelSubjectColor}
-                      channelLastMessageFontSize={channelLastMessageFontSize}
-                      channelLastMessageHeight={channelLastMessageHeight}
-                      channelLastMessageTimeFontSize={channelLastMessageTimeFontSize}
-                      channelAvatarSize={channelAvatarSize}
-                      channelAvatarTextSize={channelAvatarTextSize}
-                      channelsPaddings={channelsPaddings}
-                      channelsMargin={channelsMargin}
-                      notificationsIsMutedIcon={notificationsIsMutedIcon}
-                      notificationsIsMutedIconColor={notificationsIsMutedIconColor}
-                      pinedIcon={pinedIcon}
-                      showAvatar={showAvatar}
-                      avatarBorderRadius={avatarBorderRadius}
-                      channel={channel}
-                      key={channel.id}
-                      contactsMap={contactsMap}
-                      setSelectedChannel={setSelectedChannel}
-                      getCustomLatestMessage={getCustomLatestMessage as any}
-                      getCustomIconOnAvatar={getCustomIconOnAvatar as any}
-                      doNotShowMessageDeliveryTypes={doNotShowMessageDeliveryTypes}
-                      showPhoneNumber={showPhoneNumber}
-                    />
-                  )
-                )}
+                {channels.map((channel: IChannel) => (
+                  <ChannelRow
+                    key={channel.id}
+                    data-channel-row-id={channel.id}
+                    $backgroundColor={backgroundColor || background}
+                  >
+                    {ListItem ? (
+                      <ListItem channel={channel} setSelectedChannel={setSelectedChannel} />
+                    ) : (
+                      <Channel
+                        selectedChannelLeftBorder={selectedChannelLeftBorder}
+                        selectedChannelBackground={selectedChannelBackground}
+                        selectedChannelBorderRadius={selectedChannelBorderRadius}
+                        selectedChannelPaddings={selectedChannelPaddings}
+                        channelHoverBackground={channelHoverBackground}
+                        channelSubjectFontSize={channelSubjectFontSize}
+                        channelSubjectLineHeight={channelSubjectLineHeight}
+                        channelSubjectColor={channelSubjectColor}
+                        channelLastMessageFontSize={channelLastMessageFontSize}
+                        channelLastMessageHeight={channelLastMessageHeight}
+                        channelLastMessageTimeFontSize={channelLastMessageTimeFontSize}
+                        channelAvatarSize={channelAvatarSize}
+                        channelAvatarTextSize={channelAvatarTextSize}
+                        channelsPaddings={channelsPaddings}
+                        channelsMargin={channelsMargin}
+                        notificationsIsMutedIcon={notificationsIsMutedIcon}
+                        notificationsIsMutedIconColor={notificationsIsMutedIconColor}
+                        pinedIcon={pinedIcon}
+                        showAvatar={showAvatar}
+                        avatarBorderRadius={avatarBorderRadius}
+                        channel={channel}
+                        contactsMap={contactsMap}
+                        setSelectedChannel={setSelectedChannel}
+                        getCustomLatestMessage={getCustomLatestMessage as any}
+                        getCustomIconOnAvatar={getCustomIconOnAvatar as any}
+                        doNotShowMessageDeliveryTypes={doNotShowMessageDeliveryTypes}
+                        showPhoneNumber={showPhoneNumber}
+                      />
+                    )}
+                  </ChannelRow>
+                ))}
                 {channelsLoading === LOADING_STATE.LOADING && channelsHasNext && (
                   <ChannelSkeletonList color={surface1} count={1} />
                 )}
@@ -997,6 +999,8 @@ const Container = styled.div<{
 `
 
 const ChannelsList = styled.div<{ thumbColor: string }>`
+  /* Offset parent for rows, so reorder animation measures in scroll coordinates. */
+  position: relative;
   overflow-y: auto;
   width: 400px;
   height: 100%;
@@ -1027,6 +1031,10 @@ const ChannelsList = styled.div<{ thumbColor: string }>`
   &.show-scrollbar {
     scrollbar-color: ${(props) => props.thumbColor} transparent;
   }
+`
+const ChannelRow = styled.div<{ $backgroundColor: string }>`
+  position: relative;
+  background-color: ${(props) => props.$backgroundColor};
 `
 const SearchedChannels = styled.div`
   height: calc(100vh - 123px);

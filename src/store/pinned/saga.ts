@@ -137,7 +137,27 @@ function* loadPinnedMessages({ payload }: any): any {
   }
 }
 
+const isOppositeMutation = (queued: PendingPinMutation, next: PendingPinMutation) =>
+  queued.id !== next.id &&
+  queued.channelId === next.channelId &&
+  queued.messageId === next.messageId &&
+  (queued.pinType ?? pinScopeShared) === (next.pinType ?? pinScopeShared) &&
+  queued.operation !== next.operation
+
 function* queueMutation(mutation: PendingPinMutation): any {
+  // A PIN and an UNPIN of the same message queued while offline cancel out.
+  // Replaying both would pin on the server (and, for shared pins, broadcast a
+  // "pinned a message" system message to every member) only to unpin again.
+  const inMemory: PendingPinMutation[] = Object.values(
+    (yield select((store: any) => store.PinnedReducer?.pendingMutations)) || {}
+  )
+  const persisted: PendingPinMutation[] = (yield call(restorePinnedMutations)) || []
+  const opposite = [...inMemory, ...persisted].find((queued) => isOppositeMutation(queued, mutation))
+  if (opposite) {
+    yield put(removePendingPinMutationAC(opposite.id))
+    yield call(removePersistedPinMutation, opposite.id)
+    return
+  }
   yield put(setPendingPinMutationAC(mutation))
   yield call(persistPinMutation, mutation)
 }
@@ -339,4 +359,16 @@ export default function* PinnedMessagesSaga() {
   yield takeEvery(APPLY_PINNED_MESSAGES_EVENT, applyPinnedMessagesEvent)
   yield takeEvery(RESEND_PENDING_PIN_MUTATIONS, resendPendingPinMutations)
   yield takeEvery(clearPinnedMessages.type, clearChannelPinnedMessages)
+}
+
+export const __pinnedSagaTestables = {
+  pinMessage,
+  unpinMessage,
+  executePin,
+  queueMutation,
+  loadPinnedMessages,
+  applyPinnedMessagesEvent,
+  resendPendingPinMutations,
+  clearChannelPinnedMessages,
+  clearServerPinRefreshes: () => serverPinRefreshes.clear()
 }

@@ -1,3 +1,4 @@
+import log from 'loglevel'
 import React, { ChangeEvent, KeyboardEvent, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { Popup, PopupName, CloseIcon, PopupBody } from '../../../UIHelper'
 import { THEME_COLORS } from '../../../UIHelper/constants'
@@ -6,10 +7,12 @@ import {
   getChannelsForForwardAC,
   loadMoreChannelsForForward,
   searchChannelsForForwardAC,
-  setSearchedChannelsForForwardAC
+  setSearchedChannelsForForwardAC,
+  switchChannelActionAC
 } from '../../../store/channel/actions'
 import { useSelector, useDispatch } from 'store/hooks'
 import {
+  activeChannelSelector,
   channelsForForwardHasNextSelector,
   channelsForForwardSelector,
   channelsLoadingStateForForwardSelector,
@@ -73,7 +76,8 @@ interface IProps {
   buttonText?: string
   togglePopup: () => void
   // eslint-disable-next-line no-unused-vars
-  handleForward: (channelIds: string[], note?: IForwardMessageNote) => void
+  handleForward: (channelIds: string[], note?: IForwardMessageNote) => void | boolean | Promise<void | boolean>
+  navigateOnSingleForward?: boolean
   loading?: boolean
   maxSelectedCount?: number
   /** Defaults to 1000 characters and can be adjusted to match an application's message policy. */
@@ -213,6 +217,7 @@ function ForwardMessagePopup({
   title,
   togglePopup,
   handleForward,
+  navigateOnSingleForward = true,
   loading,
   maxSelectedCount = 5,
   maxNoteLength = DEFAULT_FORWARD_NOTE_MAX_LENGTH,
@@ -224,6 +229,7 @@ function ForwardMessagePopup({
     [THEME_COLORS.SURFACE_1]: surface1,
     [THEME_COLORS.TEXT_SECONDARY]: textSecondary,
     [THEME_COLORS.BACKGROUND]: background,
+    [THEME_COLORS.BACKGROUND_SECTIONS]: backgroundSections,
     [THEME_COLORS.ICON_INACTIVE]: iconInactive,
     [THEME_COLORS.TEXT_ON_PRIMARY]: textOnPrimary,
     [THEME_COLORS.ICON_PRIMARY]: iconPrimary,
@@ -243,6 +249,7 @@ function ForwardMessagePopup({
   const ChatClient = getClient()
   const { user } = ChatClient
   const dispatch = useDispatch()
+  const activeChannel = useSelector(activeChannelSelector)
   const channels = useSelector(channelsForForwardSelector) || []
   const searchedChannels = useSelector(searchedChannelsForForwardSelector) || []
   const contactsMap = useSelector(contactsMapSelector)
@@ -254,6 +261,9 @@ function ForwardMessagePopup({
   const [searchValue, setSearchValue] = useState('')
   const [selectedChannelsContHeight, setSelectedChannelsHeight] = useState(0)
   const [selectedChannels, setSelectedChannels] = useState<ISelectedChannelsData[]>([])
+  // A ref (not only state) so a second click/Enter in the same tick is also blocked.
+  const forwardInFlightRef = useRef(false)
+  const [isForwarding, setIsForwarding] = useState(false)
   const selectedChannelsContRef = useRef<any>()
   const [isScrolling, setIsScrolling] = useState<boolean>(false)
   const [isNoteScrolling, setIsNoteScrolling] = useState<boolean>(false)
@@ -316,7 +326,10 @@ function ForwardMessagePopup({
     }
   }
 
-  const handleForwardMessage = () => {
+  const handleForwardMessage = async () => {
+    if (forwardInFlightRef.current) return
+    forwardInFlightRef.current = true
+    setIsForwarding(true)
     const { body, bodyAttributes } = trimMessageBodyWithAttributes(noteText, noteAttributes)
     const mentionedUsers = bodyAttributes
       .filter((attribute: IBodyAttribute) => attribute.type === 'mention')
@@ -331,10 +344,27 @@ function ForwardMessagePopup({
           type: 'text' as const
         }
       : undefined
-    handleForward(
-      selectedChannels.map((channel) => channel.id),
-      note
-    )
+    let forwarded: void | boolean = false
+    try {
+      forwarded = await handleForward(
+        selectedChannels.map((channel) => channel.id),
+        note
+      )
+    } catch (e) {
+      log.error('Forward failed', e)
+      forwarded = false
+    }
+    if (
+      forwarded !== false &&
+      navigateOnSingleForward &&
+      selectedChannels.length === 1 &&
+      activeChannel?.id !== selectedChannels[0].id
+    ) {
+      dispatch(switchChannelActionAC(selectedChannels[0].channel, true, true))
+    }
+    // The popup unmounts on toggle; the guard only needs resetting if a caller keeps it open.
+    forwardInFlightRef.current = false
+    setIsForwarding(false)
     togglePopup()
   }
 
@@ -937,7 +967,7 @@ function ForwardMessagePopup({
                     thumbColor={surface2}
                   />
                   {mentionQuery && visibleMentionCandidates.length > 0 && (
-                    <ForwardMentionList backgroundColor={background} borderColor={tooltipBackground}>
+                    <ForwardMentionList backgroundColor={backgroundSections}>
                       {visibleMentionCandidates.map((member, index) => {
                         const displayName = makeUsername(contactsMap[member.id], member, getFromContacts)
                         return (
@@ -967,7 +997,7 @@ function ForwardMessagePopup({
                 <SendNoteButton
                   type='button'
                   iconColor={accentColor}
-                  disabled={!selectedChannels.length}
+                  disabled={!selectedChannels.length || isForwarding}
                   onClick={handleForwardMessage}
                   aria-label='Forward'
                 >
@@ -1239,7 +1269,7 @@ const SendNoteButton = styled.button<{ iconColor: string }>`
   }
 `
 
-const ForwardMentionList = styled.div<{ backgroundColor: string; borderColor: string }>`
+const ForwardMentionList = styled.div<{ backgroundColor: string }>`
   position: absolute;
   z-index: 10;
   bottom: calc(100% + 4px);
@@ -1248,9 +1278,8 @@ const ForwardMentionList = styled.div<{ backgroundColor: string; borderColor: st
   max-height: 180px;
   overflow-y: auto;
   background: ${(props) => props.backgroundColor};
-  border: 1px solid ${(props) => props.borderColor};
   border-radius: 8px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+  box-shadow: 0px 0px 24px 0px #11153929;
 `
 
 const ForwardMentionOption = styled.button<{ color: string; isActive?: boolean }>`

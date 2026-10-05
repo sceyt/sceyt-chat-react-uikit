@@ -41,11 +41,11 @@ import { setClient } from '../../common/client'
 import { setAvatarColor } from '../../UIHelper/avatarColors'
 import {
   browserTabIsActiveAC,
-  getContactsAC,
   setConnectionStatusAC,
   setUserAC,
   addUserInMapIfNotExistsAC,
-  checkUserStatusAC
+  checkUserStatusAC,
+  setContactsAC
 } from '../../store/user/actions'
 import { setShowOnlyContactUsers } from '../../helpers/contacts'
 import {
@@ -95,7 +95,8 @@ const SceytChat = ({
   disableFrowardMentionsCount = false,
   chatMinWidth,
   embeddedJoinGroupPopup = false,
-  onUpdateChannel
+  onUpdateChannel,
+  contacts
 }: IChatClientProps) => {
   const useInviteLink = getUseInviteLink()
   const { [THEME_COLORS.BACKGROUND]: backgroundColor, [THEME_COLORS.HIGHLIGHTED_BACKGROUND]: highlightedBackground } =
@@ -170,10 +171,6 @@ const SceytChat = ({
       setClient(client)
       setSceytChatClient(client)
       dispatch(setUserAC(client.user))
-      /* if (userDisplayNameFromContacts) {
-        dispatch(getContactsAC())
-      } */
-
       dispatch(watchForEventsAC())
     } else {
       clearMessagesMap()
@@ -193,9 +190,6 @@ const SceytChat = ({
 
   useEffect(() => {
     if (connectionStatus === CONNECTION_STATUS.CONNECTED) {
-      if (showOnlyContactUsers) {
-        dispatch(getContactsAC())
-      }
       dispatch(getRolesAC())
     }
   }, [connectionStatus, showOnlyContactUsers])
@@ -384,6 +378,12 @@ const SceytChat = ({
       setOnUpdateChannel(onUpdateChannel)
     }
   }, [onUpdateChannel])
+
+  useEffect(() => {
+    if (contacts) {
+      dispatch(setContactsAC(contacts))
+    }
+  }, [contacts])
 
   return (
     <React.Fragment>

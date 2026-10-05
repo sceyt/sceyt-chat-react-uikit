@@ -54,14 +54,12 @@ export interface IAttachment {
   cachedUrl?: string
 }
 
-declare class AttachmentBuilder {
+export interface AttachmentBuilder {
   url: string
   type: string
   name?: string
   metadata?: string
   upload?: boolean
-
-  constructor(url: string, type: string)
 
   setName: (name: string) => this
   setMetadata: (metadata: string) => this

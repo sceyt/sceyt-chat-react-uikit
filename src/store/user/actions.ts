@@ -14,16 +14,7 @@ import {
 } from './reducers'
 
 // Import saga action constants
-import {
-  BLOCK_USERS,
-  CHECK_USER_STATUS,
-  GET_CONTACTS,
-  GET_USERS,
-  LOAD_MORE_USERS,
-  SET_CONTACT_LOADING_STATE,
-  UNBLOCK_USERS,
-  UPDATE_PROFILE
-} from './constants'
+import { BLOCK_USERS, CHECK_USER_STATUS, GET_USERS, LOAD_MORE_USERS, UNBLOCK_USERS, UPDATE_PROFILE } from './constants'
 
 import { IContact, IUser } from '../../types'
 
@@ -38,11 +29,6 @@ export const loadMoreUsersAC = (limit: number) => ({
   payload: { limit }
 })
 
-export const getContactsAC = () => ({
-  type: GET_CONTACTS,
-  payload: {}
-})
-
 export const blockUserAC = (userIds: string[], callback?: (users: any, error?: any) => void) => ({
   type: BLOCK_USERS,
   payload: { userIds, callback }
@@ -51,11 +37,6 @@ export const blockUserAC = (userIds: string[], callback?: (users: any, error?: a
 export const unblockUserAC = (userIds: string[], callback?: (users: any, error?: any) => void) => ({
   type: UNBLOCK_USERS,
   payload: { userIds, callback }
-})
-
-export const setContactsLoadingStateAC = (status: number) => ({
-  type: SET_CONTACT_LOADING_STATE,
-  payload: { status }
 })
 
 export const checkUserStatusAC = () => ({

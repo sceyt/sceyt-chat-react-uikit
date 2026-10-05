@@ -60,6 +60,7 @@ import { LATEST_EDGE_GAP_PX, useChatController } from './useChatController'
 type HarnessProps = {
   messages: IMessage[]
   channel: IChannel
+  openAtLatest?: boolean
   hasPrevMessages?: boolean
   hasNextMessages?: boolean
   loadingPrevMessages?: number | null
@@ -439,6 +440,7 @@ const ControllerHarness = (props: HarnessProps) => {
   const controller = useChatController({
     messages,
     channel,
+    openAtLatest: props.openAtLatest,
     hasPrevMessages,
     hasNextMessages,
     loadingPrevMessages,
@@ -770,7 +772,14 @@ const AsyncControllerHarness = ({ server, dispatch, layoutSpec, ...props }: Asyn
         scheduleResponse('both', server.onLoadAround)(action)
       }
     },
-    [resolvedDispatch, scheduleResponse, server.onLoadAround, server.onLoadDefault, server.onLoadLatest, server.onLoadMore]
+    [
+      resolvedDispatch,
+      scheduleResponse,
+      server.onLoadAround,
+      server.onLoadDefault,
+      server.onLoadLatest,
+      server.onLoadMore
+    ]
   )
 
   const resolvedLayoutSpec = typeof layoutSpec === 'function' ? layoutSpec(state) : layoutSpec
@@ -1618,6 +1627,91 @@ describe('useChatController', () => {
     expect(dispatch).toHaveBeenCalledWith(markMessagesAsReadAC(channel.id, [unreadMessage.id]))
   })
 
+  it('finishes at the latest edge when two forwarded messages arrive during the first load', async () => {
+    const channelId = 'channel-forward-two-during-load'
+    const baseMessage = makeMessage({ id: '100', channelId, body: 'earlier-message' })
+    const firstForward = makePendingMessage({ tid: 'forward-first', channelId, body: 'first-forward' })
+    const secondForward = makePendingMessage({ tid: 'forward-second', channelId, body: 'second-forward' })
+    const thirdForward = makePendingMessage({ tid: 'forward-third', channelId, body: 'third-forward' })
+    const channel = makeChannel({ id: channelId, lastMessage: baseMessage })
+    const dispatch = jest.fn()
+    const layoutSpec = (scrollHeight: number, scrollTop = 100) => ({
+      containerRect: { top: 0, left: 0, width: 320, height: 240 },
+      scrollMetrics: { scrollTop, scrollHeight, clientHeight: 240, offsetTop: 0, offsetHeight: 240 }
+    })
+    const rendered = renderController({
+      channel,
+      openAtLatest: true,
+      messages: [baseMessage],
+      hasNextMessages: true,
+      loadingNextMessages: LOADING_STATE.LOADING,
+      connectionStatus: CONNECTION_STATUS.CONNECTED,
+      dispatch,
+      layoutSpec: layoutSpec(800)
+    })
+
+    rendered.rerender(
+      <ControllerHarness
+        channel={channel}
+        openAtLatest={true}
+        messages={[baseMessage, firstForward]}
+        hasNextMessages={true}
+        loadingNextMessages={LOADING_STATE.LOADING}
+        connectionStatus={CONNECTION_STATUS.CONNECTED}
+        dispatch={dispatch}
+        layoutSpec={layoutSpec(840)}
+      />
+    )
+    rendered.rerender(
+      <ControllerHarness
+        channel={channel}
+        openAtLatest={true}
+        messages={[baseMessage, firstForward, secondForward]}
+        hasNextMessages={true}
+        loadingNextMessages={LOADING_STATE.LOADING}
+        connectionStatus={CONNECTION_STATUS.CONNECTED}
+        dispatch={dispatch}
+        layoutSpec={layoutSpec(880)}
+      />
+    )
+    rendered.rerender(
+      <ControllerHarness
+        channel={channel}
+        openAtLatest={true}
+        messages={[baseMessage, firstForward, secondForward]}
+        hasNextMessages={false}
+        loadingNextMessages={LOADING_STATE.LOADED}
+        connectionStatus={CONNECTION_STATUS.CONNECTED}
+        dispatch={dispatch}
+        layoutSpec={layoutSpec(880)}
+      />
+    )
+
+    await flushEffects()
+    act(() => {
+      flushAnimationFrames()
+    })
+
+    expect(rendered.scrollable.scrollTop).toBe(getLatestEdgeScrollTop(880, 240))
+    expect(screen.getByText('second-forward')).toBeInTheDocument()
+
+    rendered.rerender(
+      <ControllerHarness
+        channel={channel}
+        openAtLatest={true}
+        messages={[baseMessage, firstForward, secondForward, thirdForward]}
+        hasNextMessages={false}
+        loadingNextMessages={LOADING_STATE.LOADED}
+        connectionStatus={CONNECTION_STATUS.CONNECTED}
+        dispatch={dispatch}
+        layoutSpec={layoutSpec(920, getLatestEdgeScrollTop(880, 240))}
+      />
+    )
+
+    expect(rendered.scrollable.scrollTop).toBe(getLatestEdgeScrollTop(920, 240))
+    expect(screen.getByText('third-forward')).toBeInTheDocument()
+  })
+
   it('dispatches loadLatestMessages when jumpToLatest is used while connected and latest is outside the window', () => {
     const channel = makeChannel({
       id: 'channel-connected',
@@ -2247,6 +2341,7 @@ describe('useChatController', () => {
     )
   })
 
+  // eslint-disable-next-line max-len
   it('does not snap scrollTop to the history edge for an intermediate scroll event within PRELOAD_TRIGGER_PX during a smooth jumpToLatest animation', () => {
     const channelId = 'channel-jump-no-snap-first'
     const channel = makeChannel({ id: channelId })
@@ -6675,6 +6770,7 @@ describe('useChatController', () => {
       expect(screen.getByTestId('is-viewing-latest')).toHaveTextContent('true')
     })
 
+    // eslint-disable-next-line max-len
     it('scrolls fully to the latest edge and marks isViewingLatest true after CONNECTED jump when unread separator was visible', async () => {
       const channelId = 'channel-connected-unread-full-scroll'
       const channel = makeChannel({
@@ -6775,6 +6871,7 @@ describe('useChatController', () => {
       expect(screen.getByTestId('is-viewing-latest')).toHaveTextContent('true')
     })
 
+    // eslint-disable-next-line max-len
     it('re-arms the latest jump lock when the post-load smooth scroll starts so intermediate scroll events do not trigger idle refresh', async () => {
       const channelId = 'channel-connected-unread-force-latest-after-load'
       const channel = makeChannel({
@@ -6895,11 +6992,12 @@ describe('useChatController', () => {
       })
 
       expect(screen.getByTestId('is-viewing-latest')).toHaveTextContent('true')
-      expect(dispatch.mock.calls.some(([action]) => action.type === refreshCacheAroundMessageAC(channelId, '').type)).toBe(
-        false
-      )
+      expect(
+        dispatch.mock.calls.some(([action]) => action.type === refreshCacheAroundMessageAC(channelId, '').type)
+      ).toBe(false)
     })
 
+    // eslint-disable-next-line max-len
     it('scrolls fully to the latest edge when the unread anchor was never visible in the initial window (unreadRestoreCompleted starts false)', async () => {
       // Scenario: the component boots with unreadMessageId='' so the initial useLayoutEffect
       // takes the to-bottom path (not reveal-unread-separator), leaving
@@ -7226,5 +7324,72 @@ describe('useChatController', () => {
         loadMoreMessagesAC(channel.id, LOAD_MAX_MESSAGE_COUNT, MESSAGE_LOAD_DIRECTION.PREV, '700', true)
       )
     })
+  })
+
+  // F3: the "open at latest" flag stays on for the whole channel visit. A LATER "load next"
+  // (after the user scrolled away from the latest edge) must not report the view as latest.
+  describe('openAtLatest after the first load', () => {
+    it.each([false, true])(
+      'reports not-latest while scrolled away and loading next (openAtLatest=%p)',
+      async (openAtLatest) => {
+        const channelId = `channel-open-latest-later-${openAtLatest}`
+        const messages = [
+          makeMessage({ id: '100', channelId, body: 'm-100' }),
+          makeMessage({ id: '101', channelId, body: 'm-101' }),
+          makeMessage({ id: '102', channelId, body: 'm-102' })
+        ]
+        const channel = makeChannel({ id: channelId, lastMessage: messages[2] })
+        const dispatch = jest.fn()
+        const layoutSpec = (scrollTop: number) => ({
+          containerRect: { top: 0, left: 0, width: 320, height: 240 },
+          scrollMetrics: { scrollTop, scrollHeight: 2000, clientHeight: 240, offsetTop: 0, offsetHeight: 240 }
+        })
+        // Open: the first latest-window load runs, then settles at the latest edge
+        const rendered = renderController({
+          channel,
+          openAtLatest,
+          messages,
+          hasNextMessages: true,
+          loadingNextMessages: LOADING_STATE.LOADING,
+          connectionStatus: CONNECTION_STATUS.CONNECTED,
+          dispatch,
+          layoutSpec: layoutSpec(getLatestEdgeScrollTop(2000, 240))
+        })
+        await flushEffects()
+        rendered.rerender(
+          <ControllerHarness
+            channel={channel}
+            openAtLatest={openAtLatest}
+            messages={messages}
+            hasNextMessages={false}
+            loadingNextMessages={LOADING_STATE.LOADED}
+            connectionStatus={CONNECTION_STATUS.CONNECTED}
+            dispatch={dispatch}
+            layoutSpec={layoutSpec(getLatestEdgeScrollTop(2000, 240))}
+          />
+        )
+        await flushEffects()
+
+        // Later in the same visit: user is far from the latest edge and newer messages are loading
+        rendered.rerender(
+          <ControllerHarness
+            channel={channel}
+            openAtLatest={openAtLatest}
+            messages={messages}
+            hasNextMessages={true}
+            loadingNextMessages={LOADING_STATE.LOADING}
+            connectionStatus={CONNECTION_STATUS.CONNECTED}
+            dispatch={dispatch}
+            layoutSpec={layoutSpec(900)}
+          />
+        )
+        act(() => {
+          fireEvent.scroll(rendered.scrollable)
+        })
+        await flushEffects()
+
+        expect(screen.getByTestId('is-viewing-latest')).toHaveTextContent('false')
+      }
+    )
   })
 })

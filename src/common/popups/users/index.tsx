@@ -20,7 +20,7 @@ import { addMembersAC, setUserBlockedForInviteAC } from '../../../store/member/a
 import { UserStatus } from '../../../components/Channel'
 import { THEME_COLORS } from '../../../UIHelper/constants'
 import { IAddMember, IChannel, IContact, IUser } from '../../../types'
-import { getContactsAC, getUsersAC, loadMoreUsersAC } from '../../../store/user/actions'
+import { getUsersAC, loadMoreUsersAC } from '../../../store/user/actions'
 import {
   contactListSelector,
   contactsMapSelector,
@@ -313,9 +313,7 @@ const UsersPopup = ({
   }, [selectedMembers])
 
   useEffect(() => {
-    if (getFromContacts) {
-      dispatch(getContactsAC())
-    } else {
+    if (!getFromContacts) {
       dispatch(getUsersAC({ query: userSearchValue, filter: 'all', limit: 50 }))
     }
   }, [])

@@ -14,7 +14,6 @@ import {
   openInviteModalSelector,
   rolesMapSelector
 } from '../../../../store/member/selector'
-import { getContactsAC } from '../../../../store/user/actions'
 import { connectionStatusSelector, contactsMapSelector } from '../../../../store/user/selector'
 import { createChannelAC } from '../../../../store/channel/actions'
 // Assets
@@ -245,22 +244,27 @@ const Members = ({
 
   useEffect(() => {
     if (connectionStatus === CONNECTION_STATUS.CONNECTED) {
-      if (getFromContacts) {
-        dispatch(getContactsAC())
-      }
       if (channel?.id && !(channel.type === DEFAULT_CHANNEL_TYPE.DIRECT && channel.memberCount === 2)) {
         dispatch(getMembersAC(channel.id))
       }
     }
   }, [channel?.id, connectionStatus])
 
-  const currentUserRole = members.find((member) => member.id === user.id)?.role
+  // channel.userRole is authoritative; the members list may be paginated and not include the current user
+  const currentUserRole = channel.userRole || members.find((member) => member.id === user.id)?.role
+  // A priority of 0 is valid (lowest role); only a missing priority means "unknown"
+  const rolePriority = (role?: string) => (role ? rolesMap?.[role]?.priority : undefined)
+  const outranks = (memberRole?: string) => {
+    const memberPriority = rolePriority(memberRole)
+    const myPriority = rolePriority(currentUserRole)
+    return typeof memberPriority === 'number' && typeof myPriority === 'number' && memberPriority < myPriority
+  }
 
   return (
     <Container>
       <ActionsMenu>
         <MembersList>
-          {checkActionPermission('addMember') && (currentUserRole === 'owner' || currentUserRole === 'admin') && (
+          {checkActionPermission('addMember') && (
             <MemberItem
               key={1}
               onClick={handleAddMemberPopup}
@@ -339,9 +343,7 @@ const Members = ({
                 {!noMemberEditPermissions &&
                   member.role !== 'owner' &&
                   currentUserRole &&
-                  rolesMap?.[member.role]?.priority &&
-                  rolesMap?.[currentUserRole]?.priority &&
-                  rolesMap?.[member.role]?.priority < rolesMap?.[currentUserRole]?.priority &&
+                  outranks(member.role) &&
                   member.id !== user.id && (
                     <DropDown
                       isSelect
