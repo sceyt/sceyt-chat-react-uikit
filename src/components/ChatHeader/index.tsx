@@ -32,6 +32,8 @@ import { IContactsMap, IMember } from '../../types'
 // Components
 import Avatar from '../Avatar'
 import { useColor } from '../../hooks'
+import useUpdatedUser from '../../hooks/useUpdatedUser'
+import usePresenceSubscription from '../../hooks/usePresenceSubscription'
 interface IProps {
   backgroundColor?: string
   avatarBorderRadius?: string
@@ -113,6 +115,8 @@ export default function ChatHeader({
     activeChannel.members[0].id === user.id
 
   const directChannelUser = isDirectChannel && activeChannel.members.find((member: IMember) => member.id !== user.id)
+  const currentDirectUser = useUpdatedUser(directChannelUser || null)
+  usePresenceSubscription(directChannelUser ? [directChannelUser.id] : [])
   const contactsMap: IContactsMap = useSelector(contactsMapSelector)
   const memberDisplayText = getChannelTypesMemberDisplayTextMap()
   const displayMemberText =
@@ -267,13 +271,13 @@ export default function ChatHeader({
                     lineHeight={memberInfoLineHeight}
                     color={memberInfoTextColor || textSecondary}
                   >
-                    {hideUserPresence && hideUserPresence(directChannelUser)
+                    {hideUserPresence && hideUserPresence(currentDirectUser || directChannelUser)
                       ? ''
-                      : directChannelUser.presence &&
-                        (directChannelUser.presence.state === USER_PRESENCE_STATUS.ONLINE
+                      : currentDirectUser?.presence &&
+                        (currentDirectUser.presence.state === USER_PRESENCE_STATUS.ONLINE
                           ? 'Online'
-                          : directChannelUser.presence.lastActiveAt &&
-                            userLastActiveDateFormat(directChannelUser.presence.lastActiveAt))}
+                          : currentDirectUser.presence.lastActiveAt &&
+                            userLastActiveDateFormat(currentDirectUser.presence.lastActiveAt))}
                   </SubTitle>
                 ) : (
                   <SubTitle

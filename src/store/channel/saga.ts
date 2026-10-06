@@ -1,4 +1,4 @@
-import { put, takeLatest, call, takeEvery } from 'redux-saga/effects'
+import { put, takeLatest, call, takeEvery, select } from 'redux-saga/effects'
 import { clearPinnedMessagesAC } from '../pinned/actions'
 import { v4 as uuidv4 } from 'uuid'
 import {
@@ -109,7 +109,7 @@ import {
 import type { PendingChannelRead } from '../../helpers/channelHalper'
 import { DEFAULT_CHANNEL_TYPE, LOADING_STATE, MESSAGE_DELIVERY_STATUS, USER_STATE } from '../../helpers/constants'
 import { MESSAGE_TYPE } from '../../types/enum'
-import { IAction, IChannel, IContact, IMember, IMessage, IMessageListMarker } from '../../types'
+import { IAction, IChannel, IContact, IMember, IMessage, IMessageListMarker, IUser } from '../../types'
 import { getClient } from '../../common/client'
 import {
   clearMessagesAC,
@@ -123,7 +123,7 @@ import {
   updateMessageAC
 } from '../message/actions'
 import watchForEvents from '../evetns/inedx'
-import { CHECK_USER_STATUS, CONNECTION_STATUS } from '../user/constants'
+import { CONNECTION_STATUS } from '../user/constants'
 import {
   compareMessageIds,
   evictLruChannels,
@@ -137,7 +137,8 @@ import { setActionIsRestrictedAC, updateMembersPresenceAC } from '../member/acti
 import { updateUserStatusOnMapAC } from '../user/actions'
 import { isJSON, makeUsername } from '../../helpers/message'
 import { getShowOnlyContactUsers } from '../../helpers/contacts'
-import { updateUserOnMap, usersMap, hideUserPresence } from '../../helpers/userHelper'
+import { hideUserPresence } from '../../helpers/userHelper'
+import { APPLY_PRESENCE_USERS } from '../../helpers/presence/registry'
 import log from 'loglevel'
 import { queryDirection } from 'store/message/constants'
 import store from 'store'
@@ -1885,43 +1886,33 @@ function* updateChannel(action: IAction): any {
   }
 }
 
-function* checkUsersStatus(/* action: IAction */): any {
+function* applyPresenceUsers(action: IAction): any {
   try {
-    // const { payload } = action
-    // const { usersMap } = payload
-    const SceytChatClient = getClient()
-    const usersForUpdate = Object.keys(usersMap)
-    const updatedUsers = yield call(SceytChatClient.getUsers as any, usersForUpdate)
-    const usersToUpdateMap: { [key: string]: IMember } = {}
-    let update: boolean = false
-    updatedUsers.forEach((updatedUser: IMember) => {
+    const current: { [key: string]: IUser } = yield select((state) => state.UserReducer.updatedUserMap)
+    const changed: { [key: string]: IUser } = {}
+    const lastActive = (user?: IUser) => new Date(user?.presence?.lastActiveAt || 0).getTime()
+    ;(action.payload.users as IUser[]).forEach((user) => {
+      const previous = current[user.id]
       if (
-        updatedUser.presence &&
-        (updatedUser.presence.state !== usersMap[updatedUser.id]?.presence?.state ||
-          updatedUser.presence.status !== usersMap[updatedUser.id]?.presence?.status ||
-          (updatedUser.presence.lastActiveAt &&
-            new Date(updatedUser.presence.lastActiveAt).getTime() !==
-              new Date(usersMap[updatedUser.id]?.presence?.lastActiveAt || 0).getTime()) ||
-          updatedUser.avatarUrl !== usersMap[updatedUser.id]?.avatarUrl ||
-          updatedUser.firstName !== usersMap[updatedUser.id]?.firstName ||
-          updatedUser.lastName !== usersMap[updatedUser.id]?.lastName ||
-          !!updatedUser.blocked !== !!usersMap[updatedUser.id]?.blocked)
+        !previous ||
+        user.presence?.state !== previous.presence?.state ||
+        user.presence?.status !== previous.presence?.status ||
+        lastActive(user) !== lastActive(previous) ||
+        user.avatarUrl !== previous.avatarUrl ||
+        user.firstName !== previous.firstName ||
+        user.lastName !== previous.lastName ||
+        !!user.blocked !== !!previous.blocked
       ) {
-        updateUserOnMap(updatedUser)
-        usersToUpdateMap[updatedUser.id] = { ...updatedUser, blocked: !!updatedUser.blocked }
-        update = true
+        changed[user.id] = { ...user, blocked: !!user.blocked }
       }
     })
-    if (update) {
-      const updateData = JSON.parse(JSON.stringify(usersToUpdateMap))
-      yield put(updateMembersPresenceAC(updateData))
-      yield put(updateUserStatusOnMapAC(updateData))
-      yield put(updateUserStatusOnChannelAC(updateData))
-      updateChannelMemberInAllChannels(Object.values(updateData))
-    }
+    if (!Object.keys(changed).length) return
+    yield put(updateUserStatusOnMapAC(changed))
+    yield put(updateMembersPresenceAC(changed))
+    yield put(updateUserStatusOnChannelAC(changed))
+    updateChannelMemberInAllChannels(Object.values(changed))
   } catch (e) {
-    log.error('ERROR in check user status : ', e.message)
-    // yield put(setErrorNotification(e.message))
+    log.error('ERROR in apply presence users : ', e.message)
   }
 }
 
@@ -2331,7 +2322,7 @@ export default function* ChannelsSaga() {
   yield takeLatest(MARK_CHANNEL_AS_READ, markChannelAsRead)
   yield takeLatest(RESEND_PENDING_CHANNEL_READS, resendPendingChannelReads)
   yield takeLatest(MARK_CHANNEL_AS_UNREAD, markChannelAsUnRead)
-  yield takeLatest(CHECK_USER_STATUS, checkUsersStatus)
+  yield takeEvery(APPLY_PRESENCE_USERS, applyPresenceUsers)
   yield takeLatest(SEND_TYPING, sendTyping)
   yield takeLatest(SEND_RECORDING, sendRecording)
   yield takeLatest(PIN_CHANNEL, pinChannel)
@@ -2355,6 +2346,7 @@ export default function* ChannelsSaga() {
 }
 
 export const __channelSagaTestables = {
+  applyPresenceUsers,
   switchChannel,
   updateChannel,
   leaveChannel,

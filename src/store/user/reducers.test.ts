@@ -1,5 +1,5 @@
 import UserReducer, { setContacts } from './reducers'
-import { setContactsAC } from './actions'
+import { resetUpdatedUserMapAC, setContactsAC, updateUserStatusOnMapAC } from './actions'
 import { IContact } from '../../types'
 
 const contact = (id: string, firstName: string): IContact =>
@@ -38,5 +38,20 @@ describe('user reducer - setContacts', () => {
 
   it('setContactsAC creates the slice action', () => {
     expect(setContactsAC([]).type).toBe(setContacts.type)
+  })
+})
+
+describe('user reducer - client change', () => {
+  it('clears fetched user data without removing contacts', () => {
+    let state = UserReducer(initialState(), setContactsAC([contact('u1', 'Ann')]))
+    state = UserReducer(
+      state,
+      updateUserStatusOnMapAC({
+        u1: { id: 'u1', firstName: 'Ann', lastName: 'Test', state: 'active', blocked: true } as any
+      })
+    )
+    state = UserReducer(state, resetUpdatedUserMapAC())
+    expect(state.updatedUserMap).toEqual({})
+    expect(state.contactsMap.u1).toBeDefined()
   })
 })

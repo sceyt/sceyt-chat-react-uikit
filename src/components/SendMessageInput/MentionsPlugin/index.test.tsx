@@ -1,9 +1,12 @@
 import React from 'react'
-import { act } from '@testing-library/react'
-import { MentionsContainer } from './index'
+import { act, render, screen } from '@testing-library/react'
+import { MentionTypeaheadOption, MentionsContainer, useMentionLookupService } from './index'
 import { createMessageListStore, renderWithSceytProvider } from '../../../testUtils/messageListHarness'
 import { LOADING_STATE } from '../../../helpers/constants'
 import { getMembersAC, loadMoreMembersAC, setMembersLoadingStateAC } from '../../../store/member/actions'
+import { updateUserStatusOnMapAC } from '../../../store/user/actions'
+import { presenceRegistry } from '../../../helpers/presence/registry'
+import { makeMember, makeUser } from '../../../testUtils/messageFixtures'
 
 const channelId = 'channel-mentions'
 
@@ -63,5 +66,69 @@ describe('MentionsContainer auto-load of members', () => {
 
   it('does not load more while a request is in flight', () => {
     expect(renderContainer(LOADING_STATE.LOADING).loadMoreCalls()).toEqual([])
+  })
+})
+
+describe('mention presence', () => {
+  it('rebuilds same-count matches after a member update and menu reopen', () => {
+    const offline = makeMember(makeUser({ id: 'alice', firstName: 'Alice', presence: { state: 'offline' } as any }))
+    const online = makeMember(makeUser({ id: 'alice', firstName: 'Alice', presence: { state: 'online' } as any }))
+    const Lookup = ({ member, query }: { member: typeof offline; query: string | null }) => {
+      const results = useMentionLookupService(query, {}, 'self', [member])
+      return <span>{results[0]?.presence?.state || 'closed'}</span>
+    }
+    const view = render(<Lookup member={offline} query='a' />)
+    expect(screen.getByText('offline')).toBeInTheDocument()
+    view.rerender(<Lookup member={online} query='a' />)
+    expect(screen.getByText('online')).toBeInTheDocument()
+    view.rerender(<Lookup member={online} query={null} />)
+    view.rerender(<Lookup member={online} query='a' />)
+    expect(screen.getByText('online')).toBeInTheDocument()
+  })
+
+  it('updates an open option from Redux and stops polling after the menu closes', async () => {
+    jest.useFakeTimers()
+    const getUsers = jest.fn().mockResolvedValue([])
+    const store = createMessageListStore({
+      MembersReducer: { channelsMembersHasNextMap: { [channelId]: false } }
+    } as any)
+    presenceRegistry.configure(store.dispatch, { getUsers })
+    presenceRegistry.setAvailability(true, true)
+    const option = new MentionTypeaheadOption('Alice', 'alice', { state: 'offline' })
+    const view = renderWithSceytProvider(
+      <MentionsContainer
+        queryString='a'
+        options={[option]}
+        selectedIndex={0}
+        selectOptionAndCleanUp={jest.fn()}
+        setHighlightedIndex={jest.fn()}
+        channelId={channelId}
+      />,
+      { store }
+    )
+    const row = view.container.querySelector('[data-presence-user-id="alice"]') as Element
+    act(() => (global as any).__setMockIntersection(row, true))
+    act(() => jest.advanceTimersByTime(300))
+    act(() => jest.advanceTimersByTime(150))
+    await act(async () => {
+      await Promise.resolve()
+      await Promise.resolve()
+    })
+    expect(getUsers).toHaveBeenCalledWith(['alice'])
+
+    act(() => {
+      store.dispatch(
+        updateUserStatusOnMapAC({
+          alice: makeUser({ id: 'alice', presence: { state: 'online' } as any })
+        })
+      )
+    })
+    expect(screen.getByText('Online')).toBeInTheDocument()
+    view.unmount()
+    const calls = getUsers.mock.calls.length
+    act(() => jest.advanceTimersByTime(4000))
+    expect(getUsers).toHaveBeenCalledTimes(calls)
+    presenceRegistry.dispose()
+    jest.useRealTimers()
   })
 })

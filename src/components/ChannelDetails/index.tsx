@@ -34,6 +34,8 @@ import DetailsTab from './DetailsTab'
 import Avatar from '../Avatar'
 import EditChannel from './EditChannel'
 import { useColor } from '../../hooks'
+import useUpdatedUser from '../../hooks/useUpdatedUser'
+import usePresenceSubscription from '../../hooks/usePresenceSubscription'
 import { queryDirection } from 'store/message/constants'
 
 const Details = ({
@@ -227,6 +229,8 @@ const Details = ({
   const directChannelUser =
     isDirectChannel &&
     (activeChannel.members.find((member: IMember) => member.id !== user.id) || activeChannel?.members?.[0])
+  const currentDirectUser = useUpdatedUser(directChannelUser || null)
+  usePresenceSubscription(isDirectChannel && !isSelfChannel && directChannelUser ? [directChannelUser.id] : [])
 
   const handleMembersListScroll = (event: any) => {
     if (event.target.scrollTop >= event.target.scrollHeight - event.target.offsetHeight - 100) {
@@ -409,15 +413,15 @@ const Details = ({
                         </CopiedTooltip>
                       )}
                     </PhoneNumberContainer>
-                  ) : hideUserPresence && directChannelUser && hideUserPresence(directChannelUser) ? (
+                  ) : hideUserPresence && currentDirectUser && hideUserPresence(currentDirectUser) ? (
                     ''
                   ) : (
-                    directChannelUser &&
-                    directChannelUser.presence &&
-                    (directChannelUser.presence.state === USER_PRESENCE_STATUS.ONLINE
+                    currentDirectUser &&
+                    currentDirectUser.presence &&
+                    (currentDirectUser.presence.state === USER_PRESENCE_STATUS.ONLINE
                       ? 'Online'
-                      : directChannelUser.presence.lastActiveAt &&
-                        userLastActiveDateFormat(directChannelUser.presence.lastActiveAt))
+                      : currentDirectUser.presence.lastActiveAt &&
+                        userLastActiveDateFormat(currentDirectUser.presence.lastActiveAt))
                   )}
                 </SubTitle>
               ) : (

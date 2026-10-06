@@ -48,7 +48,7 @@ const memberSlice = createSlice({
       if (!state.channelsMembersMap[channelId]) {
         state.channelsMembersMap[channelId] = []
       }
-      state.channelsMembersMap[channelId] = Array.from(new Set([...members]))
+      state.channelsMembersMap[channelId] = Array.from(new Map(members.map((member) => [member.id, member])).values())
     },
 
     addMembersToList: (state, action: PayloadAction<{ channelId: string; members: IMember[] }>) => {
@@ -56,7 +56,11 @@ const memberSlice = createSlice({
       if (!state.channelsMembersMap[channelId]) {
         state.channelsMembersMap[channelId] = []
       }
-      state.channelsMembersMap[channelId] = Array.from(new Set([...state.channelsMembersMap[channelId], ...members]))
+      const byId = new Map(state.channelsMembersMap[channelId].map((member) => [member.id, member]))
+      members.forEach((member) => {
+        if (!byId.has(member.id)) byId.set(member.id, member)
+      })
+      state.channelsMembersMap[channelId] = Array.from(byId.values())
     },
 
     updateMembers: (state, action: PayloadAction<{ channelId: string; members: IMember[] }>) => {
@@ -79,9 +83,10 @@ const memberSlice = createSlice({
 
     updateMembersPresence: (state, action: PayloadAction<{ usersMap: { [key: string]: IUser } }>) => {
       const { usersMap } = action.payload
-      for (const channelId in usersMap) {
-        if (state.channelsMembersMap[channelId]?.length) {
-          state.channelsMembersMap[channelId] = state.channelsMembersMap[channelId]?.map((member: IMember) => {
+      for (const channelId in state.channelsMembersMap) {
+        const members = state.channelsMembersMap[channelId]
+        if (members?.some((member) => usersMap[member.id])) {
+          state.channelsMembersMap[channelId] = members.map((member: IMember) => {
             if (usersMap[member.id]) {
               return { ...member, ...usersMap[member.id] }
             }

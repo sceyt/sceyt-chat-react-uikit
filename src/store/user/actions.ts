@@ -6,6 +6,7 @@ import {
   addUsers,
   setUsersLoadingState,
   updateUserMap,
+  resetUpdatedUserMap,
   addUserInMapIfNotExists,
   setContacts,
   updateUserProfile,
@@ -14,7 +15,7 @@ import {
 } from './reducers'
 
 // Import saga action constants
-import { BLOCK_USERS, CHECK_USER_STATUS, GET_USERS, LOAD_MORE_USERS, UNBLOCK_USERS, UPDATE_PROFILE } from './constants'
+import { BLOCK_USERS, GET_USERS, LOAD_MORE_USERS, UNBLOCK_USERS, UPDATE_PROFILE } from './constants'
 
 import { IContact, IUser } from '../../types'
 
@@ -37,11 +38,6 @@ export const blockUserAC = (userIds: string[], callback?: (users: any, error?: a
 export const unblockUserAC = (userIds: string[], callback?: (users: any, error?: any) => void) => ({
   type: UNBLOCK_USERS,
   payload: { userIds, callback }
-})
-
-export const checkUserStatusAC = () => ({
-  type: CHECK_USER_STATUS,
-  payload: {}
 })
 
 export const updateProfileAC = (
@@ -75,6 +71,7 @@ export const updateUserProfileAC = (profile: any) => updateUserProfile({ profile
 export const browserTabIsActiveAC = (state: boolean) => setBrowserTabIsActive({ state })
 
 export const updateUserStatusOnMapAC = (usersMap: { [key: string]: IUser }) => updateUserMap({ usersMap })
+export const resetUpdatedUserMapAC = () => resetUpdatedUserMap()
 
 export const addUserInMapIfNotExistsAC = (user: IUser) => addUserInMapIfNotExists({ user })
 

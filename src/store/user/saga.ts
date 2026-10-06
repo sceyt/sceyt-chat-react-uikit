@@ -14,7 +14,6 @@ import {
 import { updateChannelDataAC, updateChannelsMembersAC, updateUserStatusOnChannelAC } from '../channel/actions'
 import log from 'loglevel'
 import { updateMembersPresenceAC } from 'store/member/actions'
-import { updateUserOnMap } from 'helpers/userHelper'
 
 function* blockUser(action: IAction): any {
   try {
@@ -51,7 +50,6 @@ function* blockUser(action: IAction): any {
       })
     }
     for (const user of blockedUsers) {
-      updateUserOnMap({ ...user, blocked: true })
       yield put(updateUserStatusOnMapAC({ [user.id]: { ...user, blocked: true } }))
       yield put(updateMembersPresenceAC({ [user.id]: { ...user, blocked: true } }))
       yield put(updateUserStatusOnChannelAC({ [user.id]: { ...user, blocked: true } }))
@@ -108,7 +106,6 @@ function* unblockUser(action: IAction): any {
     }
     for (const user of unblockedUsers) {
       const updateData = JSON.parse(JSON.stringify(user))
-      updateUserOnMap({ ...updateData, blocked: false })
       yield put(updateUserStatusOnMapAC({ [user.id]: { ...updateData, blocked: false } }))
       yield put(updateMembersPresenceAC({ [user.id]: { ...updateData, blocked: false } }))
       yield put(updateUserStatusOnChannelAC({ [user.id]: { ...updateData, blocked: false } }))

@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useRef } from 'react'
 import styled from 'styled-components'
 import { makeUsername } from '../../../helpers/message'
 import { USER_PRESENCE_STATUS } from '../../../helpers/constants'
@@ -8,6 +8,9 @@ import { hideUserPresence } from '../../../helpers/userHelper'
 import { IContact } from '../../../types'
 import Avatar from '../../Avatar'
 import { useColor } from '../../../hooks'
+import useIsOnScreen from '../../../hooks/useIsOnScreen'
+import usePresenceSubscription from '../../../hooks/usePresenceSubscription'
+import useUpdatedUser from '../../../hooks/useUpdatedUser'
 
 interface IChannelProps {
   contact: IContact
@@ -56,10 +59,15 @@ const ContactItem: React.FC<IChannelProps> = ({
   } = useColor()
 
   const getFromContacts = getShowOnlyContactUsers()
+  const presenceRowRef = useRef<HTMLDivElement>(null)
+  const rowIsOnScreen = useIsOnScreen(presenceRowRef)
+  usePresenceSubscription([contact.user.id], { enabled: rowIsOnScreen })
+  const currentUser = useUpdatedUser(contact.user)
 
   const contactUserName = makeUsername(contact, undefined, getFromContacts)
   return (
     <Container
+      ref={presenceRowRef}
       // ref={channelItemRef}
       channelsPaddings={channelsPaddings}
       channelsMargin={channelsMargin}
@@ -72,15 +80,15 @@ const ContactItem: React.FC<IChannelProps> = ({
             // customAvatarColors={userAvatarColors}
             name={contactUserName}
             borderRadius={avatarBorderRadius}
-            image={contact.user.avatarUrl}
+            image={currentUser.avatarUrl}
             size={channelAvatarSize || 50}
             textSize={channelAvatarTextSize || 16}
             setDefaultAvatar
           />
           {hideUserPresence &&
-            (hideUserPresence(contact.user)
+            (hideUserPresence(currentUser)
               ? ''
-              : contact.user.presence && contact.user.presence.state === USER_PRESENCE_STATUS.ONLINE) && (
+              : currentUser.presence && currentUser.presence.state === USER_PRESENCE_STATUS.ONLINE) && (
               <UserStatus backgroundColor={online} borderColor={background} />
             )}
         </AvatarWrapper>

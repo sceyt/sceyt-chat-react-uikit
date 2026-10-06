@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react'
 import styled from 'styled-components'
+import { shallowEqual } from 'react-redux'
 import { useSelector, useDispatch } from 'store/hooks'
 
 import {
@@ -25,8 +26,7 @@ import {
   contactListSelector,
   contactsMapSelector,
   usersListSelector,
-  usersLoadingStateSelector,
-  usersMapSelector
+  usersLoadingStateSelector
 } from '../../../store/user/selector'
 import { createChannelAC } from '../../../store/channel/actions'
 import CustomCheckbox from '../../customCheckbox'
@@ -34,6 +34,7 @@ import { userLastActiveDateFormat } from '../../../helpers'
 import { makeUsername } from '../../../helpers/message'
 import { getShowOnlyContactUsers } from '../../../helpers/contacts'
 import { useDidUpdate, useColor, useUpdatedUser } from '../../../hooks'
+import useOnScreenUserIds from '../../../hooks/useOnScreenUserIds'
 import {
   getChannelTypesMemberDisplayTextMap,
   getDefaultRolesByChannelTypesMap,
@@ -133,11 +134,29 @@ const UsersPopup = ({
   const [selectedMembers, setSelectedMembers] = useState<ISelectedUserData[]>(creatChannelSelectedMembers || [])
   const [usersContHeight, setUsersContHeight] = useState(0)
   const [filteredUsers, setFilteredUsers] = useState<IUser[]>([])
+  const usersListRef = useRef<HTMLDivElement>(null)
+  useOnScreenUserIds(
+    usersListRef,
+    filteredUsers
+      .filter((user) => !(actionType === 'addMembers' && memberIds?.includes(user.id)))
+      .map((user) => user.id)
+  )
   const memberDisplayText = getChannelTypesMemberDisplayTextMap()
   const channelTypeRoleMap = getDefaultRolesByChannelTypesMap()
   const [isScrolling, setIsScrolling] = useState<boolean>(false)
   const [isSelectedMembersScrolling, setIsSelectedMembersScrolling] = useState<boolean>(false)
-  const usersMap = useSelector(usersMapSelector)
+  // Blocked flags Redux knows for the listed contacts and loaded users (e.g. after block/unblock).
+  // Presence-only updates leave this unchanged, so they never re-run the list effects.
+  const blockedFlags: { [id: string]: boolean } = useSelector((state: any) => {
+    const updatedUserMap = state.UserReducer.updatedUserMap || {}
+    const flags: { [id: string]: boolean } = {}
+    const collect = (id: string) => {
+      if (id && updatedUserMap[id]) flags[id] = !!updatedUserMap[id].blocked
+    }
+    contactList.forEach((contact: IContact) => collect(contact.id))
+    usersList.forEach((user: IUser) => collect(user.id))
+    return flags
+  }, shallowEqual)
   const popupTitleText =
     channel &&
     (memberDisplayText && memberDisplayText[channel.type]
@@ -250,7 +269,7 @@ const UsersPopup = ({
       if (!userSearchValue) {
         const userList = contactList.map((cont: IContact & { blocked?: boolean }) => ({
           ...cont.user,
-          blocked: !!usersMap?.[cont.id]?.blocked
+          blocked: !!blockedFlags[cont.id]
         }))
         if (actionType === 'createChat') {
           userList.unshift(selfUser)
@@ -258,13 +277,15 @@ const UsersPopup = ({
         setFilteredUsers(userList)
       }
     } else {
-      const userList = [...usersList]
+      const userList = usersList.map((user: IUser) =>
+        blockedFlags[user.id] === undefined ? user : { ...user, blocked: blockedFlags[user.id] }
+      )
       if (actionType === 'createChat') {
         userList.unshift(selfUser)
       }
       setFilteredUsers(userList)
     }
-  }, [contactList, usersList, usersMap])
+  }, [contactList, usersList, blockedFlags])
 
   useDidUpdate(() => {
     if (getFromContacts) {
@@ -286,23 +307,25 @@ const UsersPopup = ({
         ) {
           filteredContacts.unshift({ user: selfUser })
         }
-        setFilteredUsers(
-          filteredContacts.map((cont: IContact) => ({ ...cont.user, blocked: !!usersMap?.[cont.id]?.blocked }))
-        )
+        setFilteredUsers(filteredContacts.map((cont: IContact) => ({ ...cont.user, blocked: !!blockedFlags[cont.id] })))
       } else {
         const userList = contactList.map((cont: IContact) => ({
           ...cont.user,
-          blocked: !!usersMap?.[cont.id]?.blocked
+          blocked: !!blockedFlags[cont.id]
         }))
         if (actionType === 'createChat') {
           userList.unshift(selfUser)
         }
         setFilteredUsers(userList)
       }
-    } else {
+    }
+  }, [userSearchValue, blockedFlags])
+
+  useDidUpdate(() => {
+    if (!getFromContacts) {
       dispatch(getUsersAC({ query: userSearchValue, filter: 'all', limit: 50 }))
     }
-  }, [userSearchValue, usersMap])
+  }, [userSearchValue])
 
   useEffect(() => {
     if (selectedMembersCont.current) {
@@ -381,6 +404,7 @@ const UsersPopup = ({
 
           {/* <MembersContainer > */}
           <MembersContainer
+            ref={usersListRef}
             className={isScrolling ? 'show-scrollbar' : ''}
             isAdd={actionType !== 'createChat'}
             selectedMembersHeight={usersContHeight}
@@ -404,6 +428,7 @@ const UsersPopup = ({
 
               return (
                 <ListRow
+                  data-presence-user-id={user.id}
                   hoverBackground={backgroundHovered}
                   key={user.id}
                   onClick={() => {

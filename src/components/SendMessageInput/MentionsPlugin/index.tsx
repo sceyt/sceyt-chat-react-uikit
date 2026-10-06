@@ -15,14 +15,16 @@ import { THEME, USER_PRESENCE_STATUS, LOADING_STATE } from '../../../helpers/con
 import { userLastActiveDateFormat } from '../../../helpers'
 import styled from 'styled-components'
 import { $createTextNode, TextNode } from 'lexical'
-import { IContactsMap, IMember } from '../../../types'
+import { IContactsMap, IMember, IUser } from '../../../types'
 import { makeUsername } from '../../../helpers/message'
 import { useColor } from '../../../hooks'
+import useUpdatedUser from '../../../hooks/useUpdatedUser'
 import { useSelector, useDispatch } from 'store/hooks'
 import { themeSelector } from 'store/theme/selector'
 import { getMembersAC, loadMoreMembersAC } from '../../../store/member/actions'
 import { channelsMembersLoadingStateSelector, channelsMembersHasNextMapSelector } from '../../../store/member/selector'
 import { shallowEqual } from 'react-redux'
+import useOnScreenUserIds from '../../../hooks/useOnScreenUserIds'
 
 const PUNCTUATION = '\\.,\\+\\*\\?\\$\\@\\|#{}\\(\\)\\^\\-\\[\\]\\\\/!%\'"~=<>_:;'
 const NAME = '\\b[A-Z][^\\s' + PUNCTUATION + ']'
@@ -64,41 +66,16 @@ const AtSignMentionsRegexAliasRegex = new RegExp(
   '(^|\\s|\\()(' + '[' + TRIGGERS + ']' + '((?:' + VALID_CHARS + '){0,' + ALIAS_LENGTH_LIMIT + '})' + ')$'
 )
 
-const mentionsCache = new Map()
-
-let membersMap: { [key: string]: IMember } = {}
-
-function useMentionLookupService(
+export function useMentionLookupService(
   mentionString: string | null,
   contactsMap: IContactsMap,
   userId: string,
   members: IMember[],
   getFromContacts?: boolean
 ) {
-  const [results, setResults] = useState<Array<{ name: string; avatar?: string; id: string; presence: any }>>([])
-  membersMap = useMemo(() => {
-    mentionsCache.clear()
-    return members.reduce((acc: any, member: any) => {
-      acc[member.id] = member
-      return acc
-    }, {})
-  }, [members])
-  useEffect(() => {
-    const cachedResults = mentionsCache.get(mentionString)
-    if (mentionString == null) {
-      setResults([])
-      return
-    }
-
-    if (cachedResults === null) {
-      return
-    } else if (cachedResults !== undefined) {
-      setResults(cachedResults)
-      return
-    }
-
-    mentionsCache.set(mentionString, null)
-    const searchedMembers = [...members]
+  return useMemo(() => {
+    if (mentionString === null) return []
+    return members
       .filter((member: IMember) => {
         const displayName = makeUsername(contactsMap[member.id], member, getFromContacts)
         return (
@@ -122,11 +99,7 @@ function useMentionLookupService(
           presence: member.presence
         }
       })
-    mentionsCache.set(mentionString, searchedMembers)
-    setResults(searchedMembers)
-  }, [mentionString, members])
-
-  return results
+  }, [mentionString, members, contactsMap, userId, getFromContacts])
 }
 
 function checkForAtSignMentions(text: string, minMatchLength: number): MenuTextMatch | null {
@@ -182,6 +155,13 @@ function MentionsTypeaheadMenuItem({
   onMouseEnter: () => void
   option: MentionTypeaheadOption
 }) {
+  const currentUser = useUpdatedUser({
+    id: option.id,
+    firstName: option.name,
+    lastName: '',
+    state: '',
+    presence: option.presence
+  } as IUser)
   const {
     [THEME_COLORS.TEXT_PRIMARY]: textPrimary,
     [THEME_COLORS.TEXT_SECONDARY]: textSecondary,
@@ -194,6 +174,7 @@ function MentionsTypeaheadMenuItem({
   }
   return (
     <MemberItem
+      data-presence-user-id={option.id}
       key={option.id}
       tabIndex={-1}
       className={className}
@@ -216,10 +197,12 @@ function MentionsTypeaheadMenuItem({
         </MemberName>
         <SubTitle color={textSecondary}>
           {/* @ts-ignore */}
-          {option.presence && option.presence.state === USER_PRESENCE_STATUS.ONLINE
+          {currentUser.presence && currentUser.presence.state === USER_PRESENCE_STATUS.ONLINE
             ? 'Online'
             : // @ts-ignore
-              option.presence && option.presence.lastActiveAt && userLastActiveDateFormat(option.presence.lastActiveAt)}
+              currentUser.presence &&
+              currentUser.presence.lastActiveAt &&
+              userLastActiveDateFormat(currentUser.presence.lastActiveAt)}
         </SubTitle>
       </UserNamePresence>
     </MemberItem>
@@ -252,6 +235,10 @@ export function MentionsContainer({
   )
   const membersHasNext = useMemo(() => channelsMembersHasNext?.[channelId], [channelsMembersHasNext?.[channelId]])
   const mentionsListRef = useRef<HTMLUListElement>(null)
+  useOnScreenUserIds(
+    mentionsListRef,
+    options.map((option: MentionTypeaheadOption) => option.id)
+  )
 
   const contRef: any = useRef()
   // const [editor] = useLexicalComposerContext()
@@ -380,13 +367,14 @@ export default function MentionsPlugin({
   const [editor] = useLexicalComposerContext()
   const [queryString, setQueryString] = useState<string | null>(null)
   const results = useMentionLookupService(queryString, contactsMap, userId, members, getFromContacts)
+  const membersById = useMemo(() => new Map(members.map((member) => [member.id, member])), [members])
   const checkForSlashTriggerMatch = useBasicTypeaheadTriggerMatch('/', {
     minLength: 0
   })
 
   const options = useMemo(
     () => results.map((result) => new MentionTypeaheadOption(result.name, result.id, result.presence, result.avatar)),
-    [results?.length]
+    [results]
   )
 
   const handleOnOpen = () => {
@@ -399,7 +387,7 @@ export default function MentionsPlugin({
   const onSelectOption = useCallback(
     (selectedOption: MentionTypeaheadOption, nodeToReplace: TextNode | null, closeMenu: () => void) => {
       if (selectedOption) {
-        setMentionMember(membersMap[selectedOption.id])
+        setMentionMember(membersById.get(selectedOption.id))
         editor.update(() => {
           const mentionNode = $createMentionNode({ ...selectedOption, name: `@${selectedOption.name}` })
           if (nodeToReplace) {
@@ -413,7 +401,7 @@ export default function MentionsPlugin({
         closeMenu()
       }
     },
-    [editor, setMentionMember]
+    [editor, setMentionMember, membersById]
   )
 
   const checkForMentionMatch = useCallback(

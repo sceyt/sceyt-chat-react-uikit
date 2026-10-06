@@ -68,12 +68,6 @@ jest.mock('../../helpers/channelHalper', () => {
   }
 })
 
-// Mock user helper
-const mockUpdateUserOnMap = jest.fn()
-jest.mock('../../helpers/userHelper', () => ({
-  updateUserOnMap: (...args: any[]) => mockUpdateUserOnMap(...args)
-}))
-
 const runUserSaga = async (saga: (...args: any[]) => Generator, ...args: any[]) => {
   const dispatched: any[] = []
   await runSaga(
@@ -359,9 +353,6 @@ describe('user saga', () => {
 
       expect(mockClient.blockUsers).toHaveBeenCalledWith(['blocked-user'])
 
-      // Should update user on map
-      expect(mockUpdateUserOnMap).toHaveBeenCalledWith(expect.objectContaining({ id: 'blocked-user', blocked: true }))
-
       // Should dispatch updateUserStatusOnMapAC (RTK: users/updateUserMap)
       expect(dispatched).toContainEqual(
         expect.objectContaining({
@@ -449,11 +440,6 @@ describe('user saga', () => {
       const dispatched = await runUserSaga(__userSagaTestables.unblockUser, unblockUserAC(['unblocked-user'], callback))
 
       expect(mockClient.unblockUsers).toHaveBeenCalledWith(['unblocked-user'])
-
-      // Should update user on map with blocked: false
-      expect(mockUpdateUserOnMap).toHaveBeenCalledWith(
-        expect.objectContaining({ id: 'unblocked-user', blocked: false })
-      )
 
       // Should dispatch updateUserStatusOnMapAC
       expect(dispatched).toContainEqual(
