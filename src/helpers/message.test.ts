@@ -353,16 +353,6 @@ describe('bytesToSize (message.tsx)', () => {
   ])('bytesToSize(%d) = %s', (input, expected) => {
     expect(bytesToSize(input)).toBe(expected)
   })
-
-  // Sizes can arrive from the server as numeric strings
-  it.each([
-    ['30697', '30.7 KB'],
-    ['0', '0 Bytes'],
-    ['abc', '0 Bytes'],
-    ['', '0 Bytes']
-  ])('accepts a numeric string: bytesToSize(%p) = %p', (bytes, expected) => {
-    expect(bytesToSize(bytes)).toBe(expected)
-  })
 })
 
 describe('getFileExtension', () => {

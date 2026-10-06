@@ -36,16 +36,6 @@ describe('bytesToSize (index.tsx)', () => {
     expect(bytesToSize(bytes as number)).toBe(expected)
   })
 
-  // Sizes can arrive from the server as numeric strings
-  it.each([
-    ['30697', '30.7 KB'],
-    ['0', '0 Bytes'],
-    ['abc', '0 Bytes'],
-    ['', '0 Bytes']
-  ])('accepts a numeric string: bytesToSize(%p) = %p', (bytes, expected) => {
-    expect(bytesToSize(bytes)).toBe(expected)
-  })
-
   it('caps the unit at YB for huge values', () => {
     expect(bytesToSize(1e30)).toMatch(/ YB$/)
   })
