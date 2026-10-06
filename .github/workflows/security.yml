@@ -56,10 +56,14 @@ jobs:
 
       # Fails the PR if it ADDS a dependency with a known high/critical
       # vulnerability or a copyleft license. Existing issues are handled by Dependabot.
+      # The license rule protects what ships in the npm package; CI-only
+      # tools listed in allow-dependencies-licenses are exempt (TruffleHog is
+      # AGPL-3.0, which is fine for a tool that only runs in CI).
       - uses: actions/dependency-review-action@v5
         with:
           fail-on-severity: high
           deny-licenses: GPL-2.0, GPL-3.0, AGPL-3.0
+          allow-dependencies-licenses: pkg:githubactions/trufflesecurity/trufflehog
           comment-summary-in-pr: on-failure
 
   secrets:
