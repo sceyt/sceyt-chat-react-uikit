@@ -76,3 +76,4 @@ jobs:
       - uses: trufflesecurity/trufflehog@v3.98.1
         with:
           extra_args: --results=verified,unknown
+
