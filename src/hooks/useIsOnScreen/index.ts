@@ -1,5 +1,10 @@
 import { RefObject, useEffect, useState } from 'react'
 
+// A row counts as on screen only after it stays visible this long, so fast scrolling does not subscribe it.
+export const PRESENCE_ENTER_DELAY = 300
+// A row stays subscribed this long after it leaves the screen.
+export const PRESENCE_LEAVE_GRACE = 2000
+
 type VisibilityCallback = (visible: boolean) => void
 const callbacks = new Map<Element, Set<VisibilityCallback>>()
 let observer: IntersectionObserver | null = null
@@ -50,13 +55,32 @@ export default function useIsOnScreen(ref: RefObject<Element>, enabled = true): 
       setVisible(false)
       return
     }
+    let enterTimer: ReturnType<typeof setTimeout> | null = null
     let leaveTimer: ReturnType<typeof setTimeout> | null = null
+    let shown = false
     const unobserve = observePresenceRow(ref.current, (onScreen) => {
-      if (leaveTimer) clearTimeout(leaveTimer)
-      leaveTimer = onScreen ? null : setTimeout(() => setVisible(false), 2000)
-      if (onScreen) setVisible(true)
+      if (onScreen) {
+        if (leaveTimer) clearTimeout(leaveTimer)
+        leaveTimer = null
+        if (shown || enterTimer) return
+        enterTimer = setTimeout(() => {
+          enterTimer = null
+          shown = true
+          setVisible(true)
+        }, PRESENCE_ENTER_DELAY)
+      } else {
+        if (enterTimer) clearTimeout(enterTimer)
+        enterTimer = null
+        if (!shown || leaveTimer) return
+        leaveTimer = setTimeout(() => {
+          leaveTimer = null
+          shown = false
+          setVisible(false)
+        }, PRESENCE_LEAVE_GRACE)
+      }
     })
     return () => {
+      if (enterTimer) clearTimeout(enterTimer)
       if (leaveTimer) clearTimeout(leaveTimer)
       unobserve()
     }

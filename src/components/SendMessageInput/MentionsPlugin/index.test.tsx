@@ -108,6 +108,7 @@ describe('mention presence', () => {
     )
     const row = view.container.querySelector('[data-presence-user-id="alice"]') as Element
     act(() => (global as any).__setMockIntersection(row, true))
+    act(() => jest.advanceTimersByTime(300))
     act(() => jest.advanceTimersByTime(150))
     await act(async () => {
       await Promise.resolve()

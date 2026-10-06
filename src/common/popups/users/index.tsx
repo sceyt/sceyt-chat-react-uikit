@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react'
 import styled from 'styled-components'
+import { shallowEqual } from 'react-redux'
 import { useSelector, useDispatch } from 'store/hooks'
 
 import {
@@ -25,8 +26,7 @@ import {
   contactListSelector,
   contactsMapSelector,
   usersListSelector,
-  usersLoadingStateSelector,
-  usersMapSelector
+  usersLoadingStateSelector
 } from '../../../store/user/selector'
 import { createChannelAC } from '../../../store/channel/actions'
 import CustomCheckbox from '../../customCheckbox'
@@ -145,7 +145,15 @@ const UsersPopup = ({
   const channelTypeRoleMap = getDefaultRolesByChannelTypesMap()
   const [isScrolling, setIsScrolling] = useState<boolean>(false)
   const [isSelectedMembersScrolling, setIsSelectedMembersScrolling] = useState<boolean>(false)
-  const usersMap = useSelector(usersMapSelector)
+  // Only blocked flags of the listed contacts: presence updates to updatedUserMap must not re-run the list effects.
+  const contactsBlockedMap: { [id: string]: boolean } = useSelector(
+    (state: any) =>
+      contactList.reduce((acc: { [id: string]: boolean }, contact: IContact) => {
+        acc[contact.id] = !!state.UserReducer.updatedUserMap?.[contact.id]?.blocked
+        return acc
+      }, {}),
+    shallowEqual
+  )
   const popupTitleText =
     channel &&
     (memberDisplayText && memberDisplayText[channel.type]
@@ -258,7 +266,7 @@ const UsersPopup = ({
       if (!userSearchValue) {
         const userList = contactList.map((cont: IContact & { blocked?: boolean }) => ({
           ...cont.user,
-          blocked: !!usersMap?.[cont.id]?.blocked
+          blocked: !!contactsBlockedMap[cont.id]
         }))
         if (actionType === 'createChat') {
           userList.unshift(selfUser)
@@ -272,7 +280,7 @@ const UsersPopup = ({
       }
       setFilteredUsers(userList)
     }
-  }, [contactList, usersList, usersMap])
+  }, [contactList, usersList, contactsBlockedMap])
 
   useDidUpdate(() => {
     if (getFromContacts) {
@@ -295,22 +303,26 @@ const UsersPopup = ({
           filteredContacts.unshift({ user: selfUser })
         }
         setFilteredUsers(
-          filteredContacts.map((cont: IContact) => ({ ...cont.user, blocked: !!usersMap?.[cont.id]?.blocked }))
+          filteredContacts.map((cont: IContact) => ({ ...cont.user, blocked: !!contactsBlockedMap[cont.id] }))
         )
       } else {
         const userList = contactList.map((cont: IContact) => ({
           ...cont.user,
-          blocked: !!usersMap?.[cont.id]?.blocked
+          blocked: !!contactsBlockedMap[cont.id]
         }))
         if (actionType === 'createChat') {
           userList.unshift(selfUser)
         }
         setFilteredUsers(userList)
       }
-    } else {
+    }
+  }, [userSearchValue, contactsBlockedMap])
+
+  useDidUpdate(() => {
+    if (!getFromContacts) {
       dispatch(getUsersAC({ query: userSearchValue, filter: 'all', limit: 50 }))
     }
-  }, [userSearchValue, usersMap])
+  }, [userSearchValue])
 
   useEffect(() => {
     if (selectedMembersCont.current) {

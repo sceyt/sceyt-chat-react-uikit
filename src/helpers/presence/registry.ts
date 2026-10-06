@@ -1,8 +1,12 @@
 import { IUser } from '../../types'
+import { CONNECTION_STATUS } from '../../store/user/constants'
 
 export const APPLY_PRESENCE_USERS = 'APPLY_PRESENCE_USERS'
 
-type Client = { getUsers: (ids: string[]) => Promise<IUser[]> }
+const POLL_INTERVAL = 4000
+const BATCH_DELAY = 150
+
+type Client = { getUsers: (ids: string[]) => Promise<IUser[]>; connectionState?: string }
 type Dispatch = (action: { type: string; payload: { users: IUser[] } }) => void
 
 export class PresenceRegistry {
@@ -15,6 +19,7 @@ export class PresenceRegistry {
   private session = 0
   private inFlight = false
   private fullRefreshPending = false
+  private lastRequestAt = 0
   private pollTimer: ReturnType<typeof setInterval> | null = null
   private batchTimer: ReturnType<typeof setTimeout> | null = null
 
@@ -47,6 +52,8 @@ export class PresenceRegistry {
 
   configure(dispatch: Dispatch, client: Client | null) {
     this.dispatch = dispatch
+    // A new client is not polled until it reports CONNECTED (via setAvailability).
+    this.connected = client?.connectionState === CONNECTION_STATUS.CONNECTED
     this.resetSession(client)
   }
 
@@ -54,6 +61,7 @@ export class PresenceRegistry {
     this.session++
     this.client = client
     this.inFlight = false
+    this.lastRequestAt = 0
     this.pending.clear()
     this.fullRefreshPending = false
     this.clearBatch()
@@ -65,14 +73,12 @@ export class PresenceRegistry {
     const wasAvailable = this.canPoll()
     this.connected = connected
     this.tabActive = tabActive
-    if (wasAvailable && !this.canPoll()) {
-      this.session++
-      this.inFlight = false
-      this.pending.clear()
-      this.fullRefreshPending = false
-    }
+    // Pausing stops the timer and drops queued IDs (syncTimer). An in-flight request keeps
+    // its session so a quick resume waits for it instead of overlapping it.
     this.syncTimer()
-    if (!wasAvailable && this.canPoll()) this.requestRefresh()
+    if (!wasAvailable && this.canPoll() && Date.now() - this.lastRequestAt >= POLL_INTERVAL) {
+      this.requestRefresh()
+    }
   }
 
   dispose() {
@@ -99,7 +105,7 @@ export class PresenceRegistry {
 
   private syncTimer() {
     if (this.canPoll()) {
-      if (!this.pollTimer) this.pollTimer = setInterval(() => this.requestRefresh(), 4000)
+      if (!this.pollTimer) this.pollTimer = setInterval(() => this.requestRefresh(), POLL_INTERVAL)
     } else {
       if (this.pollTimer) clearInterval(this.pollTimer)
       this.pollTimer = null
@@ -116,7 +122,7 @@ export class PresenceRegistry {
     this.batchTimer = setTimeout(() => {
       this.batchTimer = null
       this.flush()
-    }, 150)
+    }, BATCH_DELAY)
   }
 
   private requestRefresh() {
@@ -138,6 +144,8 @@ export class PresenceRegistry {
     const session = this.session
     const client = this.client as Client
     this.inFlight = true
+    this.lastRequestAt = Date.now()
+    let failed = false
     Promise.resolve()
       .then(() => client.getUsers(ids))
       .then((users) => {
@@ -147,11 +155,17 @@ export class PresenceRegistry {
       })
       .catch(() => {
         // The regular interval is the retry; never start a separate retry timer.
+        failed = true
         if (session === this.session) this.fullRefreshPending = false
       })
       .finally(() => {
         if (session !== this.session) return
         this.inFlight = false
+        // After a failure, queued IDs wait for the next regular poll.
+        if (failed) {
+          this.clearBatch()
+          return
+        }
         if (this.fullRefreshPending) this.flush()
         else if (this.pending.size) this.scheduleBatch()
       })

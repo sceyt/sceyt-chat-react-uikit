@@ -126,6 +126,9 @@ const SceytChat = ({
     hidden = 'webkitHidden'
     visibilityChange = 'webkitvisibilitychange'
   }
+  const isDocumentVisible = () => (hidden ? !document[hidden as keyof Document] : document.visibilityState !== 'hidden')
+  // Presence polling pauses only for a hidden tab; browserTabIsActive also requires focus.
+  const [documentVisible, setDocumentVisible] = useState(isDocumentVisible)
   const handleDropFile = (e: any) => {
     e.preventDefault()
     e.stopPropagation()
@@ -153,8 +156,9 @@ const SceytChat = ({
   }
 
   const syncBrowserTabIsActive = () => {
-    const isVisible = hidden ? !document[hidden as keyof Document] : document.visibilityState !== 'hidden'
+    const isVisible = isDocumentVisible()
     const isFocused = typeof document.hasFocus === 'function' ? document.hasFocus() : true
+    setDocumentVisible(isVisible)
     dispatch(browserTabIsActiveAC(isVisible && isFocused))
   }
 
@@ -191,8 +195,8 @@ const SceytChat = ({
   }, [client?.connectionState])
 
   useEffect(() => {
-    presenceRegistry.setAvailability(connectionStatus === CONNECTION_STATUS.CONNECTED, browserTabIsActive)
-  }, [connectionStatus, browserTabIsActive])
+    presenceRegistry.setAvailability(connectionStatus === CONNECTION_STATUS.CONNECTED, documentVisible)
+  }, [connectionStatus, documentVisible])
 
   useEffect(() => {
     if (connectionStatus === CONNECTION_STATUS.CONNECTED) {

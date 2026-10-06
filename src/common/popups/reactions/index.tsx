@@ -5,7 +5,7 @@ import { shallowEqual } from 'react-redux'
 import { useSelector, useDispatch } from 'store/hooks'
 import { LOADING_STATE, USER_PRESENCE_STATUS } from '../../../helpers/constants'
 import { THEME_COLORS } from '../../../UIHelper/constants'
-import { IContactsMap, IReaction, IUser } from '../../../types'
+import { IContact, IContactsMap, IReaction, IUser } from '../../../types'
 import { AvatarWrapper, UserStatus } from '../../../components/Channel'
 import { Avatar } from '../../../components'
 import { userLastActiveDateFormat } from '../../../helpers'
@@ -87,7 +87,7 @@ const ReactionPresenceItem = ({
       <UserNamePresence>
         <MemberName color={textPrimary}>
           {makeUsername(
-            updatedUser.id === currentUserId ? undefined : contactsMap[updatedUser.id],
+            updatedUser.id === currentUserId ? (updatedUser as unknown as IContact) : contactsMap[updatedUser.id],
             updatedUser,
             getFromContacts
           )}

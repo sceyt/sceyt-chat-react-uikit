@@ -6,6 +6,7 @@ import { setReactionsListAC } from '../../../store/message/actions'
 import { setClient } from '../../client'
 import { GET_REACTIONS } from '../../../store/message/constants'
 import { updateUserStatusOnMapAC } from '../../../store/user/actions'
+import { setShowOnlyContactUsers } from '../../../helpers/contacts'
 
 jest.mock('../../../hooks', () => ({
   useColor: () => ({
@@ -91,6 +92,17 @@ describe('ReactionsPopup', () => {
       )
     })
     expect(screen.getByText('Online')).toBeInTheDocument()
+  })
+
+  it('shows the current user without the non-contact prefix in contacts mode', () => {
+    setShowOnlyContactUsers(true)
+    try {
+      renderPopup([{ key: '❤️', count: 1, score: 1 }])
+      expect(screen.getByText('Current User')).toBeInTheDocument()
+      expect(screen.queryByText('~Current User')).not.toBeInTheDocument()
+    } finally {
+      setShowOnlyContactUsers(false)
+    }
   })
 
   it('returns to All and refreshes the listed values after unreacting the active reaction', async () => {

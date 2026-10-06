@@ -1887,29 +1887,33 @@ function* updateChannel(action: IAction): any {
 }
 
 function* applyPresenceUsers(action: IAction): any {
-  const current: { [key: string]: IUser } = yield select((state) => state.UserReducer.updatedUserMap)
-  const changed: { [key: string]: IUser } = {}
-  const lastActive = (user?: IUser) => new Date(user?.presence?.lastActiveAt || 0).getTime()
-  ;(action.payload.users as IUser[]).forEach((user) => {
-    const previous = current[user.id]
-    if (
-      !previous ||
-      user.presence?.state !== previous.presence?.state ||
-      user.presence?.status !== previous.presence?.status ||
-      lastActive(user) !== lastActive(previous) ||
-      user.avatarUrl !== previous.avatarUrl ||
-      user.firstName !== previous.firstName ||
-      user.lastName !== previous.lastName ||
-      !!user.blocked !== !!previous.blocked
-    ) {
-      changed[user.id] = { ...user, blocked: !!user.blocked }
-    }
-  })
-  if (!Object.keys(changed).length) return
-  yield put(updateUserStatusOnMapAC(changed))
-  yield put(updateMembersPresenceAC(changed))
-  yield put(updateUserStatusOnChannelAC(changed))
-  updateChannelMemberInAllChannels(Object.values(changed))
+  try {
+    const current: { [key: string]: IUser } = yield select((state) => state.UserReducer.updatedUserMap)
+    const changed: { [key: string]: IUser } = {}
+    const lastActive = (user?: IUser) => new Date(user?.presence?.lastActiveAt || 0).getTime()
+    ;(action.payload.users as IUser[]).forEach((user) => {
+      const previous = current[user.id]
+      if (
+        !previous ||
+        user.presence?.state !== previous.presence?.state ||
+        user.presence?.status !== previous.presence?.status ||
+        lastActive(user) !== lastActive(previous) ||
+        user.avatarUrl !== previous.avatarUrl ||
+        user.firstName !== previous.firstName ||
+        user.lastName !== previous.lastName ||
+        !!user.blocked !== !!previous.blocked
+      ) {
+        changed[user.id] = { ...user, blocked: !!user.blocked }
+      }
+    })
+    if (!Object.keys(changed).length) return
+    yield put(updateUserStatusOnMapAC(changed))
+    yield put(updateMembersPresenceAC(changed))
+    yield put(updateUserStatusOnChannelAC(changed))
+    updateChannelMemberInAllChannels(Object.values(changed))
+  } catch (e) {
+    log.error('ERROR in apply presence users : ', e.message)
+  }
 }
 
 function* sendTyping(action: IAction): any {
@@ -2342,6 +2346,7 @@ export default function* ChannelsSaga() {
 }
 
 export const __channelSagaTestables = {
+  applyPresenceUsers,
   switchChannel,
   updateChannel,
   leaveChannel,
