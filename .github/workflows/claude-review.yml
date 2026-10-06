@@ -1,0 +1,73 @@
+name: Claude PR review
+
+# AI code review on pull requests. Runs when a PR is opened or marked ready
+# for review. To get a fresh review after new pushes, add the label
+# "ai-review" to the PR (remove and re-add it to run again).
+#
+# One-time setup (repo admin):
+#   1. Install the Claude GitHub App on this repo: https://github.com/apps/claude
+#   2. Add repo secret ANTHROPIC_API_KEY (Settings -> Secrets and variables -> Actions)
+
+on:
+  pull_request:
+    types: [opened, ready_for_review, reopened, labeled]
+
+concurrency:
+  group: claude-review-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  review:
+    # Skip drafts, PRs from forks (no access to secrets), and Dependabot.
+    # For "labeled" events, only react to the ai-review label.
+    if: |
+      github.event.pull_request.draft == false &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.actor != 'dependabot[bot]' &&
+      (github.event.action != 'labeled' || github.event.label.name == 'ai-review')
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      pull-requests: write
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          track_progress: true
+          prompt: |
+            REPO: ${{ github.repository }}
+            PR NUMBER: ${{ github.event.pull_request.number }}
+
+            You are reviewing a PR for sceyt-chat-react-uikit, a React 18 UI kit
+            (TypeScript, redux-saga, styled-components, IndexedDB caching) that
+            other companies install from npm and embed in their apps.
+
+            Review ONLY the changes in this PR. Focus on, in priority order:
+
+            1. Bugs: wrong logic, unhandled errors/rejected promises, race
+               conditions in sagas, stale closures, missing useEffect deps,
+               state mutations in reducers, broken message ordering/pagination.
+            2. Security: XSS in rendered message text, links, file names or
+               user names (dangerouslySetInnerHTML, unsafe URLs), leaking
+               tokens or user data to logs.
+            3. Public API: breaking changes to props, exported components or
+               types from src/index.tsx that would break apps using the kit.
+            4. Performance & leaks: unnecessary re-renders in message/channel
+               lists, missing cleanup of listeners, timers, blob/object URLs.
+            5. Tests: changed logic in src/store or src/helpers without tests.
+
+            Rules:
+            - Use inline comments for specific issues; prefix each with
+              [blocker], [should-fix] or [nit].
+            - Do not comment on formatting or style that ESLint/Prettier enforce.
+            - If you are not confident something is a real problem, say so or skip it.
+            - Finish with one short summary comment: overall risk (low/medium/high)
+              and the list of blockers. If there are none, say so.
+          claude_args: |
+            --allowedTools "mcp__github_inline_comment__create_inline_comment,Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*),Read,Grep,Glob"
