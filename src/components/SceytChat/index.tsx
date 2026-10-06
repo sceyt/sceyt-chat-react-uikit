@@ -44,7 +44,7 @@ import {
   setConnectionStatusAC,
   setUserAC,
   addUserInMapIfNotExistsAC,
-  checkUserStatusAC,
+  resetUpdatedUserMapAC,
   setContactsAC
 } from '../../store/user/actions'
 import { setShowOnlyContactUsers } from '../../helpers/contacts'
@@ -59,7 +59,8 @@ import { IChannel, IContactsMap } from '../../types'
 import { setCustomUploader, setSendAttachmentsAsSeparateMessages } from '../../helpers/customUploader'
 import { IChatClientProps } from '../ChatContainer'
 import { defaultTheme, THEME_COLORS } from '../../UIHelper/constants'
-import { clearUsersMap, setHideUserPresence } from '../../helpers/userHelper'
+import { setHideUserPresence } from '../../helpers/userHelper'
+import { presenceRegistry } from '../../helpers/presence/registry'
 import { clearDraftMessagesMap, clearMessagesMap, hydrateDraftMessages } from '../../helpers/messagesHalper'
 import { releaseAllBlobUrls, setBlobUrlEvictListener } from '../../helpers/attachmentBlobUrls'
 import { removeAttachmentUpdatedEntriesAC } from '../../store/message/actions'
@@ -159,6 +160,8 @@ const SceytChat = ({
 
   useEffect(() => {
     log.info('client is changed.... ', client)
+    dispatch(resetUpdatedUserMapAC())
+    presenceRegistry.configure(dispatch, client || null)
     if (client) {
       // Clean up old attachment cache if version changed
       cleanupOldAttachmentCache()
@@ -176,7 +179,6 @@ const SceytChat = ({
       clearMessagesMap()
       setActiveChannelId('')
       destroyChannelsMap()
-      clearUsersMap()
       clearDraftMessagesMap()
       clearPersistedDrafts()
       releaseAllBlobUrls()
@@ -185,8 +187,12 @@ const SceytChat = ({
   }, [client])
 
   useEffect(() => {
-    dispatch(setConnectionStatusAC(client.connectionState))
+    dispatch(setConnectionStatusAC(client?.connectionState || ''))
   }, [client?.connectionState])
+
+  useEffect(() => {
+    presenceRegistry.setAvailability(connectionStatus === CONNECTION_STATUS.CONNECTED, browserTabIsActive)
+  }, [connectionStatus, browserTabIsActive])
 
   useEffect(() => {
     if (connectionStatus === CONNECTION_STATUS.CONNECTED) {
@@ -272,7 +278,7 @@ const SceytChat = ({
       clearMessagesMap()
       setActiveChannelId('')
       destroyChannelsMap()
-      clearUsersMap()
+      presenceRegistry.dispose()
       releaseAllBlobUrls()
       setBlobUrlEvictListener(null)
       dispatch(destroySession())
@@ -329,7 +335,6 @@ const SceytChat = ({
         const user = { ...contact?.user }
         dispatch(addUserInMapIfNotExistsAC(user))
       }
-      dispatch(checkUserStatusAC())
     }
   }, [contactsMap])
 

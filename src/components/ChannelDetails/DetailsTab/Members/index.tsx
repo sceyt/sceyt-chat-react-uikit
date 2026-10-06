@@ -43,6 +43,8 @@ import DropDown from '../../../../common/dropdown'
 import UsersPopup from '../../../../common/popups/users'
 import InviteLinkModal from '../../../../common/popups/inviteLink/InviteLinkModal'
 import { useColor } from '../../../../hooks'
+import useUpdatedUser from '../../../../hooks/useUpdatedUser'
+import useOnScreenUserIds from '../../../../hooks/useOnScreenUserIds'
 import { shallowEqual } from 'react-redux'
 import { CONNECTION_STATUS } from 'store/user/constants'
 
@@ -64,6 +66,19 @@ interface IProps {
   memberAvatarSize?: number
   memberPresenceFontSize?: string
   QRCodeIcon?: JSX.Element
+}
+
+const MemberPresence = ({ member, color, fontSize }: { member: IMember; color: string; fontSize?: string }) => {
+  const currentMember = useUpdatedUser(member)
+  return (
+    <SubTitle color={color} margin='1px 0 0' fontSize={fontSize}>
+      {currentMember.presence && currentMember.presence.state === USER_PRESENCE_STATUS.ONLINE
+        ? 'Online'
+        : currentMember.presence &&
+          currentMember.presence.lastActiveAt &&
+          userLastActiveDateFormat(currentMember.presence.lastActiveAt)}
+    </SubTitle>
+  )
 }
 
 const Members = ({
@@ -95,6 +110,11 @@ const Members = ({
   } = useColor()
 
   const dispatch = useDispatch()
+  const membersListRef = React.useRef<HTMLUListElement>(null)
+  useOnScreenUserIds(
+    membersListRef,
+    members.map((member) => member.id)
+  )
   const getFromContacts = getShowOnlyContactUsers()
   const [selectedMember, setSelectedMember] = useState<IMember | null>(null)
   const [kickMemberPopupOpen, setKickMemberPopupOpen] = useState(false)
@@ -267,7 +287,7 @@ const Members = ({
   return (
     <Container>
       <ActionsMenu>
-        <MembersList>
+        <MembersList ref={membersListRef}>
           {checkActionPermission('addMember') && (
             <MemberItem
               key={1}
@@ -308,10 +328,11 @@ const Members = ({
             ))}
 
           {!!members.length &&
-            members.map((member, index) => (
+            members.map((member) => (
               <MemberItem
+                data-presence-user-id={member.id}
                 addMemberIconColor={iconInactive}
-                key={member.id + index}
+                key={member.id}
                 color={textPrimary}
                 hoverBackground={hoverBackgroundColor || backgroundHovered}
                 onClick={() => handleCreateChat(member)}
@@ -348,13 +369,7 @@ const Members = ({
                     )}
                   </MemberNameWrapper>
 
-                  <SubTitle color={textSecondary} margin='1px 0 0' fontSize={memberPresenceFontSize}>
-                    {member.presence && member.presence.state === USER_PRESENCE_STATUS.ONLINE
-                      ? 'Online'
-                      : member.presence &&
-                        member.presence.lastActiveAt &&
-                        userLastActiveDateFormat(member.presence.lastActiveAt)}
-                  </SubTitle>
+                  <MemberPresence member={member} color={textSecondary} fontSize={memberPresenceFontSize} />
                 </MemberNamePresence>
                 {!noMemberEditPermissions &&
                   member.role !== 'owner' &&

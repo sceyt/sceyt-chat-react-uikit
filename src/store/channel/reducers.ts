@@ -2,7 +2,6 @@ import { createSlice, PayloadAction } from '@reduxjs/toolkit'
 import { IChannel, IContact, IMember, IUser, ChannelQueryParams, IMessage } from '../../types'
 import { DEFAULT_CHANNEL_TYPE, MESSAGE_STATUS } from '../../helpers/constants'
 import { getClient } from '../../common/client'
-import { setUserToMap } from '../../helpers/userHelper'
 import { sortChannelByLastMessage } from '../../helpers/channelHalper'
 import { updateMessage } from '../message/reducers'
 
@@ -267,16 +266,6 @@ const channelSlice = createSlice({
       }
       state.activeChannel = nextChannel
       state.messageSearchIsOpen = false
-      if ((action.payload.channel as IChannel).type === DEFAULT_CHANNEL_TYPE.DIRECT) {
-        const ChatClient = getClient()
-        const { user } = ChatClient
-        const directChannelUser = (action.payload.channel as IChannel).members.find(
-          (member: IMember) => member.id !== user.id
-        )
-        if (directChannelUser) {
-          setUserToMap(directChannelUser)
-        }
-      }
     },
 
     updateChannelData: (

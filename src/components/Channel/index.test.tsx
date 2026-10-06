@@ -45,11 +45,6 @@ jest.mock('../../hooks', () => ({
   }
 }))
 
-jest.mock('../../hooks/useUpdatePresence', () => ({
-  __esModule: true,
-  default: () => undefined
-}))
-
 jest.mock('../Avatar', () => ({
   __esModule: true,
   default: ({ name }: { name?: string }) => <div data-testid='channel-avatar'>{name || 'avatar'}</div>

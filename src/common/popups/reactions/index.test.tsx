@@ -5,6 +5,7 @@ import { createMessageListStore, renderWithSceytProvider } from '../../../testUt
 import { setReactionsListAC } from '../../../store/message/actions'
 import { setClient } from '../../client'
 import { GET_REACTIONS } from '../../../store/message/constants'
+import { updateUserStatusOnMapAC } from '../../../store/user/actions'
 
 jest.mock('../../../hooks', () => ({
   useColor: () => ({
@@ -74,6 +75,22 @@ const renderPopup = (reactionTotals: any[]) => {
 describe('ReactionsPopup', () => {
   beforeEach(() => {
     setClient({ user: currentUser })
+  })
+
+  it('shows an updated presence for a reaction user already on screen', () => {
+    const { store } = renderPopup([{ key: '👍', count: 1, score: 1 }])
+    act(() => {
+      store.dispatch(
+        updateUserStatusOnMapAC({
+          'other-user': {
+            ...otherUser,
+            state: 'active',
+            presence: { state: 'online' }
+          } as any
+        })
+      )
+    })
+    expect(screen.getByText('Online')).toBeInTheDocument()
   })
 
   it('returns to All and refreshes the listed values after unreacting the active reaction', async () => {

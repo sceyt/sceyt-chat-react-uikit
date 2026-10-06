@@ -3,7 +3,8 @@ import { useSelector, useDispatch } from 'store/hooks'
 import styled from 'styled-components'
 import moment from 'moment'
 // Hooks
-import useUpdatePresence from '../../hooks/useUpdatePresence'
+import useIsOnScreen from '../../hooks/useIsOnScreen'
+import usePresenceSubscription from '../../hooks/usePresenceSubscription'
 // Store
 import {
   activeChannelSelector,
@@ -41,6 +42,7 @@ import { getClient } from '../../common/client'
 import { IChannel, IContact, IMessage, IUser } from '../../types'
 import { MessageStatusIcon, MessageTextFormat } from '../../messageUtils'
 import { useColor } from '../../hooks'
+import useUpdatedUser from '../../hooks/useUpdatedUser'
 import { MESSAGE_TYPE } from '../../types/enum'
 import {
   getPinnedMessagePreview,
@@ -365,6 +367,7 @@ const Channel: React.FC<IChannelProps> = ({
   const isSelfChannel =
     isDirectChannel && channel.memberCount === 1 && channel.members.length > 0 && channel.members[0].id === user.id
   const directChannelUser = isDirectChannel && channel.members.find((member) => member.id !== user.id)
+  const currentDirectUser = useUpdatedUser(directChannelUser || null)
   const typingOrRecordingIndicator = useSelector(typingOrRecordingIndicatorArraySelector(channel.id))
   const [draftMessageText, setDraftMessageText] = useState<any>()
   const [draftMessage, setDraftMessage] = useState<any>()
@@ -393,8 +396,9 @@ const Channel: React.FC<IChannelProps> = ({
         : '')
   const messageAuthorRef = useRef<any>(null)
   const messageTimeAndStatusRef = useRef<any>(null)
-
-  useUpdatePresence(channel, true)
+  const presenceRowRef = useRef<HTMLDivElement>(null)
+  const rowIsOnScreen = useIsOnScreen(presenceRowRef, !!directChannelUser)
+  usePresenceSubscription(directChannelUser ? [directChannelUser.id] : [], { enabled: rowIsOnScreen })
   useEffect(() => {
     if (messageTimeAndStatusRef.current) {
       setStatusWidth(messageTimeAndStatusRef.current.offsetWidth)
@@ -633,6 +637,7 @@ const Channel: React.FC<IChannelProps> = ({
 
   return (
     <Container
+      ref={presenceRowRef}
       backgroundColor={background}
       selectedChannel={channel.id === activeChannel.id}
       selectedChannelLeftBorder={selectedChannelLeftBorder}
@@ -667,7 +672,7 @@ const Channel: React.FC<IChannelProps> = ({
             hideUserPresence &&
             (hideUserPresence(directChannelUser)
               ? ''
-              : directChannelUser.presence && directChannelUser.presence.state === USER_PRESENCE_STATUS.ONLINE) && (
+              : currentDirectUser?.presence && currentDirectUser.presence.state === USER_PRESENCE_STATUS.ONLINE) && (
               <UserStatus backgroundColor={onlineStatus} borderColor={background} />
             )}
         </AvatarWrapper>

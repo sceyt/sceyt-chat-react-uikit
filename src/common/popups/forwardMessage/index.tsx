@@ -39,6 +39,8 @@ import { hideUserPresence } from '../../../helpers/userHelper'
 import { getClient } from '../../client'
 import PopupContainer from '../popupContainer'
 import { useColor, useUpdatedUser } from '../../../hooks'
+import useIsOnScreen from '../../../hooks/useIsOnScreen'
+import usePresenceSubscription from '../../../hooks/usePresenceSubscription'
 import { activeChannelMembersMapSelector } from '../../../store/member/selector'
 import { getMembersAC } from '../../../store/member/actions'
 import { themeSelector } from 'store/theme/selector'
@@ -182,12 +184,15 @@ const ChannelMembersItem = ({
   isDirectChannel: boolean
 }) => {
   const { [THEME_COLORS.TEXT_SECONDARY]: textSecondary } = useColor()
+  const presenceRef = useRef<HTMLHeadingElement>(null)
+  const onScreen = useIsOnScreen(presenceRef, isDirectChannel)
+  usePresenceSubscription(isDirectChannel && directChannelUser ? [directChannelUser.id] : [], { enabled: onScreen })
   // Always call the hook, but only use the updated value for direct channels
   const updatedUser = useUpdatedUser(directChannelUser)
   const directChannelUserUpdated = isDirectChannel ? updatedUser : directChannelUser
 
   return (
-    <ChannelMembers color={textSecondary}>
+    <ChannelMembers ref={presenceRef} color={textSecondary}>
       {isDirectChannel && directChannelUserUpdated
         ? (
             hideUserPresence && hideUserPresence(directChannelUserUpdated)

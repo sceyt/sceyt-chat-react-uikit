@@ -5,7 +5,7 @@ import { shallowEqual } from 'react-redux'
 import { useSelector, useDispatch } from 'store/hooks'
 import { LOADING_STATE, USER_PRESENCE_STATUS } from '../../../helpers/constants'
 import { THEME_COLORS } from '../../../UIHelper/constants'
-import { IReaction, IUser } from '../../../types'
+import { IContactsMap, IReaction, IUser } from '../../../types'
 import { AvatarWrapper, UserStatus } from '../../../components/Channel'
 import { Avatar } from '../../../components'
 import { userLastActiveDateFormat } from '../../../helpers'
@@ -14,6 +14,8 @@ import { contactsMapSelector } from '../../../store/user/selector'
 import { getShowOnlyContactUsers } from '../../../helpers/contacts'
 import { getClient } from '../../client'
 import { useColor, useEventListener } from '../../../hooks'
+import useUpdatedUser from '../../../hooks/useUpdatedUser'
+import useOnScreenUserIds from '../../../hooks/useOnScreenUserIds'
 import { SubTitle } from '../../../UIHelper'
 import { getReactionsAC, loadMoreReactionsAC, setReactionsListAC } from '../../../store/message/actions'
 import {
@@ -44,6 +46,65 @@ interface IReactionsPopupProps {
   openUserProfile: (user: IUser) => void
 }
 let reactionsPrevLength: any = 0
+interface IReactionPresenceItemProps {
+  reaction: IReaction
+  currentUserId: string
+  contactsMap: IContactsMap
+  getFromContacts: boolean
+  textPrimary: string
+  textSecondary: string
+  backgroundHovered: string
+  onSelect: () => void
+}
+
+const ReactionPresenceItem = ({
+  reaction,
+  currentUserId,
+  contactsMap,
+  getFromContacts,
+  textPrimary,
+  textSecondary,
+  backgroundHovered,
+  onSelect
+}: IReactionPresenceItemProps) => {
+  const updatedUser = useUpdatedUser(reaction.user)
+  return (
+    <ReactionItem
+      data-presence-user-id={reaction.user.id}
+      key={reaction.id}
+      hoverBackgroundColor={backgroundHovered}
+      onClick={onSelect}
+    >
+      <AvatarWrapper>
+        <Avatar
+          name={updatedUser.firstName || updatedUser.id}
+          image={updatedUser.avatarUrl}
+          size={40}
+          textSize={14}
+          setDefaultAvatar
+        />
+      </AvatarWrapper>
+      <UserNamePresence>
+        <MemberName color={textPrimary}>
+          {makeUsername(
+            updatedUser.id === currentUserId ? undefined : contactsMap[updatedUser.id],
+            updatedUser,
+            getFromContacts
+          )}
+        </MemberName>
+        <SubTitle color={textSecondary}>
+          {updatedUser.presence && updatedUser.presence.state === USER_PRESENCE_STATUS.ONLINE
+            ? 'Online'
+            : updatedUser.presence &&
+              updatedUser.presence.lastActiveAt &&
+              userLastActiveDateFormat(updatedUser.presence.lastActiveAt)}
+        </SubTitle>
+      </UserNamePresence>
+      <ReactionKey>{reaction.key}</ReactionKey>
+    </ReactionItem>
+  )
+}
+
 export default function ReactionsPopup({
   messageId,
   handleReactionsPopupClose,
@@ -70,8 +131,13 @@ export default function ReactionsPopup({
   } = useColor()
 
   const popupRef = useRef<HTMLDivElement>(null)
+  const reactionsListRef = useRef<HTMLUListElement>(null)
   const scoresRef = useRef<HTMLDivElement>(null)
   const reactions = useSelector(reactionsListSelector, shallowEqual)
+  useOnScreenUserIds(
+    reactionsListRef,
+    reactions.map((reaction: IReaction) => reaction.user.id)
+  )
   const messageInputHeight = useSelector(sendMessageInputHeightSelector, shallowEqual)
   // const channelListWidth = useSelector(channelListWidthSelector, shallowEqual)
   // const channelDetailsIsOpen = useSelector(channelInfoIsOpenSelector, shallowEqual)
@@ -255,6 +321,7 @@ export default function ReactionsPopup({
         </ReactionScoresList>
       </ReactionScoresCont>
       <ReactionsList
+        ref={reactionsListRef}
         className={isScrolling ? 'show-scrollbar' : ''}
         scoresHeight={scoresHeight}
         onScroll={handleReactionsListScroll}
@@ -263,10 +330,16 @@ export default function ReactionsPopup({
         onMouseLeave={() => setIsScrolling(false)}
       >
         {reactions.map((reaction: IReaction) => (
-          <ReactionItem
+          <ReactionPresenceItem
             key={reaction.id}
-            hoverBackgroundColor={backgroundHovered}
-            onClick={() => {
+            reaction={reaction}
+            currentUserId={user.id}
+            contactsMap={contactsMap}
+            getFromContacts={getFromContacts}
+            textPrimary={textPrimary}
+            textSecondary={textSecondary}
+            backgroundHovered={backgroundHovered}
+            onSelect={() => {
               if (reaction.user.id === user.id) {
                 handleAddDeleteEmoji(reaction.key)
               } else {
@@ -274,34 +347,7 @@ export default function ReactionsPopup({
                 handleReactionsPopupClose()
               }
             }}
-          >
-            <AvatarWrapper>
-              <Avatar
-                name={reaction.user.firstName || reaction.user.id}
-                image={reaction.user.avatarUrl}
-                size={40}
-                textSize={14}
-                setDefaultAvatar
-              />
-            </AvatarWrapper>
-            <UserNamePresence>
-              <MemberName color={textPrimary}>
-                {makeUsername(
-                  reaction.user.id === user.id ? reaction.user : contactsMap[reaction.user.id],
-                  reaction.user,
-                  getFromContacts
-                )}
-              </MemberName>
-              <SubTitle color={textSecondary}>
-                {reaction.user.presence && reaction.user.presence.state === USER_PRESENCE_STATUS.ONLINE
-                  ? 'Online'
-                  : reaction.user.presence &&
-                    reaction.user.presence.lastActiveAt &&
-                    userLastActiveDateFormat(reaction.user.presence.lastActiveAt)}
-              </SubTitle>
-            </UserNamePresence>
-            <ReactionKey>{reaction.key}</ReactionKey>
-          </ReactionItem>
+          />
         ))}
       </ReactionsList>
     </Container>,

@@ -34,6 +34,7 @@ import { userLastActiveDateFormat } from '../../../helpers'
 import { makeUsername } from '../../../helpers/message'
 import { getShowOnlyContactUsers } from '../../../helpers/contacts'
 import { useDidUpdate, useColor, useUpdatedUser } from '../../../hooks'
+import useOnScreenUserIds from '../../../hooks/useOnScreenUserIds'
 import {
   getChannelTypesMemberDisplayTextMap,
   getDefaultRolesByChannelTypesMap,
@@ -133,6 +134,13 @@ const UsersPopup = ({
   const [selectedMembers, setSelectedMembers] = useState<ISelectedUserData[]>(creatChannelSelectedMembers || [])
   const [usersContHeight, setUsersContHeight] = useState(0)
   const [filteredUsers, setFilteredUsers] = useState<IUser[]>([])
+  const usersListRef = useRef<HTMLDivElement>(null)
+  useOnScreenUserIds(
+    usersListRef,
+    filteredUsers
+      .filter((user) => !(actionType === 'addMembers' && memberIds?.includes(user.id)))
+      .map((user) => user.id)
+  )
   const memberDisplayText = getChannelTypesMemberDisplayTextMap()
   const channelTypeRoleMap = getDefaultRolesByChannelTypesMap()
   const [isScrolling, setIsScrolling] = useState<boolean>(false)
@@ -381,6 +389,7 @@ const UsersPopup = ({
 
           {/* <MembersContainer > */}
           <MembersContainer
+            ref={usersListRef}
             className={isScrolling ? 'show-scrollbar' : ''}
             isAdd={actionType !== 'createChat'}
             selectedMembersHeight={usersContHeight}
@@ -404,6 +413,7 @@ const UsersPopup = ({
 
               return (
                 <ListRow
+                  data-presence-user-id={user.id}
                   hoverBackground={backgroundHovered}
                   key={user.id}
                   onClick={() => {
