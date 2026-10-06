@@ -24,7 +24,7 @@ jobs:
       contents: read
       security-events: write   # upload results to the Security tab
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - uses: github/codeql-action/init@v4
         with:
@@ -52,7 +52,7 @@ jobs:
       contents: read
       pull-requests: write     # post a summary comment when it fails
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       # Fails the PR if it ADDS a dependency with a known high/critical
       # vulnerability or a copyleft license. Existing issues are handled by Dependabot.
@@ -71,7 +71,7 @@ jobs:
     if: github.event_name != 'schedule'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
