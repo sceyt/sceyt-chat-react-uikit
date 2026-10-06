@@ -13,6 +13,7 @@ import {
   setChannelsAC,
   setChannelsForForwardAC,
   setChannelsLoadingStateAC,
+  setChannelsLoadFailedAC,
   setChannelToAddAC,
   setChannelToRemoveAC,
   setCloseSearchChannelsAC,
@@ -140,7 +141,7 @@ import { updateUserOnMap, usersMap, hideUserPresence } from '../../helpers/userH
 import log from 'loglevel'
 import { queryDirection } from 'store/message/constants'
 import store from 'store'
-import { isResendableError } from 'helpers/error'
+import { isResendableError, isRetryableLoadError } from 'helpers/error'
 
 const getUniqueMessageIds = (messageIds: string[] = []) => Array.from(new Set(messageIds.filter(Boolean)))
 
@@ -436,6 +437,7 @@ function* createChannel(action: IAction): any {
 
 function* getChannels(action: IAction): any {
   log.info(`${new Date().toISOString()} [getChannels] start get channels`)
+  let mainListLoaded = false
   try {
     const { payload } = action
     const { params } = payload
@@ -449,6 +451,9 @@ function* getChannels(action: IAction): any {
       return
     }
     yield put(setChannelsLoadingStateAC(LOADING_STATE.LOADING))
+    if (store.getState().ChannelReducer.channelsLoadFailed) {
+      yield put(setChannelsLoadFailedAC(false))
+    }
     const channelQueryBuilder = new (SceytChatClient.ChannelListQueryBuilder as any)()
     const channelTypesFilter = getChannelTypesFilter()
     log.info(`${new Date().toISOString()} [getChannels] channelTypesFilter: ${JSON.stringify(channelTypesFilter)}`)
@@ -607,6 +612,7 @@ function* getChannels(action: IAction): any {
       yield put(switchChannelActionAC(JSON.parse(JSON.stringify(activeChannel))))
     }
     yield put(setChannelsLoadingStateAC(LOADING_STATE.LOADED))
+    mainListLoaded = true
     const hiddenList = store.getState().ChannelReducer.hideChannelList
     log.info(`${new Date().toISOString()} [getChannels] hiddenList state: ${hiddenList}`)
     if (!hiddenList) {
@@ -686,6 +692,16 @@ function* getChannels(action: IAction): any {
     )
     if (e.code !== 10008) {
       // yield put(setErrorNotification(e.message));
+    }
+    // Never leave the list in LOADING after a failure (the skeleton would spin forever).
+    // A retryable error (timeout, 503, ...) also sets channelsLoadFailed so ChannelList can offer a Retry.
+    // It is a separate flag so searchChannels (which shares channelsLoadingState) can't erase it.
+    // (Errors after the main list was shown -- e.g. the all-channels query -- leave the list as is.)
+    if (!mainListLoaded) {
+      yield put(setChannelsLoadingStateAC(LOADING_STATE.LOADED))
+      if (isRetryableLoadError(e)) {
+        yield put(setChannelsLoadFailedAC(true))
+      }
     }
   }
 }
@@ -1148,6 +1164,8 @@ function* channelsLoadMore(action: IAction): any {
     /* if (error.code !== 10008) {
       yield put(setErrorNotification(error.message));
     } */
+    // Reset so the bottom skeleton disappears and scrolling can try again.
+    yield put(setChannelsLoadingStateAC(LOADING_STATE.LOADED))
   }
 }
 
@@ -2344,6 +2362,7 @@ export const __channelSagaTestables = {
   markChannelAsRead,
   resendPendingChannelReads,
   getChannels,
+  channelsLoadMore,
   setWaitForReadMarkerRetry: (waitFn: typeof waitForReadMarkerRetry) => {
     waitForReadMarkerRetry = waitFn
   },

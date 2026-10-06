@@ -12,6 +12,7 @@ import {
 } from '../../../../testUtils/messageListHarness'
 import { makeMember } from '../../../../testUtils/messageFixtures'
 import { IChannel, IMember, IRole } from '../../../../types'
+import { getMembersAC } from '../../../../store/member/actions'
 
 // Mock hooks
 jest.mock('../../../../hooks', () => ({
@@ -1346,6 +1347,69 @@ describe('Members', () => {
       expect(screen.getAllByText('Alice').length).toBeGreaterThan(0)
       expect(screen.getAllByText('Bob').length).toBeGreaterThan(0)
       expect(screen.getAllByText('Charlie').length).toBeGreaterThan(0)
+    })
+  })
+
+  // ─── First load timed out ─────────────────────────────────────────────────
+
+  describe('First load timed out (FAILED)', () => {
+    const failedStore = (channelId: string) =>
+      createTestStore({
+        MembersReducer: {
+          roles: createRoles(),
+          rolesMap: createRolesMap(createRoles()),
+          channelsMembersMap: {},
+          channelsMembersLoadingState: { [channelId]: LOADING_STATE.FAILED },
+          channelsMembersHasNextMap: {},
+          getRolesFail: undefined,
+          restricted: { isRestricted: false, fromChannel: false, members: [] },
+          userBlockedForInvite: { show: false, userIds: [] },
+          openInviteModal: false
+        }
+      })
+
+    it('shows "Unable to load members" and Retry reloads the members', () => {
+      const channel = makeChannel({ id: 'members-failed', type: DEFAULT_CHANNEL_TYPE.GROUP, userRole: 'owner' })
+      const store = failedStore(channel.id)
+      const dispatchSpy = jest.spyOn(store, 'dispatch')
+      renderWithSceytProvider(
+        <Members channel={channel} members={[]} checkActionPermission={createCheckActionPermission('owner')} />,
+        { store }
+      )
+
+      expect(screen.getByText('Unable to load members')).toBeInTheDocument()
+      expect(screen.getByText("We couldn't load members. Please try again.")).toBeInTheDocument()
+      dispatchSpy.mockClear()
+      fireEvent.click(screen.getByRole('button', { name: 'Retry' }))
+      expect(dispatchSpy).toHaveBeenCalledWith(getMembersAC(channel.id))
+    })
+
+    it('shows the members (not the error) when some are already loaded', () => {
+      const channel = makeChannel({ id: 'members-failed-kept', type: DEFAULT_CHANNEL_TYPE.GROUP, userRole: 'owner' })
+      renderWithSceytProvider(
+        <Members
+          channel={channel}
+          members={[makeMember(makeUser({ id: 'u-1', firstName: 'Kept' }), 'participant')]}
+          checkActionPermission={createCheckActionPermission('owner')}
+        />,
+        { store: failedStore(channel.id) }
+      )
+      expect(screen.queryByText('Unable to load members')).not.toBeInTheDocument()
+    })
+
+    it('uses CustomLoadErrorState when provided', () => {
+      const channel = makeChannel({ id: 'members-failed-custom', type: DEFAULT_CHANNEL_TYPE.GROUP, userRole: 'owner' })
+      const Custom = ({ title }: any) => <div data-testid='custom-error'>{title}</div>
+      renderWithSceytProvider(
+        <Members
+          channel={channel}
+          members={[]}
+          checkActionPermission={createCheckActionPermission('owner')}
+          CustomLoadErrorState={Custom}
+        />,
+        { store: failedStore(channel.id) }
+      )
+      expect(screen.getByTestId('custom-error')).toHaveTextContent('Unable to load members')
     })
   })
 })

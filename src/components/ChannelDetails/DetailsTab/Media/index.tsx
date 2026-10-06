@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
+import { CustomLoadErrorStateComponent, renderLoadErrorState } from '../../../../common/LoadErrorState'
 import styled, { keyframes } from 'styled-components'
 import { shallowEqual } from 'react-redux'
 import { useSelector, useDispatch } from 'store/hooks'
@@ -12,18 +13,22 @@ import {
 import { activeTabAttachmentsSelector, attachmentLoadingStateSelector } from '../../../../store/message/selector'
 // Helpers
 import { isJSON } from '../../../../helpers/message'
-import { channelDetailsTabs, LOADING_STATE } from '../../../../helpers/constants'
+import { channelDetailsTabs, DETAILS_TAB_ATTACHMENTS_PAGE_SIZE, LOADING_STATE } from '../../../../helpers/constants'
+import { connectionStatusSelector } from '../../../../store/user/selector'
+import { CONNECTION_STATUS } from '../../../../store/user/constants'
 import { getVideoAttachmentCacheKeys } from '../../../../helpers/videoPreview'
 import { getMediaDownloadSnapshot, requestMediaDownload } from '../../../../helpers/mediaDownloadCoordinator'
 import { IAttachment, IChannel } from '../../../../types'
 // Components
 import Attachment from '../../../Attachment'
 import SliderPopup from '../../../../common/popups/sliderPopup'
-import { useColor } from '../../../../hooks'
+import { useColor, useDidUpdate } from '../../../../hooks'
 import { THEME_COLORS } from '../../../../UIHelper/constants'
 import log from 'loglevel'
 
 interface IProps {
+  /** Replaces the default "Unable to load media" view shown when the first load fails with a retryable error. */
+  CustomLoadErrorState?: CustomLoadErrorStateComponent
   channel: IChannel
 }
 
@@ -112,13 +117,14 @@ const MediaTile = ({ file, background, onOpen }: IMediaTileProps) => {
   )
 }
 
-const Media = ({ channel }: IProps) => {
+const Media = ({ channel, CustomLoadErrorState }: IProps) => {
   const {
     [THEME_COLORS.BACKGROUND]: background,
     [THEME_COLORS.TEXT_SECONDARY]: textSecondary,
     [THEME_COLORS.SURFACE_1]: surface1
   } = useColor()
   const attachments = useSelector(activeTabAttachmentsSelector, shallowEqual) || []
+  const connectionStatus = useSelector(connectionStatusSelector)
   const loadingState = useSelector(attachmentLoadingStateSelector)
   const [mediaFile, setMediaFile] = useState<any>(null)
   const dispatch = useDispatch()
@@ -153,10 +159,20 @@ const Media = ({ channel }: IProps) => {
     }
   }
 
+  const loadAttachments = () =>
+    dispatch(getAttachmentsAC(channel.id, channelDetailsTabs.media, DETAILS_TAB_ATTACHMENTS_PAGE_SIZE))
+
   useEffect(() => {
     dispatch(setAttachmentsAC([]))
-    dispatch(getAttachmentsAC(channel.id, channelDetailsTabs.media, 35))
+    loadAttachments()
   }, [channel.id])
+
+  // A load that failed while the connection dropped ends empty; reload once the connection is back
+  useDidUpdate(() => {
+    if (connectionStatus === CONNECTION_STATUS.CONNECTED && !attachments.length) {
+      loadAttachments()
+    }
+  }, [connectionStatus])
 
   const groups = useMemo(() => {
     const result: { key: string; date: Date; items: IAttachment[] }[] = []
@@ -181,6 +197,16 @@ const Media = ({ channel }: IProps) => {
             <SkeletonTile key={i} color={surface1} />
           ))}
         </SkeletonGrid>
+      ) : loadingState === LOADING_STATE.FAILED && attachments.length === 0 ? (
+        renderLoadErrorState(
+          {
+            title: 'Unable to load media',
+            description: "We couldn't load media. Please try again.",
+            onRetry: loadAttachments
+          },
+          CustomLoadErrorState,
+          { inDetailsTab: true }
+        )
       ) : loadingState === LOADING_STATE.LOADED && attachments.length === 0 ? (
         <EmptyState color={textSecondary}>No shared media.</EmptyState>
       ) : (

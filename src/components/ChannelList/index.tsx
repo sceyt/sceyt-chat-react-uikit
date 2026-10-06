@@ -9,6 +9,7 @@ import {
   addedToChannelSelector,
   channelsHasNextSelector,
   channelsLoadingState,
+  channelsLoadFailedSelector,
   channelsSelector,
   closeSearchChannelSelector,
   deletedChannelSelector,
@@ -61,6 +62,7 @@ import ProfileSettings from './ProfileSettings'
 import { useChannelReorderAnimation } from './useChannelReorderAnimation'
 import { clearMessagesAC } from 'store/message/actions'
 import { getClient } from 'common/client'
+import { CustomLoadErrorStateComponent, renderLoadErrorState } from '../../common/LoadErrorState'
 
 interface IChannelListProps {
   List?: FC<{
@@ -78,6 +80,8 @@ interface IChannelListProps {
     setSelectedChannel?: (channel: IChannel) => void
     createChatWithContact?: (contact: IContact) => void
   }>
+  /** Replaces the default "Unable to load channels" view shown when the first load fails with a retryable error. */
+  CustomLoadErrorState?: CustomLoadErrorStateComponent
   className?: string
   Profile?: JSX.Element
   CreateChannel?: JSX.Element
@@ -210,6 +214,7 @@ const ChannelList: React.FC<IChannelListProps> = ({
   channelsMargin,
   List,
   ListItem,
+  CustomLoadErrorState,
   getSelectedChannel,
   onSearchValueChange,
   Profile,
@@ -372,11 +377,26 @@ const ChannelList: React.FC<IChannelListProps> = ({
     }
   }, [deletedChannel])
 
+  const loadChannels = () => {
+    dispatch(getChannelsAC({ filter, limit, sort, search: '', memberCount: getChannelMembersCount() }, false))
+  }
+
   useEffect(() => {
     if (connectionStatus === CONNECTION_STATUS.CONNECTED) {
-      dispatch(getChannelsAC({ filter, limit, sort, search: '', memberCount: getChannelMembersCount() }, false))
+      loadChannels()
     }
   }, [connectionStatus])
+
+  // The first load failed (retryable error) and there is nothing to show
+  const channelsLoadFailed = useSelector(channelsLoadFailedSelector) && channels.length === 0
+  const channelsLoadErrorView = renderLoadErrorState(
+    {
+      title: 'Unable to load channels',
+      description: "We couldn't load your channels. Please try again.",
+      onRetry: loadChannels
+    },
+    CustomLoadErrorState
+  )
 
   useDidUpdate(() => {
     if (addedChannel) {
@@ -579,7 +599,9 @@ const ChannelList: React.FC<IChannelListProps> = ({
           loadMoreChannels={handleLoadMoreChannels}
           searchValue={searchValue}
         >
-          {!searchValue && (channelsLoading === LOADING_STATE.LOADED || channels.length > 0) ? (
+          {!searchValue && channelsLoadFailed ? (
+            channelsLoadErrorView
+          ) : !searchValue && (channelsLoading === LOADING_STATE.LOADED || channels.length > 0) ? (
             <React.Fragment>
               {channels.map(
                 (channel: IChannel) =>
@@ -784,7 +806,9 @@ const ChannelList: React.FC<IChannelListProps> = ({
       ) : (
         <React.Fragment>
           {!searchValue &&
-            (channelsLoading === LOADING_STATE.LOADED || channels.length > 0 ? (
+            (channelsLoadFailed ? (
+              channelsLoadErrorView
+            ) : channelsLoading === LOADING_STATE.LOADED || channels.length > 0 ? (
               <ChannelsList
                 ref={channelsScrollRef}
                 onScroll={handleAllChannelsListScroll}

@@ -11,6 +11,7 @@ export const visibleChannelSelector = (store: any) => store.ChannelReducer.visib
 export const activeChannelSelector = (store: any) => store.ChannelReducer.activeChannel
 export const activeChannelOpenAtLatestSelector = (store: any) => store.ChannelReducer.activeChannelOpenAtLatest
 export const channelsLoadingState = (store: any) => store.ChannelReducer.channelsLoadingState
+export const channelsLoadFailedSelector = (store: any): boolean => !!store.ChannelReducer.channelsLoadFailed
 export const channelsLoadingStateForForwardSelector = (store: any) =>
   store.ChannelReducer.channelsForForwardLoadingState
 export const channelsHasNextSelector = (store: any) => store.ChannelReducer.channelsHasNext

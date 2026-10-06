@@ -8,6 +8,8 @@ import { updateMessage } from '../message/reducers'
 
 export interface IChannelState {
   channelsLoadingState: number | null
+  // The first channels load failed with a retryable error (ChannelList offers a Retry)
+  channelsLoadFailed: boolean
   channelsForForwardLoadingState: number | null
   usersLoadingState: string | null
   channelsHasNext: boolean
@@ -65,6 +67,7 @@ export interface IChannelState {
 
 const initialState: IChannelState = {
   channelsLoadingState: null,
+  channelsLoadFailed: false,
   channelsForForwardLoadingState: null,
   usersLoadingState: null,
   channelsHasNext: true,
@@ -240,6 +243,10 @@ const channelSlice = createSlice({
       } else {
         state.channelsLoadingState = loadingState
       }
+    },
+
+    setChannelsLoadFailed: (state, action: PayloadAction<{ failed: boolean }>) => {
+      state.channelsLoadFailed = action.payload.failed
     },
 
     setChannelsHasNext: (state, action: PayloadAction<{ hasNext: boolean; forForward?: boolean }>) => {
@@ -651,6 +658,7 @@ export const {
   setChannelToHide,
   setChannelToUnhide,
   setChannelsLoadingState,
+  setChannelsLoadFailed,
   setChannelsHasNext,
   setActiveChannel,
   updateChannelData,

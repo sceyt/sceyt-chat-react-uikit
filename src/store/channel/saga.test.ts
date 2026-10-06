@@ -4,13 +4,14 @@ import {
   getChannelFromMap,
   getPendingChannelRead,
   getPendingChannelReads,
+  query,
   removePendingChannelRead,
   setActiveChannelId,
   setChannelInMap,
   setPendingChannelRead
 } from '../../helpers/channelHalper'
 import { addMessageToMap } from '../../helpers/messagesHalper'
-import { MESSAGE_DELIVERY_STATUS } from '../../helpers/constants'
+import { LOADING_STATE, MESSAGE_DELIVERY_STATUS } from '../../helpers/constants'
 import { makeChannel, makeMessage, makePendingMessage, makeUser } from '../../testUtils/messageFixtures'
 import { setUnreadScrollToAC, updateMessageAC } from '../message/actions'
 import { CONNECTION_STATUS } from '../user/constants'
@@ -22,6 +23,8 @@ import {
   leaveChannelAC,
   resendPendingChannelReadsAC,
   setChannelsAC,
+  setChannelsLoadingStateAC,
+  setChannelsLoadFailedAC,
   updateChannelAC,
   updateChannelDataAC,
   updateSearchedChannelDataAC
@@ -1272,5 +1275,95 @@ describe('channel saga getChannels pending-message preservation', () => {
 
     expect(channelInAction.lastMessage).toEqual(expect.objectContaining({ id: reduxConfirmedMessage.id }))
     expect(getChannelFromMap(channelId)?.lastMessage).toEqual(expect.objectContaining({ id: reduxConfirmedMessage.id }))
+  })
+})
+
+describe('channel saga load failures (retryable error -> channelsLoadFailed)', () => {
+  const timeoutError = Object.assign(new Error('Request timeout'), { code: 9902 })
+  const loadingStates = (dispatched: any[]) =>
+    dispatched.filter((a) => a.type === setChannelsLoadingStateAC(0).type).map((a) => a.payload.state)
+  const failedFlags = (dispatched: any[]) =>
+    dispatched.filter((a) => a.type === setChannelsLoadFailedAC(false).type).map((a) => a.payload.failed)
+
+  beforeEach(() => {
+    jest.clearAllMocks()
+    mockStore.getState.mockReturnValue(mockStoreState)
+    destroyChannelsMap()
+    mockStoreState.UserReducer.connectionStatus = CONNECTION_STATUS.CONNECTED
+    mockStoreState.ChannelReducer = {
+      channels: [],
+      channelsLoadingState: null,
+      channelsLoadFailed: false,
+      activeChannel: {},
+      hideChannelList: true
+    }
+  })
+
+  const runGetChannels = async (loadNextPage: jest.Mock) => {
+    const channelQueryBuilder: any = {
+      types: jest.fn().mockReturnThis(),
+      memberCount: jest.fn().mockReturnThis(),
+      order: jest.fn().mockReturnThis(),
+      limit: jest.fn().mockReturnThis(),
+      build: jest.fn(async () => ({ loadNextPage }))
+    }
+    setClient({ user: { id: 'current-user' }, ChannelListQueryBuilder: jest.fn(() => channelQueryBuilder) } as any)
+    const dispatched: any[] = []
+    await runSaga(
+      { dispatch: (action) => dispatched.push(action), getState: () => mockStoreState },
+      __channelSagaTestables.getChannels,
+      { type: 'GET_CHANNELS', payload: { params: { limit: 20 } } }
+    ).toPromise()
+    return dispatched
+  }
+
+  it('sets channelsLoadFailed (and LOADED) when the first channels request times out', async () => {
+    const dispatched = await runGetChannels(jest.fn().mockRejectedValue(timeoutError))
+    expect(loadingStates(dispatched)).toEqual([LOADING_STATE.LOADING, LOADING_STATE.LOADED])
+    expect(failedFlags(dispatched)).toEqual([true])
+  })
+
+  it.each([
+    ['unknown error 9900', { code: 9900 }],
+    ['service unavailable 503', { code: 503 }],
+    ['server internal error', { type: 'InternalError', message: 'Internal error' }]
+  ])('also sets channelsLoadFailed for %s on the first channels request', async (_label, error) => {
+    const dispatched = await runGetChannels(jest.fn().mockRejectedValue(error))
+    expect(loadingStates(dispatched)).toEqual([LOADING_STATE.LOADING, LOADING_STATE.LOADED])
+    expect(failedFlags(dispatched)).toEqual([true])
+  })
+
+  it.each([
+    ['connection required 9903', 9903],
+    ['query in progress 9908', 9908]
+  ])('sets LOADED without channelsLoadFailed for %s', async (_label, code) => {
+    const dispatched = await runGetChannels(jest.fn().mockRejectedValue(Object.assign(new Error('x'), { code })))
+    expect(loadingStates(dispatched)).toEqual([LOADING_STATE.LOADING, LOADING_STATE.LOADED])
+    expect(failedFlags(dispatched)).toEqual([])
+  })
+
+  it('sets LOADED (not stuck in LOADING) for other errors', async () => {
+    const dispatched = await runGetChannels(jest.fn().mockRejectedValue(Object.assign(new Error('x'), { code: 9904 })))
+    expect(loadingStates(dispatched)).toEqual([LOADING_STATE.LOADING, LOADING_STATE.LOADED])
+  })
+
+  it('clears channelsLoadFailed and ends in LOADED after a successful retry', async () => {
+    mockStoreState.ChannelReducer.channelsLoadFailed = true
+    const dispatched = await runGetChannels(jest.fn().mockResolvedValue({ channels: [], hasNext: false }))
+    const states = loadingStates(dispatched)
+    expect(states[states.length - 1]).toBe(LOADING_STATE.LOADED)
+    expect(failedFlags(dispatched)).toEqual([false])
+  })
+
+  it('resets to LOADED when loading more channels fails, so scrolling can try again', async () => {
+    query.channelQuery = { loadNextPage: jest.fn().mockRejectedValue(timeoutError) } as any
+    const dispatched: any[] = []
+    await runSaga(
+      { dispatch: (action) => dispatched.push(action), getState: () => mockStoreState },
+      __channelSagaTestables.channelsLoadMore,
+      { type: 'LOAD_MORE_CHANNEL', payload: { limit: 20 } }
+    ).toPromise()
+    query.channelQuery = null as any
+    expect(loadingStates(dispatched)).toEqual([LOADING_STATE.LOADING, LOADING_STATE.LOADED])
   })
 })

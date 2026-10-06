@@ -1,4 +1,5 @@
 import styled, { keyframes } from 'styled-components'
+import { CustomLoadErrorStateComponent, renderLoadErrorState } from '../../../../common/LoadErrorState'
 import React, { useEffect, useState } from 'react'
 import { useDispatch, useSelector } from 'store/hooks'
 // Store
@@ -50,6 +51,8 @@ interface IProps {
   members: IMember[]
   // eslint-disable-next-line no-unused-vars
   checkActionPermission: (permission: string) => boolean
+  /** Replaces the default "Unable to load members" view shown when the first load fails with a retryable error. */
+  CustomLoadErrorState?: CustomLoadErrorStateComponent
   showChangeMemberRole?: boolean
   showMakeMemberAdmin?: boolean
   showKickMember?: boolean
@@ -67,6 +70,7 @@ const Members = ({
   channel,
   members,
   checkActionPermission,
+  CustomLoadErrorState,
   showChangeMemberRole = true,
   showMakeMemberAdmin = true,
   showKickMember = true,
@@ -278,6 +282,18 @@ const Members = ({
               {`Add ${displayMemberText}`}
             </MemberItem>
           )}
+
+          {membersLoadingState === LOADING_STATE.FAILED &&
+            !members.length &&
+            renderLoadErrorState(
+              {
+                title: 'Unable to load members',
+                description: "We couldn't load members. Please try again.",
+                onRetry: () => dispatch(getMembersAC(channel.id))
+              },
+              CustomLoadErrorState,
+              { inDetailsTab: true, asListItem: true }
+            )}
 
           {membersLoadingState === LOADING_STATE.LOADING &&
             !members.length &&

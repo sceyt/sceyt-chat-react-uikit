@@ -29,9 +29,14 @@ export const UPLOAD_STATE = {
   FAIL: 'fail'
 }
 
+// First page size of the channel details Media / Files / Links / Voice tabs (initial load and Retry)
+export const DETAILS_TAB_ATTACHMENTS_PAGE_SIZE = 35
+
 export const LOADING_STATE = {
   LOADING: 1,
-  LOADED: 2
+  LOADED: 2,
+  // The first load failed with a retryable error (see isRetryableLoadError); the UI offers a Retry.
+  FAILED: 3
 }
 
 export const DEFAULT_CHANNEL_TYPE = {

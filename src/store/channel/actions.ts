@@ -15,6 +15,7 @@ import {
   setChannelToHide,
   setChannelToUnhide,
   setChannelsLoadingState,
+  setChannelsLoadFailed,
   setChannelsHasNext,
   setActiveChannel,
   updateChannelData,
@@ -138,6 +139,8 @@ export const setChannelsForForwardAC = (channels: IChannel[]) => setChannelsForF
 
 export const setChannelsLoadingStateAC = (state: number, forForward?: boolean) =>
   setChannelsLoadingState({ state, forForward })
+
+export const setChannelsLoadFailedAC = (failed: boolean) => setChannelsLoadFailed({ failed })
 
 export const channelHasNextAC = (hasNext: boolean, forForward?: boolean) => setChannelsHasNext({ hasNext, forForward })
 

@@ -20,7 +20,7 @@ import { makeUsername } from '../../../helpers/message'
 import { useColor } from '../../../hooks'
 import { useSelector, useDispatch } from 'store/hooks'
 import { themeSelector } from 'store/theme/selector'
-import { loadMoreMembersAC } from '../../../store/member/actions'
+import { getMembersAC, loadMoreMembersAC } from '../../../store/member/actions'
 import { channelsMembersLoadingStateSelector, channelsMembersHasNextMapSelector } from '../../../store/member/selector'
 import { shallowEqual } from 'react-redux'
 
@@ -226,7 +226,7 @@ function MentionsTypeaheadMenuItem({
   )
 }
 const optionObj: any = {}
-function MentionsContainer({
+export function MentionsContainer({
   queryString,
   options,
   selectedIndex,
@@ -308,7 +308,22 @@ function MentionsContainer({
     [membersHasNext, membersLoadingState, channelId, dispatch]
   )
 
+  // Channel whose failed first members load was already retried from here (reset once a load succeeds)
+  const retriedFailedLoadRef = useRef<string | null>(null)
+
   useEffect(() => {
+    // The first load failed (Members tab shows Retry): retry it once so mentions don't stay empty.
+    // Not loadMoreMembers: it would page a query that never loaded, and its LOADED would hide the Retry.
+    if (membersLoadingState === LOADING_STATE.FAILED) {
+      if (channelId && retriedFailedLoadRef.current !== channelId) {
+        retriedFailedLoadRef.current = channelId
+        dispatch(getMembersAC(channelId))
+      }
+      return
+    }
+    if (membersLoadingState === LOADING_STATE.LOADED) {
+      retriedFailedLoadRef.current = null
+    }
     if (options?.length < 20 && membersHasNext && membersLoadingState === LOADING_STATE.LOADED && channelId) {
       dispatch(loadMoreMembersAC(15, channelId))
     }

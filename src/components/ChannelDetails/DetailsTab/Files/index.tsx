@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react'
+import { CustomLoadErrorStateComponent, renderLoadErrorState } from '../../../../common/LoadErrorState'
 import { shallowEqual } from 'react-redux'
 import { useSelector, useDispatch } from 'store/hooks'
 import styled, { keyframes } from 'styled-components'
@@ -14,12 +15,16 @@ import { bytesToSize, downloadFile, formatLargeText, formatChannelDetailsDate } 
 import { isJSON } from 'helpers/message'
 import { base64ToDataURL } from 'helpers/resizeImage'
 import { IAttachment } from '../../../../types'
-import { channelDetailsTabs, LOADING_STATE } from '../../../../helpers/constants'
+import { channelDetailsTabs, DETAILS_TAB_ATTACHMENTS_PAGE_SIZE, LOADING_STATE } from '../../../../helpers/constants'
+import { connectionStatusSelector } from '../../../../store/user/selector'
+import { CONNECTION_STATUS } from '../../../../store/user/constants'
 import { AttachmentPreviewTitle } from '../../../../UIHelper'
 import { THEME_COLORS } from '../../../../UIHelper/constants'
-import { useColor } from '../../../../hooks'
+import { useColor, useDidUpdate } from '../../../../hooks'
 
 interface IProps {
+  /** Replaces the default "Unable to load files" view shown when the first load fails with a retryable error. */
+  CustomLoadErrorState?: CustomLoadErrorStateComponent
   channelId: string
   filePreviewIcon?: JSX.Element
   filePreviewHoverIcon?: JSX.Element
@@ -35,6 +40,7 @@ interface IProps {
 
 const Files = ({
   channelId,
+  CustomLoadErrorState,
   filePreviewIcon,
   filePreviewHoverIcon,
   filePreviewTitleColor,
@@ -59,6 +65,7 @@ const Files = ({
   const dispatch = useDispatch()
   const [downloadingFilesMap, setDownloadingFilesMap] = useState<{ [key: string]: { uploadPercent: number } }>({})
   const attachments = useSelector(activeTabAttachmentsSelector, shallowEqual) || []
+  const connectionStatus = useSelector(connectionStatusSelector)
   const loadingState = useSelector(attachmentLoadingStateSelector)
   const nameSizeNum = fileNameFontSize && Number(fileNameFontSize.slice(0, -2))
   const nameMaxLength = nameSizeNum ? 32 - (nameSizeNum - 15) * (nameSizeNum < 20 ? 2 : 1) : 32
@@ -80,9 +87,19 @@ const Files = ({
     })
   }
 
+  const loadAttachments = () =>
+    dispatch(getAttachmentsAC(channelId, channelDetailsTabs.file, DETAILS_TAB_ATTACHMENTS_PAGE_SIZE))
+
   useEffect(() => {
-    dispatch(getAttachmentsAC(channelId, channelDetailsTabs.file, 35))
+    loadAttachments()
   }, [channelId])
+
+  // A load that failed while the connection dropped ends empty; reload once the connection is back
+  useDidUpdate(() => {
+    if (connectionStatus === CONNECTION_STATUS.CONNECTED && !attachments.length) {
+      loadAttachments()
+    }
+  }, [connectionStatus])
 
   const groups = useMemo(() => {
     const result: { key: string; date: Date; items: IAttachment[] }[] = []
@@ -113,6 +130,16 @@ const Files = ({
             </SkeletonRow>
           ))}
         </React.Fragment>
+      ) : loadingState === LOADING_STATE.FAILED && attachments.length === 0 ? (
+        renderLoadErrorState(
+          {
+            title: 'Unable to load files',
+            description: "We couldn't load files. Please try again.",
+            onRetry: loadAttachments
+          },
+          CustomLoadErrorState,
+          { inDetailsTab: true, asListItem: true }
+        )
       ) : loadingState === LOADING_STATE.LOADED && attachments.length === 0 ? (
         <EmptyState color={textSecondary}>No shared files.</EmptyState>
       ) : (

@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react'
+import { CustomLoadErrorStateComponent } from '../../common/LoadErrorState'
 import styled from 'styled-components'
 import { shallowEqual } from 'react-redux'
 import { useSelector } from 'store/hooks'
@@ -118,6 +119,8 @@ export interface IDetailsProps {
   voicePreviewTitleColor?: string
   voicePreviewDateAndTimeColor?: string
   voicePreviewHoverBackgroundColor?: string
+  /** Replaces the default "Unable to load ..." view shown when a details tab's first load fails with a retryable error. */
+  CustomLoadErrorState?: CustomLoadErrorStateComponent
 
   filePreviewIcon?: JSX.Element
   filePreviewHoverIcon?: JSX.Element
@@ -228,6 +231,7 @@ const ChannelDetailsContainer = ({
   blockAndLeaveChannelTextColor,
   unblockUserIcon,
   linkPreviewIcon,
+  CustomLoadErrorState,
   linkPreviewHoverIcon,
   linkPreviewTitleColor,
   linkPreviewColor,
@@ -363,6 +367,7 @@ const ChannelDetailsContainer = ({
           blockAndLeaveChannelTextColor={blockAndLeaveChannelTextColor}
           unblockUserIcon={unblockUserIcon}
           linkPreviewIcon={linkPreviewIcon}
+          CustomLoadErrorState={CustomLoadErrorState}
           linkPreviewHoverIcon={linkPreviewHoverIcon}
           linkPreviewTitleColor={linkPreviewTitleColor}
           linkPreviewColor={linkPreviewColor}

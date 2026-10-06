@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo } from 'react'
+import { CustomLoadErrorStateComponent } from '../../../common/LoadErrorState'
 import styled from 'styled-components'
 import { useDispatch, useSelector } from 'store/hooks'
 // Store
@@ -26,6 +27,7 @@ interface IProps {
   setActiveTab: (activeTab: string) => void
   // eslint-disable-next-line no-unused-vars
   checkActionPermission: (permission: string) => boolean
+  CustomLoadErrorState?: CustomLoadErrorStateComponent
   linkPreviewIcon?: JSX.Element
   linkPreviewHoverIcon?: JSX.Element
   linkPreviewTitleColor?: string
@@ -70,6 +72,7 @@ const DetailsTab = ({
   channel,
   activeTab,
   checkActionPermission,
+  CustomLoadErrorState,
   setActiveTab,
   linkPreviewIcon,
   linkPreviewHoverIcon,
@@ -197,6 +200,7 @@ const DetailsTab = ({
           members={members}
           channel={channel}
           checkActionPermission={checkActionPermission}
+          CustomLoadErrorState={CustomLoadErrorState}
           showChangeMemberRole={showChangeMemberRole}
           showKickMember={showKickMember}
           showKickAndBlockMember={showKickAndBlockMember}
@@ -210,10 +214,13 @@ const DetailsTab = ({
           QRCodeIcon={QRCodeIcon}
         />
       )}
-      {activeTab === channelDetailsTabs.media && <Media channel={channel} />}
+      {activeTab === channelDetailsTabs.media && (
+        <Media channel={channel} CustomLoadErrorState={CustomLoadErrorState} />
+      )}
       {activeTab === channelDetailsTabs.file && (
         <Files
           channelId={channel.id}
+          CustomLoadErrorState={CustomLoadErrorState}
           filePreviewIcon={filePreviewIcon}
           filePreviewHoverIcon={filePreviewHoverIcon}
           filePreviewTitleColor={filePreviewTitleColor}
@@ -229,6 +236,7 @@ const DetailsTab = ({
       {activeTab === channelDetailsTabs.link && (
         <Links
           channelId={channel.id}
+          CustomLoadErrorState={CustomLoadErrorState}
           linkPreviewIcon={linkPreviewIcon}
           linkPreviewHoverIcon={linkPreviewHoverIcon}
           linkPreviewTitleColor={linkPreviewTitleColor}
@@ -239,6 +247,7 @@ const DetailsTab = ({
       {activeTab === channelDetailsTabs.voice && (
         <Voices
           channelId={channel.id}
+          CustomLoadErrorState={CustomLoadErrorState}
           voicePreviewPlayHoverIcon={voicePreviewPlayIcon}
           voicePreviewPlayIcon={voicePreviewPlayHoverIcon}
           voicePreviewPauseIcon={voicePreviewPauseIcon}

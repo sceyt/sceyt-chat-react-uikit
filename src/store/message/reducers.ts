@@ -63,6 +63,8 @@ export interface IMessageStore {
   threadMessagesHasNext: boolean
   threadMessagesHasPrev: boolean
   activeChannelMessages: IMessage[]
+  // Channel whose first message load failed (retryable error) with nothing to show (MessageList offers a Retry)
+  messagesLoadFailedChannelId: string | null
   activeChannelNewMessage: IMessage | null
   activeTabAttachments: any[]
   tabAttachmentsCache: { [key: string]: any[] }
@@ -127,6 +129,7 @@ const initialState: IMessageStore = {
   threadMessagesHasNext: false,
   threadMessagesHasPrev: true,
   activeChannelMessages: [],
+  messagesLoadFailedChannelId: null,
   attachmentsForPopup: [],
   activeTabAttachments: [],
   tabAttachmentsCache: {},
@@ -629,6 +632,10 @@ const messageSlice = createSlice({
       state.messageToEdit = action.payload.message
     },
 
+    setMessagesLoadFailed: (state, action: PayloadAction<{ channelId: string | null }>) => {
+      state.messagesLoadFailedChannelId = action.payload.channelId
+    },
+
     setLoadingPrevMessagesState: (state, action: PayloadAction<{ state: number | null }>) => {
       state.loadingPrevMessagesState = action.payload.state
     },
@@ -1049,6 +1056,7 @@ export const {
   removeUploadProgress,
   setMessageToEdit,
   setLoadingPrevMessagesState,
+  setMessagesLoadFailed,
   setLoadingNextMessagesState,
   setActivePaginationIntent,
   clearActivePaginationIntent,

@@ -25,9 +25,11 @@ import {
   showScrollToNewMessageButtonSelector,
   unreadScrollToSelector,
   unreadMessageIdSelector,
-  visibleMessagesMapSelector
+  visibleMessagesMapSelector,
+  messagesLoadFailedChannelIdSelector
 } from '../../../store/message/selector'
 import { setPinnedMessagesListOpenAC } from '../../../store/message/actions'
+import { CustomLoadErrorStateComponent, renderLoadErrorState } from '../../../common/LoadErrorState'
 import {
   activeChannelOpenAtLatestSelector,
   activeChannelSelector,
@@ -191,6 +193,8 @@ interface MessagesProps {
     message: IMessage,
     context: { placement: 'banner' | 'system' }
   ) => React.ReactNode | null | undefined
+  /** Replaces the default "Unable to load messages" view shown when the first load fails with a retryable error. */
+  CustomLoadErrorState?: CustomLoadErrorStateComponent
   messageStatusSize?: string
   messageStatusColor?: string
   messageReadStatusColor?: string
@@ -343,6 +347,7 @@ const MessageList: React.FC<MessagesProps> = ({
   endVoteIcon,
   pinnedMessageIcon,
   renderPinnedMessagePreview,
+  CustomLoadErrorState,
   allowEditDeleteIncomingMessage = true,
   starIcon,
   staredIcon,
@@ -466,6 +471,7 @@ const MessageList: React.FC<MessagesProps> = ({
   const dispatch = useDispatch()
   const channel: IChannel = useSelector(activeChannelSelector)
   const openAtLatest = useSelector(activeChannelOpenAtLatestSelector)
+  const messagesLoadFailedChannelId = useSelector(messagesLoadFailedChannelIdSelector)
   const contactsMap: IContactsMap = useSelector(contactsMapSelector, shallowEqual)
   const connectionStatus = useSelector(connectionStatusSelector, shallowEqual)
   // const sendMessageInputHeight: number = useSelector(sendMessageInputHeightSelector)
@@ -522,6 +528,7 @@ const MessageList: React.FC<MessagesProps> = ({
   }
 
   const {
+    retryInitialLoad,
     scrollRef,
     setLastVisibleMessageId,
     handleScrollToRepliedMessage,
@@ -534,6 +541,7 @@ const MessageList: React.FC<MessagesProps> = ({
     messages,
     channel,
     openAtLatest,
+    messagesLoadFailedChannelId,
     hasPrevMessages,
     hasNextMessages,
     loadingPrevMessages,
@@ -1141,6 +1149,15 @@ const MessageList: React.FC<MessagesProps> = ({
                   )
                 })}
               </MessagesBox>
+            ) : channel?.id && messagesLoadFailedChannelId === channel.id ? (
+              renderLoadErrorState(
+                {
+                  title: 'Unable to load messages',
+                  description: "We couldn't load messages. Please try again.",
+                  onRetry: retryInitialLoad
+                },
+                CustomLoadErrorState
+              )
             ) : loadingPrevMessages === LOADING_STATE.LOADED && loadingNextMessages === LOADING_STATE.LOADED ? (
               <NoMessagesContainer color={textPrimary}>
                 <NoMessagesIcon />

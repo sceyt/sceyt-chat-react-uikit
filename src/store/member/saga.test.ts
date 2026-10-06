@@ -221,6 +221,57 @@ describe('member saga', () => {
       expect(dispatched[1].type).toBe('members/setMembersLoadingState')
     })
 
+    it('sets FAILED when the first members request times out', async () => {
+      const mockMembersQuery = {
+        loadNextPage: jest.fn().mockRejectedValue({ code: 9902, message: 'Request timeout' })
+      }
+      mockClient.MemberListQueryBuilder = jest.fn().mockImplementation(() => ({
+        all: jest.fn().mockReturnThis(),
+        byAffiliationOrder: jest.fn().mockReturnThis(),
+        orderKeyByUsername: jest.fn().mockReturnThis(),
+        limit: jest.fn().mockReturnThis(),
+        build: jest.fn().mockResolvedValue(mockMembersQuery)
+      }))
+      setChannelInMap(makeChannel({ id: 'channel-timeout', members: [] }))
+
+      const dispatched = await runMemberSaga(__memberSagaTestables.getMembers, getMembersAC('channel-timeout'))
+
+      const states = dispatched
+        .filter((a) => a.type === 'members/setMembersLoadingState')
+        .map((a) => a.payload.loadingState)
+      expect(states).toEqual([LOADING_STATE.LOADING, LOADING_STATE.FAILED])
+    })
+
+    it('keeps LOADED when members are already loaded and the reload times out', async () => {
+      // FAILED would block load-more (mentions list, members scroll), which only runs under LOADED
+      const newState = createMockStoreState({
+        MembersReducer: {
+          channelsMembersMap: { 'channel-cached': [{ id: 'member-1' }] },
+          channelsMembersHasNextMap: {}
+        }
+      })
+      mockStoreState = newState
+      mockStore.getState.mockReturnValue(newState)
+      const mockMembersQuery = {
+        loadNextPage: jest.fn().mockRejectedValue({ code: 9902, message: 'Request timeout' })
+      }
+      mockClient.MemberListQueryBuilder = jest.fn().mockImplementation(() => ({
+        all: jest.fn().mockReturnThis(),
+        byAffiliationOrder: jest.fn().mockReturnThis(),
+        orderKeyByUsername: jest.fn().mockReturnThis(),
+        limit: jest.fn().mockReturnThis(),
+        build: jest.fn().mockResolvedValue(mockMembersQuery)
+      }))
+      setChannelInMap(makeChannel({ id: 'channel-cached', members: [] }))
+
+      const dispatched = await runMemberSaga(__memberSagaTestables.getMembers, getMembersAC('channel-cached'))
+
+      const states = dispatched
+        .filter((a) => a.type === 'members/setMembersLoadingState')
+        .map((a) => a.payload.loadingState)
+      expect(states).toEqual([LOADING_STATE.LOADING, LOADING_STATE.LOADED])
+    })
+
     it('handles SDK error gracefully without crashing', async () => {
       const mockMembersQuery = {
         loadNextPage: jest.fn().mockRejectedValue({ code: 5000, message: 'Network error' })

@@ -20,6 +20,7 @@ import { THEME_COLORS } from '../UIHelper/constants'
 import { OGMetadata } from './Message/OGMetadata'
 import PollMessage from './Message/PollMessage'
 import ForwardMessagePopup, { IForwardMessageNote, IForwardPreviewMessage } from 'common/popups/forwardMessage'
+import { CustomLoadErrorStateComponent, ILoadErrorStateProps } from 'common/LoadErrorState'
 import {
   createOrGetDirectChannel,
   switchChannelActiveChannel,
@@ -63,7 +64,9 @@ export {
   unBlockUsers,
   ForwardMessagePopup,
   IForwardMessageNote,
-  IForwardPreviewMessage
+  IForwardPreviewMessage,
+  CustomLoadErrorStateComponent,
+  ILoadErrorStateProps
 }
 
 declare global {

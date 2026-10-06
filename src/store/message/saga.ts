@@ -108,12 +108,14 @@ import {
   setOGMetadataAC,
   fetchOGMetadataForLinkAC,
   setUnreadMessageIdAC,
-  deleteMessageFromListAC
+  deleteMessageFromListAC,
+  setMessagesLoadFailedAC
 } from './actions'
 import {
   attachmentTypes,
   DEFAULT_CHANNEL_TYPE,
   channelDetailsTabs,
+  DETAILS_TAB_ATTACHMENTS_PAGE_SIZE,
   LOADING_STATE,
   MESSAGE_STATUS,
   UPLOAD_STATE
@@ -186,6 +188,7 @@ import store from '../index'
 import { IProgress } from '../../components/ChatContainer'
 import { canBeViewOnce, isJSON } from '../../helpers/message'
 import log from 'loglevel'
+import { isRetryableLoadError } from '../../helpers/error'
 import { getVideoFirstFrame, getVideoPreviewFrame } from 'helpers/getVideoFrame'
 import { MESSAGE_TYPE } from 'types/enum'
 import { setWaitToSendPendingMessagesAC } from 'store/user/actions'
@@ -687,6 +690,8 @@ const addPendingMessage = (
 ) => {
   const messageToAdd = {
     ...messageCopy,
+    // The SDK builder leaves channelId empty until the server confirms; "this chat's messages" checks need it
+    channelId,
     createdAt: new Date(Date.now()),
     mentionedUsers: message.mentionedUsers,
     // A forward is a new standalone message. Do not carry the source reply's
@@ -2793,6 +2798,7 @@ function* backgroundRefreshRestoreWindow(
 
 function* loadAroundMessageWorker(action: IAction): any {
   try {
+    yield call(clearMessagesLoadFailed, action.payload?.channel?.id)
     const { channel, messageId, networkChanged, restoreWindow } = action.payload
     const connectionState = store.getState().UserReducer.connectionStatus
     const messages = store.getState().MessageReducer.activeChannelMessages
@@ -2934,6 +2940,7 @@ function* loadAroundMessageWorker(action: IAction): any {
     }
   } catch (e) {
     log.error('error in loadAroundMessage', e)
+    yield call(markMessagesLoadFailedIfEmpty, action.payload?.channel?.id, e)
   } finally {
     yield call(setMessageListLoading, 'both', LOADING_STATE.LOADED)
   }
@@ -3004,8 +3011,37 @@ function* loadAroundMessage(action: IAction): any {
   }
 }
 
+// The first load of a chat failed (retryable error) and there is nothing on screen -> MessageList shows
+// "Unable to load messages" with a Retry. Cached messages, a chat that is no longer open, or
+// other errors keep today's behavior.
+function* markMessagesLoadFailedIfEmpty(channelId: string | undefined, error: unknown): any {
+  if (!channelId || !isRetryableLoadError(error) || getActiveChannelId() !== channelId) {
+    return
+  }
+  // Only this chat's messages count: some switch paths keep the previous chat's list until the load lands
+  const shownMessages: IMessage[] = store.getState().MessageReducer?.activeChannelMessages || []
+  if (!shownMessages.some((message) => message.channelId === channelId)) {
+    yield put(setMessagesLoadFailedAC(channelId))
+  }
+}
+
+function* clearMessagesLoadFailed(channelId: string | undefined): any {
+  const failedChannelId = store.getState().MessageReducer?.messagesLoadFailedChannelId
+  if (!failedChannelId) {
+    return
+  }
+  if (failedChannelId === channelId) {
+    // Nothing is on screen: show the spinner first, or the list falls through to "No messages yet"
+    // while the load starts (the failed run's finally left both directions LOADED).
+    // Another chat's stale flag must not hide this chat's cached window behind a spinner.
+    yield call(setMessageListLoading, 'both', LOADING_STATE.LOADING)
+  }
+  yield put(setMessagesLoadFailedAC(null))
+}
+
 function* loadNearUnread(action: IAction): any {
   try {
+    yield call(clearMessagesLoadFailed, action.payload?.channel?.id)
     const { channel } = action.payload
     const connectionState = store.getState().UserReducer.connectionStatus
 
@@ -3124,6 +3160,7 @@ function* loadNearUnread(action: IAction): any {
     }
   } catch (e) {
     log.error('error in loadNearUnread', e)
+    yield call(markMessagesLoadFailedIfEmpty, action.payload?.channel?.id, e)
   } finally {
     yield call(setMessageListLoading, 'both', LOADING_STATE.LOADED)
   }
@@ -3131,6 +3168,7 @@ function* loadNearUnread(action: IAction): any {
 
 function* loadDefaultMessages(action: IAction): any {
   try {
+    yield call(clearMessagesLoadFailed, action.payload?.channel?.id)
     const { channel } = action.payload
     const connectionState = store.getState().UserReducer.connectionStatus
 
@@ -3234,6 +3272,7 @@ function* loadDefaultMessages(action: IAction): any {
     }
   } catch (e) {
     log.error('error in loadDefaultMessages', e)
+    yield call(markMessagesLoadFailedIfEmpty, action.payload?.channel?.id, e)
   } finally {
     yield call(setMessageListLoading, 'both', LOADING_STATE.LOADED)
   }
@@ -3241,6 +3280,7 @@ function* loadDefaultMessages(action: IAction): any {
 
 function* getMessagesQuery(action: IAction): any {
   try {
+    yield call(clearMessagesLoadFailed, action.payload?.channel?.id)
     yield call(setMessageListLoading, 'both', LOADING_STATE.LOADING)
     const { channel, limit, networkChanged, applyVisibleWindow = true, forceLatestWindow = false } = action.payload
     const channelNewMessageCount = channel?.newMessageCount || 0
@@ -3385,6 +3425,7 @@ function* getMessagesQuery(action: IAction): any {
     }
   } catch (e) {
     log.error('error in message query', e)
+    yield call(markMessagesLoadFailedIfEmpty, action.payload?.channel?.id, e)
     /* if (e.code !== 10008) {
       yield put(setErrorNotification(e.message));
     } */
@@ -3872,6 +3913,8 @@ function* getMessageAttachments(action: IAction): any {
   const cachedAttachmentIdsAtRequestStart = new Set(
     (cachedAttachments || []).map((attachment: IAttachment) => attachment.id)
   )
+  // The first load of this tab failed (retryable error) with nothing cached -> the tab shows "Unable to load ..."
+  let loadFailed = false
   if (!forPopup) {
     activeDisplayedCacheKey = cacheKey
     activeDisplayedAttachmentScope = { channelId, attachmentType }
@@ -3879,6 +3922,15 @@ function* getMessageAttachments(action: IAction): any {
   try {
     if (cachedAttachments !== undefined) {
       yield put(setAttachmentsAC(cachedAttachments))
+      // The loading state is shared by all tabs: don't carry another tab's failure over to this one
+      if (store.getState().MessageReducer.attachmentLoadingState === LOADING_STATE.FAILED) {
+        yield put(
+          setAttachmentsLoadingStateAC(
+            cachedAttachments.length ? LOADING_STATE.LOADED : LOADING_STATE.LOADING,
+            forPopup
+          )
+        )
+      }
     } else {
       yield put(setAttachmentsLoadingStateAC(LOADING_STATE.LOADING, forPopup))
     }
@@ -3953,9 +4005,10 @@ function* getMessageAttachments(action: IAction): any {
     }
   } catch (e) {
     log.error('error in message attachment query', e)
+    loadFailed = !forPopup && isRetryableLoadError(e) && !cachedAttachments?.length
     // yield put(setErrorNotification(e.message))
   } finally {
-    yield put(setAttachmentsLoadingStateAC(LOADING_STATE.LOADED, forPopup))
+    yield put(setAttachmentsLoadingStateAC(loadFailed ? LOADING_STATE.FAILED : LOADING_STATE.LOADED, forPopup))
   }
 }
 
@@ -4033,7 +4086,7 @@ function* refreshActiveMediaAttachmentsAfterReconnect(action: IAction): any {
       attachmentTypes.video,
       attachmentTypes.image
     ])
-    queryBuilder.limit(35)
+    queryBuilder.limit(DETAILS_TAB_ATTACHMENTS_PAGE_SIZE)
     const attachmentQuery = yield call(queryBuilder.build)
     const result: { attachments: IAttachment[]; hasNext: boolean } = yield call(
       attachmentQuery.loadNextAttachmentId,
