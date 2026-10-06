@@ -67,4 +67,22 @@ describe('UsersPopup presence updates', () => {
     expect(dispatchSpy).toHaveBeenCalledWith(setUserBlockedForInviteAC(true, ['ada']))
     expect(getUsersCalls(dispatchSpy)).toHaveLength(0)
   })
+
+  it('makes a loaded user selectable again after unblocking without re-querying users', () => {
+    setShowOnlyContactUsers(false)
+    const blockedAda = { ...ada, blocked: true }
+    const { store, dispatchSpy, container } = renderPopup({ UserReducer: { usersList: [blockedAda] } })
+    const adaRow = () => container.ownerDocument.querySelector('[data-presence-user-id="ada"]') as Element
+    fireEvent.click(adaRow())
+    expect(dispatchSpy).toHaveBeenCalledWith(setUserBlockedForInviteAC(true, ['ada']))
+    dispatchSpy.mockClear()
+
+    // What the unblockUser saga stores for the user.
+    act(() => {
+      store.dispatch(updateUserStatusOnMapAC({ ada: { ...blockedAda, blocked: false } }))
+    })
+    fireEvent.click(adaRow())
+    expect(dispatchSpy).not.toHaveBeenCalledWith(setUserBlockedForInviteAC(true, ['ada']))
+    expect(getUsersCalls(dispatchSpy)).toHaveLength(0)
+  })
 })

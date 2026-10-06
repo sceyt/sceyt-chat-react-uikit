@@ -145,15 +145,18 @@ const UsersPopup = ({
   const channelTypeRoleMap = getDefaultRolesByChannelTypesMap()
   const [isScrolling, setIsScrolling] = useState<boolean>(false)
   const [isSelectedMembersScrolling, setIsSelectedMembersScrolling] = useState<boolean>(false)
-  // Only blocked flags of the listed contacts: presence updates to updatedUserMap must not re-run the list effects.
-  const contactsBlockedMap: { [id: string]: boolean } = useSelector(
-    (state: any) =>
-      contactList.reduce((acc: { [id: string]: boolean }, contact: IContact) => {
-        acc[contact.id] = !!state.UserReducer.updatedUserMap?.[contact.id]?.blocked
-        return acc
-      }, {}),
-    shallowEqual
-  )
+  // Blocked flags Redux knows for the listed contacts and loaded users (e.g. after block/unblock).
+  // Presence-only updates leave this unchanged, so they never re-run the list effects.
+  const blockedFlags: { [id: string]: boolean } = useSelector((state: any) => {
+    const updatedUserMap = state.UserReducer.updatedUserMap || {}
+    const flags: { [id: string]: boolean } = {}
+    const collect = (id: string) => {
+      if (id && updatedUserMap[id]) flags[id] = !!updatedUserMap[id].blocked
+    }
+    contactList.forEach((contact: IContact) => collect(contact.id))
+    usersList.forEach((user: IUser) => collect(user.id))
+    return flags
+  }, shallowEqual)
   const popupTitleText =
     channel &&
     (memberDisplayText && memberDisplayText[channel.type]
@@ -266,7 +269,7 @@ const UsersPopup = ({
       if (!userSearchValue) {
         const userList = contactList.map((cont: IContact & { blocked?: boolean }) => ({
           ...cont.user,
-          blocked: !!contactsBlockedMap[cont.id]
+          blocked: !!blockedFlags[cont.id]
         }))
         if (actionType === 'createChat') {
           userList.unshift(selfUser)
@@ -274,13 +277,15 @@ const UsersPopup = ({
         setFilteredUsers(userList)
       }
     } else {
-      const userList = [...usersList]
+      const userList = usersList.map((user: IUser) =>
+        blockedFlags[user.id] === undefined ? user : { ...user, blocked: blockedFlags[user.id] }
+      )
       if (actionType === 'createChat') {
         userList.unshift(selfUser)
       }
       setFilteredUsers(userList)
     }
-  }, [contactList, usersList, contactsBlockedMap])
+  }, [contactList, usersList, blockedFlags])
 
   useDidUpdate(() => {
     if (getFromContacts) {
@@ -302,13 +307,11 @@ const UsersPopup = ({
         ) {
           filteredContacts.unshift({ user: selfUser })
         }
-        setFilteredUsers(
-          filteredContacts.map((cont: IContact) => ({ ...cont.user, blocked: !!contactsBlockedMap[cont.id] }))
-        )
+        setFilteredUsers(filteredContacts.map((cont: IContact) => ({ ...cont.user, blocked: !!blockedFlags[cont.id] })))
       } else {
         const userList = contactList.map((cont: IContact) => ({
           ...cont.user,
-          blocked: !!contactsBlockedMap[cont.id]
+          blocked: !!blockedFlags[cont.id]
         }))
         if (actionType === 'createChat') {
           userList.unshift(selfUser)
@@ -316,7 +319,7 @@ const UsersPopup = ({
         setFilteredUsers(userList)
       }
     }
-  }, [userSearchValue, contactsBlockedMap])
+  }, [userSearchValue, blockedFlags])
 
   useDidUpdate(() => {
     if (!getFromContacts) {
