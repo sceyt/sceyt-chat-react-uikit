@@ -8,14 +8,16 @@ import { getAttachmentsAC } from '../../../../store/message/actions'
 import { activeTabAttachmentsSelector, attachmentLoadingStateSelector } from '../../../../store/message/selector'
 // Helpers
 import { IAttachment } from '../../../../types'
-import { channelDetailsTabs, LOADING_STATE } from '../../../../helpers/constants'
+import { channelDetailsTabs, DETAILS_TAB_ATTACHMENTS_PAGE_SIZE, LOADING_STATE } from '../../../../helpers/constants'
+import { connectionStatusSelector } from '../../../../store/user/selector'
+import { CONNECTION_STATUS } from '../../../../store/user/constants'
 // Components
 import LinkItem from './linkItem'
 import { THEME_COLORS } from '../../../../UIHelper/constants'
-import { useColor } from '../../../../hooks'
+import { useColor, useDidUpdate } from '../../../../hooks'
 
 interface IProps {
-  /** Replaces the default "Unable to load links" view shown when the first load times out. */
+  /** Replaces the default "Unable to load links" view shown when the first load fails with a retryable error. */
   CustomLoadErrorState?: CustomLoadErrorStateComponent
   channelId: string
   linkPreviewIcon?: JSX.Element
@@ -41,11 +43,22 @@ const Links = ({
   } = useColor()
   const dispatch = useDispatch()
   const attachments = useSelector(activeTabAttachmentsSelector, shallowEqual) || []
+  const connectionStatus = useSelector(connectionStatusSelector)
   const loadingState = useSelector(attachmentLoadingStateSelector)
 
+  const loadAttachments = () =>
+    dispatch(getAttachmentsAC(channelId, channelDetailsTabs.link, DETAILS_TAB_ATTACHMENTS_PAGE_SIZE))
+
   useEffect(() => {
-    dispatch(getAttachmentsAC(channelId, channelDetailsTabs.link, 35))
+    loadAttachments()
   }, [channelId])
+
+  // A load that failed while the connection dropped ends empty; reload once the connection is back
+  useDidUpdate(() => {
+    if (connectionStatus === CONNECTION_STATUS.CONNECTED && !attachments.length) {
+      loadAttachments()
+    }
+  }, [connectionStatus])
 
   const groups = useMemo(() => {
     const result: { key: string; date: Date; items: IAttachment[] }[] = []
@@ -78,9 +91,10 @@ const Links = ({
           {
             title: 'Unable to load links',
             description: "We couldn't load links. Please try again.",
-            onRetry: () => dispatch(getAttachmentsAC(channelId, channelDetailsTabs.link, 35))
+            onRetry: loadAttachments
           },
-          CustomLoadErrorState
+          CustomLoadErrorState,
+          { inList: true }
         )
       ) : loadingState === LOADING_STATE.LOADED && attachments.length === 0 ? (
         <EmptyState color={textSecondary}>No shared links.</EmptyState>

@@ -120,3 +120,19 @@ The view is now shown for any **retryable load error** (`isRetryableLoadError` i
 | | 1203 TOO_LARGE_MESSAGE (send-only) |
 
 Copy no longer says "in time": e.g. "We couldn't load your channels. Please try again."
+
+## Update — review fixes (2026-10-05)
+
+- Channel list: the failure is now its own flag, `ChannelReducer.channelsLoadFailed` (set by `getChannels`
+  on a retryable error, cleared when `getChannels` starts). `channelsLoadingState` goes back to `LOADED`, so
+  `searchChannels` (which shares it) can no longer erase the Retry, and load-more keeps working when
+  channels are already shown. `LOADING_STATE.FAILED` is still used for members and attachments.
+- Members: `FAILED` only when the channel has no members yet. With members shown, a failed reload keeps
+  `LOADED` so the mentions list and members scroll can still load more.
+- Messages: the failed check counts only the open chat's messages (some switch paths keep the previous
+  chat's list), and clearing the flag sets both directions to `LOADING` first (no "No messages yet" flash
+  on Retry).
+- Attachments: a cache hit resets another tab's `FAILED`; the tabs reload when the connection comes back
+  and the tab is empty. Page size is `DETAILS_TAB_ATTACHMENTS_PAGE_SIZE`.
+- `LoadErrorState`: Retry reuses the UIHelper `Button` (hover state), `role="status"`, an `inList` layout for
+  the `<ul>` tabs, `retryText` removed. `ILoadErrorStateProps` / `CustomLoadErrorStateComponent` are exported.

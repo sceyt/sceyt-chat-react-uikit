@@ -3136,6 +3136,36 @@ describe('MessageList first-load timeout', () => {
     expect(screen.queryByText('Unable to load messages')).not.toBeInTheDocument()
   })
 
+  it('reloads the chat when a message arrives while the error is shown', () => {
+    // Otherwise the list shows only that one message: no history, no Retry
+    const channel = makeChannel({ id: 'channel-incoming' })
+    const store = failedStore(channel)
+    const dispatchSpy = jest.spyOn(store, 'dispatch')
+    renderMessageList(store)
+    expect(screen.getByText('Unable to load messages')).toBeInTheDocument()
+    dispatchSpy.mockClear()
+
+    act(() => {
+      store.dispatch(addMessageAC(makeMessage({ id: '500', channelId: channel.id, body: 'incoming' })))
+    })
+
+    expect(dispatchSpy).toHaveBeenCalledWith(loadDefaultMessagesAC(channel))
+  })
+
+  it('does not reload when the failed chat has no messages', () => {
+    const channel = makeChannel({ id: 'channel-still-failed' })
+    const store = failedStore(channel)
+    const dispatchSpy = jest.spyOn(store, 'dispatch')
+    renderMessageList(store)
+    dispatchSpy.mockClear()
+
+    act(() => {
+      store.dispatch(setMessagesAC([]))
+    })
+
+    expect(dispatchSpy).not.toHaveBeenCalledWith(loadDefaultMessagesAC(channel))
+  })
+
   it('uses CustomLoadErrorState when provided', () => {
     const channel = makeChannel({ id: 'channel-custom-error' })
     const Custom = ({ title }: any) => React.createElement('div', { 'data-testid': 'custom-error' }, title)

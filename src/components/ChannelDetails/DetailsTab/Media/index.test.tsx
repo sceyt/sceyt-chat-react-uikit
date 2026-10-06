@@ -25,7 +25,8 @@ jest.mock('../../../../common/popups/sliderPopup', () => ({
 }))
 
 jest.mock('../../../../hooks', () => ({
-  useColor: () => ({ background: '#fff', textSecondary: '#666', surface1: '#eee' })
+  useColor: () => ({ background: '#fff', textSecondary: '#666', surface1: '#eee' }),
+  useDidUpdate: jest.requireActual('../../../../hooks/basic/useDidUpdate').default
 }))
 
 jest.mock('../../../../helpers/mediaDownloadCoordinator', () => ({

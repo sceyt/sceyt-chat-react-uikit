@@ -119,7 +119,7 @@ export interface IDetailsProps {
   voicePreviewTitleColor?: string
   voicePreviewDateAndTimeColor?: string
   voicePreviewHoverBackgroundColor?: string
-  /** Replaces the default "Unable to load ..." view shown when a details tab's first load times out. */
+  /** Replaces the default "Unable to load ..." view shown when a details tab's first load fails with a retryable error. */
   CustomLoadErrorState?: CustomLoadErrorStateComponent
 
   filePreviewIcon?: JSX.Element

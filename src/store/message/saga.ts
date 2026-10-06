@@ -3006,21 +3006,25 @@ function* loadAroundMessage(action: IAction): any {
   }
 }
 
-// The first load of a chat timed out and there is nothing on screen -> MessageList shows
+// The first load of a chat failed (retryable error) and there is nothing on screen -> MessageList shows
 // "Unable to load messages" with a Retry. Cached messages, a chat that is no longer open, or
 // other errors keep today's behavior.
 function* markMessagesLoadFailedIfEmpty(channelId: string | undefined, error: unknown): any {
   if (!channelId || !isRetryableLoadError(error) || getActiveChannelId() !== channelId) {
     return
   }
-  const shownMessages = store.getState().MessageReducer?.activeChannelMessages || []
-  if (!shownMessages.length) {
+  // Only this chat's messages count: some switch paths keep the previous chat's list until the load lands
+  const shownMessages: IMessage[] = store.getState().MessageReducer?.activeChannelMessages || []
+  if (!shownMessages.some((message) => message.channelId === channelId)) {
     yield put(setMessagesLoadFailedAC(channelId))
   }
 }
 
 function* clearMessagesLoadFailed(): any {
   if (store.getState().MessageReducer?.messagesLoadFailedChannelId) {
+    // Nothing is on screen: show the spinner first, or the list falls through to "No messages yet"
+    // while the load starts (the failed run's finally left both directions LOADED)
+    yield call(setMessageListLoading, 'both', LOADING_STATE.LOADING)
     yield put(setMessagesLoadFailedAC(null))
   }
 }
@@ -3899,7 +3903,7 @@ function* getMessageAttachments(action: IAction): any {
   const cachedAttachmentIdsAtRequestStart = new Set(
     (cachedAttachments || []).map((attachment: IAttachment) => attachment.id)
   )
-  // The first load of this tab timed out with nothing cached -> the tab shows "Unable to load ..."
+  // The first load of this tab failed (retryable error) with nothing cached -> the tab shows "Unable to load ..."
   let loadFailed = false
   if (!forPopup) {
     activeDisplayedCacheKey = cacheKey
@@ -3908,6 +3912,15 @@ function* getMessageAttachments(action: IAction): any {
   try {
     if (cachedAttachments !== undefined) {
       yield put(setAttachmentsAC(cachedAttachments))
+      // The loading state is shared by all tabs: don't carry another tab's failure over to this one
+      if (store.getState().MessageReducer.attachmentLoadingState === LOADING_STATE.FAILED) {
+        yield put(
+          setAttachmentsLoadingStateAC(
+            cachedAttachments.length ? LOADING_STATE.LOADED : LOADING_STATE.LOADING,
+            forPopup
+          )
+        )
+      }
     } else {
       yield put(setAttachmentsLoadingStateAC(LOADING_STATE.LOADING, forPopup))
     }

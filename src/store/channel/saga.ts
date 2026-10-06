@@ -13,6 +13,7 @@ import {
   setChannelsAC,
   setChannelsForForwardAC,
   setChannelsLoadingStateAC,
+  setChannelsLoadFailedAC,
   setChannelToAddAC,
   setChannelToRemoveAC,
   setCloseSearchChannelsAC,
@@ -138,10 +139,9 @@ import { isJSON, makeUsername } from '../../helpers/message'
 import { getShowOnlyContactUsers } from '../../helpers/contacts'
 import { updateUserOnMap, usersMap, hideUserPresence } from '../../helpers/userHelper'
 import log from 'loglevel'
-import { isRetryableLoadError } from '../../helpers/error'
 import { queryDirection } from 'store/message/constants'
 import store from 'store'
-import { isResendableError } from 'helpers/error'
+import { isResendableError, isRetryableLoadError } from 'helpers/error'
 
 const getUniqueMessageIds = (messageIds: string[] = []) => Array.from(new Set(messageIds.filter(Boolean)))
 
@@ -451,6 +451,9 @@ function* getChannels(action: IAction): any {
       return
     }
     yield put(setChannelsLoadingStateAC(LOADING_STATE.LOADING))
+    if (store.getState().ChannelReducer.channelsLoadFailed) {
+      yield put(setChannelsLoadFailedAC(false))
+    }
     const channelQueryBuilder = new (SceytChatClient.ChannelListQueryBuilder as any)()
     const channelTypesFilter = getChannelTypesFilter()
     log.info(`${new Date().toISOString()} [getChannels] channelTypesFilter: ${JSON.stringify(channelTypesFilter)}`)
@@ -691,10 +694,14 @@ function* getChannels(action: IAction): any {
       // yield put(setErrorNotification(e.message));
     }
     // Never leave the list in LOADING after a failure (the skeleton would spin forever).
-    // A timeout gets FAILED so ChannelList can offer a Retry.
+    // A retryable error (timeout, 503, ...) also sets channelsLoadFailed so ChannelList can offer a Retry.
+    // It is a separate flag so searchChannels (which shares channelsLoadingState) can't erase it.
     // (Errors after the main list was shown -- e.g. the all-channels query -- leave the list as is.)
     if (!mainListLoaded) {
-      yield put(setChannelsLoadingStateAC(isRetryableLoadError(e) ? LOADING_STATE.FAILED : LOADING_STATE.LOADED))
+      yield put(setChannelsLoadingStateAC(LOADING_STATE.LOADED))
+      if (isRetryableLoadError(e)) {
+        yield put(setChannelsLoadFailedAC(true))
+      }
     }
   }
 }

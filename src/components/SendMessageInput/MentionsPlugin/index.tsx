@@ -226,7 +226,7 @@ function MentionsTypeaheadMenuItem({
   )
 }
 const optionObj: any = {}
-function MentionsContainer({
+export function MentionsContainer({
   queryString,
   options,
   selectedIndex,
@@ -309,7 +309,10 @@ function MentionsContainer({
   )
 
   useEffect(() => {
-    if (options?.length < 20 && membersHasNext && membersLoadingState === LOADING_STATE.LOADED && channelId) {
+    // FAILED counts as finished: a timed-out first load (Members tab shows Retry) must not leave mentions empty
+    const lastLoadFinished =
+      membersLoadingState === LOADING_STATE.LOADED || membersLoadingState === LOADING_STATE.FAILED
+    if (options?.length < 20 && membersHasNext && lastLoadFinished && channelId) {
       dispatch(loadMoreMembersAC(15, channelId))
     }
   }, [options?.length, membersHasNext, membersLoadingState, channelId, dispatch])

@@ -51,7 +51,7 @@ interface IProps {
   members: IMember[]
   // eslint-disable-next-line no-unused-vars
   checkActionPermission: (permission: string) => boolean
-  /** Replaces the default "Unable to load members" view shown when the first load times out. */
+  /** Replaces the default "Unable to load members" view shown when the first load fails with a retryable error. */
   CustomLoadErrorState?: CustomLoadErrorStateComponent
   showChangeMemberRole?: boolean
   showMakeMemberAdmin?: boolean
@@ -291,7 +291,8 @@ const Members = ({
                 description: "We couldn't load members. Please try again.",
                 onRetry: () => dispatch(getMembersAC(channel.id))
               },
-              CustomLoadErrorState
+              CustomLoadErrorState,
+              { inList: true }
             )}
 
           {membersLoadingState === LOADING_STATE.LOADING &&

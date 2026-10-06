@@ -43,7 +43,7 @@ import store from 'store'
 function* getMembers(action: IAction): any {
   const { payload } = action
   const { channelId } = payload
-  // The first load timed out -> Members tab shows "Unable to load members" with a Retry
+  // The first load failed (retryable error) -> Members tab shows "Unable to load members" with a Retry
   let loadFailed = false
   try {
     yield put(setMembersHasNextAC(true, channelId))
@@ -79,7 +79,8 @@ function* getMembers(action: IAction): any {
     yield put(updateChannelDataAC(channelId, updateChannelData))
   } catch (e) {
     log.error('ERROR in get members - ', e.message)
-    loadFailed = isRetryableLoadError(e)
+    // Only when nothing is shown yet: FAILED blocks load-more (mentions list, members scroll)
+    loadFailed = isRetryableLoadError(e) && !store.getState().MembersReducer.channelsMembersMap?.[channelId]?.length
     if (e.code !== 10008) {
       // yield put(setErrorNotification(e.message))
     }

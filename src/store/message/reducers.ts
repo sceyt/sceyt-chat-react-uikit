@@ -63,7 +63,7 @@ export interface IMessageStore {
   threadMessagesHasNext: boolean
   threadMessagesHasPrev: boolean
   activeChannelMessages: IMessage[]
-  // Channel whose first message load timed out with nothing to show (MessageList offers a Retry)
+  // Channel whose first message load failed (retryable error) with nothing to show (MessageList offers a Retry)
   messagesLoadFailedChannelId: string | null
   activeChannelNewMessage: IMessage | null
   activeTabAttachments: any[]

@@ -121,7 +121,7 @@ interface MessagesProps {
     message: IMessage,
     context: { placement: 'banner' | 'system' }
   ) => React.ReactNode | null | undefined
-  /** Replaces the default "Unable to load messages" view shown when the first load times out. */
+  /** Replaces the default "Unable to load messages" view shown when the first load fails with a retryable error. */
   CustomLoadErrorState?: CustomLoadErrorStateComponent
   openFrequentlyUsedReactions?: boolean
   fixEmojiCategoriesTitleOnTop?: boolean

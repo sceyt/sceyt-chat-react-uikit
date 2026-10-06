@@ -3,17 +3,19 @@ import { CustomLoadErrorStateComponent, renderLoadErrorState } from '../../../..
 import styled, { keyframes } from 'styled-components'
 import { shallowEqual } from 'react-redux'
 import { useDispatch, useSelector } from 'store/hooks'
-import { channelDetailsTabs, LOADING_STATE } from '../../../../helpers/constants'
+import { channelDetailsTabs, DETAILS_TAB_ATTACHMENTS_PAGE_SIZE, LOADING_STATE } from '../../../../helpers/constants'
+import { connectionStatusSelector } from '../../../../store/user/selector'
+import { CONNECTION_STATUS } from '../../../../store/user/constants'
 import { activeTabAttachmentsSelector, attachmentLoadingStateSelector } from '../../../../store/message/selector'
 import { IAttachment } from '../../../../types'
 import { getAttachmentsAC } from '../../../../store/message/actions'
 import VoiceItem from './voiceItem'
 import { isJSON } from '../../../../helpers/message'
 import { THEME_COLORS } from '../../../../UIHelper/constants'
-import { useColor } from '../../../../hooks'
+import { useColor, useDidUpdate } from '../../../../hooks'
 
 interface IProps {
-  /** Replaces the default "Unable to load voice messages" view shown when the first load times out. */
+  /** Replaces the default "Unable to load voice messages" view shown when the first load fails with a retryable error. */
   CustomLoadErrorState?: CustomLoadErrorStateComponent
   channelId: string
   voicePreviewPlayIcon?: JSX.Element
@@ -43,11 +45,22 @@ const Voices = ({
   } = useColor()
   const dispatch = useDispatch()
   const attachments = useSelector(activeTabAttachmentsSelector, shallowEqual) || []
+  const connectionStatus = useSelector(connectionStatusSelector)
   const loadingState = useSelector(attachmentLoadingStateSelector)
 
+  const loadAttachments = () =>
+    dispatch(getAttachmentsAC(channelId, channelDetailsTabs.voice, DETAILS_TAB_ATTACHMENTS_PAGE_SIZE))
+
   useEffect(() => {
-    dispatch(getAttachmentsAC(channelId, channelDetailsTabs.voice, 35))
+    loadAttachments()
   }, [channelId])
+
+  // A load that failed while the connection dropped ends empty; reload once the connection is back
+  useDidUpdate(() => {
+    if (connectionStatus === CONNECTION_STATUS.CONNECTED && !attachments.length) {
+      loadAttachments()
+    }
+  }, [connectionStatus])
 
   const groups = useMemo(() => {
     const result: { key: string; date: Date; items: IAttachment[] }[] = []
@@ -83,9 +96,10 @@ const Voices = ({
           {
             title: 'Unable to load voice messages',
             description: "We couldn't load voice messages. Please try again.",
-            onRetry: () => dispatch(getAttachmentsAC(channelId, channelDetailsTabs.voice, 35))
+            onRetry: loadAttachments
           },
-          CustomLoadErrorState
+          CustomLoadErrorState,
+          { inList: true }
         )
       ) : loadingState === LOADING_STATE.LOADED && attachments.length === 0 ? (
         <EmptyState color={textSecondary}>No shared voice messages.</EmptyState>

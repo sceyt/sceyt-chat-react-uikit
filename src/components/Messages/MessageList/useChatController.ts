@@ -145,6 +145,8 @@ export interface UseChatControllerParams {
   messages: IMessage[]
   channel: IChannel
   openAtLatest?: boolean
+  // Channel whose first load failed ("Unable to load messages")
+  messagesLoadFailedChannelId?: string | null
   hasPrevMessages: boolean
   hasNextMessages: boolean
   loadingPrevMessages: number | null
@@ -385,6 +387,7 @@ export function useChatController({
   messages,
   channel,
   openAtLatest = false,
+  messagesLoadFailedChannelId = null,
   hasPrevMessages,
   hasNextMessages,
   loadingPrevMessages,
@@ -2406,14 +2409,14 @@ export function useChatController({
   }, [messages])
 
   // First load of a chat: newest (forwarded chats), near the unread separator, or the default window.
-  // Also used by Retry after that load timed out ("Unable to load messages").
+  // Also used by Retry after that load failed ("Unable to load messages").
   const dispatchInitialLoad = useCallback(() => {
     if (!channel?.id) {
       return
     }
-    // A forwarded chat opens at its newest message, even when unread history exists.
     dispatch(clearVisibleMessagesMapAC())
     suppressNextMessageChange()
+    // A forwarded chat opens at its newest message, even when unread history exists.
     if (openAtLatest) {
       dispatch(loadLatestMessagesAC(channel, undefined, undefined, true, true))
     } else if (channel.newMessageCount && channel.lastDisplayedMessageId) {
@@ -2422,6 +2425,15 @@ export function useChatController({
       dispatch(loadDefaultMessagesAC(channel))
     }
   }, [dispatch, channel, openAtLatest, suppressNextMessageChange])
+
+  // A message arrived (or was sent) while "Unable to load messages" was shown. The list would show only
+  // that message, with no history and no Retry, so load the chat again around it.
+  const firstLoadFailed = !!channel?.id && messagesLoadFailedChannelId === channel.id
+  useEffect(() => {
+    if (firstLoadFailed && messages.length) {
+      dispatchInitialLoad()
+    }
+  }, [firstLoadFailed, messages.length > 0])
 
   useEffect(() => {
     messagesIndexMapRef.current = {}

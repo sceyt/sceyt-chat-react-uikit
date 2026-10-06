@@ -5872,6 +5872,35 @@ describe('message first-load failure (Unable to load messages)', () => {
     const dispatched = await runMessageSaga(__messageSagaTestables.loadDefaultMessages, loadDefaultMessagesAC(channel))
     expect(failedActions(dispatched)).toEqual([null])
   })
+
+  it('shows loading before clearing a previous failure, so Retry never flashes "No messages yet"', async () => {
+    const channel = makeChannel({ id: 'retry-loading' })
+    setActiveChannelId(channel.id)
+    setChannelInMap(channel)
+    mockStoreState.MessageReducer.messagesLoadFailedChannelId = channel.id
+    setClient(createClient(createMessageQuery(), channel))
+
+    const dispatched = await runMessageSaga(__messageSagaTestables.loadDefaultMessages, loadDefaultMessagesAC(channel))
+
+    const clearIndex = dispatched.findIndex((a) => a.type === setMessagesLoadFailedAC(null).type)
+    const loadingIndex = dispatched.findIndex(
+      (a) => a.type === setLoadingPrevMessagesStateAC(null).type && a.payload.state === LOADING_STATE.LOADING
+    )
+    expect(loadingIndex).toBeGreaterThanOrEqual(0)
+    expect(loadingIndex).toBeLessThan(clearIndex)
+  })
+
+  it("marks the chat failed even when the previous chat's messages are still in the list", async () => {
+    // switchChannelActiveChannel / forward navigation don't clear activeChannelMessages first
+    const channel = makeChannel({ id: 'new-chat' })
+    setActiveChannelId(channel.id)
+    setChannelInMap(channel)
+    mockStoreState.MessageReducer.activeChannelMessages = [makeMessage({ id: '1', channelId: 'previous-chat' })]
+    setClient(createClient(failingQuery(timeoutError), channel))
+
+    const dispatched = await runMessageSaga(__messageSagaTestables.loadDefaultMessages, loadDefaultMessagesAC(channel))
+    expect(failedActions(dispatched)).toEqual([channel.id])
+  })
 })
 
 describe('attachments first-load timeout (details tabs)', () => {
@@ -5920,6 +5949,29 @@ describe('attachments first-load timeout (details tabs)', () => {
       getAttachmentsAC('channel-cached', channelDetailsTabs.media, 35)
     )
     expect(loadingStates(dispatched)).not.toContain(LOADING_STATE.FAILED)
+  })
+
+  it('does not set FAILED for the slider popup query', async () => {
+    setClient(clientWithAttachmentQuery(jest.fn().mockRejectedValue(timeoutError)) as any)
+    const dispatched = await runMessageSaga(
+      __messageSagaTestables.getMessageAttachments,
+      getAttachmentsAC('channel-popup', channelDetailsTabs.media, 35, undefined, 'a1', true)
+    )
+    expect(loadingStates(dispatched)).not.toContain(LOADING_STATE.FAILED)
+  })
+
+  it.each([
+    ['nothing cached ([]) -> LOADING', [], LOADING_STATE.LOADING],
+    ['cached items -> LOADED', [{ id: 'f1', type: 'file' }], LOADING_STATE.LOADED]
+  ])("resets another tab's FAILED state on a cache hit: %s", async (_label, cached, expected) => {
+    mockStoreState.MessageReducer.attachmentLoadingState = LOADING_STATE.FAILED
+    mockStoreState.MessageReducer.tabAttachmentsCache = { [`channel-files_${channelDetailsTabs.file}`]: cached }
+    setClient(clientWithAttachmentQuery(jest.fn().mockResolvedValue({ attachments: [], hasNext: false })) as any)
+    const dispatched = await runMessageSaga(
+      __messageSagaTestables.getMessageAttachments,
+      getAttachmentsAC('channel-files', channelDetailsTabs.file, 35)
+    )
+    expect(loadingStates(dispatched)[0]).toBe(expected)
   })
 
   it('keeps LOADED for other errors', async () => {

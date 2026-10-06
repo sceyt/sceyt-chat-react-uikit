@@ -22,9 +22,9 @@ const props = {
 describe('LoadErrorState', () => {
   beforeEach(() => props.onRetry.mockClear())
 
-  it('renders the title, description and a Retry button as an alert', () => {
+  it('renders the title, description and a Retry button as a status region', () => {
     render(<LoadErrorState {...props} />)
-    expect(screen.getByRole('alert')).toBeInTheDocument()
+    expect(screen.getByRole('status')).toBeInTheDocument()
     expect(screen.getByText('Unable to load channels')).toBeInTheDocument()
     expect(screen.getByText("We couldn't load your channels. Please try again.")).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Retry' })).toBeInTheDocument()
@@ -36,9 +36,14 @@ describe('LoadErrorState', () => {
     expect(props.onRetry).toHaveBeenCalledTimes(1)
   })
 
-  it('supports custom retry text', () => {
-    render(<LoadErrorState {...props} retryText='Try again' />)
-    expect(screen.getByRole('button', { name: 'Try again' })).toBeInTheDocument()
+  it('renders as a list item placed like the tab empty state when inList is set', () => {
+    render(
+      <ul>
+        <>{renderLoadErrorState(props, undefined, { inList: true })}</>
+      </ul>
+    )
+    expect(screen.getByTestId('load-error-state').tagName).toBe('LI')
+    expect(screen.getByTestId('load-error-state')).toHaveStyle('margin-top: 100px')
   })
 
   it('uses theme colors', () => {

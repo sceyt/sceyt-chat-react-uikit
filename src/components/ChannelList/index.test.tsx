@@ -20,7 +20,8 @@ import {
   setAddedToChannelAC,
   setChannelToRemoveAC,
   setChannelToHideAC,
-  setChannelToUnHideAC
+  setChannelToUnHideAC,
+  setChannelsLoadingStateAC
 } from '../../store/channel/actions'
 
 // Mock useColor hook
@@ -723,6 +724,20 @@ describe('ChannelList', () => {
       expect(dispatchSpy.mock.calls.filter((call) => call[0]?.type === loadMoreChannels().type)).toHaveLength(0)
     })
 
+    it('still loads more when a reload failed but channels are shown', () => {
+      const store = createTestStore({
+        channels: [makeChannel({ id: 'a', subject: 'A' }), makeChannel({ id: 'b', subject: 'B' })],
+        channelsHasNext: true,
+        channelsLoadFailed: true
+      })
+      const dispatchSpy = jest.spyOn(store, 'dispatch')
+      renderWithSceytProvider(<ChannelList />, { store })
+
+      scrollToBottom(getList())
+
+      expect(dispatchSpy.mock.calls.filter((call) => call[0]?.type === loadMoreChannels().type)).toHaveLength(1)
+    })
+
     it('does not load more while searching', () => {
       const store = createTestStore({
         channels: [makeChannel({ id: 'a', subject: 'A' })],
@@ -741,9 +756,9 @@ describe('ChannelList', () => {
 
   // ─── Load timeout ─────────────────────────────────────────────────────────
 
-  describe('First load timed out (FAILED)', () => {
+  describe('First load failed (channelsLoadFailed)', () => {
     it('shows "Unable to load channels" with the description and Retry', () => {
-      const store = createTestStore({ channels: [], channelsLoadingState: LOADING_STATE.FAILED })
+      const store = createTestStore({ channels: [], channelsLoadFailed: true })
       renderWithSceytProvider(<ChannelList />, { store })
 
       expect(screen.getByText('Unable to load channels')).toBeInTheDocument()
@@ -753,7 +768,7 @@ describe('ChannelList', () => {
     })
 
     it('Retry dispatches getChannelsAC with the same params as the initial load', () => {
-      const store = createTestStore({ channels: [], channelsLoadingState: LOADING_STATE.FAILED })
+      const store = createTestStore({ channels: [], channelsLoadFailed: true })
       const dispatchSpy = jest.spyOn(store, 'dispatch')
       const filter = { channelType: 'group' } as any
       renderWithSceytProvider(<ChannelList filter={filter} limit={15} />, { store })
@@ -775,7 +790,7 @@ describe('ChannelList', () => {
     it('keeps showing the channels when some are already loaded', () => {
       const store = createTestStore({
         channels: [makeChannel({ id: 'a', subject: 'Kept' })],
-        channelsLoadingState: LOADING_STATE.FAILED
+        channelsLoadFailed: true
       })
       renderWithSceytProvider(<ChannelList />, { store })
 
@@ -790,14 +805,29 @@ describe('ChannelList', () => {
     })
 
     it('does not show the error while searching', () => {
-      const store = createTestStore({ channels: [], channelsLoadingState: LOADING_STATE.FAILED })
+      const store = createTestStore({ channels: [], channelsLoadFailed: true })
       renderWithSceytProvider(<ChannelList />, { store })
       fireEvent.change(screen.getByTestId('search-input'), { target: { value: 'abc' } })
       expect(screen.queryByText('Unable to load channels')).not.toBeInTheDocument()
     })
 
+    it('brings the error back after a search is typed and cleared', () => {
+      // searchChannels shares channelsLoadingState; the failure flag must survive it
+      const store = createTestStore({ channels: [], channelsLoadFailed: true })
+      renderWithSceytProvider(<ChannelList />, { store })
+      fireEvent.change(screen.getByTestId('search-input'), { target: { value: 'abc' } })
+      act(() => {
+        store.dispatch(setChannelsLoadingStateAC(LOADING_STATE.LOADING))
+        store.dispatch(setChannelsLoadingStateAC(LOADING_STATE.LOADED))
+      })
+      fireEvent.change(screen.getByTestId('search-input'), { target: { value: '' } })
+
+      expect(screen.getByText('Unable to load channels')).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Retry' })).toBeInTheDocument()
+    })
+
     it('uses CustomLoadErrorState when provided and passes a working onRetry', () => {
-      const store = createTestStore({ channels: [], channelsLoadingState: LOADING_STATE.FAILED })
+      const store = createTestStore({ channels: [], channelsLoadFailed: true })
       const dispatchSpy = jest.spyOn(store, 'dispatch')
       const Custom = ({ title, onRetry }: any) => (
         <button type='button' onClick={onRetry}>
@@ -814,7 +844,7 @@ describe('ChannelList', () => {
     })
 
     it('shows the error inside a custom List too', () => {
-      const store = createTestStore({ channels: [], channelsLoadingState: LOADING_STATE.FAILED })
+      const store = createTestStore({ channels: [], channelsLoadFailed: true })
       const List = ({ children }: any) => <div data-testid='custom-list'>{children}</div>
       renderWithSceytProvider(<ChannelList List={List} />, { store })
       expect(screen.getByTestId('custom-list')).toHaveTextContent('Unable to load channels')

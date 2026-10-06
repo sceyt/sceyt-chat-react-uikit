@@ -24,6 +24,7 @@ import {
   resendPendingChannelReadsAC,
   setChannelsAC,
   setChannelsLoadingStateAC,
+  setChannelsLoadFailedAC,
   updateChannelAC,
   updateChannelDataAC,
   updateSearchedChannelDataAC
@@ -1277,10 +1278,12 @@ describe('channel saga getChannels pending-message preservation', () => {
   })
 })
 
-describe('channel saga load failures (retryable error -> FAILED)', () => {
+describe('channel saga load failures (retryable error -> channelsLoadFailed)', () => {
   const timeoutError = Object.assign(new Error('Request timeout'), { code: 9902 })
   const loadingStates = (dispatched: any[]) =>
     dispatched.filter((a) => a.type === setChannelsLoadingStateAC(0).type).map((a) => a.payload.state)
+  const failedFlags = (dispatched: any[]) =>
+    dispatched.filter((a) => a.type === setChannelsLoadFailedAC(false).type).map((a) => a.payload.failed)
 
   beforeEach(() => {
     jest.clearAllMocks()
@@ -1290,6 +1293,7 @@ describe('channel saga load failures (retryable error -> FAILED)', () => {
     mockStoreState.ChannelReducer = {
       channels: [],
       channelsLoadingState: null,
+      channelsLoadFailed: false,
       activeChannel: {},
       hideChannelList: true
     }
@@ -1313,26 +1317,29 @@ describe('channel saga load failures (retryable error -> FAILED)', () => {
     return dispatched
   }
 
-  it('sets FAILED when the first channels request times out', async () => {
+  it('sets channelsLoadFailed (and LOADED) when the first channels request times out', async () => {
     const dispatched = await runGetChannels(jest.fn().mockRejectedValue(timeoutError))
-    expect(loadingStates(dispatched)).toEqual([LOADING_STATE.LOADING, LOADING_STATE.FAILED])
+    expect(loadingStates(dispatched)).toEqual([LOADING_STATE.LOADING, LOADING_STATE.LOADED])
+    expect(failedFlags(dispatched)).toEqual([true])
   })
 
   it.each([
     ['unknown error 9900', { code: 9900 }],
     ['service unavailable 503', { code: 503 }],
     ['server internal error', { type: 'InternalError', message: 'Internal error' }]
-  ])('also sets FAILED for %s on the first channels request', async (_label, error) => {
+  ])('also sets channelsLoadFailed for %s on the first channels request', async (_label, error) => {
     const dispatched = await runGetChannels(jest.fn().mockRejectedValue(error))
-    expect(loadingStates(dispatched)).toEqual([LOADING_STATE.LOADING, LOADING_STATE.FAILED])
+    expect(loadingStates(dispatched)).toEqual([LOADING_STATE.LOADING, LOADING_STATE.LOADED])
+    expect(failedFlags(dispatched)).toEqual([true])
   })
 
   it.each([
     ['connection required 9903', 9903],
     ['query in progress 9908', 9908]
-  ])('sets LOADED, not FAILED, for %s', async (_label, code) => {
+  ])('sets LOADED without channelsLoadFailed for %s', async (_label, code) => {
     const dispatched = await runGetChannels(jest.fn().mockRejectedValue(Object.assign(new Error('x'), { code })))
     expect(loadingStates(dispatched)).toEqual([LOADING_STATE.LOADING, LOADING_STATE.LOADED])
+    expect(failedFlags(dispatched)).toEqual([])
   })
 
   it('sets LOADED (not stuck in LOADING) for other errors', async () => {
@@ -1340,11 +1347,12 @@ describe('channel saga load failures (retryable error -> FAILED)', () => {
     expect(loadingStates(dispatched)).toEqual([LOADING_STATE.LOADING, LOADING_STATE.LOADED])
   })
 
-  it('ends in LOADED after a successful retry', async () => {
+  it('clears channelsLoadFailed and ends in LOADED after a successful retry', async () => {
+    mockStoreState.ChannelReducer.channelsLoadFailed = true
     const dispatched = await runGetChannels(jest.fn().mockResolvedValue({ channels: [], hasNext: false }))
     const states = loadingStates(dispatched)
     expect(states[states.length - 1]).toBe(LOADING_STATE.LOADED)
-    expect(states).not.toContain(LOADING_STATE.FAILED)
+    expect(failedFlags(dispatched)).toEqual([false])
   })
 
   it('resets to LOADED when loading more channels fails, so scrolling can try again', async () => {

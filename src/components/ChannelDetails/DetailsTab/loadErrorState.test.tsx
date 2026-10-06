@@ -1,14 +1,17 @@
 import React from 'react'
-import { fireEvent, screen } from '@testing-library/react'
+import { act, fireEvent, screen } from '@testing-library/react'
 import Media from './Media'
 import Files from './Files'
 import Links from './Links'
 import Voices from './Voices'
 import { createMessageListStore, renderWithSceytProvider } from '../../../testUtils/messageListHarness'
-import { channelDetailsTabs, LOADING_STATE } from '../../../helpers/constants'
+import { channelDetailsTabs, DETAILS_TAB_ATTACHMENTS_PAGE_SIZE, LOADING_STATE } from '../../../helpers/constants'
 import { getAttachmentsAC } from '../../../store/message/actions'
+import { setConnectionStatusAC } from '../../../store/user/actions'
+import { CONNECTION_STATUS } from '../../../store/user/constants'
 
 jest.mock('../../../hooks', () => ({
+  useDidUpdate: jest.requireActual('../../../hooks/basic/useDidUpdate').default,
   useColor: () => ({
     background: '#fff',
     textPrimary: '#111',
@@ -67,7 +70,7 @@ describe.each(tabs)('$name tab: first load timed out', ({ noun, type, render }) 
 
     dispatchSpy.mockClear()
     fireEvent.click(screen.getByRole('button', { name: 'Retry' }))
-    expect(dispatchSpy).toHaveBeenCalledWith(getAttachmentsAC(channel.id, type, 35))
+    expect(dispatchSpy).toHaveBeenCalledWith(getAttachmentsAC(channel.id, type, DETAILS_TAB_ATTACHMENTS_PAGE_SIZE))
   })
 
   it('does not show the error while loading or after a successful empty load', () => {
@@ -76,6 +79,21 @@ describe.each(tabs)('$name tab: first load timed out', ({ noun, type, render }) 
     unmount()
     renderWithSceytProvider(render({}), { store: storeWith(LOADING_STATE.LOADED) })
     expect(screen.queryByText(`Unable to load ${noun}`)).not.toBeInTheDocument()
+  })
+
+  it('reloads an empty tab when the connection comes back', () => {
+    // A load that failed with a connection error (9903/9904) ends LOADED and empty
+    const store = storeWith(LOADING_STATE.LOADED)
+    const dispatchSpy = jest.spyOn(store, 'dispatch')
+    renderWithSceytProvider(render({}), { store })
+    act(() => {
+      store.dispatch(setConnectionStatusAC(CONNECTION_STATUS.CONNECTING))
+    })
+    dispatchSpy.mockClear()
+    act(() => {
+      store.dispatch(setConnectionStatusAC(CONNECTION_STATUS.CONNECTED))
+    })
+    expect(dispatchSpy).toHaveBeenCalledWith(getAttachmentsAC(channel.id, type, DETAILS_TAB_ATTACHMENTS_PAGE_SIZE))
   })
 
   it('uses CustomLoadErrorState when provided', () => {

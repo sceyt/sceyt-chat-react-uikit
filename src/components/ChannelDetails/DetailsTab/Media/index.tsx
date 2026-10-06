@@ -13,19 +13,21 @@ import {
 import { activeTabAttachmentsSelector, attachmentLoadingStateSelector } from '../../../../store/message/selector'
 // Helpers
 import { isJSON } from '../../../../helpers/message'
-import { channelDetailsTabs, LOADING_STATE } from '../../../../helpers/constants'
+import { channelDetailsTabs, DETAILS_TAB_ATTACHMENTS_PAGE_SIZE, LOADING_STATE } from '../../../../helpers/constants'
+import { connectionStatusSelector } from '../../../../store/user/selector'
+import { CONNECTION_STATUS } from '../../../../store/user/constants'
 import { getVideoAttachmentCacheKeys } from '../../../../helpers/videoPreview'
 import { getMediaDownloadSnapshot, requestMediaDownload } from '../../../../helpers/mediaDownloadCoordinator'
 import { IAttachment, IChannel } from '../../../../types'
 // Components
 import Attachment from '../../../Attachment'
 import SliderPopup from '../../../../common/popups/sliderPopup'
-import { useColor } from '../../../../hooks'
+import { useColor, useDidUpdate } from '../../../../hooks'
 import { THEME_COLORS } from '../../../../UIHelper/constants'
 import log from 'loglevel'
 
 interface IProps {
-  /** Replaces the default "Unable to load media" view shown when the first load times out. */
+  /** Replaces the default "Unable to load media" view shown when the first load fails with a retryable error. */
   CustomLoadErrorState?: CustomLoadErrorStateComponent
   channel: IChannel
 }
@@ -122,6 +124,7 @@ const Media = ({ channel, CustomLoadErrorState }: IProps) => {
     [THEME_COLORS.SURFACE_1]: surface1
   } = useColor()
   const attachments = useSelector(activeTabAttachmentsSelector, shallowEqual) || []
+  const connectionStatus = useSelector(connectionStatusSelector)
   const loadingState = useSelector(attachmentLoadingStateSelector)
   const [mediaFile, setMediaFile] = useState<any>(null)
   const dispatch = useDispatch()
@@ -156,10 +159,20 @@ const Media = ({ channel, CustomLoadErrorState }: IProps) => {
     }
   }
 
+  const loadAttachments = () =>
+    dispatch(getAttachmentsAC(channel.id, channelDetailsTabs.media, DETAILS_TAB_ATTACHMENTS_PAGE_SIZE))
+
   useEffect(() => {
     dispatch(setAttachmentsAC([]))
-    dispatch(getAttachmentsAC(channel.id, channelDetailsTabs.media, 35))
+    loadAttachments()
   }, [channel.id])
+
+  // A load that failed while the connection dropped ends empty; reload once the connection is back
+  useDidUpdate(() => {
+    if (connectionStatus === CONNECTION_STATUS.CONNECTED && !attachments.length) {
+      loadAttachments()
+    }
+  }, [connectionStatus])
 
   const groups = useMemo(() => {
     const result: { key: string; date: Date; items: IAttachment[] }[] = []
@@ -189,7 +202,7 @@ const Media = ({ channel, CustomLoadErrorState }: IProps) => {
           {
             title: 'Unable to load media',
             description: "We couldn't load media. Please try again.",
-            onRetry: () => dispatch(getAttachmentsAC(channel.id, channelDetailsTabs.media, 35))
+            onRetry: loadAttachments
           },
           CustomLoadErrorState
         )

@@ -9,6 +9,7 @@ import {
   addedToChannelSelector,
   channelsHasNextSelector,
   channelsLoadingState,
+  channelsLoadFailedSelector,
   channelsSelector,
   closeSearchChannelSelector,
   deletedChannelSelector,
@@ -79,7 +80,7 @@ interface IChannelListProps {
     setSelectedChannel?: (channel: IChannel) => void
     createChatWithContact?: (contact: IContact) => void
   }>
-  /** Replaces the default "Unable to load channels" view shown when the first load times out. */
+  /** Replaces the default "Unable to load channels" view shown when the first load fails with a retryable error. */
   CustomLoadErrorState?: CustomLoadErrorStateComponent
   className?: string
   Profile?: JSX.Element
@@ -386,8 +387,8 @@ const ChannelList: React.FC<IChannelListProps> = ({
     }
   }, [connectionStatus])
 
-  // The first load timed out and there is nothing to show
-  const channelsLoadFailed = channelsLoading === LOADING_STATE.FAILED && channels.length === 0
+  // The first load failed (retryable error) and there is nothing to show
+  const channelsLoadFailed = useSelector(channelsLoadFailedSelector) && channels.length === 0
   const channelsLoadErrorView = renderLoadErrorState(
     {
       title: 'Unable to load channels',
@@ -598,7 +599,9 @@ const ChannelList: React.FC<IChannelListProps> = ({
           loadMoreChannels={handleLoadMoreChannels}
           searchValue={searchValue}
         >
-          {!searchValue && (channelsLoading === LOADING_STATE.LOADED || channels.length > 0) ? (
+          {!searchValue && channelsLoadFailed ? (
+            channelsLoadErrorView
+          ) : !searchValue && (channelsLoading === LOADING_STATE.LOADED || channels.length > 0) ? (
             <React.Fragment>
               {channels.map(
                 (channel: IChannel) =>
@@ -796,8 +799,6 @@ const ChannelList: React.FC<IChannelListProps> = ({
                 </NoData>
               )}
             </React.Fragment>
-          ) : !searchValue && channelsLoadFailed ? (
-            channelsLoadErrorView
           ) : (
             <ChannelSkeletonList color={surface1} />
           )}
@@ -805,7 +806,9 @@ const ChannelList: React.FC<IChannelListProps> = ({
       ) : (
         <React.Fragment>
           {!searchValue &&
-            (channelsLoading === LOADING_STATE.LOADED || channels.length > 0 ? (
+            (channelsLoadFailed ? (
+              channelsLoadErrorView
+            ) : channelsLoading === LOADING_STATE.LOADED || channels.length > 0 ? (
               <ChannelsList
                 ref={channelsScrollRef}
                 onScroll={handleAllChannelsListScroll}
@@ -859,8 +862,6 @@ const ChannelList: React.FC<IChannelListProps> = ({
                   <ChannelSkeletonList color={surface1} count={1} />
                 )}
               </ChannelsList>
-            ) : channelsLoadFailed ? (
-              channelsLoadErrorView
             ) : (
               <ChannelSkeletonList color={surface1} />
             ))}
