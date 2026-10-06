@@ -14,15 +14,23 @@ export interface ILoadErrorStateProps {
 export type CustomLoadErrorStateComponent = React.FC<ILoadErrorStateProps>
 
 interface ILoadErrorStateLayout {
-  /** Rendered inside a list (<ul>) of a channel details tab: an <li> placed like the tab's empty state. */
-  inList?: boolean
+  /** Shown in a channel details tab: placed like the tab's empty state instead of centered in its container. */
+  inDetailsTab?: boolean
+  /** Rendered inside a list (<ul>): an <li> instead of a <div>. */
+  asListItem?: boolean
 }
 
 /**
  * Shown when the first load of a list (channels, messages, channel details tabs) failed with a retryable error
  * and there is nothing to show. Centered title, one-line description and a Retry button.
  */
-const LoadErrorState = ({ title, description, onRetry, inList }: ILoadErrorStateProps & ILoadErrorStateLayout) => {
+const LoadErrorState = ({
+  title,
+  description,
+  onRetry,
+  inDetailsTab,
+  asListItem
+}: ILoadErrorStateProps & ILoadErrorStateLayout) => {
   const {
     [THEME_COLORS.TEXT_PRIMARY]: textPrimary,
     [THEME_COLORS.TEXT_SECONDARY]: textSecondary,
@@ -30,7 +38,7 @@ const LoadErrorState = ({ title, description, onRetry, inList }: ILoadErrorState
   } = useColor()
 
   return (
-    <Container as={inList ? 'li' : 'div'} $inList={inList} role='status' data-testid='load-error-state'>
+    <Container as={asListItem ? 'li' : 'div'} $inDetailsTab={inDetailsTab} role='status' data-testid='load-error-state'>
       <Title color={textPrimary}>{title}</Title>
       <Description color={textSecondary}>{description}</Description>
       <RetryButton type='button' onClick={onRetry} color={textPrimary} backgroundColor={surface1} borderRadius='8px'>
@@ -40,27 +48,50 @@ const LoadErrorState = ({ title, description, onRetry, inList }: ILoadErrorState
   )
 }
 
-/** Renders the app's custom component when given, otherwise the default view. */
+/**
+ * Renders the app's custom component when given, otherwise the default view.
+ * In a details tab the custom component is wrapped so it keeps the tab's placement (and is a valid <li> in a list).
+ */
 export const renderLoadErrorState = (
   props: ILoadErrorStateProps,
   CustomLoadErrorState?: CustomLoadErrorStateComponent,
   layout?: ILoadErrorStateLayout
-) => (CustomLoadErrorState ? <CustomLoadErrorState {...props} /> : <LoadErrorState {...props} {...layout} />)
+) => {
+  if (!CustomLoadErrorState) {
+    return <LoadErrorState {...props} {...layout} />
+  }
+  if (!layout?.inDetailsTab) {
+    return <CustomLoadErrorState {...props} />
+  }
+  return (
+    <CustomContainer as={layout.asListItem ? 'li' : 'div'}>
+      <CustomLoadErrorState {...props} />
+    </CustomContainer>
+  )
+}
 
 export default LoadErrorState
 
-const Container = styled.div<{ $inList?: boolean }>`
+// Same offset as the details tabs' empty state ("No shared files.")
+const DETAILS_TAB_OFFSET = '100px'
+
+const Container = styled.div<{ $inDetailsTab?: boolean }>`
   display: flex;
   flex: 1;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  height: ${(props) => (props.$inList ? 'auto' : '100%')};
-  min-height: ${(props) => (props.$inList ? '0' : '200px')};
-  margin-top: ${(props) => (props.$inList ? '100px' : '0')};
-  padding: ${(props) => (props.$inList ? '0 16px' : '24px 16px')};
+  height: ${(props) => (props.$inDetailsTab ? 'auto' : '100%')};
+  min-height: ${(props) => (props.$inDetailsTab ? '0' : '200px')};
+  margin-top: ${(props) => (props.$inDetailsTab ? DETAILS_TAB_OFFSET : '0')};
+  padding: ${(props) => (props.$inDetailsTab ? '0 16px' : '24px 16px')};
   box-sizing: border-box;
   text-align: center;
+  list-style: none;
+`
+
+const CustomContainer = styled.div`
+  margin-top: ${DETAILS_TAB_OFFSET};
   list-style: none;
 `
 

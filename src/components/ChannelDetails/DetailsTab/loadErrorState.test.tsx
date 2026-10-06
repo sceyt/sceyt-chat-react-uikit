@@ -32,24 +32,29 @@ const channel = { id: 'channel-tabs', type: 'group' } as any
 const tabs = [
   {
     name: 'Media',
+    // Files / Links / Voices render inside a <ul>; Media's grid is a <div>
+    listItem: false,
     noun: 'media',
     type: channelDetailsTabs.media,
     render: (props: any) => <Media channel={channel} {...props} />
   },
   {
     name: 'Files',
+    listItem: true,
     noun: 'files',
     type: channelDetailsTabs.file,
     render: (props: any) => <Files channelId={channel.id} {...props} />
   },
   {
     name: 'Links',
+    listItem: true,
     noun: 'links',
     type: channelDetailsTabs.link,
     render: (props: any) => <Links channelId={channel.id} {...props} />
   },
   {
     name: 'Voices',
+    listItem: true,
     noun: 'voice messages',
     type: channelDetailsTabs.voice,
     render: (props: any) => <Voices channelId={channel.id} {...props} />
@@ -59,7 +64,7 @@ const tabs = [
 const storeWith = (attachmentLoadingState: number, activeTabAttachments: any[] = []) =>
   createMessageListStore({ MessageReducer: { attachmentLoadingState, activeTabAttachments } } as any)
 
-describe.each(tabs)('$name tab: first load timed out', ({ noun, type, render }) => {
+describe.each(tabs)('$name tab: first load timed out', ({ noun, type, render, listItem }) => {
   it(`shows "Unable to load ${noun}" and Retry reloads the tab`, () => {
     const store = storeWith(LOADING_STATE.FAILED)
     const dispatchSpy = jest.spyOn(store, 'dispatch')
@@ -71,6 +76,21 @@ describe.each(tabs)('$name tab: first load timed out', ({ noun, type, render }) 
     dispatchSpy.mockClear()
     fireEvent.click(screen.getByRole('button', { name: 'Retry' }))
     expect(dispatchSpy).toHaveBeenCalledWith(getAttachmentsAC(channel.id, type, DETAILS_TAB_ATTACHMENTS_PAGE_SIZE))
+  })
+
+  it("places the error like the tab's empty state", () => {
+    renderWithSceytProvider(render({}), { store: storeWith(LOADING_STATE.FAILED) })
+    const view = screen.getByTestId('load-error-state')
+    expect(view.tagName).toBe(listItem ? 'LI' : 'DIV')
+    expect(view).toHaveStyle('margin-top: 100px')
+  })
+
+  it('wraps CustomLoadErrorState so it sits like the default view', () => {
+    const Custom = ({ title }: any) => <div data-testid='custom-error'>{title}</div>
+    renderWithSceytProvider(render({ CustomLoadErrorState: Custom }), { store: storeWith(LOADING_STATE.FAILED) })
+    const wrapper = screen.getByTestId('custom-error').parentElement as HTMLElement
+    expect(wrapper.tagName).toBe(listItem ? 'LI' : 'DIV')
+    expect(wrapper).toHaveStyle('margin-top: 100px')
   })
 
   it('does not show the error while loading or after a successful empty load', () => {

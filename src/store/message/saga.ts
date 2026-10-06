@@ -115,6 +115,7 @@ import {
   attachmentTypes,
   DEFAULT_CHANNEL_TYPE,
   channelDetailsTabs,
+  DETAILS_TAB_ATTACHMENTS_PAGE_SIZE,
   LOADING_STATE,
   MESSAGE_STATUS,
   UPLOAD_STATE
@@ -689,6 +690,8 @@ const addPendingMessage = (
 ) => {
   const messageToAdd = {
     ...messageCopy,
+    // The SDK builder leaves channelId empty until the server confirms; "this chat's messages" checks need it
+    channelId,
     createdAt: new Date(Date.now()),
     mentionedUsers: message.mentionedUsers,
     // A forward is a new standalone message. Do not carry the source reply's
@@ -2795,6 +2798,7 @@ function* backgroundRefreshRestoreWindow(
 
 function* loadAroundMessageWorker(action: IAction): any {
   try {
+    yield call(clearMessagesLoadFailed, action.payload?.channel?.id)
     const { channel, messageId, networkChanged, restoreWindow } = action.payload
     const connectionState = store.getState().UserReducer.connectionStatus
     const messages = store.getState().MessageReducer.activeChannelMessages
@@ -2936,6 +2940,7 @@ function* loadAroundMessageWorker(action: IAction): any {
     }
   } catch (e) {
     log.error('error in loadAroundMessage', e)
+    yield call(markMessagesLoadFailedIfEmpty, action.payload?.channel?.id, e)
   } finally {
     yield call(setMessageListLoading, 'both', LOADING_STATE.LOADED)
   }
@@ -3020,18 +3025,23 @@ function* markMessagesLoadFailedIfEmpty(channelId: string | undefined, error: un
   }
 }
 
-function* clearMessagesLoadFailed(): any {
-  if (store.getState().MessageReducer?.messagesLoadFailedChannelId) {
-    // Nothing is on screen: show the spinner first, or the list falls through to "No messages yet"
-    // while the load starts (the failed run's finally left both directions LOADED)
-    yield call(setMessageListLoading, 'both', LOADING_STATE.LOADING)
-    yield put(setMessagesLoadFailedAC(null))
+function* clearMessagesLoadFailed(channelId: string | undefined): any {
+  const failedChannelId = store.getState().MessageReducer?.messagesLoadFailedChannelId
+  if (!failedChannelId) {
+    return
   }
+  if (failedChannelId === channelId) {
+    // Nothing is on screen: show the spinner first, or the list falls through to "No messages yet"
+    // while the load starts (the failed run's finally left both directions LOADED).
+    // Another chat's stale flag must not hide this chat's cached window behind a spinner.
+    yield call(setMessageListLoading, 'both', LOADING_STATE.LOADING)
+  }
+  yield put(setMessagesLoadFailedAC(null))
 }
 
 function* loadNearUnread(action: IAction): any {
   try {
-    yield call(clearMessagesLoadFailed)
+    yield call(clearMessagesLoadFailed, action.payload?.channel?.id)
     const { channel } = action.payload
     const connectionState = store.getState().UserReducer.connectionStatus
 
@@ -3158,7 +3168,7 @@ function* loadNearUnread(action: IAction): any {
 
 function* loadDefaultMessages(action: IAction): any {
   try {
-    yield call(clearMessagesLoadFailed)
+    yield call(clearMessagesLoadFailed, action.payload?.channel?.id)
     const { channel } = action.payload
     const connectionState = store.getState().UserReducer.connectionStatus
 
@@ -3270,7 +3280,7 @@ function* loadDefaultMessages(action: IAction): any {
 
 function* getMessagesQuery(action: IAction): any {
   try {
-    yield call(clearMessagesLoadFailed)
+    yield call(clearMessagesLoadFailed, action.payload?.channel?.id)
     yield call(setMessageListLoading, 'both', LOADING_STATE.LOADING)
     const { channel, limit, networkChanged, applyVisibleWindow = true, forceLatestWindow = false } = action.payload
     const channelNewMessageCount = channel?.newMessageCount || 0
@@ -4076,7 +4086,7 @@ function* refreshActiveMediaAttachmentsAfterReconnect(action: IAction): any {
       attachmentTypes.video,
       attachmentTypes.image
     ])
-    queryBuilder.limit(35)
+    queryBuilder.limit(DETAILS_TAB_ATTACHMENTS_PAGE_SIZE)
     const attachmentQuery = yield call(queryBuilder.build)
     const result: { attachments: IAttachment[]; hasNext: boolean } = yield call(
       attachmentQuery.loadNextAttachmentId,

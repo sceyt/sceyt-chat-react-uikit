@@ -2428,12 +2428,15 @@ export function useChatController({
 
   // A message arrived (or was sent) while "Unable to load messages" was shown. The list would show only
   // that message, with no history and no Retry, so load the chat again around it.
+  // Only this chat's messages count: some switch paths keep the previous chat's list, and reloading on it
+  // would retry the failed load forever.
   const firstLoadFailed = !!channel?.id && messagesLoadFailedChannelId === channel.id
+  const hasChannelMessages = !!channel?.id && messages.some((message) => message.channelId === channel.id)
   useEffect(() => {
-    if (firstLoadFailed && messages.length) {
+    if (firstLoadFailed && hasChannelMessages) {
       dispatchInitialLoad()
     }
-  }, [firstLoadFailed, messages.length > 0])
+  }, [firstLoadFailed, hasChannelMessages])
 
   useEffect(() => {
     messagesIndexMapRef.current = {}

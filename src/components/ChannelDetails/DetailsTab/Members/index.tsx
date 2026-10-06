@@ -292,7 +292,7 @@ const Members = ({
                 onRetry: () => dispatch(getMembersAC(channel.id))
               },
               CustomLoadErrorState,
-              { inList: true }
+              { inDetailsTab: true, asListItem: true }
             )}
 
           {membersLoadingState === LOADING_STATE.LOADING &&

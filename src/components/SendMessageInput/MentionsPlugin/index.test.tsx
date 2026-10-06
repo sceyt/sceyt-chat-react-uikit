@@ -1,8 +1,9 @@
 import React from 'react'
+import { act } from '@testing-library/react'
 import { MentionsContainer } from './index'
 import { createMessageListStore, renderWithSceytProvider } from '../../../testUtils/messageListHarness'
 import { LOADING_STATE } from '../../../helpers/constants'
-import { loadMoreMembersAC } from '../../../store/member/actions'
+import { getMembersAC, loadMoreMembersAC, setMembersLoadingStateAC } from '../../../store/member/actions'
 
 const channelId = 'channel-mentions'
 
@@ -25,20 +26,42 @@ const renderContainer = (loadingState: number) => {
     />,
     { store }
   )
-  return dispatchSpy.mock.calls.filter((call) => (call[0] as any)?.type === loadMoreMembersAC(15, channelId).type)
+  const callsOf = (type: string) => dispatchSpy.mock.calls.filter((call) => (call[0] as any)?.type === type)
+  return {
+    store,
+    getMembersCalls: () => callsOf(getMembersAC(channelId).type),
+    loadMoreCalls: () => callsOf(loadMoreMembersAC(15, channelId).type)
+  }
 }
 
 describe('MentionsContainer auto-load of members', () => {
   it('loads more members when the list is short and the last load finished', () => {
-    expect(renderContainer(LOADING_STATE.LOADED)).toEqual([[loadMoreMembersAC(15, channelId)]])
+    expect(renderContainer(LOADING_STATE.LOADED).loadMoreCalls()).toEqual([[loadMoreMembersAC(15, channelId)]])
   })
 
-  it('still loads members after the first load failed, so mentions recover', () => {
-    // getMembers sets FAILED (Members tab shows Retry); the mentions list must not stay empty
-    expect(renderContainer(LOADING_STATE.FAILED)).toEqual([[loadMoreMembersAC(15, channelId)]])
+  it('retries the first load (not load-more) after it failed, so mentions recover', () => {
+    // getMembers sets FAILED (Members tab shows Retry); the mentions list must not stay empty.
+    // loadMoreMembers would page a query that never loaded and overwrite FAILED with LOADED.
+    const result = renderContainer(LOADING_STATE.FAILED)
+    expect(result.getMembersCalls()).toEqual([[getMembersAC(channelId)]])
+    expect(result.loadMoreCalls()).toEqual([])
+  })
+
+  it('retries a failed first load only once while it keeps failing', () => {
+    const result = renderContainer(LOADING_STATE.FAILED)
+    for (let i = 0; i < 3; i++) {
+      act(() => {
+        result.store.dispatch(setMembersLoadingStateAC(LOADING_STATE.LOADING, channelId))
+      })
+      act(() => {
+        result.store.dispatch(setMembersLoadingStateAC(LOADING_STATE.FAILED, channelId))
+      })
+    }
+    expect(result.getMembersCalls()).toEqual([[getMembersAC(channelId)]])
+    expect(result.loadMoreCalls()).toEqual([])
   })
 
   it('does not load more while a request is in flight', () => {
-    expect(renderContainer(LOADING_STATE.LOADING)).toEqual([])
+    expect(renderContainer(LOADING_STATE.LOADING).loadMoreCalls()).toEqual([])
   })
 })

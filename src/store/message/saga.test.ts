@@ -2212,12 +2212,13 @@ describe('message saga message-list flows', () => {
       })
     })
     const createdMessage = makePendingMessage({
-      channelId: channel.id,
       tid: 'offline-tid',
       body: 'offline hello',
       metadata: '{}',
       user: currentUser
     })
+    // Like the SDK: MessageBuilder.create() leaves channelId empty until the server confirms
+    delete (createdMessage as any).channelId
     const builder = {
       setBody: jest.fn().mockReturnThis(),
       setBodyAttributes: jest.fn().mockReturnThis(),
@@ -2298,6 +2299,14 @@ describe('message saga message-list flows', () => {
       expect.objectContaining({ tid: 'offline-tid', state: MESSAGE_STATUS.FAILED })
     )
     expect(getChannelFromMap(channel.id)?.lastMessage).toEqual(expect.objectContaining({ tid: 'offline-tid' }))
+    // The optimistic copy carries its chat: the SDK builder leaves channelId empty until the server confirms,
+    // and "this chat's messages" checks (Unable to load messages) must count a message sent while offline
+    const optimisticAdd = mockStore.dispatch.mock.calls
+      .map(([action]: any) => action)
+      .find((action: any) => action?.type === addMessagesAC([], 'next').type)
+    expect(optimisticAdd?.payload.messages[0]).toEqual(
+      expect.objectContaining({ tid: 'offline-tid', channelId: channel.id })
+    )
   })
 
   it('updates the channel-list delivery status after a packet-loss failure is manually resent', async () => {
@@ -5888,6 +5897,54 @@ describe('message first-load failure (Unable to load messages)', () => {
     )
     expect(loadingIndex).toBeGreaterThanOrEqual(0)
     expect(loadingIndex).toBeLessThan(clearIndex)
+  })
+
+  it("another chat's stale failure does not put this chat's list in LOADING before the load starts", async () => {
+    // Chat A failed, the user opened chat B: B's cached window must not hide behind a spinner
+    const channel = makeChannel({ id: 'other-chat-loading' })
+    setActiveChannelId(channel.id)
+    setChannelInMap(channel)
+    mockStoreState.MessageReducer.messagesLoadFailedChannelId = 'previously-failed-chat'
+    setClient(createClient(createMessageQuery(), channel))
+
+    const dispatched = await runMessageSaga(__messageSagaTestables.loadDefaultMessages, loadDefaultMessagesAC(channel))
+
+    const clearIndex = dispatched.findIndex((a) => a.type === setMessagesLoadFailedAC(null).type)
+    const loadingIndex = dispatched.findIndex(
+      (a) => a.type === setLoadingPrevMessagesStateAC(null).type && a.payload.state === LOADING_STATE.LOADING
+    )
+    expect(clearIndex).toBeGreaterThanOrEqual(0)
+    expect(loadingIndex === -1 || loadingIndex > clearIndex).toBe(true)
+  })
+
+  it('loadAroundMessage: a timeout with nothing shown marks the open chat as failed', async () => {
+    const channel = makeChannel({ id: 'failed-load-around' })
+    setActiveChannelId(channel.id)
+    setChannelInMap(channel)
+    setClient(createClient(failingQuery(timeoutError), channel))
+
+    const dispatched = await runMessageSaga(
+      __messageSagaTestables.loadAroundMessageWorker,
+      loadAroundMessageAC(channel, '10')
+    )
+
+    expect(failedActions(dispatched)).toEqual([channel.id])
+  })
+
+  it('loadAroundMessage: a jump while the error is shown clears it', async () => {
+    // Otherwise the flag outlives the jump and the list reloads the default window over it
+    const channel = makeChannel({ id: 'jump-clears-failure' })
+    setActiveChannelId(channel.id)
+    setChannelInMap(channel)
+    mockStoreState.MessageReducer.messagesLoadFailedChannelId = channel.id
+    setClient(createClient(createMessageQuery(), channel))
+
+    const dispatched = await runMessageSaga(
+      __messageSagaTestables.loadAroundMessageWorker,
+      loadAroundMessageAC(channel, '10')
+    )
+
+    expect(failedActions(dispatched)).toEqual([null])
   })
 
   it("marks the chat failed even when the previous chat's messages are still in the list", async () => {

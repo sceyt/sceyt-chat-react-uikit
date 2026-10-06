@@ -36,14 +36,32 @@ describe('LoadErrorState', () => {
     expect(props.onRetry).toHaveBeenCalledTimes(1)
   })
 
-  it('renders as a list item placed like the tab empty state when inList is set', () => {
+  it('renders as a list item placed like the tab empty state in a details tab list', () => {
     render(
       <ul>
-        <>{renderLoadErrorState(props, undefined, { inList: true })}</>
+        <>{renderLoadErrorState(props, undefined, { inDetailsTab: true, asListItem: true })}</>
       </ul>
     )
     expect(screen.getByTestId('load-error-state').tagName).toBe('LI')
     expect(screen.getByTestId('load-error-state')).toHaveStyle('margin-top: 100px')
+  })
+
+  it('keeps a div with the details tab offset outside a list', () => {
+    render(<>{renderLoadErrorState(props, undefined, { inDetailsTab: true })}</>)
+    expect(screen.getByTestId('load-error-state').tagName).toBe('DIV')
+    expect(screen.getByTestId('load-error-state')).toHaveStyle('margin-top: 100px')
+  })
+
+  it('wraps the app component in a list item inside a details tab list', () => {
+    const Custom = ({ title }: any) => <div data-testid='custom'>{title}</div>
+    render(
+      <ul>
+        <>{renderLoadErrorState(props, Custom, { inDetailsTab: true, asListItem: true })}</>
+      </ul>
+    )
+    const wrapper = screen.getByTestId('custom').parentElement as HTMLElement
+    expect(wrapper.tagName).toBe('LI')
+    expect(wrapper).toHaveStyle('margin-top: 100px')
   })
 
   it('uses theme colors', () => {

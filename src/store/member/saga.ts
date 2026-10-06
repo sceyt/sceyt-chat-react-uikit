@@ -79,7 +79,8 @@ function* getMembers(action: IAction): any {
     yield put(updateChannelDataAC(channelId, updateChannelData))
   } catch (e) {
     log.error('ERROR in get members - ', e.message)
-    // Only when nothing is shown yet: FAILED blocks load-more (mentions list, members scroll)
+    // Only when nothing is shown yet: FAILED blocks load-more (members scroll); the mentions list retries
+    // this first load once instead
     loadFailed = isRetryableLoadError(e) && !store.getState().MembersReducer.channelsMembersMap?.[channelId]?.length
     if (e.code !== 10008) {
       // yield put(setErrorNotification(e.message))

@@ -94,7 +94,7 @@ const Links = ({
             onRetry: loadAttachments
           },
           CustomLoadErrorState,
-          { inList: true }
+          { inDetailsTab: true, asListItem: true }
         )
       ) : loadingState === LOADING_STATE.LOADED && attachments.length === 0 ? (
         <EmptyState color={textSecondary}>No shared links.</EmptyState>

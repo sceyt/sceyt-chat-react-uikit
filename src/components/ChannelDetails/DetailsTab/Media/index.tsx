@@ -204,7 +204,8 @@ const Media = ({ channel, CustomLoadErrorState }: IProps) => {
             description: "We couldn't load media. Please try again.",
             onRetry: loadAttachments
           },
-          CustomLoadErrorState
+          CustomLoadErrorState,
+          { inDetailsTab: true }
         )
       ) : loadingState === LOADING_STATE.LOADED && attachments.length === 0 ? (
         <EmptyState color={textSecondary}>No shared media.</EmptyState>

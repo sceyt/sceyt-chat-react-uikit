@@ -17,6 +17,7 @@ import {
   setMessagesAC,
   setMessagesHasNextAC,
   setMessagesHasPrevAC,
+  setMessagesLoadFailedAC,
   setStableUnreadAnchorAC,
   setUnreadMessageIdAC,
   updateMessageAC
@@ -3150,6 +3151,35 @@ describe('MessageList first-load timeout', () => {
     })
 
     expect(dispatchSpy).toHaveBeenCalledWith(loadDefaultMessagesAC(channel))
+  })
+
+  it("does not reload in a loop while the previous chat's messages are still in the store", () => {
+    // Switch paths other than a ChannelList click keep the previous chat's list until the load lands
+    const channel = makeChannel({ id: 'channel-after-switch' })
+    const store = createMessageListStore({
+      ChannelReducer: { activeChannel: channel },
+      UserReducer: { connectionStatus: CONNECTION_STATUS.CONNECTED },
+      MessageReducer: {
+        activeChannelMessages: [makeMessage({ id: '10', channelId: 'previous-channel', body: 'previous chat' })],
+        loadingPrevMessagesState: LOADING_STATE.LOADED,
+        loadingNextMessagesState: LOADING_STATE.LOADED
+      }
+    } as any)
+    const dispatchSpy = jest.spyOn(store, 'dispatch')
+    renderMessageList(store)
+    dispatchSpy.mockClear()
+
+    // Each failed load: the saga clears the flag when it starts, then sets it again
+    for (let i = 0; i < 3; i++) {
+      act(() => {
+        store.dispatch(setMessagesLoadFailedAC(null))
+      })
+      act(() => {
+        store.dispatch(setMessagesLoadFailedAC(channel.id))
+      })
+    }
+
+    expect(dispatchSpy).not.toHaveBeenCalledWith(loadDefaultMessagesAC(channel))
   })
 
   it('does not reload when the failed chat has no messages', () => {
