@@ -10,15 +10,17 @@ export const urlRegex =
   // eslint-disable-next-line max-len
   /(https?:\/\/(?:www\.|(?!www))[a-zA-Z0-9][a-zA-Z0-9-]+[a-zA-Z0-9]\.[^\s]{2,}|www\.[a-zA-Z0-9][a-zA-Z0-9-]+[a-zA-Z0-9]\.[^\s]{2,}|https?:\/\/(?:www\.|(?!www))[a-zA-Z0-9]+\.[^\s]{2,}|www\.[a-zA-Z0-9]+\.[^\s]{2,})/gi
 
-export const bytesToSize = (bytes: number, decimals = 1) => {
+export const bytesToSize = (bytes: number | string, decimals = 1) => {
   // 0, negative, NaN and Infinity have no meaningful size; values below 1 byte
-  // would give a negative unit index (Math.log < 0).
-  if (!Number.isFinite(bytes) || bytes <= 0) return '0 Bytes'
+  // would give a negative unit index (Math.log < 0).]
+  // Sizes can arrive from the server as numeric strings ("30697")
+  const size = Number(bytes)
+  if (!Number.isFinite(size) || size <= 0) return '0 Bytes'
   const k = 1000
   const dm = decimals < 0 ? 0 : decimals
   const sizes = ['B', 'KB', 'MB', 'GB', 'TB', 'PB', 'EB', 'ZB', 'YB']
-  const i = Math.min(Math.max(0, Math.floor(Math.log(bytes) / Math.log(k))), sizes.length - 1)
-  return `${parseFloat((bytes / k ** i).toFixed(dm))} ${sizes[i]}`
+  const i = Math.min(Math.max(0, Math.floor(Math.log(size) / Math.log(k))), sizes.length - 1)
+  return `${parseFloat((size / k ** i).toFixed(dm))} ${sizes[i]}`
 }
 
 export const systemMessageUserName = (userId: string, contact?: IContact, mentionedUsers?: IUser[]) => {
