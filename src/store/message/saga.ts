@@ -1722,6 +1722,12 @@ function* sendTextMessage(action: IAction): any {
       ...createdMessage,
       ...(action.type === RESEND_MESSAGE ? { attachments: message?.attachments, state: MESSAGE_STATUS.UNMODIFIED } : {})
     }
+    // A resent message comes from the local cache, where its metadata was
+    // already parsed into an object by the first send. The SDK expects a
+    // string, and the JSON.parse below would throw on an object.
+    if (messageToSend.metadata && typeof messageToSend.metadata !== 'string') {
+      messageToSend.metadata = JSON.stringify(messageToSend.metadata)
+    }
     pendingMessage = {
       ...messageToSend,
       createdAt: new Date(Date.now()),
@@ -1729,7 +1735,7 @@ function* sendTextMessage(action: IAction): any {
       parentMessage: message.parentMessage
     }
     sendMessageTid = messageToSend.tid
-    if (pendingMessage && pendingMessage.metadata) {
+    if (pendingMessage && typeof pendingMessage.metadata === 'string' && isJSON(pendingMessage.metadata)) {
       pendingMessage.metadata = JSON.parse(pendingMessage.metadata)
     }
     if (pendingMessage) {
