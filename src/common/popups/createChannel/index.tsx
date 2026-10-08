@@ -122,13 +122,11 @@ export default function CreateChannel({
 
   const GoToAddMember = () => {
     if (requiredFields) {
-      if (
-        !(
-          (requiredFields.subject && !subjectValue) ||
-          (requiredFields.description && !metadataValue) ||
-          (requiredFields.uri && !URIValue)
-        )
-      ) {
+      if (!(
+        (requiredFields.subject && !subjectValue) ||
+        (requiredFields.description && !metadataValue) ||
+        (requiredFields.uri && !URIValue)
+      )) {
         setUsersPopupVisible(true)
         setCreateGroupChannelPopupVisible(false)
       }

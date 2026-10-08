@@ -219,9 +219,9 @@ const VIDEO_PREPARATION_TIMEOUT_MS = 10_000
 const hasLivePendingAttachment = (message: IMessage) =>
   Boolean(
     message.tid &&
-      message.attachments?.some((attachment: IAttachment) =>
-        Boolean(attachment.tid && getPendingAttachment(attachment.tid)?.file)
-      )
+    message.attachments?.some((attachment: IAttachment) =>
+      Boolean(attachment.tid && getPendingAttachment(attachment.tid)?.file)
+    )
   )
 
 // Keep the SDK method invocation out of redux-saga's overloaded `call`
@@ -1838,12 +1838,10 @@ function* forwardMessage(action: IAction): any {
     }
     const mentionedUserIds = message.mentionedUsers ? message.mentionedUsers.map((member: any) => member.id) : []
     let attachments = message.attachments
-    if (
-      !(
-        (channel.type === DEFAULT_CHANNEL_TYPE.BROADCAST || channel.type === DEFAULT_CHANNEL_TYPE.PUBLIC) &&
-        !(channel.userRole === 'admin' || channel.userRole === 'owner')
-      )
-    ) {
+    if (!(
+      (channel.type === DEFAULT_CHANNEL_TYPE.BROADCAST || channel.type === DEFAULT_CHANNEL_TYPE.PUBLIC) &&
+      !(channel.userRole === 'admin' || channel.userRole === 'owner')
+    )) {
       if (message.attachments && message.attachments.length && action.type !== RESEND_MESSAGE) {
         // Attachment metadata is normalized to an object after a message is
         // rendered locally, while the SDK builder expects its wire format.
