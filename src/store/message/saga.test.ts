@@ -1495,7 +1495,7 @@ describe('message saga message-list flows', () => {
     await flushMockServerDelay()
     expect(query.loadPrevious).toHaveBeenCalledTimes(1)
 
-    // The same user sends from mobile while WAAFI Web is still opening the channel.
+    // The same user sends from mobile while the web app is still opening the channel.
     const incomingDuringOpen = makeMessage({
       id: '703',
       channelId: channel.id,
@@ -5065,18 +5065,18 @@ describe('message saga message-list flows', () => {
       expect(dispatched).toContainEqual(setMessagesHasNextAC(true))
     })
 
-    // WAAF-2904: online -> offline -> a message arrives -> back online (the
+    // Online -> offline -> a message arrives -> back online (the
     // channel list syncs lastMessage + unread count, but the message itself is
     // never loaded into the message cache) -> offline again -> open the chat.
     // The newly received message is known locally as channel.lastMessage and
     // must be shown; the chat must open on the unread position.
-    // Known bug (WAAF-2904 is open): the offline near-unread window stops at
+    // Known bug (open): the offline near-unread window stops at
     // the cached 705 and drops the received 706, even though newMessageCount
     // is 1 and lastDisplayedMessageId is 705, so 706 is the very next message.
     itFailing(
-      'WAAF-2904 shows a message received between two offline periods when the chat is opened offline (loadNearUnread)',
+      'shows a message received between two offline periods when the chat is opened offline (loadNearUnread)',
       async () => {
-        const channelId = 'channel-waaf-2904'
+        const channelId = 'channel-offline-gap'
         const received = makeMessage({ id: '706', channelId, body: 'received-while-away', incoming: true })
         const channel = makeChannel({
           id: channelId,

@@ -6,8 +6,8 @@
  * would actually see in the message list after the network comes back:
  * no lost messages, no duplicates, no messages stuck as pending.
  *
- * Covers: WAAF-3244 (pending messages not recovered after network restore),
- * WAAF-3279 / WAAF-3281 (video not sent / sent as a file after reconnect).
+ * Covers: pending messages not recovered after network restore, and a video
+ * not sent / sent as a file after reconnect.
  */
 import { runSaga } from 'redux-saga'
 import log from 'loglevel'
@@ -221,7 +221,7 @@ describe('offline / reconnect: sending messages', () => {
     __resetMessageSagaTestState()
   })
 
-  it('WAAF-3244 a text sent while offline is shown once, then sent once and confirmed after reconnect', async () => {
+  it('a text sent while offline is shown once, then sent once and confirmed after reconnect', async () => {
     const channelId = 'channel-offline-text'
     const { sdk } = setupChannel(channelId, ['tid-a'])
 
@@ -249,7 +249,7 @@ describe('offline / reconnect: sending messages', () => {
     expect(getPendingMessagesFromMap(channelId)).toHaveLength(0)
   })
 
-  it('WAAF-3244 several texts sent while offline are all sent after reconnect, in order, with no duplicates', async () => {
+  it('several texts sent while offline are all sent after reconnect, in order, with no duplicates', async () => {
     const channelId = 'channel-offline-many'
     const { sdk } = setupChannel(channelId, ['tid-1', 'tid-2', 'tid-3'])
 
@@ -290,7 +290,7 @@ describe('offline / reconnect: sending messages', () => {
     expect(getPendingMessagesFromMap(channelId)).toHaveLength(0)
   })
 
-  it('WAAF-3279 / WAAF-3281 a video queued while offline is sent as a video after reconnect', async () => {
+  it('a video queued while offline is sent as a video after reconnect', async () => {
     const channelId = 'channel-offline-video'
     const { channel, sdk } = setupChannel(channelId, [])
     const currentUser = makeUser({ id: 'current-user' })
