@@ -1,0 +1,29 @@
+version: 2
+updates:
+  # Library dependencies (root package.json / yarn.lock only; examples/ excluded)
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    groups:
+      # One PR per week for all non-breaking dev-tool updates
+      dev-dependencies:
+        dependency-type: development
+        update-types: [minor, patch]
+    ignore:
+      # peerDependencies are pinned to React 18.2 on purpose
+      - dependency-name: react
+      - dependency-name: react-dom
+    labels: [dependencies]
+
+  # Keeps actions/* versions in workflows current
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+    groups:
+      actions:
+        patterns: ['*']
+    labels: [dependencies, ci]
