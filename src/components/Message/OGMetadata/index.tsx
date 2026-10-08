@@ -402,7 +402,7 @@ const OGMetadataContainer = styled.div<{
   display: grid;
   grid-template-columns: 1fr;
   background-color: ${({ showBackground, customBg, bgColor }) =>
-    showBackground ? customBg ?? bgColor : 'transparent'};
+    showBackground ? (customBg ?? bgColor) : 'transparent'};
   border-radius: ${({ borderRadius }) => (borderRadius !== undefined ? borderRadius : '8px')};
   margin: ${({ containerMargin }) => containerMargin ?? '8px auto 0'};
   padding: ${({ padding }) => padding ?? '0'};
