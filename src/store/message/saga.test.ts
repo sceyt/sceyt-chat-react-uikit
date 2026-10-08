@@ -142,8 +142,8 @@ const createMessageQuery = (overrides: Partial<Record<string, jest.Mock>> = {}) 
   reverse: true,
   loadPrevious: jest.fn((): Promise<QueryResult> => resolveWithMockServerDelay({ messages: [], hasNext: false })),
   loadNearMessageId: jest.fn((): Promise<QueryResult> => resolveWithMockServerDelay({ messages: [], hasNext: false })),
-  loadPreviousMessageId: jest.fn(
-    (): Promise<QueryResult> => resolveWithMockServerDelay({ messages: [], hasNext: false })
+  loadPreviousMessageId: jest.fn((): Promise<QueryResult> =>
+    resolveWithMockServerDelay({ messages: [], hasNext: false })
   ),
   loadNextMessageId: jest.fn((): Promise<QueryResult> => resolveWithMockServerDelay({ messages: [], hasNext: false })),
   ...overrides
