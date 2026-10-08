@@ -67,6 +67,10 @@
       "json-summary",
       "lcov"
     ],
+    "moduleNameMapper": {
+      "^@lexical/react/(ReactExtension|ReactProviderExtension|ReactPluginHostExtension|TreeViewExtension|ExtensionComponent)$": "@lexical/react/Lexical$1.js",
+      "^@lexical/react/use(ExtensionComponent|ExtensionSignalValue)$": "@lexical/react/useLexical$1.js"
+    },
     "coverageThreshold": {
       "./src/store/message/saga.ts": {
         "lines": 64,
@@ -189,10 +193,10 @@
     "@babel/plugin-proposal-unicode-property-regex": "^7.18.6",
     "@ffmpeg/ffmpeg": "^0.12.10",
     "@ffmpeg/util": "^0.12.1",
-    "@lexical/offset": "0.52.0",
-    "@lexical/react": "0.16.0",
+    "@lexical/offset": "0.44.0",
+    "@lexical/react": "0.44.0",
     "file-saver": "^2.0.5",
-    "lexical": "0.16.0",
+    "lexical": "0.44.0",
     "linkify-it": "^5.0.1",
     "loglevel": "^1.9.2",
     "mic-recorder-to-mp3": "^2.2.2",

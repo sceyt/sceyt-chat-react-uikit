@@ -86,7 +86,7 @@ export class MentionNode extends TextNode {
     return dom
   }
 
-  updateDOM(prevNode: MentionNode, dom: HTMLElement, config: EditorConfig): boolean {
+  updateDOM(prevNode: this, dom: HTMLElement, config: EditorConfig): boolean {
     const wasUnchangedMention = prevNode.isUnchangedMention()
     const isUnchangedMention = this.isUnchangedMention()
     if (wasUnchangedMention !== isUnchangedMention) {
