@@ -1,10 +1,22 @@
 #!/bin/sh
-# Runs the full test suite before every push; a failing run aborts the push.
+# Runs lint and the full test suite before every push; a failing step aborts the push.
 #
 # One-time setup per clone (points git at this versioned hooks dir):
 #   git config core.hooksPath .githooks
 #
 # Bypass in an emergency: git push --no-verify
+
+# Lint first: it is much faster than the test suite, so lint errors fail the push early.
+echo "→ pre-push: running yarn test:lint ..."
+yarn test:lint
+status=$?
+
+if [ $status -ne 0 ]; then
+  echo ""
+  echo "✖ Push aborted: lint failed (exit $status)."
+  echo "  Fix the lint errors (yarn test:lint), or bypass once with: git push --no-verify"
+  exit $status
+fi
 
 echo "→ pre-push: running yarn test:all ..."
 yarn test:all
@@ -17,5 +29,5 @@ if [ $status -ne 0 ]; then
   exit $status
 fi
 
-echo "✓ All tests passed — pushing."
+echo "✓ Lint and all tests passed — pushing."
 exit 0
