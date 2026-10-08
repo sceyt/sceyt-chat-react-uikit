@@ -8,9 +8,16 @@ name: Claude PR review
 #   1. Install the Claude GitHub App on this repo: https://github.com/apps/claude
 #   2. Add repo secret ANTHROPIC_API_KEY (Settings -> Secrets and variables -> Actions)
 
+# PAUSED: automatic runs are disabled until the Claude GitHub App is installed
+# on the sceyt org. To turn it back on, restore the pull_request trigger:
+#
+#   pull_request:
+#     types: [opened, ready_for_review, reopened, labeled]
+#
+# Until then it can only be started by hand (Actions -> Claude PR review -> Run workflow),
+# and the review job is skipped because it needs a pull_request event.
 on:
-  pull_request:
-    types: [opened, ready_for_review, reopened, labeled]
+  workflow_dispatch:
 
 concurrency:
   group: claude-review-${{ github.event.pull_request.number }}
@@ -21,6 +28,7 @@ jobs:
     # Skip drafts, PRs from forks (no access to secrets), and Dependabot.
     # For "labeled" events, only react to the ai-review label.
     if: |
+      github.event_name == 'pull_request' &&
       github.event.pull_request.draft == false &&
       github.event.pull_request.head.repo.full_name == github.repository &&
       github.actor != 'dependabot[bot]' &&
