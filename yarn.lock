@@ -1717,6 +1717,11 @@
     "@lexical/utils" "0.16.0"
     lexical "0.16.0"
 
+"@lexical/internal@0.52.0":
+  version "0.52.0"
+  resolved "https://registry.yarnpkg.com/@lexical/internal/-/internal-0.52.0.tgz#7a257cda4715259f5a0d4a17911d5717ad7c0730"
+  integrity sha512-Y7jKqeh4Irf/FwNmAqHIk3b05HpMsHv2RyWPQ8+M7FAdEbT9N2mksjc8ZUZ3tHqDMi7FNiLkjZN/DwbdekUb1g==
+
 "@lexical/link@0.16.0":
   version "0.16.0"
   resolved "https://registry.npmjs.org/@lexical/link/-/link-0.16.0.tgz#f137ab3071206ed3c3a8b8a302ed66b084399ed1"
@@ -1760,6 +1765,14 @@
   integrity sha512-4TqPEC2qA7sgO8Tm65nOWnhJ8dkl22oeuGv9sUB+nhaiRZnw3R45mDelg23r56CWE8itZnvueE7TKvV+F3OXtQ==
   dependencies:
     lexical "0.16.0"
+
+"@lexical/offset@0.52.0":
+  version "0.52.0"
+  resolved "https://registry.yarnpkg.com/@lexical/offset/-/offset-0.52.0.tgz#9796ade43545d2075415edb7ed262703747f3875"
+  integrity sha512-njRN9GqMnvHEtDtVMxmulMmw/au7jCEg2iyE3blE8PxtIUViHq9UoEQ3SaSdHmLBBOBYBM0u37PFWcp1WB5avQ==
+  dependencies:
+    "@lexical/internal" "0.52.0"
+    lexical "0.52.0"
 
 "@lexical/overflow@0.16.0":
   version "0.16.0"
@@ -7794,6 +7807,13 @@ lexical@0.16.0:
   version "0.16.0"
   resolved "https://registry.npmjs.org/lexical/-/lexical-0.16.0.tgz#0515d4003cbfba5a5e0e3e50f32f65076a6b89e2"
   integrity sha512-Skn45Qhriazq4fpAtwnAB11U//GKc4vjzx54xsV3TkDLDvWpbL4Z9TNRwRoN3g7w8AkWnqjeOSODKkrjgfRSrg==
+
+lexical@0.52.0:
+  version "0.52.0"
+  resolved "https://registry.yarnpkg.com/lexical/-/lexical-0.52.0.tgz#fe745feb1800c0b5f75caa756c1bc7fccec71ca3"
+  integrity sha512-mePejqwCDaW0GR89IoofJTTlk/EiwwlGhbs1D8qOx/Iw6ieG5D3nh7PSPLv0Csia0UC58HpuV91DilJjqeAWSw==
+  dependencies:
+    "@lexical/internal" "0.52.0"
 
 lilconfig@^2.0.3:
   version "2.1.0"
