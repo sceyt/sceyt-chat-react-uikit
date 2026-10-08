@@ -1367,3 +1367,68 @@ describe('channel saga load failures (retryable error -> channelsLoadFailed)', (
     expect(loadingStates(dispatched)).toEqual([LOADING_STATE.LOADING, LOADING_STATE.LOADED])
   })
 })
+
+describe('regressions', () => {
+  const clearPendingChannelReads = () => {
+    getPendingChannelReads().forEach((pendingRead) => removePendingChannelRead(pendingRead.channelId))
+  }
+
+  beforeEach(() => {
+    jest.clearAllMocks()
+    mockStore.getState.mockReturnValue(mockStoreState)
+    destroyChannelsMap()
+    clearPendingChannelReads()
+    __channelSagaTestables.setWaitForReadMarkerRetry(() => Promise.resolve())
+  })
+
+  afterEach(() => {
+    mockStoreState.UserReducer.connectionStatus = CONNECTION_STATUS.CONNECTED
+    __channelSagaTestables.resetWaitForReadMarkerRetry()
+    clearPendingChannelReads()
+    destroyChannelsMap()
+  })
+
+  it('WAAF-2745 unread badge clears when a chat is read offline and stays cleared after reconnect', async () => {
+    const channelId = 'channel-waaf-2745'
+    const markMessagesAsDisplayed = jest.fn(async () => ({
+      messageIds: ['901', '902'],
+      user: makeUser({ id: 'current-user' }),
+      createdAt: new Date('2026-06-18T10:00:00.000Z')
+    }))
+    const channel = makeChannel({
+      id: channelId,
+      lastMessage: makeMessage({ id: '902', channelId, incoming: true }),
+      lastDisplayedMessageId: '900',
+      unread: true,
+      newMessageCount: 2,
+      markMessagesAsDisplayed
+    })
+    setChannelInMap(channel)
+
+    // 1. The chat is opened and its messages become visible while the network is down.
+    mockStoreState.UserReducer.connectionStatus = CONNECTION_STATUS.DISCONNECTED
+    const offlineDispatched = await runChannelSaga(
+      __channelSagaTestables.markMessagesRead,
+      markMessagesAsReadAC(channelId, ['901', '902'])
+    )
+
+    expect(markMessagesAsDisplayed).not.toHaveBeenCalled()
+    expect(getPendingChannelRead(channelId)).toEqual(expect.objectContaining({ messageIds: ['901', '902'] }))
+    expect(offlineDispatched).toContainEqual(
+      updateChannelDataAC(channelId, expect.objectContaining({ newMessageCount: 0, unread: false }))
+    )
+    expect(getChannelFromMap(channelId).newMessageCount).toBe(0)
+
+    // 2. The network comes back: the queued read is sent and the badge stays cleared.
+    mockStoreState.UserReducer.connectionStatus = CONNECTION_STATUS.CONNECTED
+    await runChannelSaga(
+      __channelSagaTestables.resendPendingChannelReads,
+      resendPendingChannelReadsAC(CONNECTION_STATUS.CONNECTED)
+    )
+
+    expect(markMessagesAsDisplayed).toHaveBeenCalledWith(['901', '902'])
+    expect(getPendingChannelRead(channelId)).toBeUndefined()
+    expect(getChannelFromMap(channelId).newMessageCount).toBe(0)
+    expect(getChannelFromMap(channelId).unread).toBe(false)
+  })
+})

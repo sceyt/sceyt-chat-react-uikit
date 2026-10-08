@@ -1,0 +1,66 @@
+name: Fix needs test
+
+# A fix PR must add or change at least one *.test.* file.
+# A PR counts as a fix when its branch starts with fix/ or hotfix/,
+# or its title starts with "fix" (e.g. "Fix: ...", "fix(chat-list): ...").
+# Pure styling fixes can skip the check with the `no-test-needed` label
+# (the reviewer must agree and the PR must say why).
+
+on:
+  pull_request:
+    types: [opened, reopened, synchronize, edited, labeled, unlabeled]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: fix-needs-test-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    name: Fix needs test
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Check that fix PRs include a test
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          HEAD_REF: ${{ github.event.pull_request.head.ref }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          SKIP_LABEL: ${{ contains(github.event.pull_request.labels.*.name, 'no-test-needed') }}
+        run: |
+          set -euo pipefail
+
+          title_lc="$(printf '%s' "$PR_TITLE" | tr '[:upper:]' '[:lower:]')"
+          is_fix=false
+          case "$HEAD_REF" in fix/*|hotfix/*) is_fix=true ;; esac
+          case "$title_lc" in fix*) is_fix=true ;; esac
+
+          if [ "$is_fix" != "true" ]; then
+            echo "Not a fix PR (branch '$HEAD_REF'). Nothing to check."
+            exit 0
+          fi
+
+          if [ "$SKIP_LABEL" = "true" ]; then
+            echo "Fix PR has the 'no-test-needed' label. Skipping."
+            exit 0
+          fi
+
+          changed_tests="$(git diff --name-only --diff-filter=AM "$BASE_SHA" "$HEAD_SHA" | grep -E '\.test\.(ts|tsx|js|jsx)$' || true)"
+
+          if [ -z "$changed_tests" ]; then
+            echo "::error::This is a fix PR but it adds or changes no *.test.* file."
+            echo "Add a test that fails before the fix and passes after it,"
+            echo "or add the 'no-test-needed' label for a pure styling change and explain why in the PR."
+            exit 1
+          fi
+
+          echo "Test files added or changed:"
+          echo "$changed_tests"
