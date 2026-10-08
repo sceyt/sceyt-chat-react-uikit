@@ -220,6 +220,60 @@ let activeSegmentChannelId: string | null = null
 // A jump to a different position creates a new separate entry; pagination extends the existing one.
 let loadedSegmentsMap: { [channelId: string]: Array<{ startId: string; endId: string }> } = {}
 
+// Confirmed channel.lastMessage values seen during chat-list synchronization,
+// one per channel. A message can be known here (e.g. received while the web
+// client was offline, then synced on reconnect) without being in the message
+// cache yet.
+//
+// Kept separate from messagesMap and loadedSegmentsMap on purpose: the
+// latest-window checks treat the newest cached segment as a complete window,
+// so a lone snapshot stored there would be served as the whole chat. Nothing
+// here changes messagesMap, segment boundaries or the active segment.
+//
+// Session-only: snapshots are not persisted to IndexedDB.
+let latestMessageSnapshots: { [channelId: string]: IMessage } = {}
+
+/**
+ * Records a channel's confirmed last message. A newer id replaces an older
+ * snapshot; an older id never replaces a newer one; the same id replaces the
+ * stored copy so edits and delivery-state changes stay current.
+ * Returns true when the snapshot was stored.
+ */
+export function setLatestMessageSnapshot(channelId: string, message?: IMessage | null): boolean {
+  if (!channelId || !message?.id || message.deliveryStatus === MESSAGE_DELIVERY_STATUS.PENDING) {
+    return false
+  }
+  const current = latestMessageSnapshots[channelId]
+  if (current?.id && compareMessageIds(message.id, current.id) < 0) {
+    return false
+  }
+  latestMessageSnapshots[channelId] = { ...message }
+  return true
+}
+
+export const getLatestMessageSnapshot = (channelId: string): IMessage | null =>
+  latestMessageSnapshots[channelId] || null
+
+/**
+ * Removes a channel's snapshot. When `messageId` is given, the snapshot is only
+ * removed if it is still that message, so reconciling an older snapshot cannot
+ * erase a newer one recorded in the meantime.
+ */
+export function clearLatestMessageSnapshot(channelId: string, messageId?: string) {
+  const current = latestMessageSnapshots[channelId]
+  if (!current) {
+    return
+  }
+  if (messageId && current.id !== messageId) {
+    return
+  }
+  delete latestMessageSnapshots[channelId]
+}
+
+export const clearAllLatestMessageSnapshots = () => {
+  latestMessageSnapshots = {}
+}
+
 export const removeAllMessages = () => {
   clearActiveSegment()
 }
@@ -1050,10 +1104,19 @@ export function getMessageFromMap(channelId: string, messageId: string) {
   return Object.values(channelMessages).find((message) => message.id === messageId || message.tid === messageId) || null
 }
 
-export function removeMessagesFromMap(channelId: string) {
+// Drops a channel's in-memory cache. Used directly by LRU eviction, where the
+// channel still exists, so its latest-message snapshot is kept.
+function dropChannelCacheFromMemory(channelId: string) {
   delete messagesMap[channelId]
   delete loadedSegmentsMap[channelId]
   channelVisitOrder = channelVisitOrder.filter((id) => id !== channelId)
+}
+
+// Removes a channel's cache because it was deleted, left or its history was
+// cleared, so its latest-message snapshot is no longer valid either.
+export function removeMessagesFromMap(channelId: string) {
+  dropChannelCacheFromMemory(channelId)
+  clearLatestMessageSnapshot(channelId)
 }
 
 // ---- In-memory channel-cache LRU with IndexedDB spill ----------------------
@@ -1094,7 +1157,7 @@ export const evictLruChannels = (activeChannelId: string) => {
     persistChannelMessages(channelId, Object.values(messagesMap[channelId] || {}), [
       ...(loadedSegmentsMap[channelId] || [])
     ])
-    removeMessagesFromMap(channelId)
+    dropChannelCacheFromMemory(channelId)
     store.dispatch(removeChannelMarkersAC(channelId))
     evictedIds.push(channelId)
     overflow--
@@ -1157,6 +1220,7 @@ export function removeMessageFromMap(channelId: string, messageId: string) {
 export function clearMessagesMap() {
   messagesMap = {}
   loadedSegmentsMap = {}
+  latestMessageSnapshots = {}
   channelVisitOrder = []
   deletedPendingMessageTids.clear()
   clearActiveSegment()
@@ -1169,6 +1233,7 @@ export function checkChannelExistsOnMessagesMap(channelId: string) {
 export function destroyChannelsMap() {
   messagesMap = {}
   loadedSegmentsMap = {}
+  latestMessageSnapshots = {}
   channelVisitOrder = []
   clearActiveSegment()
 }
