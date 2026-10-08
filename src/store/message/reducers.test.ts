@@ -929,3 +929,64 @@ describe('memory-bounded maps', () => {
     expect(Object.keys(state.oGMetadata || {})).toContain('https://example.com/1')
   })
 })
+
+describe('regressions', () => {
+  const initialState = () => MessageReducer(undefined, { type: '@@INIT' } as any)
+  const tid = 'tid-waaf-1536'
+  const channelId = 'channel-waaf-1536'
+
+  const makeSendPair = () => {
+    const pending = makePendingMessage({ tid, channelId, body: 'hello', user: makeUser({ id: 'current-user' }) })
+    const confirmed = makeMessage({
+      id: '1536000',
+      tid,
+      channelId,
+      body: 'hello',
+      incoming: false,
+      deliveryStatus: MESSAGE_DELIVERY_STATUS.SENT
+    })
+    return { pending, confirmed }
+  }
+
+  beforeEach(() => {
+    resetMessageListFixtureIds()
+    clearMessagesMap()
+  })
+
+  afterEach(() => {
+    clearMessagesMap()
+  })
+
+  const bodiesAndIds = (state: any) => state.activeChannelMessages.map((m: any) => `${m.id || ''}/${m.tid}/${m.body}`)
+
+  it('WAAF-1536 sent message is shown once when the server echo arrives after the pending copy', () => {
+    const { pending, confirmed } = makeSendPair()
+    let state = MessageReducer(initialState(), addMessage({ message: pending } as any))
+    state = MessageReducer(state, addMessages({ messages: [confirmed], direction: 'next' } as any))
+
+    expect(bodiesAndIds(state)).toEqual(['1536000/tid-waaf-1536/hello'])
+  })
+
+  it('WAAF-1536 sent message is shown once when the send response and the echo both arrive', () => {
+    const { pending, confirmed } = makeSendPair()
+    let state = MessageReducer(initialState(), addMessage({ message: pending } as any))
+    state = MessageReducer(
+      state,
+      updateMessage({
+        messageId: tid,
+        params: { id: confirmed.id, deliveryStatus: MESSAGE_DELIVERY_STATUS.SENT } as any
+      } as any)
+    )
+    state = MessageReducer(state, addMessages({ messages: [confirmed], direction: 'next' } as any))
+
+    expect(bodiesAndIds(state)).toEqual(['1536000/tid-waaf-1536/hello'])
+  })
+
+  it('WAAF-1536 sent message is shown once when the confirmed copy is added directly', () => {
+    const { pending, confirmed } = makeSendPair()
+    let state = MessageReducer(initialState(), addMessage({ message: pending } as any))
+    state = MessageReducer(state, addMessage({ message: confirmed } as any))
+
+    expect(bodiesAndIds(state)).toEqual(['1536000/tid-waaf-1536/hello'])
+  })
+})
