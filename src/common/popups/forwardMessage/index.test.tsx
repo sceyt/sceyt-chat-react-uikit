@@ -201,7 +201,7 @@ describe('ForwardMessagePopup', () => {
         attachments: [
           makeAttachment({
             type: attachmentTypes.link,
-            url: 'https://waafi.com/call/6f564464402045a580d92d047f2ec71d',
+            url: 'https://sceyt.com/call/6f564464402045a580d92d047f2ec71d',
             metadata: JSON.stringify({ iur: 'https://img.example.com/thumb.png' })
           })
         ]
@@ -213,7 +213,7 @@ describe('ForwardMessagePopup', () => {
 
     const image = screen.getByAltText('Link preview') as HTMLImageElement
     expect(image.src).toBe('https://img.example.com/thumb.png')
-    expect(screen.getByText('https://waafi.com/call/6f564464402045a580d92d047f2ec71d')).toBeInTheDocument()
+    expect(screen.getByText('https://sceyt.com/call/6f564464402045a580d92d047f2ec71d')).toBeInTheDocument()
     expect(screen.queryByText('linkIcon.svg')).not.toBeInTheDocument()
   })
 

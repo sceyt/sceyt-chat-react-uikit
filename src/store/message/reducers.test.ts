@@ -932,8 +932,8 @@ describe('memory-bounded maps', () => {
 
 describe('regressions', () => {
   const initialState = () => MessageReducer(undefined, { type: '@@INIT' } as any)
-  const tid = 'tid-waaf-1536'
-  const channelId = 'channel-waaf-1536'
+  const tid = 'tid-duplicate-send'
+  const channelId = 'channel-duplicate-send'
 
   const makeSendPair = () => {
     const pending = makePendingMessage({ tid, channelId, body: 'hello', user: makeUser({ id: 'current-user' }) })
@@ -959,15 +959,15 @@ describe('regressions', () => {
 
   const bodiesAndIds = (state: any) => state.activeChannelMessages.map((m: any) => `${m.id || ''}/${m.tid}/${m.body}`)
 
-  it('WAAF-1536 sent message is shown once when the server echo arrives after the pending copy', () => {
+  it('sent message is shown once when the server echo arrives after the pending copy', () => {
     const { pending, confirmed } = makeSendPair()
     let state = MessageReducer(initialState(), addMessage({ message: pending } as any))
     state = MessageReducer(state, addMessages({ messages: [confirmed], direction: 'next' } as any))
 
-    expect(bodiesAndIds(state)).toEqual(['1536000/tid-waaf-1536/hello'])
+    expect(bodiesAndIds(state)).toEqual(['1536000/tid-duplicate-send/hello'])
   })
 
-  it('WAAF-1536 sent message is shown once when the send response and the echo both arrive', () => {
+  it('sent message is shown once when the send response and the echo both arrive', () => {
     const { pending, confirmed } = makeSendPair()
     let state = MessageReducer(initialState(), addMessage({ message: pending } as any))
     state = MessageReducer(
@@ -979,14 +979,14 @@ describe('regressions', () => {
     )
     state = MessageReducer(state, addMessages({ messages: [confirmed], direction: 'next' } as any))
 
-    expect(bodiesAndIds(state)).toEqual(['1536000/tid-waaf-1536/hello'])
+    expect(bodiesAndIds(state)).toEqual(['1536000/tid-duplicate-send/hello'])
   })
 
-  it('WAAF-1536 sent message is shown once when the confirmed copy is added directly', () => {
+  it('sent message is shown once when the confirmed copy is added directly', () => {
     const { pending, confirmed } = makeSendPair()
     let state = MessageReducer(initialState(), addMessage({ message: pending } as any))
     state = MessageReducer(state, addMessage({ message: confirmed } as any))
 
-    expect(bodiesAndIds(state)).toEqual(['1536000/tid-waaf-1536/hello'])
+    expect(bodiesAndIds(state)).toEqual(['1536000/tid-duplicate-send/hello'])
   })
 })

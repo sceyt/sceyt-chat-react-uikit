@@ -92,7 +92,7 @@ interface AttachmentPops {
   onlyVideoImage?: boolean
 }
 
-// The WAAFI custom downloader converts an AbortController abort into this
+// The app's custom downloader converts an AbortController abort into this
 // ordinary Error. Treat it exactly like AbortError: stopping a transfer is a
 // user action, not a failed download.
 const isMediaDownloadCancellation = (error: any) =>

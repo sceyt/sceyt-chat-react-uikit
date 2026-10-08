@@ -9,6 +9,7 @@ import {
   getContiguousPrevMessages,
   getMessageFromMap,
   getPendingMessagesFromMap,
+  setLatestMessageSnapshot,
   MESSAGES_MAX_PAGE_COUNT,
   MESSAGE_LOAD_DIRECTION,
   setActiveSegment
@@ -89,6 +90,7 @@ import MessageReducer from './reducers'
 import ChannelReducer from '../channel/reducers'
 import { navigateToLatest } from '../../helpers/messageListNavigator'
 import { IChannel, IMessage } from '../../types'
+import { itFailing } from '../../testUtils/itFailing'
 
 const mockStoreState = {
   ChannelReducer: {
@@ -1493,7 +1495,7 @@ describe('message saga message-list flows', () => {
     await flushMockServerDelay()
     expect(query.loadPrevious).toHaveBeenCalledTimes(1)
 
-    // The same user sends from mobile while WAAFI Web is still opening the channel.
+    // The same user sends from mobile while the web app is still opening the channel.
     const incomingDuringOpen = makeMessage({
       id: '703',
       channelId: channel.id,
@@ -5061,6 +5063,106 @@ describe('message saga message-list flows', () => {
       ])
       // 707-711 are not cached — the list must know there is more to load next
       expect(dispatched).toContainEqual(setMessagesHasNextAC(true))
+    })
+
+    // Online -> offline -> a message arrives -> back online (the
+    // channel list syncs lastMessage + unread count, but the message itself is
+    // never loaded into the message cache) -> offline again -> open the chat.
+    // The newly received message is known locally as channel.lastMessage and
+    // must be shown; the chat must open on the unread position.
+    // Known bug (open): the offline near-unread window stops at
+    // the cached 705 and drops the received 706, even though newMessageCount
+    // is 1 and lastDisplayedMessageId is 705, so 706 is the very next message.
+    itFailing(
+      'shows a message received between two offline periods when the chat is opened offline (loadNearUnread)',
+      async () => {
+        const channelId = 'channel-offline-gap'
+        const received = makeMessage({ id: '706', channelId, body: 'received-while-away', incoming: true })
+        const channel = makeChannel({
+          id: channelId,
+          newMessageCount: 1,
+          lastDisplayedMessageId: '705',
+          lastMessage: received
+        })
+        const cachedSegment = ['700', '701', '702', '703', '704', '705'].map((id) =>
+          makeMessage({ id, channelId, body: `cached-${id}`, incoming: true })
+        )
+        cachedSegment.forEach((message) => addMessageToMap(channelId, message))
+        setActiveSegment(channelId, '700', '705')
+
+        mockStoreState.UserReducer.connectionStatus = CONNECTION_STATUS.DISCONNECTED
+        setActiveChannelId(channelId)
+        setChannelInMap(channel)
+
+        const dispatched = await runMessageSaga(__messageSagaTestables.loadNearUnread, loadNearUnreadAC(channel))
+
+        const lastSetMessages = dispatched.filter((action) => action.type === setMessagesAC([], channelId).type).at(-1)
+        const bodies = lastSetMessages.payload.messages.map((message: any) => message.body)
+        expect(bodies).toContain('received-while-away')
+        expect(bodies.indexOf('received-while-away')).toBe(bodies.length - 1)
+      }
+    )
+
+    // The latest-message snapshot (chat-list sync) must not change how a chat
+    // opens until the gap UI exists: the latest-window checks must still see
+    // 705 as the cached latest and fetch from the server when online.
+    describe('with a latest-message snapshot newer than the cache', () => {
+      const channelId = 'channel-snapshot-neutral'
+      const setup = () => {
+        const received = makeMessage({ id: '706', channelId, body: 'snapshot-706', incoming: true })
+        const channel = makeChannel({ id: channelId, lastMessage: received })
+        ;['700', '701', '702', '703', '704', '705'].forEach((id) =>
+          addMessageToMap(channelId, makeMessage({ id, channelId, body: `cached-${id}`, incoming: true }))
+        )
+        setActiveSegment(channelId, '700', '705')
+        setLatestMessageSnapshot(channelId, received)
+        setActiveChannelId(channelId)
+        setChannelInMap(channel)
+        return channel
+      }
+
+      it('still fetches the latest window from the server when online (getMessagesQuery)', async () => {
+        const channel = setup()
+        const serverWindow = ['703', '704', '705', '706'].map((id) =>
+          makeMessage({ id, channelId, body: `server-${id}`, incoming: true })
+        )
+        const query = createMessageQuery({
+          loadPrevious: jest.fn(() => resolveWithMockServerDelay({ messages: serverWindow, hasNext: false }))
+        })
+        mockStoreState.UserReducer.connectionStatus = CONNECTION_STATUS.CONNECTED
+        setClient(createClient(query, { ...channel }))
+
+        const dispatched = await runMessageSaga(__messageSagaTestables.getMessagesQuery, loadLatestMessagesAC(channel))
+
+        expect(query.loadPrevious).toHaveBeenCalledTimes(1)
+        const setMessagesActions = dispatched.filter((action) => action.type === setMessagesAC([], channelId).type)
+        setMessagesActions.forEach((action) => {
+          expect(action.payload.messages.map((message: any) => message.body)).not.toEqual(['snapshot-706'])
+        })
+        expect(setMessagesActions.at(-1).payload.messages.map((message: any) => message.body)).toEqual([
+          'server-703',
+          'server-704',
+          'server-705',
+          'server-706'
+        ])
+      })
+
+      it('does not paint the snapshot alone as the chat when opening offline (loadDefaultMessages)', async () => {
+        const channel = setup()
+        mockStoreState.UserReducer.connectionStatus = CONNECTION_STATUS.DISCONNECTED
+
+        const dispatched = await runMessageSaga(
+          __messageSagaTestables.loadDefaultMessages,
+          loadDefaultMessagesAC(channel)
+        )
+
+        const setMessagesActions = dispatched.filter((action) => action.type === setMessagesAC([], channelId).type)
+        expect(setMessagesActions.length).toBeGreaterThan(0)
+        setMessagesActions.forEach((action) => {
+          expect(action.payload.messages.map((message: any) => message.body)).not.toEqual(['snapshot-706'])
+        })
+        expect(getActiveSegment()).toEqual({ startId: '700', endId: '705' })
+      })
     })
   })
 })

@@ -10,7 +10,12 @@ import {
   setChannelInMap,
   setPendingChannelRead
 } from '../../helpers/channelHalper'
-import { addMessageToMap } from '../../helpers/messagesHalper'
+import {
+  addMessageToMap,
+  clearAllLatestMessageSnapshots,
+  getLatestMessageSnapshot,
+  setLatestMessageSnapshot
+} from '../../helpers/messagesHalper'
 import { LOADING_STATE, MESSAGE_DELIVERY_STATUS } from '../../helpers/constants'
 import { makeChannel, makeMessage, makePendingMessage, makeUser } from '../../testUtils/messageFixtures'
 import { setUnreadScrollToAC, updateMessageAC } from '../message/actions'
@@ -1388,8 +1393,8 @@ describe('regressions', () => {
     destroyChannelsMap()
   })
 
-  it('WAAF-2745 unread badge clears when a chat is read offline and stays cleared after reconnect', async () => {
-    const channelId = 'channel-waaf-2745'
+  it('unread badge clears when a chat is read offline and stays cleared after reconnect', async () => {
+    const channelId = 'channel-offline-read-badge'
     const markMessagesAsDisplayed = jest.fn(async () => ({
       messageIds: ['901', '902'],
       user: makeUser({ id: 'current-user' }),
@@ -1430,5 +1435,84 @@ describe('regressions', () => {
     expect(getPendingChannelRead(channelId)).toBeUndefined()
     expect(getChannelFromMap(channelId).newMessageCount).toBe(0)
     expect(getChannelFromMap(channelId).unread).toBe(false)
+  })
+})
+
+describe('channel saga getChannels latest-message snapshots', () => {
+  beforeEach(() => {
+    jest.clearAllMocks()
+    mockStore.getState.mockReturnValue(mockStoreState)
+    destroyChannelsMap()
+    clearAllLatestMessageSnapshots()
+    mockStoreState.UserReducer.connectionStatus = CONNECTION_STATUS.CONNECTED
+    mockStoreState.ChannelReducer = {
+      channels: [],
+      channelsLoadingState: null,
+      activeChannel: {},
+      hideChannelList: true
+    }
+  })
+
+  afterEach(() => {
+    destroyChannelsMap()
+    clearAllLatestMessageSnapshots()
+  })
+
+  const syncChannels = async (serverChannels: any[]) => {
+    const channelQuery = {
+      loadNextPage: jest.fn(async () => ({ channels: serverChannels, hasNext: false }))
+    }
+    const channelQueryBuilder: any = {
+      types: jest.fn().mockReturnThis(),
+      memberCount: jest.fn().mockReturnThis(),
+      order: jest.fn().mockReturnThis(),
+      limit: jest.fn().mockReturnThis(),
+      build: jest.fn(async () => channelQuery)
+    }
+    setClient({
+      user: { id: 'current-user' },
+      ChannelListQueryBuilder: jest.fn(() => channelQueryBuilder)
+    } as any)
+
+    await runSaga({ dispatch: () => undefined, getState: () => mockStoreState }, __channelSagaTestables.getChannels, {
+      type: 'GET_CHANNELS',
+      payload: { params: { limit: 20 } }
+    }).toPromise()
+  }
+
+  it('records the confirmed lastMessage of each synced channel (offline gap staging)', async () => {
+    const received = makeMessage({ id: '706', channelId: 'channel-sync-a', body: 'received-while-away' })
+    const other = makeMessage({ id: '42', channelId: 'channel-sync-b', body: 'other' })
+
+    await syncChannels([
+      makeChannel({ id: 'channel-sync-a', lastMessage: received, newMessageCount: 1 }),
+      makeChannel({ id: 'channel-sync-b', lastMessage: other })
+    ])
+
+    expect(getLatestMessageSnapshot('channel-sync-a')).toEqual(
+      expect.objectContaining({ id: '706', body: 'received-while-away' })
+    )
+    expect(getLatestMessageSnapshot('channel-sync-b')?.id).toBe('42')
+  })
+
+  it('does not record a pending lastMessage and keeps the existing snapshot', async () => {
+    const channelId = 'channel-sync-pending'
+    setLatestMessageSnapshot(channelId, makeMessage({ id: '500', channelId, body: 'confirmed-earlier' }))
+    const pending = makePendingMessage({ channelId, tid: 'pending-tid', body: 'not sent yet' })
+
+    await syncChannels([makeChannel({ id: channelId, lastMessage: pending as any })])
+
+    expect(getLatestMessageSnapshot(channelId)).toEqual(
+      expect.objectContaining({ id: '500', body: 'confirmed-earlier' })
+    )
+  })
+
+  it('does not let an older synced lastMessage replace a newer snapshot', async () => {
+    const channelId = 'channel-sync-older'
+    setLatestMessageSnapshot(channelId, makeMessage({ id: '707', channelId, body: 'newer' }))
+
+    await syncChannels([makeChannel({ id: channelId, lastMessage: makeMessage({ id: '706', channelId }) })])
+
+    expect(getLatestMessageSnapshot(channelId)).toEqual(expect.objectContaining({ id: '707', body: 'newer' }))
   })
 })

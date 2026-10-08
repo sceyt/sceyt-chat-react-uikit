@@ -1,8 +1,8 @@
 ## What changed
 
-<!-- One or two sentences. Link the WAAF ticket. -->
+<!-- One or two sentences. Link the ticket. -->
 
-Jira: WAAF-
+Ticket:
 
 ## Type
 

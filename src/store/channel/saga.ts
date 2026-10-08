@@ -130,6 +130,7 @@ import {
   getMessagesFromMap,
   removeAllMessages,
   removeMessagesFromMap,
+  setLatestMessageSnapshot,
   trackChannelVisit,
   updateMessageOnMap
 } from '../../helpers/messagesHalper'
@@ -436,6 +437,17 @@ function* createChannel(action: IAction): any {
   }
 }
 
+// Chat-list sync can bring a channel's newest message (e.g. one received while
+// offline) without loading it into the message cache. Keep it as a snapshot so
+// the message list can show it later; see setLatestMessageSnapshot.
+const recordLatestMessageSnapshots = (channels: IChannel[] = []) => {
+  channels.forEach((channel) => {
+    if (channel?.id && channel.lastMessage) {
+      setLatestMessageSnapshot(channel.id, channel.lastMessage)
+    }
+  })
+}
+
 function* getChannels(action: IAction): any {
   log.info(`${new Date().toISOString()} [getChannels] start get channels`)
   let mainListLoaded = false
@@ -589,6 +601,7 @@ function* getChannels(action: IAction): any {
     log.info(
       `${new Date().toISOString()} [getChannels] setting channels in state, count: ${mappedChannels?.length || 0}`
     )
+    recordLatestMessageSnapshots(mappedChannels)
     yield put(setChannelsAC(mappedChannels))
     for (const ch of mappedChannels) {
       const lastMsg = ch.lastMessage
@@ -1146,6 +1159,7 @@ function* channelsLoadMore(action: IAction): any {
       `${new Date().toISOString()} [channelsLoadMore] adding channels to state, count:`,
       mappedChannels?.length || 0
     )
+    recordLatestMessageSnapshots(mappedChannels)
     yield put(addChannelsAC(mappedChannels))
     yield put(setChannelsLoadingStateAC(LOADING_STATE.LOADED))
     log.info(
