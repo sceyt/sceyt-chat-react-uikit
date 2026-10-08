@@ -108,6 +108,7 @@ import {
   setOGMetadataAC,
   fetchOGMetadataForLinkAC,
   setUnreadMessageIdAC,
+  setMessageListGapAC,
   deleteMessageFromListAC,
   setMessagesLoadFailedAC
 } from './actions'
@@ -149,6 +150,7 @@ import {
   getMessageFromMap,
   getMessagesFromMap,
   getLatestContiguousMessagesFromMap,
+  getLatestMessageSnapshot,
   getLatestMessagesFromMap,
   getLastConfirmedMessageId,
   getPendingMessagesFromMap,
@@ -3043,6 +3045,24 @@ function* clearMessagesLoadFailed(channelId: string | undefined): any {
   yield put(setMessagesLoadFailedAC(null))
 }
 
+// Returns the channel's latest-message snapshot when it is newer than the end
+// of a cached window that has nothing cached after it; otherwise null.
+const getOfflineSnapshotAfterWindow = (
+  channelId: string,
+  windowMessages: IMessage[],
+  windowHasNextCached: boolean
+): IMessage | null => {
+  if (windowHasNextCached) {
+    return null
+  }
+  const snapshot = getLatestMessageSnapshot(channelId)
+  const windowLastConfirmedId = getLastConfirmedMessageId(windowMessages)
+  if (!snapshot?.id || !windowLastConfirmedId || compareMessageIds(snapshot.id, windowLastConfirmedId) <= 0) {
+    return null
+  }
+  return snapshot
+}
+
 function* loadNearUnread(action: IAction): any {
   try {
     yield call(clearMessagesLoadFailed, action.payload?.channel?.id)
@@ -3064,16 +3084,40 @@ function* loadNearUnread(action: IAction): any {
           compareMessageIds(channel.lastMessage.id, cachedLastConfirmedMessageId) > 0)
 
       if (cacheWasShown) {
+        // WAAF-2904: offline, the newest message may be known only from chat-list
+        // sync (a latest-message snapshot) while the cache ends earlier. Show it
+        // after the cached window with an explicit gap: nothing proves the two
+        // are adjacent (unread counts ignore own messages from other devices).
+        const offlineSnapshot =
+          connectionState !== CONNECTION_STATUS.CONNECTED
+            ? getOfflineSnapshotAfterWindow(channel.id, cachedNearWindow.messages, cachedNearWindow.hasNextMessages)
+            : null
+        const windowMessages = offlineSnapshot
+          ? [...cachedNearWindow.messages, offlineSnapshot]
+          : cachedNearWindow.messages
+        const windowHasNextMessages = offlineSnapshot
+          ? !!channel.lastMessage?.id && compareMessageIds(channel.lastMessage.id, offlineSnapshot.id) > 0
+          : cachedHasNextMessages
+
         yield put(setUnreadMessageIdAC(channel.lastDisplayedMessageId))
         yield put(setMessagesHasPrevAC(cachedHasPrevMessages))
-        yield put(setMessagesHasNextAC(cachedHasNextMessages))
-        yield call(loadOGMetadataForLinkMessages, cachedNearWindow.messages, true)
-        yield put(setMessagesAC(cachedNearWindow.messages, channel.id))
+        yield put(setMessagesHasNextAC(windowHasNextMessages))
+        yield call(loadOGMetadataForLinkMessages, windowMessages, true)
+        yield put(setMessagesAC(windowMessages, channel.id))
+        if (offlineSnapshot) {
+          yield put(
+            setMessageListGapAC({
+              channelId: channel.id,
+              afterMessageId: cachedLastConfirmedMessageId,
+              beforeMessageId: offlineSnapshot.id
+            })
+          )
+        }
         yield put(scrollToNewMessageAC(false))
         yield put(setUnreadScrollToAC(true))
 
-        const filteredPendingMessages = getFilteredPendingMessages(channel, cachedNearWindow.messages, {
-          hasNext: cachedHasNextMessages
+        const filteredPendingMessages = getFilteredPendingMessages(channel, windowMessages, {
+          hasNext: windowHasNextMessages
         })
         yield put(addMessagesAC(filteredPendingMessages, MESSAGE_LOAD_DIRECTION.NEXT))
         yield call(loadOGMetadataForLinkMessages, filteredPendingMessages, true)

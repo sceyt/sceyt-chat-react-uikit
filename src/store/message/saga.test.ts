@@ -79,6 +79,7 @@ import {
   setPendingMessageMutationAC,
   setReactionsListAC,
   setUnreadMessageIdAC,
+  setMessageListGapAC,
   setUnreadScrollToAC,
   updateAttachmentUploadingStateAC,
   updateMessageAC
@@ -90,7 +91,6 @@ import MessageReducer from './reducers'
 import ChannelReducer from '../channel/reducers'
 import { navigateToLatest } from '../../helpers/messageListNavigator'
 import { IChannel, IMessage } from '../../types'
-import { itFailing } from '../../testUtils/itFailing'
 
 const mockStoreState = {
   ChannelReducer: {
@@ -5068,40 +5068,133 @@ describe('message saga message-list flows', () => {
     // WAAF-2904: online -> offline -> a message arrives -> back online (the
     // channel list syncs lastMessage + unread count, but the message itself is
     // never loaded into the message cache) -> offline again -> open the chat.
-    // The newly received message is known locally as channel.lastMessage and
-    // must be shown; the chat must open on the unread position.
-    // Known bug (WAAF-2904 is open): the offline near-unread window stops at
-    // the cached 705 and drops the received 706, even though newMessageCount
-    // is 1 and lastDisplayedMessageId is 705, so 706 is the very next message.
-    itFailing(
-      'WAAF-2904 shows a message received between two offline periods when the chat is opened offline (loadNearUnread)',
-      async () => {
-        const channelId = 'channel-waaf-2904'
-        const received = makeMessage({ id: '706', channelId, body: 'received-while-away', incoming: true })
+    // The received message is known from chat-list sync (latest-message
+    // snapshot) and must be shown after the cached window, with an explicit gap:
+    // nothing proves 706 directly follows 705 (unread counts ignore own messages
+    // sent from other devices).
+    describe('WAAF-2904 opening a chat offline with a message known only from chat-list sync', () => {
+      const channelId = 'channel-waaf-2904'
+
+      const setup = (snapshotId = '706', lastMessageId = snapshotId) => {
+        const received = makeMessage({ id: snapshotId, channelId, body: 'received-while-away', incoming: true })
+        const lastMessage =
+          lastMessageId === snapshotId
+            ? received
+            : makeMessage({ id: lastMessageId, channelId, body: 'newer-unknown', incoming: true })
         const channel = makeChannel({
           id: channelId,
           newMessageCount: 1,
           lastDisplayedMessageId: '705',
-          lastMessage: received
+          lastMessage
         })
-        const cachedSegment = ['700', '701', '702', '703', '704', '705'].map((id) =>
-          makeMessage({ id, channelId, body: `cached-${id}`, incoming: true })
+        ;['700', '701', '702', '703', '704', '705'].forEach((id) =>
+          addMessageToMap(channelId, makeMessage({ id, channelId, body: `cached-${id}`, incoming: true }))
         )
-        cachedSegment.forEach((message) => addMessageToMap(channelId, message))
         setActiveSegment(channelId, '700', '705')
+        // Recorded by chat-list sync on reconnect (PR 1).
+        setLatestMessageSnapshot(channelId, received)
 
         mockStoreState.UserReducer.connectionStatus = CONNECTION_STATUS.DISCONNECTED
         setActiveChannelId(channelId)
         setChannelInMap(channel)
 
+        const client = {
+          user: { id: 'current-user' },
+          Channel: { create: jest.fn() },
+          MessageListQueryBuilder: jest.fn(),
+          getChannel: jest.fn()
+        }
+        setClient(client)
+        return { channel, client }
+      }
+
+      const lastSetMessagesBodies = (dispatched: any[]) =>
+        dispatched
+          .filter((action) => action.type === setMessagesAC([], channelId).type)
+          .at(-1)
+          .payload.messages.map((message: any) => message.body)
+
+      it('shows the received message last, after the cached window', async () => {
+        const { channel } = setup()
+
         const dispatched = await runMessageSaga(__messageSagaTestables.loadNearUnread, loadNearUnreadAC(channel))
 
-        const lastSetMessages = dispatched.filter((action) => action.type === setMessagesAC([], channelId).type).at(-1)
-        const bodies = lastSetMessages.payload.messages.map((message: any) => message.body)
-        expect(bodies).toContain('received-while-away')
-        expect(bodies.indexOf('received-while-away')).toBe(bodies.length - 1)
-      }
-    )
+        expect(lastSetMessagesBodies(dispatched)).toEqual([
+          'cached-700',
+          'cached-701',
+          'cached-702',
+          'cached-703',
+          'cached-704',
+          'cached-705',
+          'received-while-away'
+        ])
+      })
+
+      it('marks an explicit gap between the cached window and the received message', async () => {
+        const { channel } = setup()
+
+        const dispatched = await runMessageSaga(__messageSagaTestables.loadNearUnread, loadNearUnreadAC(channel))
+
+        expect(dispatched).toContainEqual(
+          setMessageListGapAC({ channelId, afterMessageId: '705', beforeMessageId: '706' })
+        )
+        // The gap is set after the window it belongs to (setMessages clears any previous gap).
+        const setMessagesIndex = dispatched.findIndex((action) => action.type === setMessagesAC([], channelId).type)
+        const gapIndex = dispatched.findIndex((action) => action.type === setMessageListGapAC(null).type)
+        expect(gapIndex).toBeGreaterThan(setMessagesIndex)
+      })
+
+      it('keeps the unread anchor on the last read message and sets the edge flags', async () => {
+        const { channel } = setup()
+
+        const dispatched = await runMessageSaga(__messageSagaTestables.loadNearUnread, loadNearUnreadAC(channel))
+
+        expect(dispatched).toContainEqual(setUnreadMessageIdAC('705'))
+        expect(dispatched).toContainEqual(setMessagesHasPrevAC(true))
+        // The received message is the chat's latest: nothing to load after it,
+        // even though the gap before it is still unresolved.
+        expect(dispatched).toContainEqual(setMessagesHasNextAC(false))
+        expect(dispatched).not.toContainEqual(setMessagesHasNextAC(true))
+      })
+
+      it('keeps hasNext when the chat has an even newer message than the snapshot', async () => {
+        const { channel } = setup('706', '709')
+
+        const dispatched = await runMessageSaga(__messageSagaTestables.loadNearUnread, loadNearUnreadAC(channel))
+
+        expect(lastSetMessagesBodies(dispatched).at(-1)).toBe('received-while-away')
+        expect(dispatched).toContainEqual(setMessagesHasNextAC(true))
+      })
+
+      it('makes no network call while offline', async () => {
+        const { channel, client } = setup()
+
+        await runMessageSaga(__messageSagaTestables.loadNearUnread, loadNearUnreadAC(channel))
+
+        expect(client.MessageListQueryBuilder).not.toHaveBeenCalled()
+        expect(client.getChannel).not.toHaveBeenCalled()
+      })
+
+      it('does not change the message cache or the active segment', async () => {
+        const { channel } = setup()
+
+        await runMessageSaga(__messageSagaTestables.loadNearUnread, loadNearUnreadAC(channel))
+
+        expect(getMessageFromMap(channelId, '706')).toBeNull()
+        expect(getActiveSegment()).toEqual({ startId: '700', endId: '705' })
+      })
+
+      it('does not add a gap when the snapshot is not newer than the cache', async () => {
+        const { channel } = setup('705')
+
+        const dispatched = await runMessageSaga(__messageSagaTestables.loadNearUnread, loadNearUnreadAC(channel))
+
+        expect(dispatched.some((action) => action.type === setMessageListGapAC(null).type)).toBe(false)
+        expect(lastSetMessagesBodies(dispatched).filter((body: string) => body === 'received-while-away')).toHaveLength(
+          0
+        )
+      })
+    })
 
     // The latest-message snapshot (chat-list sync) must not change how a chat
     // opens until the gap UI exists: the latest-window checks must still see
