@@ -77,7 +77,7 @@ function CreateChannelButton() {
       <CreateChannel
         handleClose={() => setShowCreateChannel(false)}
         channelType={creatingChannelType}
-        uriPrefixOnCreateChannel='waafi.com/'
+        uriPrefixOnCreateChannel='sceyt.com/'
         withoutConfig={creatingChannelType === 'direct'}
         channelTypeRequiredFieldsMap={{public: {uri: true, subject: true}, private: {subject: true, members: true}}}
         showUri={creatingChannelType === 'public'}

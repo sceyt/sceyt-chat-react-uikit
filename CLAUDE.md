@@ -1,6 +1,6 @@
 # CLAUDE.md — sceyt-chat-react-uikit
 
-React 18 UI kit for Sceyt Chat, published to npm as `sceyt-chat-react-uikit` and used by WAAFI Web and other customer apps.
+React 18 UI kit for Sceyt Chat, published to npm as `sceyt-chat-react-uikit` and used by the Sceyt web app and other customer apps.
 Stack: TypeScript, Redux Toolkit + redux-saga, styled-components, Lexical editor, IndexedDB caching. Built with microbundle-crl.
 
 ## Commands
@@ -33,14 +33,14 @@ Tests resolve react/react-dom from `examples/sceyt-livechat-demo/node_modules`, 
 
 1. **Message state lives in 4 places**: Redux `activeChannelMessages`, module-level cache in `helpers/messagesHalper` (`messagesMap`, `activeSegment`, `loadedSegmentsMap`), IndexedDB (`messagesIdb`), and the SDK. Any change to send/receive/edit/delete/reconnect must keep all of them consistent.
 2. **`Message` is wrapped in `React.memo` with a custom comparator** (`components/Message/index.tsx`, bottom of file) that checks only listed fields. A new prop or message field that affects rendering must be added there, or the UI won't update.
-3. **Offline / reconnect** (pending messages, uploads, pin queue, `resumePendingMessagesAfterReconnect`) is the most repeated bug area in Jira.
+3. **Offline / reconnect** (pending messages, uploads, pin queue, `resumePendingMessagesAfterReconnect`) is the most repeated bug area.
 4. **Very large files**: `store/message/saga.ts` (~4.9k lines), `SendMessageInput/index.tsx`, `MessageList/useChatController.ts`. Keep changes small and local.
 5. `react-hooks/exhaustive-deps` is disabled in `.eslintrc` — check hook dependencies by hand.
 6. Module-level mutable state must be reset in tests (`clearMessagesMap()`, `destroyChannelsMap()`, `clearActiveSegment()`) or tests leak into each other.
 
 ## Rules for every change
 
-- **Every bug fix includes a regression test** that fails before the fix and passes after. Name it after the Jira ticket, e.g. `it('WAAF-3069 sent message is not shown as pending', …)`.
+- **Every bug fix includes a regression test** that fails before the fix and passes after. Name it after the behavior it protects, e.g. `it('sent message is not shown as pending', …)`.
 - Prefer tests that assert behavior: reducers (state in → state out), sagas with `runSaga` + recorded dispatches (not generator `.next()` steps), components via React Testing Library queries by role/text.
 - Use fixtures from `src/testUtils/messageFixtures` (`makeUser`, `makeChannel`, `makeMessage`, `makePendingMessage`) instead of inline objects. Message IDs are 64-bit; use values above `Number.MAX_SAFE_INTEGER` in ordering tests.
 - Use `jest.useFakeTimers()` for debounce/batching; never wait on real timers.
@@ -65,5 +65,3 @@ The npm package is published from a separate repo (`sceyt-chat-react-uikit-npm`)
 
 - `sceyt-chat-js-sdk-source` — chat SDK (`sceyt-chat`); the UIKit receives a client instance from the app
 - `sceyt-call-js-sdk-source` — call SDK (`sceyt-call`)
-- `waafi/waafiweb/client/waafiweb` — WAAFI Web, the main consumer
-- Jira: waafi.atlassian.net, project WAAF

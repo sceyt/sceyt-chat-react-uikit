@@ -1,5 +1,5 @@
 /**
- * Latest-message snapshot store (staging for WAAF-2904).
+ * Latest-message snapshot store (staging for the offline gap fix).
  *
  * Chat-list sync can bring a channel's newest message without loading it into
  * the message cache. The snapshot keeps it, separately from messagesMap and

@@ -783,7 +783,7 @@ describe('MessageList', () => {
     const channelId = 'channel-unread-grouping'
     const sharedUser = {
       id: 'shared-remote-user',
-      firstName: 'Waffi',
+      firstName: 'Remote',
       lastName: 'Test',
       state: 'active'
     }

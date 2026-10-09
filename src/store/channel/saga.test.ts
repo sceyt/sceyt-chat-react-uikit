@@ -1416,8 +1416,8 @@ describe('regressions', () => {
     destroyChannelsMap()
   })
 
-  it('WAAF-2745 unread badge clears when a chat is read offline and stays cleared after reconnect', async () => {
-    const channelId = 'channel-waaf-2745'
+  it('unread badge clears when a chat is read offline and stays cleared after reconnect', async () => {
+    const channelId = 'channel-offline-read-badge'
     const markMessagesAsDisplayed = jest.fn(async () => ({
       messageIds: ['901', '902'],
       user: makeUser({ id: 'current-user' }),
@@ -1503,7 +1503,7 @@ describe('channel saga getChannels latest-message snapshots', () => {
     }).toPromise()
   }
 
-  it('records the confirmed lastMessage of each synced channel (WAAF-2904 staging)', async () => {
+  it('records the confirmed lastMessage of each synced channel (offline gap staging)', async () => {
     const received = makeMessage({ id: '706', channelId: 'channel-sync-a', body: 'received-while-away' })
     const other = makeMessage({ id: '42', channelId: 'channel-sync-b', body: 'other' })
 

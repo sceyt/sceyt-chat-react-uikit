@@ -1497,7 +1497,7 @@ describe('message saga message-list flows', () => {
     await flushMockServerDelay()
     expect(query.loadPrevious).toHaveBeenCalledTimes(1)
 
-    // The same user sends from mobile while WAAFI Web is still opening the channel.
+    // The same user sends from mobile while the web app is still opening the channel.
     const incomingDuringOpen = makeMessage({
       id: '703',
       channelId: channel.id,
@@ -5158,14 +5158,14 @@ describe('message saga message-list flows', () => {
       expect(dispatched).toContainEqual(setMessagesHasNextAC(true))
     })
 
-    // WAAF-2904: online -> offline -> a message arrives -> back online (the
+    // Online -> offline -> a message arrives -> back online (the
     // channel list syncs lastMessage + unread count, but the message itself is
     // never loaded into the message cache) -> offline again -> open the chat.
     // The received message is known from chat-list sync (latest-message
     // snapshot) and must be shown after the cached window, with an explicit gap:
     // nothing proves 706 directly follows 705 (unread counts ignore own messages
     // sent from other devices).
-    describe('WAAF-2904 opening a chat offline with a message known only from chat-list sync', () => {
+    describe('shows a message received between two offline periods when the chat is opened offline (loadNearUnread)', () => {
       const channelId = 'channel-waaf-2904'
 
       const setup = (snapshotId = '706', lastMessageId = snapshotId) => {

@@ -99,7 +99,7 @@ describe('Message', () => {
     const channelId = 'channel-message-unread-grouping'
     const remoteUser = makeUser({
       id: 'remote-user-1',
-      firstName: 'Waffi'
+      firstName: 'Remote'
     })
     const readMessage = makeMessage({
       id: '1500',
@@ -173,7 +173,7 @@ describe('Message', () => {
 
   it('keeps same-sender pinned messages grouped across different days', () => {
     const channelId = 'channel-pinned-avatar-grouping'
-    const remoteUser = makeUser({ id: 'remote-user-pinned', firstName: 'Waffi' })
+    const remoteUser = makeUser({ id: 'remote-user-pinned', firstName: 'Remote' })
     const firstPinnedMessage = makeMessage({
       id: '1503',
       channelId,
@@ -234,21 +234,21 @@ describe('Message', () => {
       channelId,
       body: 'read-message',
       incoming: true,
-      user: makeUser({ id: 77 as any, firstName: 'Waffi' })
+      user: makeUser({ id: 77 as any, firstName: 'Remote' })
     })
     const firstUnread = makeMessage({
       id: '1511',
       channelId,
       body: 'first-unread',
       incoming: true,
-      user: makeUser({ id: '77' as any, firstName: 'Waffi' })
+      user: makeUser({ id: '77' as any, firstName: 'Remote' })
     })
     const secondUnread = makeMessage({
       id: '1512',
       channelId,
       body: 'second-unread',
       incoming: true,
-      user: makeUser({ id: 77 as any, firstName: 'Waffi' })
+      user: makeUser({ id: 77 as any, firstName: 'Remote' })
     })
     const channel = makeChannel({
       id: channelId,
