@@ -116,6 +116,7 @@ import {
   clearSelectedMessagesAC,
   clearTabAttachmentsCacheAC,
   removeChannelMarkersAC,
+  patchMessagesAC,
   sendTextMessageAC,
   setMessagesHasPrevAC,
   setUnreadScrollToAC,
@@ -130,6 +131,8 @@ import {
   removeAllMessages,
   removeMessagesFromMap,
   setLatestMessageSnapshot,
+  shouldSkipDeliveryStatusUpdate,
+  syncCachedMessagesDeliveryStatus,
   trackChannelVisit,
   evictLruChannels,
   updateMessageOnMap
@@ -439,13 +442,34 @@ function* createChannel(action: IAction): any {
 
 // Chat-list sync can bring a channel's newest message (e.g. one received while
 // offline) without loading it into the message cache. Keep it as a snapshot so
-// the message list can show it later; see setLatestMessageSnapshot.
-const recordLatestMessageSnapshots = (channels: IChannel[] = []) => {
-  channels.forEach((channel) => {
+// the message list can show it later; see setLatestMessageSnapshot. Messages
+// already cached also need delivery statuses missed while disconnected.
+function* recordLatestMessageSnapshots(channels: IChannel[] = []): any {
+  const activeChannelId = getActiveChannelId()
+  const changedActiveMessages: IMessage[] = []
+  for (const channel of channels) {
     if (channel?.id && channel.lastMessage) {
       setLatestMessageSnapshot(channel.id, channel.lastMessage)
+      const updated = syncCachedMessagesDeliveryStatus(channel.id, channel.lastMessage)
+      if (updated.length && channel.id === activeChannelId) {
+        const updatedById = new Map(updated.map((message) => [message.id, message]))
+        const shownMessages: IMessage[] = store.getState().MessageReducer?.activeChannelMessages || []
+        for (const shown of shownMessages) {
+          const cached = updatedById.get(shown.id)
+          if (
+            shown.channelId === channel.id &&
+            cached &&
+            !shouldSkipDeliveryStatusUpdate(cached.deliveryStatus, shown.deliveryStatus)
+          ) {
+            changedActiveMessages.push({ ...shown, deliveryStatus: cached.deliveryStatus })
+          }
+        }
+      }
     }
-  })
+  }
+  if (changedActiveMessages.length) {
+    yield put(patchMessagesAC(changedActiveMessages))
+  }
 }
 
 function* getChannels(action: IAction): any {
@@ -601,7 +625,7 @@ function* getChannels(action: IAction): any {
     log.info(
       `${new Date().toISOString()} [getChannels] setting channels in state, count: ${mappedChannels?.length || 0}`
     )
-    recordLatestMessageSnapshots(mappedChannels)
+    yield call(recordLatestMessageSnapshots, mappedChannels)
     yield put(setChannelsAC(mappedChannels))
     for (const ch of mappedChannels) {
       const lastMsg = ch.lastMessage
@@ -1159,7 +1183,7 @@ function* channelsLoadMore(action: IAction): any {
       `${new Date().toISOString()} [channelsLoadMore] adding channels to state, count:`,
       mappedChannels?.length || 0
     )
-    recordLatestMessageSnapshots(mappedChannels)
+    yield call(recordLatestMessageSnapshots, mappedChannels)
     yield put(addChannelsAC(mappedChannels))
     yield put(setChannelsLoadingStateAC(LOADING_STATE.LOADED))
     log.info(

@@ -7,7 +7,8 @@
  * what was (or was not) fetched.
  */
 import { IChannel, IMessage } from '../types'
-import { makeChannel, makeMessage } from './messageFixtures'
+import { MESSAGE_DELIVERY_STATUS, MESSAGE_STATUS } from '../helpers/constants'
+import { makeChannel, makeMessage, makeUser } from './messageFixtures'
 
 export type FakeServerRequest = {
   channelId: string
@@ -41,16 +42,142 @@ export class FakeMessageServer {
   /** Tells the server whether the app is online, so requests sent offline can be detected. */
   isAppOnline: () => boolean = () => true
 
+  /** Next id for a message sent through the SDK (sendMessage). */
+  nextSentId = 900000
+
   /** Creates a chat with messages `firstId`..`firstId+count-1`. */
   addChat(channelId: string, firstId: number, count: number, extra: Partial<IChannel> = {}) {
     this.histories[channelId] = []
     this.appendMessages(channelId, firstId, count)
-    this.channels[channelId] = makeChannel({
-      id: channelId,
-      lastMessage: this.lastMessage(channelId) || undefined,
-      ...extra
-    })
+    this.channels[channelId] = this.withSdkMethods(
+      makeChannel({
+        id: channelId,
+        lastMessage: this.lastMessage(channelId) || undefined,
+        ...extra
+      })
+    )
     return this.channels[channelId]
+  }
+
+  /** Replaces a server message (e.g. edited or deleted) and keeps the chat's lastMessage in sync. */
+  private replaceMessage(channelId: string, updated: IMessage) {
+    this.histories[channelId] = (this.histories[channelId] || []).map((message) =>
+      message.id === updated.id ? updated : message
+    )
+    const channel = this.channels[channelId]
+    if (channel?.lastMessage?.id === updated.id) {
+      this.channels[channelId] = { ...channel, lastMessage: updated }
+    }
+    if ((channel as any)?.lastReactedMessage?.id === updated.id) {
+      this.channels[channelId] = {
+        ...this.channels[channelId],
+        ...(updated.state === MESSAGE_STATUS.DELETE
+          ? { lastReactedMessage: null, newReactions: [] }
+          : { lastReactedMessage: updated })
+      } as any
+    }
+  }
+
+  /** The remote user reacts to a message (as the chat list reports it afterwards). */
+  react(channelId: string, messageId: string, key = '👍') {
+    const message = (this.histories[channelId] || []).find((item) => item.id === messageId)!
+    const reaction = { id: `reaction-${messageId}`, key, score: 1, user: makeUser({ id: 'remote-user' }) }
+    const reacted = { ...message, reactionTotals: [{ key, score: 1, count: 1 }], userReactions: [] } as any
+    this.replaceMessage(channelId, reacted)
+    this.channels[channelId] = {
+      ...this.channels[channelId],
+      lastReactedMessage: reacted,
+      newReactions: [reaction],
+      newReactedMessageCount: 1
+    } as any
+    return { message: reacted, reaction }
+  }
+
+  /** Adds the SDK channel methods the sagas call (send, edit, delete), backed by this server. */
+  withSdkMethods(channel: IChannel): IChannel {
+    // eslint-disable-next-line @typescript-eslint/no-this-alias
+    const server = this
+    const channelId = channel.id
+    const sdk: any = {
+      createMessageBuilder: () => {
+        const fields: any = { body: '', metadata: '', attachments: [], mentionUserIds: [] }
+        const builder: any = {}
+        const chain = (key: string) => (value: any) => {
+          fields[key] = value
+          return builder
+        }
+        ;[
+          'setBody',
+          'setBodyAttributes',
+          'setAttachments',
+          'setMentionUserIds',
+          'setType',
+          'setDisplayCount',
+          'setSilent',
+          'setMetadata',
+          'setPollDetails',
+          'setParentMessageId',
+          'setReplyInThread',
+          'setDisableMentionsCount',
+          'setViewOnce'
+        ].forEach((method) => {
+          builder[method] = chain(method.replace(/^set/, '').replace(/^./, (c) => c.toLowerCase()))
+        })
+        builder.create = () => ({
+          tid: `tid-${server.nextSentId}-${Math.random().toString(36).slice(2, 8)}`,
+          id: '',
+          body: fields.body,
+          bodyAttributes: fields.bodyAttributes || [],
+          metadata: fields.metadata || '',
+          attachments: [],
+          mentionedUsers: [],
+          user: makeUser({ id: 'current-user' }),
+          createdAt: new Date(),
+          deliveryStatus: MESSAGE_DELIVERY_STATUS.PENDING,
+          state: MESSAGE_STATUS.UNMODIFIED,
+          incoming: false,
+          type: fields.type || 'text',
+          channelId
+        })
+        return builder
+      },
+      sendMessage: async (message: any) => {
+        const id = String(server.nextSentId++)
+        const confirmed = makeMessage({
+          id,
+          tid: message.tid,
+          channelId,
+          body: message.body,
+          incoming: false,
+          deliveryStatus: MESSAGE_DELIVERY_STATUS.SENT,
+          metadata: message.metadata || ''
+        })
+        server.histories[channelId] = [...(server.histories[channelId] || []), confirmed].sort(byId)
+        server.channels[channelId] = { ...server.channels[channelId], lastMessage: confirmed }
+        return { ...confirmed }
+      },
+      editMessage: async (message: any) => {
+        const current = (server.histories[channelId] || []).find((item) => item.id === message.id)!
+        const edited = { ...current, body: message.body, state: MESSAGE_STATUS.EDIT, updatedAt: new Date() }
+        server.replaceMessage(channelId, edited)
+        return { ...edited }
+      },
+      deleteMessageById: async (messageId: string) => {
+        const current = (server.histories[channelId] || []).find((item) => item.id === messageId)!
+        const deleted = {
+          ...current,
+          body: '',
+          state: MESSAGE_STATUS.DELETE,
+          type: 'deleted',
+          attachments: [],
+          reactionTotals: [],
+          updatedAt: new Date()
+        }
+        server.replaceMessage(channelId, deleted)
+        return { ...deleted }
+      }
+    }
+    return Object.assign(channel, sdk)
   }
 
   /** Messages that arrive on the server (e.g. while the user is offline). */

@@ -17,11 +17,12 @@ import {
   clearMessagesMap,
   getInMemoryCachedChannelIds,
   getLatestMessageSnapshot,
+  getMessagesFromMap,
   setLatestMessageSnapshot
 } from '../../helpers/messagesHalper'
 import { LOADING_STATE, MESSAGE_DELIVERY_STATUS } from '../../helpers/constants'
 import { makeChannel, makeMessage, makePendingMessage, makeUser } from '../../testUtils/messageFixtures'
-import { setUnreadScrollToAC, updateMessageAC } from '../message/actions'
+import { patchMessagesAC, setUnreadScrollToAC, updateMessageAC } from '../message/actions'
 import { CONNECTION_STATUS } from '../user/constants'
 import {
   markChannelAsReadAC,
@@ -1493,6 +1494,9 @@ describe('channel saga getChannels latest-message snapshots', () => {
     mockStore.getState.mockReturnValue(mockStoreState)
     destroyChannelsMap()
     clearAllLatestMessageSnapshots()
+    clearMessagesMap()
+    setActiveChannelId('')
+    mockStoreState.MessageReducer = { activeChannelMessages: [] }
     mockStoreState.UserReducer.connectionStatus = CONNECTION_STATUS.CONNECTED
     mockStoreState.ChannelReducer = {
       channels: [],
@@ -1505,6 +1509,10 @@ describe('channel saga getChannels latest-message snapshots', () => {
   afterEach(() => {
     destroyChannelsMap()
     clearAllLatestMessageSnapshots()
+    clearMessagesMap()
+    setActiveChannelId('')
+    delete mockStoreState.MessageReducer
+    query.channelQuery = null as any
   })
 
   const syncChannels = async (serverChannels: any[]) => {
@@ -1523,10 +1531,10 @@ describe('channel saga getChannels latest-message snapshots', () => {
       ChannelListQueryBuilder: jest.fn(() => channelQueryBuilder)
     } as any)
 
-    await runSaga({ dispatch: () => undefined, getState: () => mockStoreState }, __channelSagaTestables.getChannels, {
+    return runChannelSaga(__channelSagaTestables.getChannels, {
       type: 'GET_CHANNELS',
       payload: { params: { limit: 20 } }
-    }).toPromise()
+    })
   }
 
   it('records the confirmed lastMessage of each synced channel (offline gap staging)', async () => {
@@ -1563,5 +1571,82 @@ describe('channel saga getChannels latest-message snapshots', () => {
     await syncChannels([makeChannel({ id: channelId, lastMessage: makeMessage({ id: '706', channelId }) })])
 
     expect(getLatestMessageSnapshot(channelId)).toEqual(expect.objectContaining({ id: '707', body: 'newer' }))
+  })
+
+  it('patches an open message status while preserving its visible content', async () => {
+    const channelId = 'channel-sync-active-status'
+    const cached = makeMessage({ id: '705', channelId, body: 'cached body' })
+    const shown = { ...cached, body: 'visible local edit' }
+    const synced = { ...cached, body: 'server body', deliveryStatus: MESSAGE_DELIVERY_STATUS.READ }
+    addMessageToMap(channelId, cached)
+    setChannelInMap(makeChannel({ id: channelId, lastMessage: cached }))
+    setActiveChannelId(channelId)
+    mockStoreState.MessageReducer.activeChannelMessages = [shown]
+
+    const dispatched = await syncChannels([makeChannel({ id: channelId, lastMessage: synced })])
+
+    expect(getMessagesFromMap(channelId)[cached.id]).toEqual({
+      ...cached,
+      deliveryStatus: MESSAGE_DELIVERY_STATUS.READ
+    })
+    expect(dispatched).toContainEqual(patchMessagesAC([{ ...shown, deliveryStatus: MESSAGE_DELIVERY_STATUS.READ }]))
+  })
+
+  it('does not regress a visible read status when a lower status is synced into the cache', async () => {
+    const channelId = 'channel-sync-visible-read'
+    const cached = makeMessage({ id: '705', channelId })
+    addMessageToMap(channelId, cached)
+    setChannelInMap(makeChannel({ id: channelId, lastMessage: cached }))
+    setActiveChannelId(channelId)
+    mockStoreState.MessageReducer.activeChannelMessages = [{ ...cached, deliveryStatus: MESSAGE_DELIVERY_STATUS.READ }]
+
+    const dispatched = await syncChannels([
+      makeChannel({ id: channelId, lastMessage: { ...cached, deliveryStatus: MESSAGE_DELIVERY_STATUS.DELIVERED } })
+    ])
+
+    expect(dispatched.some((action) => action.type === patchMessagesAC([]).type)).toBe(false)
+  })
+
+  it('patches all earlier outgoing statuses when the open chat latest message is already read', async () => {
+    const channelId = 'channel-sync-active-cumulative'
+    const earlier = [makeMessage({ id: '701', channelId }), makeMessage({ id: '703', channelId })]
+    const incoming = makeMessage({ id: '702', channelId, incoming: true })
+    const latest = makeMessage({ id: '705', channelId, deliveryStatus: MESSAGE_DELIVERY_STATUS.READ })
+    ;[...earlier, incoming, latest].forEach((message) => addMessageToMap(channelId, message))
+    setChannelInMap(makeChannel({ id: channelId, lastMessage: latest }))
+    setActiveChannelId(channelId)
+    const shown = earlier.map((message) => ({ ...message, body: `local edit ${message.id}` }))
+    mockStoreState.MessageReducer.activeChannelMessages = [...shown, incoming, latest]
+
+    const dispatched = await syncChannels([makeChannel({ id: channelId, lastMessage: latest })])
+
+    expect(dispatched).toContainEqual(
+      patchMessagesAC(shown.map((message) => ({ ...message, deliveryStatus: MESSAGE_DELIVERY_STATUS.READ })))
+    )
+    expect(earlier.map((message) => getMessagesFromMap(channelId)[message.id].deliveryStatus)).toEqual([
+      MESSAGE_DELIVERY_STATUS.READ,
+      MESSAGE_DELIVERY_STATUS.READ
+    ])
+    expect(getMessagesFromMap(channelId)[incoming.id]).toBe(incoming)
+  })
+
+  it('syncs cached delivery status from a later channel-list page without changing the open chat', async () => {
+    const channelId = 'channel-sync-status-next-page'
+    const cached = makeMessage({ id: '705', channelId })
+    addMessageToMap(channelId, cached)
+    setActiveChannelId('another-chat')
+    const synced = makeChannel({
+      id: channelId,
+      lastMessage: { ...cached, deliveryStatus: MESSAGE_DELIVERY_STATUS.READ }
+    })
+    query.channelQuery = { loadNextPage: jest.fn(async () => ({ channels: [synced], hasNext: false })) } as any
+
+    const dispatched = await runChannelSaga(__channelSagaTestables.channelsLoadMore, {
+      type: 'LOAD_MORE_CHANNEL',
+      payload: { limit: 20 }
+    })
+
+    expect(getMessagesFromMap(channelId)[cached.id].deliveryStatus).toBe(MESSAGE_DELIVERY_STATUS.READ)
+    expect(dispatched.some((action) => action.type === patchMessagesAC([]).type)).toBe(false)
   })
 })
