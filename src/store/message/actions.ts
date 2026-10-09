@@ -541,9 +541,16 @@ export function updateMessageAC(
   voteDetails?: {
     type: 'add' | 'delete' | 'addOwn' | 'deleteOwn' | 'close'
     vote?: IPollVote
-  }
+  },
+  allowStaleContent?: boolean
 ) {
-  return updateMessage({ messageId, params, addIfNotExists, voteDetails })
+  return updateMessage({
+    messageId,
+    params,
+    addIfNotExists,
+    voteDetails,
+    ...(allowStaleContent ? { allowStaleContent } : {})
+  })
 }
 
 export function updateMessagesStatusAC(

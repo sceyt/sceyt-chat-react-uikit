@@ -18,6 +18,7 @@ import log from 'loglevel'
 import { handleVoteDetails } from '../../helpers/message'
 import store from 'store'
 import { getPollVotesAC } from './actions'
+import { shouldSkipMessageContentUpdate } from '../../helpers/messageContentUpdate'
 
 export const OG_METADATA_MAX = 200
 
@@ -217,11 +218,13 @@ const messageMatchesIdOrTid = (message: Partial<Pick<IMessage, 'id' | 'tid'>> | 
 const syncParentMessageSnapshot = (
   parentMessage: IMessage | null | undefined,
   messageId: string,
-  params: Partial<IMessage>
+  params: Partial<IMessage>,
+  allowStaleContent?: boolean
 ) => {
   if (!messageMatchesIdOrTid(parentMessage, messageId)) {
     return parentMessage || null
   }
+  if (!allowStaleContent && shouldSkipMessageContentUpdate(parentMessage, params)) return parentMessage || null
 
   if (params.state === MESSAGE_STATUS.DELETE) {
     return {
@@ -432,19 +435,21 @@ const messageSlice = createSlice({
         messageId: string
         params: IMessage
         addIfNotExists?: boolean
+        allowStaleContent?: boolean
         voteDetails?: {
           type: 'add' | 'delete' | 'addOwn' | 'deleteOwn' | 'close'
           vote?: IPollVote
         }
       }>
     ) => {
-      const { messageId, params, addIfNotExists, voteDetails } = action.payload
+      const { messageId, params, addIfNotExists, voteDetails, allowStaleContent } = action.payload
       let messageFound = false
       state.activeChannelMessages = state.activeChannelMessages.map((message) => {
         let nextMessage = message
 
         if (message.tid === messageId || message.id === messageId) {
           messageFound = true
+          if (!allowStaleContent && shouldSkipMessageContentUpdate(message, params)) return message
           if (params.state === MESSAGE_STATUS.DELETE) {
             nextMessage = { ...params } as IMessage
           } else {
@@ -474,7 +479,12 @@ const messageSlice = createSlice({
           }
         }
 
-        const syncedParentMessage = syncParentMessageSnapshot(nextMessage.parentMessage, messageId, params)
+        const syncedParentMessage = syncParentMessageSnapshot(
+          nextMessage.parentMessage,
+          messageId,
+          params,
+          allowStaleContent
+        )
         if (syncedParentMessage !== nextMessage.parentMessage) {
           nextMessage = {
             ...nextMessage,

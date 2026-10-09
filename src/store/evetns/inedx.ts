@@ -71,6 +71,9 @@ import {
   appendMessageToLatestSegment,
   addReactionToMessageOnMap,
   checkChannelExistsOnMessagesMap,
+  getMessageFromMap,
+  getMessagesFromMap,
+  hasAppliedRemoteMarker,
   messagesShareReference,
   removeAllMessages,
   removeMessagesFromMap,
@@ -95,6 +98,7 @@ import { attachmentTypes, DEFAULT_CHANNEL_TYPE, MESSAGE_STATUS } from '../../hel
 import { updateTabAttachmentCache } from '../message/saga'
 import { MessageTextFormat } from '../../messageUtils'
 import { isJSON } from '../../helpers/message'
+import { shouldSkipMessageContentUpdate } from '../../helpers/messageContentUpdate'
 import log from 'loglevel'
 import store from 'store'
 import { updateActiveChannelMembersAdd, updateActiveChannelMembersRemove } from '../member/helpers'
@@ -395,13 +399,24 @@ export function* handleMessageMarkersReceivedEvent(
   args: { channelId: string; markerList: IMarker },
   SceytChatClient: any
 ): any {
-  const { channelId, markerList } = args
+  const { channelId } = args
+  let { markerList } = args
   const channel = getStoredChannel(channelId)
   if (!channel) {
     return
   }
 
   const isOwnMarker = markerList.user?.id === SceytChatClient.user.id
+  if (!isOwnMarker && markerList.user?.id) {
+    const knownMarkers = store.getState().MessageReducer.messageMarkers?.[channelId]
+    const messageIds = markerList.messageIds.filter(
+      (id) =>
+        !hasAppliedRemoteMarker(getMessageFromMap(channelId, id), markerList) &&
+        !knownMarkers?.[id]?.[markerList.name]?.some((marker: IMarker) => marker.user?.id === markerList.user?.id)
+    )
+    if (!messageIds.length) return
+    markerList = { ...markerList, messageIds }
+  }
   const activeChannelId = yield call(getActiveChannelId)
   let updateLastMessage = false
   const markersMap: any = {}
@@ -484,6 +499,18 @@ export function* handleEditMessageEvent(args: { channel: IChannel; message: IMes
   const reduxChannel = (store.getState().ChannelReducer?.channels || []).find(
     (stored: IChannel) => stored.id === channel.id
   )
+  const cached = getMessagesFromMap(channel.id) || {}
+  const visible: IMessage[] = store.getState().MessageReducer.activeChannelMessages || []
+  const knownCopies = [
+    getMessageFromMap(channel.id, message.id),
+    storedChannel?.lastMessage,
+    storedChannel?.lastReactedMessage,
+    reduxChannel?.lastMessage,
+    reduxChannel?.lastReactedMessage,
+    ...visible.flatMap((item) => [item, item.parentMessage]),
+    ...(!cached[message.id] ? Object.values(cached).map((item) => item.parentMessage) : [])
+  ]
+  if (knownCopies.some((known) => known?.id === message.id && shouldSkipMessageContentUpdate(known, message))) return
   const isLastMessage = channel.lastMessage?.id === message.id
   const isLastReactedMessage =
     storedChannel?.lastReactedMessage?.id === message.id || reduxChannel?.lastReactedMessage?.id === message.id

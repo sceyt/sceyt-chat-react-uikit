@@ -8,6 +8,7 @@ import { handleVoteDetails } from '../message'
 import store from 'store'
 import { removeChannelMarkersAC, removePendingPollActionAC, setPendingPollActionsMapAC } from 'store/message/actions'
 import { persistDraft, removePersistedDraft, restoreDrafts } from '../messagesIdb'
+import { shouldSkipMessageContentUpdate } from '../messageContentUpdate'
 export const MESSAGES_MAX_PAGE_COUNT = 60
 export const MESSAGES_MAX_LENGTH = 40
 export const LOAD_MAX_MESSAGE_COUNT = 20
@@ -17,6 +18,20 @@ export const MESSAGE_LOAD_DIRECTION = {
   NEXT: 'next'
 }
 const PENDING_MESSAGE_SORT_MULTIPLIER = BigInt(1000000)
+// Per-copy immutable receipt provenance. Symbols survive object spreads but are
+// omitted from JSON/SDK payloads; there is no mutable global consumption set.
+const remoteReceipts = Symbol('remoteReceipts')
+type RemoteReceiptState = { [remoteReceipts]?: Readonly<Record<string, true>> }
+const remoteReceiptKey = (message: IMessage, marker?: Partial<IMarker>) =>
+  marker?.user?.id && marker.name
+    ? JSON.stringify([message.channelId, message.id || message.tid, marker.name, marker.user.id])
+    : undefined
+
+export const hasAppliedRemoteMarker = (message: IMessage | null | undefined, marker: Partial<IMarker>) => {
+  if (!message) return false
+  const key = remoteReceiptKey(message, marker)
+  return !!(key && (message as IMessage & RemoteReceiptState)[remoteReceipts]?.[key])
+}
 
 /**
  * Checks if a message should be skipped when updating delivery status.
@@ -100,11 +115,11 @@ const mergeUserMarkers = (message: IMessage, markerName: string, params: any) =>
 
 const mergeMarkerTotals = (message: IMessage, markerName: string, params: any) => {
   const markerTotals = [...(message.markerTotals || [])]
-  const hasProvidedMarkerTotals = !!params?.markerTotals?.length
+  const hasProvidedMarkerTotals = Array.isArray(params?.markerTotals)
   const markerTotalsParams = hasProvidedMarkerTotals ? params.markerTotals : [{ name: markerName, count: 1 }]
 
   for (const marker of markerTotalsParams) {
-    const count = marker.count || 1
+    const count = marker.count ?? 1
     const markerIndex = markerTotals.findIndex((mark: any) => mark.name === marker.name)
     if (markerIndex === -1) {
       markerTotals.push({ ...marker, count })
@@ -137,7 +152,7 @@ export const updateMessageDeliveryStatusAndMarkers = (
   userMarkers?: IMarker[]
   markerTotals?: IMarker[]
   deliveryStatus: string
-} => {
+} & RemoteReceiptState => {
   const markerName = params?.deliveryStatus
   if (!markerName) {
     return {
@@ -157,9 +172,16 @@ export const updateMessageDeliveryStatusAndMarkers = (
     }
   }
 
+  const key = remoteReceiptKey(message, params?.marker)
+  const applied = (message as IMessage & RemoteReceiptState)[remoteReceipts]
+  const duplicate = !!(key && applied?.[key])
   return {
-    markerTotals: mergeMarkerTotals(message, markerName, params),
-    deliveryStatus
+    markerTotals:
+      duplicate && !Array.isArray(params?.markerTotals)
+        ? message.markerTotals
+        : mergeMarkerTotals(message, markerName, params),
+    deliveryStatus,
+    ...(key ? { [remoteReceipts]: duplicate ? applied : { ...applied, [key]: true as const } } : {})
   }
 }
 
@@ -948,7 +970,7 @@ export function checkIsItSentAlready(messageId: string, channelId: string) {
 
 export function updateMessageOnMap(
   channelId: string,
-  updatedMessage: { messageId: string; params: any },
+  updatedMessage: { messageId: string; params: any; allowStaleContent?: boolean },
   voteDetails?: {
     vote?: IPollVote
     type: 'add' | 'delete' | 'addOwn' | 'deleteOwn' | 'close'
@@ -966,6 +988,11 @@ export function updateMessageOnMap(
       ) {
         return message
       }
+      if (
+        !updatedMessage.allowStaleContent &&
+        shouldSkipMessageContentUpdate(message.parentMessage, updatedMessage.params)
+      )
+        return message
 
       const parentMessage =
         updatedMessage.params?.state === MESSAGE_STATUS.DELETE
@@ -991,6 +1018,10 @@ export function updateMessageOnMap(
       let nextMessage = mes
 
       if (mes.tid === updatedMessage.messageId || mes.id === updatedMessage.messageId) {
+        if (!updatedMessage.allowStaleContent && shouldSkipMessageContentUpdate(mes, updatedMessage.params)) {
+          messagesList.push(syncParentMessageSnapshot(mes))
+          continue
+        }
         if (updatedMessage.params.state === MESSAGE_STATUS.DELETE) {
           updatedMessageData = { ...updatedMessage.params }
           nextMessage = { ...mes, ...updatedMessageData }
