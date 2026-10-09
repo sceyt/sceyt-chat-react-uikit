@@ -69,9 +69,19 @@ const emitMessage = (message: IMessage) =>
   ).toPromise()
 const emitEdit = (message: IMessage) =>
   runSaga(options(), handleEditMessageEvent, {
-    channel: { ...channel(), lastMessage: message },
+    channel: { ...channel(), ...(channel().lastMessage?.id === message.id ? { lastMessage: message } : {}) },
     message: { ...message }
   }).toPromise()
+const emitReceipt = (messageId: string, name = MESSAGE_DELIVERY_STATUS.READ, recipient = 'recipient') =>
+  runSaga(
+    options(),
+    handleMessageMarkersReceivedEvent,
+    {
+      channelId,
+      markerList: { name, messageIds: [messageId], user: makeUser({ id: recipient }), createdAt: earlier }
+    },
+    fake.server.client()
+  ).toPromise()
 const emitDelete = (deletedMessage: IMessage) =>
   runSaga(options(), handleDeleteMessageEvent, {
     channel: channel(),
@@ -394,6 +404,155 @@ describe.each([true, false])('integration: replayed SDK events (chat open: %s)',
     await reopenOffline()
     expectContent(removed)
     expect(fake.server.lastMessage(channelId)?.state).toBe(MESSAGE_STATUS.DELETE)
+  })
+
+  it('keeps read status when delivered is replayed after read, without recounting either marker', async () => {
+    const message = fake.server.lastMessage(channelId)!
+    await emitReceipt(message.id, MESSAGE_DELIVERY_STATUS.DELIVERED)
+    await emitReceipt(message.id)
+    await emitReceipt(message.id, MESSAGE_DELIVERY_STATUS.DELIVERED)
+    await emitReceipt(message.id)
+    await reopenOffline()
+    for (const copy of [
+      getMessagesFromMap(channelId)[message.id],
+      visible().find((item) => item.id === message.id),
+      preview()
+    ]) {
+      expect(copy?.deliveryStatus).toBe(MESSAGE_DELIVERY_STATUS.READ)
+      expect(copy?.markerTotals).toEqual([
+        { name: MESSAGE_DELIVERY_STATUS.DELIVERED, count: 1 },
+        { name: MESSAGE_DELIVERY_STATUS.READ, count: 1 }
+      ])
+    }
+  })
+
+  it('does not turn an own read marker into a remote read count', async () => {
+    const message = fake.server.lastMessage(channelId)!
+    await emitReceipt(message.id, MESSAGE_DELIVERY_STATUS.READ, 'current-user')
+    await emitReceipt(message.id, MESSAGE_DELIVERY_STATUS.READ, 'current-user')
+    await emitReceipt(message.id)
+    await emitReceipt(message.id)
+    await reopenOffline()
+    for (const copy of [
+      getMessagesFromMap(channelId)[message.id],
+      visible().find((item) => item.id === message.id),
+      preview()
+    ]) {
+      expect(copy?.markerTotals).toEqual([{ name: MESSAGE_DELIVERY_STATUS.READ, count: 1 }])
+      expect(copy?.userMarkers.filter((marker) => marker.name === MESSAGE_DELIVERY_STATUS.READ)).toHaveLength(1)
+    }
+  })
+
+  it('preserves receipt identity after accepting a newer edit', async () => {
+    const original = fake.server.lastMessage(channelId)!
+    await emitReceipt(original.id)
+    const message = {
+      ...edited(original, 'edited after being read', later),
+      deliveryStatus: MESSAGE_DELIVERY_STATUS.READ,
+      markerTotals: [{ name: MESSAGE_DELIVERY_STATUS.READ, count: 1 }]
+    } as IMessage
+    replaceOnServer(message)
+    await emitEdit(message)
+    await emitReceipt(message.id)
+    await reopenOffline()
+    expectContent(message)
+    for (const copy of [
+      getMessagesFromMap(channelId)[message.id],
+      visible().find((item) => item.id === message.id),
+      preview()
+    ]) {
+      expect(copy?.markerTotals).toEqual(message.markerTotals)
+      expect(copy?.deliveryStatus).toBe(MESSAGE_DELIVERY_STATUS.READ)
+    }
+  })
+
+  it('updates an older message and its quoted copy without replacing the latest chat preview', async () => {
+    const original = fake.server.histories[channelId][1]
+    const [reply] = fake.server.appendMessages(channelId, 1005, 1, false)
+    reply.parentMessage = original
+    reply.parentId = original.id
+    await emitMessage(reply)
+    const latestPreview = preview()
+    const first = edited(original, 'first parent edit')
+    const second = edited(first, 'second parent edit', later)
+    fake.server.histories[channelId][1] = second
+    await emitEdit(second)
+    await emitEdit(first)
+    await reopenOffline()
+    expect(preview()).toMatchObject({
+      id: latestPreview!.id,
+      body: latestPreview!.body,
+      state: latestPreview!.state,
+      parentMessage: { id: original.id, body: second.body, state: second.state }
+    })
+    expect(getMessagesFromMap(channelId)[original.id].body).toBe(second.body)
+    expect(visible().find((message) => message.id === original.id)?.body).toBe(second.body)
+    expect(getMessagesFromMap(channelId)[reply.id].parentMessage?.body).toBe(second.body)
+    expect(visible().find((message) => message.id === reply.id)?.parentMessage?.body).toBe(second.body)
+    expect(visibleIds()).toEqual(ids(1000, 6))
+  })
+
+  it('rejects an edit against a deleted preview after its message cache has been discarded', async () => {
+    const original = fake.server.lastMessage(channelId)!
+    const removed = deleted(original)
+    replaceOnServer(removed)
+    await emitDelete(removed)
+    removeMessagesFromMap(channelId)
+    await emitEdit(edited(original, 'later edit must not restore deletion', new Date(later.getTime() + 60000)))
+    expect(preview()?.state).toBe(MESSAGE_STATUS.DELETE)
+    expect(preview()?.body).toBe('')
+    expect(getMessagesFromMap(channelId)).toBeUndefined()
+    if (chatIsOpen) {
+      expect(visible().find((message) => message.id === original.id)?.state).toBe(MESSAGE_STATUS.DELETE)
+    }
+  })
+
+  it('accepts a queued edit acknowledgement with a server timestamp older than the optimistic client timestamp', async () => {
+    const original = fake.server.lastMessage(channelId)!
+    const response = edited(original, 'server normalized text')
+    const request = jest.fn(async () => {
+      replaceOnServer(response)
+      return response
+    })
+    fake.server.channels[channelId] = { ...channel(), editMessage: request }
+    await syncChatList()
+    await goOffline()
+    store.dispatch(editMessageAC(channelId, edited(original, 'client text')))
+    await waitUntil(() => !!state().MessageReducer.pendingMessageMutations[original.id], 'queued edit')
+    expect(getMessagesFromMap(channelId)[original.id].updatedAt!.getTime()).toBeGreaterThan(earlier.getTime())
+    await goOnline()
+    await waitUntil(() => !state().MessageReducer.pendingMessageMutations[original.id], 'queued edit acknowledged')
+    expect(request).toHaveBeenCalledTimes(1)
+    await reopenOffline()
+    expectContent(response)
+    expect(getMessagesFromMap(channelId)[original.id].updatedAt).toEqual(earlier)
+  })
+
+  it('does not roll back a queued edit after a newer remote edit confirms its replacement', async () => {
+    const original = fake.server.lastMessage(channelId)!
+    let rejectResponse: ((error: Error) => void) | undefined
+    const request = jest.fn(
+      () =>
+        new Promise<IMessage>((_resolve, reject) => {
+          rejectResponse = reject
+        })
+    )
+    fake.server.channels[channelId] = { ...channel(), editMessage: request }
+    await syncChatList()
+    await goOffline()
+    store.dispatch(editMessageAC(channelId, edited(original, 'queued edit')))
+    await waitUntil(() => !!state().MessageReducer.pendingMessageMutations[original.id], 'queued edit')
+    await goOnline()
+    await waitUntil(() => request.mock.calls.length === 1, 'edit retry in flight')
+    const optimistic = getMessagesFromMap(channelId)[original.id]
+    const confirmed = edited(original, 'newer remote text', new Date(optimistic.updatedAt!.getTime() + 60000))
+    replaceOnServer(confirmed)
+    await emitEdit(confirmed)
+    expect(state().MessageReducer.pendingMessageMutations[original.id]).toBeUndefined()
+    rejectResponse!(new Error('superseded edit rejected'))
+    await openChat(channelId)
+    await reopenOffline()
+    expectContent(confirmed)
   })
 })
 
