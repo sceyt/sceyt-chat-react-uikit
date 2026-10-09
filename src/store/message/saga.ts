@@ -1,5 +1,6 @@
 import { put, call, delay, spawn, takeLatest, takeEvery, take, race } from 'redux-saga/effects'
 import { v4 as uuidv4 } from 'uuid'
+import { shouldSkipMessageContentUpdate } from '../../helpers/messageContentUpdate'
 import {
   ADD_REACTION,
   DELETE_MESSAGE,
@@ -877,23 +878,45 @@ function* getChannelForMessageMutation(channelId: string): any {
   return channel
 }
 
-function* applyLocalMessageUpdate(channelId: string, messageId: string, params: IMessage): any {
-  yield put(updateMessageAC(messageId, params))
+function* applyLocalMessageUpdate(
+  channelId: string,
+  messageId: string,
+  params: IMessage,
+  allowStaleContent = false
+): any {
+  const storedChannel = getStoredChannel(channelId)
+  const reduxChannel = (store.getState().ChannelReducer?.channels || []).find(
+    (channel: IChannel) => channel.id === channelId
+  )
+  const cached = getMessagesFromMap(channelId) || {}
+  const visible: IMessage[] = store.getState().MessageReducer.activeChannelMessages || []
+  const knownCopies = [
+    getMessageFromMap(channelId, messageId),
+    storedChannel?.lastMessage,
+    storedChannel?.lastReactedMessage,
+    reduxChannel?.lastMessage,
+    reduxChannel?.lastReactedMessage,
+    ...visible.flatMap((message) => [message, message.parentMessage]),
+    ...(!cached[messageId] ? Object.values(cached).map((message) => message.parentMessage) : [])
+  ]
+  const contentIsStale = knownCopies.some(
+    (known) => known?.id === messageId && shouldSkipMessageContentUpdate(known, params)
+  )
+  if (!allowStaleContent && contentIsStale) return
+  const bypassContentGuard = allowStaleContent && contentIsStale
+  yield put(updateMessageAC(messageId, params, undefined, undefined, bypassContentGuard))
   updateMessageOnMap(channelId, {
     messageId,
-    params
+    params,
+    allowStaleContent: bypassContentGuard
   })
 
-  const storedChannel = getStoredChannel(channelId)
   if (storedChannel?.lastMessage?.id === messageId) {
     const nextLastMessage = cloneSerializable(params)
     updateChannelLastMessageOnAllChannels(channelId, nextLastMessage)
     yield put(updateChannelLastMessageAC(nextLastMessage, storedChannel))
   }
 
-  const reduxChannel = (store.getState().ChannelReducer?.channels || []).find(
-    (channel: IChannel) => channel.id === channelId
-  )
   if (storedChannel?.lastReactedMessage?.id === messageId || reduxChannel?.lastReactedMessage?.id === messageId) {
     const reactionPreviewUpdate =
       params.state === MESSAGE_STATUS.DELETE
@@ -926,7 +949,7 @@ function* applyOptimisticEditMessage(channelId: string, message: IMessage, origi
     updatedAt: new Date(Date.now())
   }
 
-  yield call(applyLocalMessageUpdate, channelId, message.id, optimisticEditedMessage)
+  yield call(applyLocalMessageUpdate, channelId, message.id, optimisticEditedMessage, true)
 }
 
 function* syncChannelLastMessageAfterLocalRemoval(channelId: string, removedMessage: IMessage): any {
@@ -1012,7 +1035,10 @@ function* executeDeleteMessageMutation(
 
 function* executeEditMessageMutation(channel: IChannel, message: IMessage): any {
   const editedMessage = yield call(channel.editMessage, getEditMessageRequestPayload(channel, message))
-  yield call(applyLocalMessageUpdate, channel.id, editedMessage.id, editedMessage)
+  // An outstanding queued edit is displayed with a client timestamp. Only its
+  // acknowledgement may replace that optimistic clock with the server's one.
+  const isQueuedEdit = getPendingMessageMutations()[message.id]?.type === 'EDIT_MESSAGE'
+  yield call(applyLocalMessageUpdate, channel.id, editedMessage.id, editedMessage, isQueuedEdit)
   yield put(removePendingMessageMutationAC(message.id))
 }
 
@@ -4827,11 +4853,16 @@ function* resendPendingMessageMutations(action: IAction): any {
           return
         }
 
+        // A real-time confirmation may already have removed or replaced this
+        // mutation. Its failed request must not roll back the confirmed state.
+        if (getPendingMessageMutations()[mutation.messageId] !== currentMutation) continue
+
         yield call(
           applyLocalMessageUpdate,
           mutation.channelId,
           mutation.messageId,
-          cloneSerializable(mutation.originalMessage)
+          cloneSerializable(mutation.originalMessage),
+          true
         )
         yield put(removePendingMessageMutationAC(mutation.messageId))
         log.error('error in resend pending message mutations', error)
