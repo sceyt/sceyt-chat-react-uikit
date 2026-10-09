@@ -911,10 +911,16 @@ export function addMessageToMap(channelId: string, message: IMessage) {
       deliveryStatus: message.deliveryStatus,
       state: MESSAGE_STATUS.UNMODIFIED
     }
-    if (existing.tid && channelMessages[existing.tid] && existing.tid !== (existing.id || existing.tid)) {
+    // Confirmation promotes the cache key from tid to the server id. Marker
+    // updates index by server id; retain tid on the message only for echo matching.
+    const messageKey = merged.id || merged.tid!
+    if (existing.tid && existing.tid !== messageKey) {
       delete channelMessages[existing.tid]
     }
-    channelMessages[existing.id || existing.tid!] = merged
+    if (message.tid && message.tid !== messageKey) {
+      delete channelMessages[message.tid]
+    }
+    channelMessages[messageKey] = merged
     return
   }
 
@@ -1139,6 +1145,51 @@ export function updateMessageStatusOnMap(
       messagesMap[channelId][messageId] = { ...messageShouldBeUpdated, ...statusUpdatedMessage }
     }
   })
+}
+
+// Delivered/read markers are cumulative for outgoing messages. A channel-list
+// snapshot must reconcile earlier cached messages even if its own status is
+// already current. Do not insert history, overwrite edits or increment totals.
+export function syncCachedMessagesDeliveryStatus(channelId: string, message: IMessage): IMessage[] {
+  const channelMessages = messagesMap[channelId]
+  if (
+    !channelMessages ||
+    !message?.id ||
+    !message.deliveryStatus ||
+    message.deliveryStatus === MESSAGE_DELIVERY_STATUS.PENDING
+  ) {
+    return []
+  }
+
+  const isCumulative =
+    message.incoming === false &&
+    !!message.user?.id &&
+    (message.deliveryStatus === MESSAGE_DELIVERY_STATUS.DELIVERED ||
+      message.deliveryStatus === MESSAGE_DELIVERY_STATUS.READ)
+  const candidates = isCumulative
+    ? Object.values(channelMessages).filter(
+        (cached) =>
+          !!cached.id &&
+          cached.incoming === false &&
+          cached.user?.id === message.user.id &&
+          compareMessageIds(cached.id, message.id) <= 0
+      )
+    : channelMessages[message.id]
+      ? [channelMessages[message.id]]
+      : []
+  const changedMessages: IMessage[] = []
+  for (const cached of candidates) {
+    if (
+      cached.deliveryStatus === MESSAGE_DELIVERY_STATUS.PENDING ||
+      shouldSkipDeliveryStatusUpdate(message.deliveryStatus, cached.deliveryStatus)
+    ) {
+      continue
+    }
+    const updated = { ...cached, deliveryStatus: message.deliveryStatus }
+    channelMessages[cached.id] = updated
+    changedMessages.push(updated)
+  }
+  return changedMessages
 }
 
 export function getMessagesFromMap(channelId: string) {

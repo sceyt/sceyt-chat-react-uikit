@@ -17,12 +17,14 @@ import { destroyChannelsMap, getChannelFromMap, setActiveChannelId } from '../he
 import { CONNECTION_STATUS } from '../store/user/constants'
 import { LOADING_STATE } from '../helpers/constants'
 import { setConnectionStatusAC } from '../store/user/actions'
-import { getChannelsAC, switchChannelActionAC } from '../store/channel/actions'
+import { getChannelsAC, resendPendingChannelReadsAC, switchChannelActionAC } from '../store/channel/actions'
+import { resendPendingPinMutationsAC } from '../store/pinned/actions'
 import {
   addMessagesAC,
   clearVisibleMessagesMapAC,
   loadDefaultMessagesAC,
-  loadNearUnreadAC
+  loadNearUnreadAC,
+  resendPendingMessageMutationsAC
 } from '../store/message/actions'
 import { __resetMessageSagaTestState } from '../store/message/saga'
 
@@ -59,9 +61,16 @@ export const goOffline = async () => {
   await sleep(20)
 }
 
-// Like the app: the connection comes back, then the chat list syncs.
+/**
+ * Like the app: the connection comes back, then the chat list syncs. Mirrors
+ * handleConnectionStatusChangedEvent (store/evetns), which also resends queued
+ * edits/deletes, read markers and pin changes (roles loading is left out).
+ */
 export const goOnline = async () => {
   store.dispatch(setConnectionStatusAC(CONNECTION_STATUS.CONNECTED))
+  store.dispatch(resendPendingMessageMutationsAC(CONNECTION_STATUS.CONNECTED) as any)
+  store.dispatch(resendPendingChannelReadsAC(CONNECTION_STATUS.CONNECTED) as any)
+  store.dispatch(resendPendingPinMutationsAC() as any)
   await syncChatList()
 }
 
