@@ -2,8 +2,6 @@ import { persistDraft, removePersistedDraft, restoreDrafts } from '../messagesId
 import { getDraftMessageFromMap, hydrateDraftMessages, removeDraftMessageFromMap, setDraftMessageToMap } from './index'
 
 jest.mock('../messagesIdb', () => ({
-  persistChannelMessages: jest.fn(),
-  restoreChannelMessages: jest.fn(),
   persistDraft: jest.fn(async () => undefined),
   removePersistedDraft: jest.fn(async () => undefined),
   restoreDrafts: jest.fn(async () => [])

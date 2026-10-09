@@ -4594,6 +4594,126 @@ describe('useChatController', () => {
     ).toBe(false)
   })
 
+  describe('WAAF-2904 reconnect fills the gap without moving the view', () => {
+    // After opening offline, the list is [1000..1005, 1007]: 1007 is known from
+    // chat-list sync, the messages between 1005 and 1007 are not loaded yet.
+    // The user reads around the unread anchor 1005 (top of the viewport).
+    const channel = makeChannel({ id: 'channel-waaf-2904-scroll', newMessageCount: 1, lastDisplayedMessageId: '1005' })
+    const msg = (id: string, body = `msg-${id}`) => makeMessage({ id, channelId: channel.id, body })
+    const offlineMessages = ['1000', '1001', '1002', '1003', '1004', '1005', '1007'].map((id) => msg(id))
+    const rectsFor = (ids: string[], topOfAnchor: number) => {
+      const anchorIndex = ids.indexOf('1005')
+      return Object.fromEntries(
+        ids.map((id, index) => [id, { top: topOfAnchor + (index - anchorIndex) * 40, left: 0, width: 320, height: 32 }])
+      )
+    }
+    const layout = (ids: string[], scrollTop: number, scrollHeight: number, topOfAnchor: number) => ({
+      containerRect: { top: 0, left: 0, width: 320, height: 240 },
+      scrollMetrics: { scrollTop, scrollHeight, clientHeight: 240, offsetTop: 0, offsetHeight: 240 },
+      itemRects: rectsFor(ids, topOfAnchor)
+    })
+
+    const openOfflineThenReconnect = () => {
+      const dispatch = jest.fn()
+      const ids = offlineMessages.map((message) => message.id)
+      const rendered = renderController({
+        channel,
+        messages: offlineMessages,
+        unreadMessageId: '1005',
+        connectionStatus: CONNECTION_STATUS.DISCONNECTED,
+        dispatch,
+        layoutSpec: layout(ids, 100, 600, 0)
+      })
+      // 1005 is the visible anchor (index 5).
+      fireEvent.click(screen.getByTestId('set-visible-5'))
+      dispatch.mockClear()
+
+      rendered.rerender(
+        <ControllerHarness
+          channel={channel}
+          messages={offlineMessages}
+          unreadMessageId='1005'
+          connectionStatus={CONNECTION_STATUS.CONNECTED}
+          dispatch={dispatch}
+          layoutSpec={layout(ids, 100, 600, 0)}
+        />
+      )
+      return { rendered, dispatch }
+    }
+
+    it('asks for a reconnect reload around the visible anchor, not a jump to latest', () => {
+      const { dispatch } = openOfflineThenReconnect()
+
+      expect(dispatch).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: reloadActiveChannelAfterReconnectAC(channel).type,
+          payload: expect.objectContaining({
+            visibleAnchorId: '1005',
+            wasViewingLatest: false,
+            applyVisibleWindow: true
+          })
+        })
+      )
+    })
+
+    it('keeps the view when the missing messages are inserted below the anchor', async () => {
+      const { rendered, dispatch } = openOfflineThenReconnect()
+      const filled = [...offlineMessages.slice(0, 6), msg('1006', 'own-from-other-device'), msg('1007')]
+
+      rendered.rerender(
+        <ControllerHarness
+          channel={channel}
+          messages={filled}
+          unreadMessageId='1005'
+          connectionStatus={CONNECTION_STATUS.CONNECTED}
+          dispatch={dispatch}
+          // The browser keeps scrollTop; content below the anchor grows, the anchor does not move.
+          layoutSpec={layout(
+            filled.map((message) => message.id),
+            100,
+            640,
+            0
+          )}
+        />
+      )
+      await flushEffects()
+      act(() => {
+        flushAnimationFrames()
+      })
+
+      expect(rendered.scrollable.scrollTop).toBe(100)
+    })
+
+    it('re-anchors when the server window also adds older messages above the anchor', async () => {
+      const { rendered, dispatch } = openOfflineThenReconnect()
+      const filled = [msg('998'), msg('999'), ...offlineMessages.slice(0, 6), msg('1006'), msg('1007')]
+
+      rendered.rerender(
+        <ControllerHarness
+          channel={channel}
+          messages={filled}
+          unreadMessageId='1005'
+          connectionStatus={CONNECTION_STATUS.CONNECTED}
+          dispatch={dispatch}
+          // Two rows (80px) were added above: the browser keeps scrollTop, so the
+          // anchor is pushed down by 80px until the controller corrects it.
+          layoutSpec={layout(
+            filled.map((message) => message.id),
+            100,
+            720,
+            80
+          )}
+        />
+      )
+      await flushEffects()
+      act(() => {
+        flushAnimationFrames()
+      })
+
+      expect(rendered.scrollable.scrollTop).toBe(180)
+    })
+  })
+
   it('re-anchors scrollTop after the reconnect window prepends messages above the visible anchor', async () => {
     // Scenario:
     //   1. Offline: user is in history and scrolls to the history edge → PREV pagination fires.
@@ -7391,5 +7511,109 @@ describe('useChatController', () => {
         expect(screen.getByTestId('is-viewing-latest')).toHaveTextContent('false')
       }
     )
+  })
+
+  describe('scrolling offline through messages prefetched after reconnect', () => {
+    // Chat X was prefetched in the background: 1000-1105 are cached in one
+    // contiguous range. Offline it opens at the first unread message with a
+    // window of 40 (1005-1044); the rest must be reachable by scrolling.
+    const channelId = 'channel-offline-prefetched'
+    const range = (from: number, count: number) =>
+      Array.from({ length: count }, (_, index) =>
+        makeMessage({ id: String(from + index), channelId, body: `msg-${from + index}` })
+      )
+    const channel = makeChannel({
+      id: channelId,
+      lastMessage: makeMessage({ id: '1105', channelId, body: 'msg-1105' }),
+      newMessageCount: 100,
+      lastDisplayedMessageId: '1005'
+    })
+
+    const idsFrom = (from: number, count: number) => range(from, count).map((message) => message.id)
+    // Ids of the messages the controller added to the list from the cache, per direction.
+    const addedIds = (dispatch: jest.Mock, direction: string) =>
+      dispatch.mock.calls
+        .map(([action]) => action)
+        .filter((action) => action.type === addMessagesAC([], direction).type && action.payload.direction === direction)
+        .flatMap((action) => action.payload.messages.map((message: IMessage) => message.id))
+
+    beforeEach(() => {
+      range(1000, 106).forEach((message) => addMessageToMap(channelId, message))
+      setActiveSegment(channelId, '1000', '1105')
+    })
+
+    it('scrolling down shows the next cached page without asking the server', () => {
+      const { scrollable, dispatch } = renderController({
+        channel,
+        messages: range(1005, 40),
+        hasPrevMessages: true,
+        hasNextMessages: true,
+        connectionStatus: CONNECTION_STATUS.DISCONNECTED
+      })
+      dispatch.mockClear()
+
+      act(() => {
+        setScrollMetrics(scrollable, {
+          scrollTop: toNativeScrollTop(2, 1800, 240),
+          scrollHeight: 1800,
+          clientHeight: 240
+        })
+        fireEvent.scroll(scrollable)
+      })
+
+      expect(addedIds(dispatch, MESSAGE_LOAD_DIRECTION.NEXT)).toEqual(idsFrom(1045, LOAD_MAX_MESSAGE_COUNT))
+      const types = dispatch.mock.calls.map(([action]) => action.type)
+      expect(types).not.toContain(loadMoreMessagesAC(channelId, 0, MESSAGE_LOAD_DIRECTION.NEXT, '', true).type)
+      expect(types).not.toContain(prefetchMessagesAC(channelId, '', MESSAGE_LOAD_DIRECTION.NEXT, 2).type)
+    })
+
+    it('scrolling up shows the cached messages before the unread message without asking the server', () => {
+      const { scrollable, dispatch } = renderController({
+        channel,
+        messages: range(1005, 40),
+        hasPrevMessages: true,
+        hasNextMessages: true,
+        connectionStatus: CONNECTION_STATUS.DISCONNECTED
+      })
+      dispatch.mockClear()
+
+      act(() => {
+        setScrollMetrics(scrollable, {
+          scrollTop: toNativeScrollTop(1558, 1800, 240),
+          scrollHeight: 1800,
+          clientHeight: 240
+        })
+        fireEvent.scroll(scrollable)
+      })
+
+      expect(addedIds(dispatch, MESSAGE_LOAD_DIRECTION.PREV)).toEqual(idsFrom(1000, 5))
+      const types = dispatch.mock.calls.map(([action]) => action.type)
+      expect(types).not.toContain(loadMoreMessagesAC(channelId, 0, MESSAGE_LOAD_DIRECTION.PREV, '', true).type)
+      expect(types).not.toContain(prefetchMessagesAC(channelId, '', MESSAGE_LOAD_DIRECTION.PREV, 2).type)
+    })
+
+    it('at the end of the cache offline, scrolling down does not ask the server', () => {
+      const { scrollable, dispatch } = renderController({
+        channel,
+        messages: range(1066, 40),
+        hasPrevMessages: true,
+        hasNextMessages: true,
+        connectionStatus: CONNECTION_STATUS.DISCONNECTED
+      })
+      dispatch.mockClear()
+
+      act(() => {
+        setScrollMetrics(scrollable, {
+          scrollTop: toNativeScrollTop(2, 1800, 240),
+          scrollHeight: 1800,
+          clientHeight: 240
+        })
+        fireEvent.scroll(scrollable)
+      })
+
+      const types = dispatch.mock.calls.map(([action]) => action.type)
+      expect(types).not.toContain(loadMoreMessagesAC(channelId, 0, MESSAGE_LOAD_DIRECTION.NEXT, '', true).type)
+      expect(types).not.toContain(prefetchMessagesAC(channelId, '', MESSAGE_LOAD_DIRECTION.NEXT, 2).type)
+    })
   })
 })

@@ -16,155 +16,6 @@ describe('messagesIdb', () => {
     messagesIdb = require('./messagesIdb')
   })
 
-  describe('sanitizeMessageForPersist', () => {
-    it('removes SDK helper functions before writing a message to IndexedDB', () => {
-      const message: any = makeMessage({
-        requestedMentionUserIds: (() => ['user-1']) as any,
-        metadata: { resolveMention: () => ['user-1'] }
-      })
-
-      const sanitized = messagesIdb.sanitizeMessageForPersist(message)
-
-      expect(sanitized).not.toBe(message)
-      expect(sanitized.requestedMentionUserIds).toBeUndefined()
-      expect((sanitized.metadata as any).resolveMention).toBeUndefined()
-      expect(() => structuredClone(sanitized)).not.toThrow()
-    })
-
-    it('keeps valid mention ids while sanitizing attachments', () => {
-      const message = makeMessage({
-        requestedMentionUserIds: ['user-1'],
-        attachments: [{ attachmentUrl: 'blob:session-file', data: new Blob(['file']) } as any]
-      })
-
-      const sanitized = messagesIdb.sanitizeMessageForPersist(message)
-
-      expect(sanitized.requestedMentionUserIds).toEqual(['user-1'])
-      expect(sanitized.attachments[0]).toEqual({ attachmentUrl: undefined })
-    })
-
-    it('removes blob: URLs from attachmentUrl', () => {
-      const message = makeMessage({
-        attachments: [
-          { attachmentUrl: 'blob:http://localhost/abc123', name: 'file.pdf' } as any,
-          { attachmentUrl: 'https://cdn.example.com/file.pdf', name: 'remote.pdf' } as any
-        ]
-      })
-
-      const sanitized = messagesIdb.sanitizeMessageForPersist(message)
-
-      expect(sanitized.attachments[0].attachmentUrl).toBeUndefined()
-      expect(sanitized.attachments[0].name).toBe('file.pdf')
-      expect(sanitized.attachments[1].attachmentUrl).toBe('https://cdn.example.com/file.pdf')
-    })
-
-    it('removes File/Blob data from attachments', () => {
-      const message = makeMessage({
-        attachments: [{ data: new File(['content'], 'test.txt'), name: 'test.txt' } as any]
-      })
-
-      const sanitized = messagesIdb.sanitizeMessageForPersist(message)
-
-      expect(sanitized.attachments[0].data).toBeUndefined()
-      expect(sanitized.attachments[0].name).toBe('test.txt')
-    })
-
-    it('strips functions from nested objects', () => {
-      const message = makeMessage({
-        metadata: {
-          nested: {
-            callback: () => 'test',
-            value: 42
-          }
-        }
-      })
-
-      const sanitized = messagesIdb.sanitizeMessageForPersist(message)
-
-      expect((sanitized.metadata as any).nested.callback).toBeUndefined()
-      expect((sanitized.metadata as any).nested.value).toBe(42)
-    })
-
-    it('handles null attachments', () => {
-      const message = makeMessage({ attachments: [] })
-
-      const sanitized = messagesIdb.sanitizeMessageForPersist(message)
-
-      expect(sanitized.attachments).toEqual([])
-    })
-  })
-
-  describe('persistChannelMessages / restoreChannelMessages', () => {
-    it('round-trips messages and segments', async () => {
-      const messages = [makeMessage({ id: '1', body: 'hello' }), makeMessage({ id: '2', body: 'world' })]
-      const segments = [{ startId: '1', endId: '2' }]
-
-      await messagesIdb.persistChannelMessages('ch-1', messages, segments)
-      await flushWrites()
-
-      const restored = await messagesIdb.restoreChannelMessages('ch-1')
-
-      expect(restored).not.toBeNull()
-      expect(restored!.channelId).toBe('ch-1')
-      expect(restored!.messages).toHaveLength(2)
-      expect(restored!.messages[0].body).toBe('hello')
-      expect(restored!.messages[1].body).toBe('world')
-      expect(restored!.segments).toEqual(segments)
-      expect(restored!.savedAt).toBeGreaterThan(0)
-    })
-
-    it('is a no-op for empty channelId', async () => {
-      await messagesIdb.persistChannelMessages('', [makeMessage()], [])
-      await flushWrites()
-
-      const restored = await messagesIdb.restoreChannelMessages('')
-      expect(restored).toBeNull()
-    })
-
-    it('is a no-op for empty messages array', async () => {
-      await messagesIdb.persistChannelMessages('ch-empty', [], [])
-      await flushWrites()
-
-      const restored = await messagesIdb.restoreChannelMessages('ch-empty')
-      expect(restored).toBeNull()
-    })
-
-    it('returns null for unknown channel', async () => {
-      const restored = await messagesIdb.restoreChannelMessages('unknown-channel')
-      expect(restored).toBeNull()
-    })
-
-    it('sanitizes messages on write', async () => {
-      const messageWithBlob = makeMessage({
-        id: '1',
-        attachments: [{ attachmentUrl: 'blob:http://localhost/123', data: new Blob(['test']) } as any]
-      })
-
-      await messagesIdb.persistChannelMessages('ch-sanitize', [messageWithBlob], [])
-      await flushWrites()
-
-      const restored = await messagesIdb.restoreChannelMessages('ch-sanitize')
-
-      expect(restored!.messages[0].attachments[0].attachmentUrl).toBeUndefined()
-      expect(restored!.messages[0].attachments[0].data).toBeUndefined()
-    })
-
-    it('overwrites previous channel data', async () => {
-      const messages1 = [makeMessage({ id: '1', body: 'first' })]
-      const messages2 = [makeMessage({ id: '2', body: 'second' })]
-
-      await messagesIdb.persistChannelMessages('ch-overwrite', messages1, [])
-      await flushWrites()
-      await messagesIdb.persistChannelMessages('ch-overwrite', messages2, [])
-      await flushWrites()
-
-      const restored = await messagesIdb.restoreChannelMessages('ch-overwrite')
-
-      expect(restored!.messages).toHaveLength(1)
-      expect(restored!.messages[0].body).toBe('second')
-    })
-  })
-
   describe('drafts', () => {
     it('persist/restore round-trip', async () => {
       const draft = { text: 'hello', mentions: ['user-1'] }
@@ -432,7 +283,6 @@ describe('messagesIdb', () => {
       await flushWrites()
 
       // Persist some data
-      await messagesIdb.persistChannelMessages('ch-1', [makeMessage({ id: '1' })], [])
       await messagesIdb.persistDraft('ch-1', { text: 'draft' })
       await messagesIdb.persistPinnedMessages('ch-1', [{ id: 'pin-1' }])
       await flushWrites()
@@ -442,21 +292,18 @@ describe('messagesIdb', () => {
       await flushWrites()
 
       // Data should still exist
-      const messages = await messagesIdb.restoreChannelMessages('ch-1')
       const drafts = await messagesIdb.restoreDrafts()
       const pins = await messagesIdb.restorePinnedMessages('ch-1')
 
-      expect(messages).not.toBeNull()
       expect(drafts).toHaveLength(1)
       expect(pins).not.toBeNull()
     })
 
-    it('different user -> channels, drafts and pins all wiped', async () => {
+    it('different user -> drafts and pins all wiped', async () => {
       // Init with user-1 and persist data
       await messagesIdb.initMessagesIdbForUser('user-1')
       await flushWrites()
 
-      await messagesIdb.persistChannelMessages('ch-1', [makeMessage({ id: '1' })], [])
       await messagesIdb.persistDraft('ch-1', { text: 'draft' })
       await messagesIdb.persistPinnedMessages('ch-1', [{ id: 'pin-1' }])
       await messagesIdb.persistPinMutation({
@@ -473,97 +320,27 @@ describe('messagesIdb', () => {
       await flushWrites()
 
       // All data should be wiped
-      const messages = await messagesIdb.restoreChannelMessages('ch-1')
       const drafts = await messagesIdb.restoreDrafts()
       const pins = await messagesIdb.restorePinnedMessages('ch-1')
       const mutations = await messagesIdb.restorePinnedMutations()
 
-      expect(messages).toBeNull()
       expect(drafts).toHaveLength(0)
       expect(pins).toBeNull()
       expect(mutations).toHaveLength(0)
     })
 
-    it('entries older than IDB_MAX_AGE_MS are pruned', async () => {
-      const realDateNow = Date.now
-      const baseTime = 1700000000000
-
-      // Init and persist data at baseTime
-      Date.now = () => baseTime
-      await messagesIdb.initMessagesIdbForUser('user-1')
-      await flushWrites()
-
-      await messagesIdb.persistChannelMessages('ch-old', [makeMessage({ id: '1' })], [])
-      await flushWrites()
-
-      // Persist newer data at baseTime + 1 day
-      Date.now = () => baseTime + 24 * 60 * 60 * 1000
-      await messagesIdb.persistChannelMessages('ch-new', [makeMessage({ id: '2' })], [])
-      await flushWrites()
-
-      // Re-init at baseTime + MAX_AGE + 1 day (old channel should be pruned)
-      Date.now = () => baseTime + messagesIdb.IDB_MAX_AGE_MS + 24 * 60 * 60 * 1000
-      await messagesIdb.initMessagesIdbForUser('user-1')
-      await flushWrites()
-
-      Date.now = realDateNow
-
-      // Old channel should be pruned, new channel should remain
-      const oldChannel = await messagesIdb.restoreChannelMessages('ch-old')
-      const newChannel = await messagesIdb.restoreChannelMessages('ch-new')
-
-      expect(oldChannel).toBeNull()
-      expect(newChannel).not.toBeNull()
-    })
-
-    it('more than IDB_MAX_STORED_CHANNELS -> oldest removed first', async () => {
-      const realDateNow = Date.now
-      let currentTime = 1700000000000
-
-      Date.now = () => currentTime
-
-      await messagesIdb.initMessagesIdbForUser('user-1')
-      await flushWrites()
-
-      // Persist MAX + 5 channels with increasing timestamps
-      for (let i = 0; i < messagesIdb.IDB_MAX_STORED_CHANNELS + 5; i++) {
-        currentTime += 1000 // Increment time for each channel
-        await messagesIdb.persistChannelMessages(`ch-${i}`, [makeMessage({ id: `${i}` })], [])
-        await flushWrites()
-      }
-
-      // Re-init to trigger pruning
-      currentTime += 1000
-      await messagesIdb.initMessagesIdbForUser('user-1')
-      await flushWrites()
-
-      Date.now = realDateNow
-
-      // First 5 channels (oldest) should be pruned
-      for (let i = 0; i < 5; i++) {
-        const restored = await messagesIdb.restoreChannelMessages(`ch-${i}`)
-        expect(restored).toBeNull()
-      }
-
-      // Rest should remain
-      for (let i = 5; i < messagesIdb.IDB_MAX_STORED_CHANNELS + 5; i++) {
-        const restored = await messagesIdb.restoreChannelMessages(`ch-${i}`)
-        expect(restored).not.toBeNull()
-      }
-    })
-
     it('is a no-op for empty userId', async () => {
       await messagesIdb.initMessagesIdbForUser('user-1')
       await flushWrites()
-      await messagesIdb.persistChannelMessages('ch-1', [makeMessage({ id: '1' })], [])
+      await messagesIdb.persistDraft('ch-1', { text: 'draft' })
       await flushWrites()
 
       await messagesIdb.initMessagesIdbForUser('')
       await flushWrites()
 
       // Data should still exist (empty userId is no-op)
-      const messages = await messagesIdb.restoreChannelMessages('ch-1')
-      expect(messages).not.toBeNull()
+      const drafts = await messagesIdb.restoreDrafts()
+      expect(drafts).toHaveLength(1)
     })
   })
 
@@ -574,15 +351,6 @@ describe('messagesIdb', () => {
       delete global.indexedDB
       jest.resetModules()
       messagesIdb = require('./messagesIdb')
-    })
-
-    it('persistChannelMessages resolves without throwing', async () => {
-      await expect(messagesIdb.persistChannelMessages('ch-1', [makeMessage()], [])).resolves.toBeUndefined()
-    })
-
-    it('restoreChannelMessages returns null', async () => {
-      const result = await messagesIdb.restoreChannelMessages('ch-1')
-      expect(result).toBeNull()
     })
 
     it('persistDraft resolves without throwing', async () => {
@@ -671,8 +439,6 @@ describe('messagesIdb', () => {
       messagesIdb = require('./messagesIdb')
 
       // All functions should resolve safely
-      await expect(messagesIdb.persistChannelMessages('ch-1', [makeMessage()], [])).resolves.toBeUndefined()
-      await expect(messagesIdb.restoreChannelMessages('ch-1')).resolves.toBeNull()
       await expect(messagesIdb.persistDraft('ch-1', {})).resolves.toBeUndefined()
       await expect(messagesIdb.restoreDrafts()).resolves.toEqual([])
     })
@@ -701,7 +467,6 @@ describe('messagesIdb', () => {
       jest.resetModules()
       messagesIdb = require('./messagesIdb')
 
-      await expect(messagesIdb.restoreChannelMessages('ch-1')).resolves.toBeNull()
       await expect(messagesIdb.restoreDrafts()).resolves.toEqual([])
     })
 
@@ -719,19 +484,17 @@ describe('messagesIdb', () => {
       messagesIdb = require('./messagesIdb')
 
       // First call: open fails, resolves safely
-      await expect(messagesIdb.restoreChannelMessages('ch-1')).resolves.toBeNull()
+      await expect(messagesIdb.restoreDrafts()).resolves.toEqual([])
 
       // The underlying problem goes away: a working IndexedDB is available again
       global.indexedDB = new IDBFactory()
 
       // Same module instance must retry and be able to write and read back
-      const message = makeMessage({ id: 'retry-1', channelId: 'ch-1', body: 'after retry' })
-      await messagesIdb.persistChannelMessages('ch-1', [message], [{ startId: 'retry-1', endId: 'retry-1' }])
+      await messagesIdb.persistDraft('ch-1', { text: 'after retry' })
       await new Promise((resolve) => setTimeout(resolve, 0))
 
-      const restored = await messagesIdb.restoreChannelMessages('ch-1')
-      expect(restored).not.toBeNull()
-      expect(restored?.messages.map((m: any) => m.id)).toEqual(['retry-1'])
+      const drafts = await messagesIdb.restoreDrafts()
+      expect(drafts.map((d: any) => d.channelId)).toEqual(['ch-1'])
       expect(failingIndexedDB.open).toHaveBeenCalledTimes(1)
     })
 
@@ -759,35 +522,49 @@ describe('messagesIdb', () => {
     })
   })
 
-  describe('removePersistedChannel / clearPersistedChannels', () => {
-    it('removePersistedChannel removes a single channel', async () => {
-      await messagesIdb.persistChannelMessages('ch-remove', [makeMessage({ id: '1' })], [])
-      await messagesIdb.persistChannelMessages('ch-keep', [makeMessage({ id: '2' })], [])
-      await flushWrites()
-
-      await messagesIdb.removePersistedChannel('ch-remove')
-      await flushWrites()
-
-      const removed = await messagesIdb.restoreChannelMessages('ch-remove')
-      const kept = await messagesIdb.restoreChannelMessages('ch-keep')
-
-      expect(removed).toBeNull()
-      expect(kept).not.toBeNull()
+  describe('messages are not stored in IndexedDB', () => {
+    it('does not export message cache persistence', () => {
+      expect((messagesIdb as any).persistChannelMessages).toBeUndefined()
+      expect((messagesIdb as any).restoreChannelMessages).toBeUndefined()
     })
 
-    it('clearPersistedChannels removes all channels', async () => {
-      await messagesIdb.persistChannelMessages('ch-1', [makeMessage({ id: '1' })], [])
-      await messagesIdb.persistChannelMessages('ch-2', [makeMessage({ id: '2' })], [])
-      await flushWrites()
+    it('upgrading from version 3 deletes stored message caches and keeps drafts', async () => {
+      // A browser that used the earlier version: messages in the "channels" store.
+      await new Promise<void>((resolve, reject) => {
+        const request = indexedDB.open('sceyt-uikit-messages', 3)
+        request.onupgradeneeded = () => {
+          const db = request.result
+          db.createObjectStore('channels', { keyPath: 'channelId' })
+          db.createObjectStore('drafts', { keyPath: 'channelId' })
+          db.createObjectStore('meta')
+          db.createObjectStore('pins', { keyPath: 'channelId' })
+          db.createObjectStore('pinMutations', { keyPath: 'id' })
+        }
+        request.onsuccess = () => {
+          const db = request.result
+          const tx = db.transaction(['channels', 'drafts'], 'readwrite')
+          tx.objectStore('channels').put({ channelId: 'ch-1', messages: [makeMessage({ id: '1' })], segments: [] })
+          tx.objectStore('drafts').put({ channelId: 'ch-1', draft: { text: 'kept' }, savedAt: 1 })
+          tx.oncomplete = () => {
+            db.close()
+            resolve()
+          }
+        }
+        request.onerror = () => reject(request.error)
+      })
 
-      await messagesIdb.clearPersistedChannels()
-      await flushWrites()
+      const drafts = await messagesIdb.restoreDrafts()
 
-      const ch1 = await messagesIdb.restoreChannelMessages('ch-1')
-      const ch2 = await messagesIdb.restoreChannelMessages('ch-2')
-
-      expect(ch1).toBeNull()
-      expect(ch2).toBeNull()
+      expect(drafts.map((d: any) => d.draft.text)).toEqual(['kept'])
+      const storeNames = await new Promise<string[]>((resolve) => {
+        const request = indexedDB.open('sceyt-uikit-messages')
+        request.onsuccess = () => {
+          resolve(Array.from(request.result.objectStoreNames))
+          request.result.close()
+        }
+      })
+      expect(storeNames).not.toContain('channels')
+      expect(storeNames).toEqual(expect.arrayContaining(['drafts', 'meta', 'pins', 'pinMutations']))
     })
   })
 })
