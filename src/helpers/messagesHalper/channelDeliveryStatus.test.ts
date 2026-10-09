@@ -2,13 +2,14 @@ import {
   addMessageToMap,
   clearMessagesMap,
   getActiveSegment,
+  getContiguousNextMessages,
   getLatestCachedConfirmedMessageId,
   getMessagesFromMap,
   setActiveSegment,
   syncCachedMessagesDeliveryStatus
 } from './index'
 import { MESSAGE_DELIVERY_STATUS, MESSAGE_STATUS } from '../constants'
-import { makeMessage, makePendingMessage } from '../../testUtils/messageFixtures'
+import { makeMessage, makePendingMessage, makeUser } from '../../testUtils/messageFixtures'
 
 describe('delivery status from channel-list sync', () => {
   const channelId = 'channel-status-sync'
@@ -135,4 +136,106 @@ describe('delivery status from channel-list sync', () => {
       expect(getMessagesFromMap(channelId)[earlier.id]).toBe(earlier)
     }
   )
+
+  it.each([MESSAGE_DELIVERY_STATUS.DELIVERED, MESSAGE_DELIVERY_STATUS.READ])(
+    'limits cumulative %s updates to the snapshot author and channel',
+    (status) => {
+      const own = makeMessage({ id: '701', channelId })
+      const otherAuthor = makeMessage({ id: '702', channelId, user: makeUser({ id: 'another-user' }) })
+      const otherChannel = makeMessage({ id: own.id, channelId: 'another-channel' })
+      addMessageToMap(channelId, own)
+      addMessageToMap(channelId, otherAuthor)
+      addMessageToMap(otherChannel.channelId, otherChannel)
+
+      expect(
+        syncCachedMessagesDeliveryStatus(channelId, makeMessage({ id: '705', channelId, deliveryStatus: status }))
+      ).toEqual([{ ...own, deliveryStatus: status }])
+      expect(getMessagesFromMap(channelId)[otherAuthor.id]).toBe(otherAuthor)
+      expect(getMessagesFromMap(otherChannel.channelId)[own.id]).toBe(otherChannel)
+    }
+  )
+
+  it('does not merge disjoint cached segments when advancing statuses across both', () => {
+    const older = [makeMessage({ id: '700', channelId }), makeMessage({ id: '701', channelId })]
+    const newer = [makeMessage({ id: '705', channelId }), makeMessage({ id: '706', channelId })]
+    older.forEach((message) => addMessageToMap(channelId, message))
+    setActiveSegment(channelId, '700', '701')
+    newer.forEach((message) => addMessageToMap(channelId, message))
+    setActiveSegment(channelId, '705', '706')
+
+    const changed = syncCachedMessagesDeliveryStatus(channelId, {
+      ...newer[1],
+      deliveryStatus: MESSAGE_DELIVERY_STATUS.READ
+    })
+
+    expect(changed.map((message) => message.id)).toEqual(['700', '701', '705', '706'])
+    expect(changed.every((message) => message.deliveryStatus === MESSAGE_DELIVERY_STATUS.READ)).toBe(true)
+    expect(Object.keys(getMessagesFromMap(channelId))).toEqual(['700', '701', '705', '706'])
+    expect(getContiguousNextMessages(channelId, older[1], 40)).toEqual([])
+    expect(getActiveSegment()).toEqual({ startId: '705', endId: '706' })
+  })
+
+  it.each([MESSAGE_STATUS.EDIT, MESSAGE_STATUS.DELETE])(
+    'preserves local %s content and marker collections on an immutable cached message',
+    (state) => {
+      const cached = makeMessage({
+        id: '704',
+        channelId,
+        state,
+        body: 'local content',
+        metadata: 'local metadata',
+        markerTotals: [{ name: MESSAGE_DELIVERY_STATUS.DELIVERED, count: 2 } as any],
+        userMarkers: [{ name: MESSAGE_DELIVERY_STATUS.SENT } as any]
+      })
+      Object.freeze(cached.markerTotals)
+      Object.freeze(cached.userMarkers)
+      Object.freeze(cached)
+      addMessageToMap(channelId, cached)
+      const snapshot = Object.freeze(
+        makeMessage({ id: '705', channelId, deliveryStatus: MESSAGE_DELIVERY_STATUS.READ })
+      )
+
+      const changed = syncCachedMessagesDeliveryStatus(channelId, snapshot)
+
+      expect(changed).toEqual([{ ...cached, deliveryStatus: MESSAGE_DELIVERY_STATUS.READ }])
+      expect(changed[0].markerTotals).toBe(cached.markerTotals)
+      expect(changed[0].userMarkers).toBe(cached.userMarkers)
+      expect(cached.deliveryStatus).toBe(MESSAGE_DELIVERY_STATUS.SENT)
+      expect(syncCachedMessagesDeliveryStatus(channelId, snapshot)).toEqual([])
+    }
+  )
+
+  it.each([MESSAGE_DELIVERY_STATUS.PLAYED, MESSAGE_DELIVERY_STATUS.OPENED])(
+    'retains %s while a delivered snapshot is followed by a read snapshot',
+    (status) => {
+      const higher = makeMessage({ id: '701', channelId, deliveryStatus: status })
+      const pendingWithId = makePendingMessage({ id: '702', channelId })
+      const sent = makeMessage({ id: '703', channelId })
+      ;[higher, pendingWithId, sent].forEach((message) => addMessageToMap(channelId, message))
+
+      for (const next of [MESSAGE_DELIVERY_STATUS.DELIVERED, MESSAGE_DELIVERY_STATUS.READ]) {
+        expect(
+          syncCachedMessagesDeliveryStatus(channelId, makeMessage({ id: '705', channelId, deliveryStatus: next }))
+        ).toEqual([{ ...sent, deliveryStatus: next }])
+        expect(getMessagesFromMap(channelId)[higher.id]).toBe(higher)
+        expect(getMessagesFromMap(channelId)[pendingWithId.id]).toBe(pendingWithId)
+      }
+    }
+  )
+
+  it.each([
+    ['incoming flag', { incoming: undefined }],
+    ['author id', { user: { ...makeUser({ id: 'snapshot-user' }), id: '' } }]
+  ])('does not infer a cumulative read when the snapshot lacks an %s', (_field, missing) => {
+    const earlier = makeMessage({ id: '704', channelId })
+    const latest = makeMessage({ id: '705', channelId })
+    addMessageToMap(channelId, earlier)
+    addMessageToMap(channelId, latest)
+    const snapshot = { ...latest, deliveryStatus: MESSAGE_DELIVERY_STATUS.READ, ...missing } as any
+
+    expect(syncCachedMessagesDeliveryStatus(channelId, snapshot)).toEqual([
+      { ...latest, deliveryStatus: MESSAGE_DELIVERY_STATUS.READ }
+    ])
+    expect(getMessagesFromMap(channelId)[earlier.id]).toBe(earlier)
+  })
 })
