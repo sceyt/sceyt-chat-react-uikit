@@ -6,7 +6,7 @@ import { releaseBlobUrls } from '../attachmentBlobUrls'
 import { clearVideoPreparation } from '../attachmentPreparation'
 import { handleVoteDetails } from '../message'
 import store from 'store'
-import { removePendingPollActionAC, setPendingPollActionsMapAC } from 'store/message/actions'
+import { removeChannelMarkersAC, removePendingPollActionAC, setPendingPollActionsMapAC } from 'store/message/actions'
 import { persistDraft, removePersistedDraft, restoreDrafts } from '../messagesIdb'
 export const MESSAGES_MAX_PAGE_COUNT = 60
 export const MESSAGES_MAX_LENGTH = 40
@@ -1156,7 +1156,9 @@ export function getMessageFromMap(channelId: string, messageId: string) {
   return Object.values(channelMessages).find((message) => message.id === messageId || message.tid === messageId) || null
 }
 
-// Drops a channel's in-memory cache (messages, segments, visit order).
+// Drops a channel's in-memory cache (messages, segments, visit order). Used
+// directly by the memory limit, where the chat still exists, so its
+// latest-message snapshot is kept.
 function dropChannelCacheFromMemory(channelId: string) {
   delete messagesMap[channelId]
   delete loadedSegmentsMap[channelId]
@@ -1170,10 +1172,14 @@ export function removeMessagesFromMap(channelId: string) {
   clearLatestMessageSnapshot(channelId)
 }
 
-// ---- Visit order of cached channels ------------------------------------------
-// Every visited channel's messages stay in memory for the session (nothing is
-// written to IndexedDB). The visit order is used to prefetch the most recently
-// visited chats first after a reconnect.
+// ---- In-memory channel-cache limit -------------------------------------------
+// Messages are cached in memory only (nothing is written to IndexedDB). The
+// open chat plus the MESSAGES_CACHE_MAX_CHANNELS most recently visited chats
+// keep their messages; older chats are dropped from memory and load from the
+// server when opened again. The visit order also decides which chats the
+// reconnect prefetch handles first.
+
+export const MESSAGES_CACHE_MAX_CHANNELS = 30
 
 let channelVisitOrder: string[] = []
 
@@ -1183,6 +1189,37 @@ export const trackChannelVisit = (channelId: string) => {
   }
   channelVisitOrder = channelVisitOrder.filter((id) => id !== channelId)
   channelVisitOrder.push(channelId)
+}
+
+/**
+ * Drops the messages of the least recently visited chats beyond the limit from
+ * memory. Never drops the open chat or a chat with unsent (pending) messages.
+ * The chat's latest-message snapshot is kept, since the chat still exists.
+ * Returns the dropped chat ids.
+ */
+export const evictLruChannels = (activeChannelId: string) => {
+  // Only chats with messages in memory can be dropped. Chats without messages
+  // stay in the visit order: a chat that was just opened has no messages yet
+  // (they load right after the switch) and must still be tracked.
+  const candidates = channelVisitOrder.filter((id) => id !== activeChannelId && !!messagesMap[id])
+  let overflow = candidates.length - MESSAGES_CACHE_MAX_CHANNELS
+  if (overflow <= 0) {
+    return []
+  }
+  const evictedIds: string[] = []
+  for (const channelId of candidates) {
+    if (overflow <= 0) {
+      break
+    }
+    if (getPendingMessagesFromMap(channelId).length) {
+      continue
+    }
+    dropChannelCacheFromMemory(channelId)
+    store.dispatch(removeChannelMarkersAC(channelId))
+    evictedIds.push(channelId)
+    overflow--
+  }
+  return evictedIds
 }
 // ----------------------------------------------------------------------------
 

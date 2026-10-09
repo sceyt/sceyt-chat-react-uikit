@@ -3076,7 +3076,6 @@ const getOfflineSnapshotAfterWindow = (
 // disconnect still leaves messages that are only available online (the
 // latest-message snapshot covers the newest one).
 
-const BACKGROUND_PREFETCH_PAGE_SIZE = MESSAGES_MAX_LENGTH
 // Per chat: at most 10 pages (400 messages).
 const BACKGROUND_PREFETCH_MAX_PAGES_PER_CHANNEL = 10
 const BACKGROUND_PREFETCH_WAIT_TIMEOUT_MS = 10000
@@ -3155,13 +3154,17 @@ const channelStillExists = (channelId: string) =>
 // Fetches one page after `fromId` with a dedicated query (the shared
 // active-chat query is not touched). Returns the confirmed messages after it.
 function* fetchPageAfter(channelId: string, fromId: string): any {
+  // Page size of 40 (MESSAGES_MAX_LENGTH). Read here, not in a module-level
+  // constant: messagesHalper and the store import each other, so at module
+  // load time the value can still be undefined (which meant "no limit").
+  const pageSize = MESSAGES_MAX_LENGTH
   const SceytChatClient = getClient()
   const messageQueryBuilder = new (SceytChatClient.MessageListQueryBuilder as any)(channelId)
-  messageQueryBuilder.limit(BACKGROUND_PREFETCH_PAGE_SIZE)
+  messageQueryBuilder.limit(pageSize)
   messageQueryBuilder.reverse(true)
   const messageQuery = yield call(messageQueryBuilder.build)
   messageQuery.reverse = false
-  messageQuery.limit = BACKGROUND_PREFETCH_PAGE_SIZE
+  messageQuery.limit = pageSize
   const result: { messages: IMessage[]; hasNext: boolean } = yield call(messageQuery.loadNextMessageId, fromId)
   return (result?.messages || [])
     .filter((message) => !!message.id && compareMessageIds(message.id, fromId) > 0)

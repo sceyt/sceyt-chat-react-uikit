@@ -108,7 +108,7 @@ describe('channel saga read markers', () => {
     expect(dispatched).toContainEqual(setActiveChannelAC(channel, true))
   })
 
-  it('keeps every visited chat in memory when switching through more than 8 chats', async () => {
+  it('keeps every visited chat in memory when switching through 20 chats (under the limit of 30)', async () => {
     clearMessagesMap()
     const total = 20
     for (let index = 0; index < total; index++) {
@@ -125,6 +125,32 @@ describe('channel saga read markers', () => {
     }
     expect(getInMemoryCachedChannelIds()).toHaveLength(total)
     expect(getInMemoryCachedChannelIds()[0]).toBe(`channel-${total - 1}`)
+    clearMessagesMap()
+  })
+
+  it('switching through more than 30 chats keeps the 30 most recent in memory (messages load after each switch)', async () => {
+    clearMessagesMap()
+    const total = 35
+    for (let index = 0; index < total; index++) {
+      const channel = makeChannel({ id: `channel-${index}` })
+      setChannelInMap(channel)
+      await runChannelSaga(__channelSagaTestables.switchChannel, switchChannelActionAC(channel, true, true))
+      // Like the app: the chat's messages load after the switch.
+      addMessageToMap(channel.id, makeMessage({ id: `${index + 1}`, channelId: channel.id }))
+    }
+    // The next switch applies the limit.
+    const home = makeChannel({ id: 'channel-home' })
+    setChannelInMap(home)
+    await runChannelSaga(__channelSagaTestables.switchChannel, switchChannelActionAC(home, true, true))
+
+    // channel-0..4 are dropped; channel-5..34 (the 30 most recent) stay, plus the open chat-home (no messages).
+    for (let index = 0; index < 5; index++) {
+      expect(checkChannelExistsOnMessagesMap(`channel-${index}`)).toBe(false)
+    }
+    for (let index = 5; index < total; index++) {
+      expect(checkChannelExistsOnMessagesMap(`channel-${index}`)).toBe(true)
+    }
+    expect(getInMemoryCachedChannelIds()).toHaveLength(30)
     clearMessagesMap()
   })
 

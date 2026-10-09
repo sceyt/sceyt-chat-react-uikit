@@ -5,8 +5,11 @@ import log from 'loglevel'
 // Every operation degrades to a no-op when IndexedDB is unavailable.
 
 const DB_NAME = 'sceyt-uikit-messages'
-const DB_VERSION = 4
-// Removed in version 4: message caches are no longer stored in IndexedDB.
+// The version stays 3 (same schema as before), so a tab still running an
+// older build can't block an upgrade.
+const DB_VERSION = 3
+// Message caches stored by earlier builds. The store is kept in the schema for
+// those builds, but this build never reads it and empties it on open.
 const LEGACY_CHANNELS_STORE = 'channels'
 const DRAFTS_STORE = 'drafts'
 const META_STORE = 'meta'
@@ -39,6 +42,17 @@ export type PersistedPinMutation = {
 
 let dbPromise: Promise<IDBDatabase | null> | null = null
 
+// Empties the message caches stored by earlier builds (never read any more).
+const clearLegacyMessageCaches = (db: IDBDatabase) => {
+  try {
+    if (db.objectStoreNames.contains(LEGACY_CHANNELS_STORE)) {
+      db.transaction(LEGACY_CHANNELS_STORE, 'readwrite').objectStore(LEGACY_CHANNELS_STORE).clear()
+    }
+  } catch (e) {
+    log.info('messagesIdb: failed to clear legacy message caches', e)
+  }
+}
+
 const openDb = (): Promise<IDBDatabase | null> => {
   if (typeof indexedDB === 'undefined') {
     return Promise.resolve(null)
@@ -57,9 +71,9 @@ const openDb = (): Promise<IDBDatabase | null> => {
       const request = indexedDB.open(DB_NAME, DB_VERSION)
       request.onupgradeneeded = () => {
         const db = request.result
-        // Drop message caches stored by earlier versions.
-        if (db.objectStoreNames.contains(LEGACY_CHANNELS_STORE)) {
-          db.deleteObjectStore(LEGACY_CHANNELS_STORE)
+        if (!db.objectStoreNames.contains(LEGACY_CHANNELS_STORE)) {
+          const store = db.createObjectStore(LEGACY_CHANNELS_STORE, { keyPath: 'channelId' })
+          store.createIndex('savedAt', 'savedAt')
         }
         if (!db.objectStoreNames.contains(DRAFTS_STORE)) {
           db.createObjectStore(DRAFTS_STORE, { keyPath: 'channelId' })
@@ -76,7 +90,16 @@ const openDb = (): Promise<IDBDatabase | null> => {
           store.createIndex('channelId', 'channelId')
         }
       }
-      request.onsuccess = () => resolve(request.result)
+      request.onsuccess = () => {
+        const db = request.result
+        // Let a future upgrade from another tab go through instead of being blocked by this tab.
+        db.onversionchange = () => {
+          db.close()
+          dbPromise = null
+        }
+        clearLegacyMessageCaches(db)
+        resolve(db)
+      }
       request.onerror = () => {
         log.info('messagesIdb: failed to open database', request.error)
         fail(resolve)

@@ -131,6 +131,7 @@ import {
   removeMessagesFromMap,
   setLatestMessageSnapshot,
   trackChannelVisit,
+  evictLruChannels,
   updateMessageOnMap
 } from '../../helpers/messagesHalper'
 import { setActionIsRestrictedAC, updateMembersPresenceAC } from '../member/actions'
@@ -1476,6 +1477,7 @@ function* switchChannel(action: IAction): any {
       yield call(setActiveChannelId, channel && channel.id)
       if (channel && channel.id) {
         trackChannelVisit(channel.id)
+        evictLruChannels(channel.id)
       }
       if (channel.isLinkedChannel) {
         channelToSwitch.linkedFrom = currentActiveChannel

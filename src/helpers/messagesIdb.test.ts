@@ -528,43 +528,92 @@ describe('messagesIdb', () => {
       expect((messagesIdb as any).restoreChannelMessages).toBeUndefined()
     })
 
-    it('upgrading from version 3 deletes stored message caches and keeps drafts', async () => {
-      // A browser that used the earlier version: messages in the "channels" store.
-      await new Promise<void>((resolve, reject) => {
+    // Creates the database the way the earlier build did (version 3) with a
+    // stored message cache and a draft. Returns the open connection.
+    const openAsEarlierBuild = () =>
+      new Promise<IDBDatabase>((resolve, reject) => {
         const request = indexedDB.open('sceyt-uikit-messages', 3)
         request.onupgradeneeded = () => {
           const db = request.result
-          db.createObjectStore('channels', { keyPath: 'channelId' })
+          db.createObjectStore('channels', { keyPath: 'channelId' }).createIndex('savedAt', 'savedAt')
           db.createObjectStore('drafts', { keyPath: 'channelId' })
           db.createObjectStore('meta')
-          db.createObjectStore('pins', { keyPath: 'channelId' })
-          db.createObjectStore('pinMutations', { keyPath: 'id' })
+          db.createObjectStore('pins', { keyPath: 'channelId' }).createIndex('savedAt', 'savedAt')
+          db.createObjectStore('pinMutations', { keyPath: 'id' }).createIndex('channelId', 'channelId')
         }
         request.onsuccess = () => {
           const db = request.result
           const tx = db.transaction(['channels', 'drafts'], 'readwrite')
           tx.objectStore('channels').put({ channelId: 'ch-1', messages: [makeMessage({ id: '1' })], segments: [] })
           tx.objectStore('drafts').put({ channelId: 'ch-1', draft: { text: 'kept' }, savedAt: 1 })
-          tx.oncomplete = () => {
-            db.close()
-            resolve()
-          }
+          tx.oncomplete = () => resolve(db)
         }
         request.onerror = () => reject(request.error)
       })
 
-      const drafts = await messagesIdb.restoreDrafts()
-
-      expect(drafts.map((d: any) => d.draft.text)).toEqual(['kept'])
-      const storeNames = await new Promise<string[]>((resolve) => {
+    const readRaw = () =>
+      new Promise<{ version: number; stores: string[]; channelRecords: number }>((resolve) => {
         const request = indexedDB.open('sceyt-uikit-messages')
         request.onsuccess = () => {
-          resolve(Array.from(request.result.objectStoreNames))
-          request.result.close()
+          const db = request.result
+          const stores = Array.from(db.objectStoreNames)
+          const count = db.transaction('channels', 'readonly').objectStore('channels').count()
+          count.onsuccess = () => {
+            resolve({ version: db.version, stores, channelRecords: count.result })
+            db.close()
+          }
         }
       })
-      expect(storeNames).not.toContain('channels')
-      expect(storeNames).toEqual(expect.arrayContaining(['drafts', 'meta', 'pins', 'pinMutations']))
+
+    it('keeps version 3 and the same stores, empties message caches stored by earlier builds and keeps drafts', async () => {
+      const earlier = await openAsEarlierBuild()
+      earlier.close()
+
+      const drafts = await messagesIdb.restoreDrafts()
+      await flushWrites()
+
+      expect(drafts.map((d: any) => d.draft.text)).toEqual(['kept'])
+      const raw = await readRaw()
+      expect(raw.version).toBe(3)
+      expect(raw.stores.sort()).toEqual(['channels', 'drafts', 'meta', 'pinMutations', 'pins'])
+      expect(raw.channelRecords).toBe(0)
+    })
+
+    it('a tab still running the earlier build (database open) does not block drafts and pins', async () => {
+      const earlierTab = await openAsEarlierBuild()
+
+      await messagesIdb.persistDraft('ch-2', { text: 'saved while the old tab is open' })
+      await messagesIdb.persistPinnedMessages('ch-2', [{ id: 'pin-1' }])
+      await flushWrites()
+
+      expect((await messagesIdb.restoreDrafts()).map((d: any) => d.channelId).sort()).toEqual(['ch-1', 'ch-2'])
+      expect(await messagesIdb.restorePinnedMessages('ch-2')).not.toBeNull()
+      earlierTab.close()
+    })
+
+    it('a fresh install creates the same schema as the earlier build', async () => {
+      await messagesIdb.restoreDrafts()
+
+      const raw = await readRaw()
+      expect(raw.version).toBe(3)
+      expect(raw.stores.sort()).toEqual(['channels', 'drafts', 'meta', 'pinMutations', 'pins'])
+    })
+
+    it('closes its connection when another tab upgrades, so that upgrade is not blocked', async () => {
+      await messagesIdb.persistDraft('ch-1', { text: 'draft' })
+      await flushWrites()
+
+      const upgraded = await new Promise<string>((resolve) => {
+        const request = indexedDB.open('sceyt-uikit-messages', 4)
+        request.onblocked = () => resolve('blocked')
+        request.onsuccess = () => {
+          request.result.close()
+          resolve('upgraded')
+        }
+        request.onerror = () => resolve('error')
+      })
+
+      expect(upgraded).toBe('upgraded')
     })
   })
 })
