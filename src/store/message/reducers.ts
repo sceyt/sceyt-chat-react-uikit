@@ -19,6 +19,7 @@ import { handleVoteDetails } from '../../helpers/message'
 import store from 'store'
 import { getPollVotesAC } from './actions'
 import { shouldSkipMessageContentUpdate } from '../../helpers/messageContentUpdate'
+import { addRemoteReceipt, RemoteReceiptState } from '../../helpers/remoteReceiptProvenance'
 
 export const OG_METADATA_MAX = 200
 
@@ -118,6 +119,7 @@ export interface IMessageStore {
   oGMetadata: { [key: string]: IOGMetadata | null } | null
   attachmentUpdatedMap: { [key: string]: string }
   messageMarkers: { [key: string]: { [key: string]: { [key: string]: IMarker[] } } }
+  appliedMessageReceipts: { [channelId: string]: { [messageId: string]: RemoteReceiptState | undefined } }
   messagesMarkersLoadingState: number | null
   pollVotesList: { [key: string]: IPollVote[] } // key format: pollId_optionId
   pollVotesHasMore: { [key: string]: boolean }
@@ -178,6 +180,7 @@ const initialState: IMessageStore = {
   oGMetadata: null,
   attachmentUpdatedMap: {},
   messageMarkers: {},
+  appliedMessageReceipts: {},
   messagesMarkersLoadingState: null,
   pollVotesList: {},
   pollVotesHasMore: {},
@@ -390,9 +393,10 @@ const messageSlice = createSlice({
         markersMap: { [key: string]: IMarker }
         isOwnMarker?: boolean
         marker?: IMarker
+        knownRemoteMarkerCounts?: Record<string, number>
       }>
     ) => {
-      const { name, markersMap, isOwnMarker, marker } = action.payload
+      const { name, markersMap, isOwnMarker, marker, knownRemoteMarkerCounts } = action.payload
       const markerName = name
       const isForwardMarker =
         markerName === MESSAGE_DELIVERY_STATUS.DELIVERED || markerName === MESSAGE_DELIVERY_STATUS.READ
@@ -420,7 +424,7 @@ const messageSlice = createSlice({
           if (!inMap && shouldSkipDeliveryStatusUpdate(markerName, message.deliveryStatus)) continue
           const statusUpdatedMessage = updateMessageDeliveryStatusAndMarkers(
             message,
-            { deliveryStatus: markerName, marker },
+            { deliveryStatus: markerName, marker, knownRemoteMarkerCount: knownRemoteMarkerCounts?.[message.id] },
             isOwnMarker
           )
           state.activeChannelMessages[index] = { ...message, ...statusUpdatedMessage }
@@ -870,6 +874,16 @@ const messageSlice = createSlice({
       const userId = marker.user?.id
       const messageIds = marker.messageIds
       for (const messageId of messageIds) {
+        // Recipient details fetched by Message info do not prove an event has
+        // updated message copies. Keep applied identities across detail reloads.
+        if (userId && marker.name) {
+          if (!state.appliedMessageReceipts[channelId]) state.appliedMessageReceipts[channelId] = {}
+          state.appliedMessageReceipts[channelId][messageId] = addRemoteReceipt(
+            state.appliedMessageReceipts[channelId][messageId],
+            { channelId, id: messageId },
+            marker
+          )
+        }
         if (!state.messageMarkers[channelId]) {
           state.messageMarkers[channelId] = {}
         }
@@ -904,6 +918,7 @@ const messageSlice = createSlice({
 
     removeChannelMarkers: (state, action: PayloadAction<{ channelId: string }>) => {
       delete state.messageMarkers[action.payload.channelId]
+      delete state.appliedMessageReceipts[action.payload.channelId]
     },
 
     setPollVotesList: (

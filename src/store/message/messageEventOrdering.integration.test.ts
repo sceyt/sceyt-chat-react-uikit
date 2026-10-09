@@ -7,11 +7,12 @@ import {
   MESSAGES_CACHE_MAX_CHANNELS,
   trackChannelVisit
 } from '../../helpers/messagesHalper'
-import { MESSAGE_DELIVERY_STATUS, MESSAGE_STATUS } from '../../helpers/constants'
+import { LOADING_STATE, MESSAGE_DELIVERY_STATUS, MESSAGE_STATUS } from '../../helpers/constants'
 import { makeMessage, makeUser } from '../../testUtils/messageFixtures'
-import { IChannel, IMessage } from '../../types'
+import { IChannel, IMarker, IMessage } from '../../types'
 import { MESSAGE_TYPE } from '../../types/enum'
-import { deleteMessageAC, editMessageAC } from './actions'
+import { deleteMessageAC, editMessageAC, getMessageMarkersAC } from './actions'
+import { setClient } from '../../common/client'
 import {
   handleChannelMessageEvent,
   handleDeleteMessageEvent,
@@ -87,6 +88,21 @@ const emitDelete = (deletedMessage: IMessage) =>
     channel: channel(),
     deletedMessage: { ...deletedMessage }
   }).toPromise()
+const fetchReceiptDetails = async (messageId: string, markers: IMarker[], name = MESSAGE_DELIVERY_STATUS.READ) => {
+  const loadNext = jest.fn(async () => ({ markers }))
+  setClient({
+    ...fake.server.client(),
+    MessageMarkerListQueryBuilder: class {
+      build = () => ({ loadNext })
+    }
+  })
+  store.dispatch(getMessageMarkersAC(messageId, channelId, name))
+  await waitUntil(
+    () => state().MessageReducer.messagesMarkersLoadingState === LOADING_STATE.LOADED,
+    'Message info fetched recipients'
+  )
+  expect(loadNext).toHaveBeenCalledTimes(1)
+}
 const edited = (message: IMessage, body: string, updatedAt = earlier): IMessage => ({
   ...message,
   body,
@@ -553,6 +569,91 @@ describe.each([true, false])('integration: replayed SDK events (chat open: %s)',
     await openChat(channelId)
     await reopenOffline()
     expectContent(confirmed)
+  })
+  it.each([MESSAGE_DELIVERY_STATUS.READ, MESSAGE_DELIVERY_STATUS.DELIVERED])(
+    'applies a first live %s receipt after Message info fetched the same reader',
+    async (name) => {
+      const original = fake.server.lastMessage(channelId)!
+      const confirmed = { ...original, deliveryStatus: name, markerTotals: [{ name, count: 1 }] } as IMessage
+      replaceOnServer(confirmed)
+      const marker = { name, messageIds: [original.id], user: makeUser({ id: 'recipient' }), createdAt: earlier }
+      await fetchReceiptDetails(original.id, [marker], name)
+      expect(state().MessageReducer.messageMarkers[channelId][original.id][name]).toEqual([marker])
+      expect(getMessagesFromMap(channelId)[original.id].deliveryStatus).toBe(MESSAGE_DELIVERY_STATUS.SENT)
+      expect(getMessagesFromMap(channelId)[original.id].markerTotals).toEqual([])
+      await emitReceipt(original.id, name)
+      await emitReceipt(original.id, name)
+      await reopenOffline()
+      for (const copy of [
+        getMessagesFromMap(channelId)[original.id],
+        visible().find((item) => item.id === original.id),
+        preview()
+      ]) {
+        expect(copy?.deliveryStatus).toBe(name)
+        expect(copy?.markerTotals).toEqual(confirmed.markerTotals)
+      }
+    }
+  )
+
+  it('retains applied receipt identity when fetched details omit a reader and the cache is reloaded', async () => {
+    const original = fake.server.lastMessage(channelId)!
+    const confirmed = {
+      ...original,
+      deliveryStatus: MESSAGE_DELIVERY_STATUS.READ,
+      markerTotals: [{ name: MESSAGE_DELIVERY_STATUS.READ, count: 1 }]
+    } as IMessage
+    replaceOnServer(confirmed)
+    await emitReceipt(original.id)
+    // A paginated/stale detail response is not evidence that a live receipt was unapplied.
+    await fetchReceiptDetails(original.id, [])
+    expect(state().MessageReducer.messageMarkers[channelId][original.id][MESSAGE_DELIVERY_STATUS.READ]).toEqual([])
+    removeMessagesFromMap(channelId)
+    await openChat(channelId)
+    await emitReceipt(original.id)
+    await reopenOffline()
+    for (const copy of [
+      getMessagesFromMap(channelId)[original.id],
+      visible().find((item) => item.id === original.id),
+      preview()
+    ]) {
+      expect(copy?.markerTotals).toEqual(confirmed.markerTotals)
+      expect(copy?.deliveryStatus).toBe(MESSAGE_DELIVERY_STATUS.READ)
+    }
+  })
+  it.each([1, 2])('reconciles a fetched reader with a pre-existing aggregate and %s known readers', async (count) => {
+    const original = fake.server.lastMessage(channelId)!
+    const snapshot = {
+      ...original,
+      deliveryStatus: MESSAGE_DELIVERY_STATUS.READ,
+      markerTotals: [{ name: MESSAGE_DELIVERY_STATUS.READ, count: 1 }]
+    } as IMessage
+    replaceOnServer(snapshot)
+    await syncChatList()
+    removeMessagesFromMap(channelId)
+    await openChat(channelId)
+    if (!chatIsOpen) await openChat('chat-a')
+    expect(getMessagesFromMap(channelId)[original.id].markerTotals).toEqual(snapshot.markerTotals)
+    expect(preview()?.markerTotals).toEqual(snapshot.markerTotals)
+    const markers = Array.from({ length: count }, (_, index) => ({
+      name: MESSAGE_DELIVERY_STATUS.READ,
+      messageIds: [original.id],
+      user: makeUser({ id: index === 0 ? 'recipient' : 'other-recipient' }),
+      createdAt: earlier
+    }))
+    await fetchReceiptDetails(original.id, markers)
+    const confirmed = { ...snapshot, markerTotals: [{ name: MESSAGE_DELIVERY_STATUS.READ, count }] } as IMessage
+    replaceOnServer(confirmed)
+    await emitReceipt(original.id)
+    await emitReceipt(original.id)
+    await reopenOffline()
+    for (const copy of [
+      getMessagesFromMap(channelId)[original.id],
+      visible().find((item) => item.id === original.id),
+      preview()
+    ]) {
+      expect(copy?.deliveryStatus).toBe(MESSAGE_DELIVERY_STATUS.READ)
+      expect(copy?.markerTotals).toEqual(confirmed.markerTotals)
+    }
   })
 })
 

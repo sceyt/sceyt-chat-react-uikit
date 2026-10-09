@@ -9,6 +9,7 @@ import store from 'store'
 import { removeChannelMarkersAC, removePendingPollActionAC, setPendingPollActionsMapAC } from 'store/message/actions'
 import { persistDraft, removePersistedDraft, restoreDrafts } from '../messagesIdb'
 import { shouldSkipMessageContentUpdate } from '../messageContentUpdate'
+import { addRemoteReceipt, hasRemoteReceipt, RemoteReceiptState } from '../remoteReceiptProvenance'
 export const MESSAGES_MAX_PAGE_COUNT = 60
 export const MESSAGES_MAX_LENGTH = 40
 export const LOAD_MAX_MESSAGE_COUNT = 20
@@ -21,16 +22,11 @@ const PENDING_MESSAGE_SORT_MULTIPLIER = BigInt(1000000)
 // Per-copy immutable receipt provenance. Symbols survive object spreads but are
 // omitted from JSON/SDK payloads; there is no mutable global consumption set.
 const remoteReceipts = Symbol('remoteReceipts')
-type RemoteReceiptState = { [remoteReceipts]?: Readonly<Record<string, true>> }
-const remoteReceiptKey = (message: IMessage, marker?: Partial<IMarker>) =>
-  marker?.user?.id && marker.name
-    ? JSON.stringify([message.channelId, message.id || message.tid, marker.name, marker.user.id])
-    : undefined
+type MessageReceiptMetadata = { [remoteReceipts]?: RemoteReceiptState }
 
 export const hasAppliedRemoteMarker = (message: IMessage | null | undefined, marker: Partial<IMarker>) => {
   if (!message) return false
-  const key = remoteReceiptKey(message, marker)
-  return !!(key && (message as IMessage & RemoteReceiptState)[remoteReceipts]?.[key])
+  return hasRemoteReceipt((message as IMessage & MessageReceiptMetadata)[remoteReceipts], message, marker)
 }
 
 /**
@@ -152,7 +148,7 @@ export const updateMessageDeliveryStatusAndMarkers = (
   userMarkers?: IMarker[]
   markerTotals?: IMarker[]
   deliveryStatus: string
-} & RemoteReceiptState => {
+} & MessageReceiptMetadata => {
   const markerName = params?.deliveryStatus
   if (!markerName) {
     return {
@@ -172,16 +168,31 @@ export const updateMessageDeliveryStatusAndMarkers = (
     }
   }
 
-  const key = remoteReceiptKey(message, params?.marker)
-  const applied = (message as IMessage & RemoteReceiptState)[remoteReceipts]
-  const duplicate = !!(key && applied?.[key])
+  const applied = (message as IMessage & MessageReceiptMetadata)[remoteReceipts]
+  const duplicate = hasRemoteReceipt(applied, message, params?.marker)
+  const nextApplied = addRemoteReceipt(applied, message, params?.marker)
+  // Fetched identities establish a lower bound, rather than an additional
+  // receipt: an authoritative snapshot may already include this reader.
+  const knownCount = params?.knownRemoteMarkerCount
+  const totalsParams =
+    typeof knownCount === 'number' && !Array.isArray(params?.markerTotals)
+      ? {
+          ...params,
+          markerTotals: [
+            {
+              name: markerName,
+              count: Math.max(knownCount, message.markerTotals?.find((total) => total.name === markerName)?.count || 0)
+            }
+          ]
+        }
+      : params
   return {
     markerTotals:
       duplicate && !Array.isArray(params?.markerTotals)
         ? message.markerTotals
-        : mergeMarkerTotals(message, markerName, params),
+        : mergeMarkerTotals(message, markerName, totalsParams),
     deliveryStatus,
-    ...(key ? { [remoteReceipts]: duplicate ? applied : { ...applied, [key]: true as const } } : {})
+    ...(nextApplied ? { [remoteReceipts]: nextApplied } : {})
   }
 }
 
@@ -1124,7 +1135,7 @@ export function removeReactionToMessageOnMap(
 
 export function updateMessageStatusOnMap(
   channelId: string,
-  newMarkers: { name: string; markersMap: any; marker?: IMarker },
+  newMarkers: { name: string; markersMap: any; marker?: IMarker; knownRemoteMarkerCounts?: Record<string, number> },
   isOwnMarker?: boolean
 ) {
   if (!messagesMap[channelId] || !newMarkers?.markersMap) return
@@ -1168,7 +1179,8 @@ export function updateMessageStatusOnMap(
         messageShouldBeUpdated,
         {
           deliveryStatus: newMarkers.name,
-          marker: newMarkers.marker
+          marker: newMarkers.marker,
+          knownRemoteMarkerCount: newMarkers.knownRemoteMarkerCounts?.[messageId]
         },
         isOwnMarker
       )

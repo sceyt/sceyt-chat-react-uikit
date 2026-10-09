@@ -557,9 +557,16 @@ export function updateMessagesStatusAC(
   name: string,
   markersMap: { [key: string]: IMarker },
   isOwnMarker?: boolean,
-  marker?: IMarker
+  marker?: IMarker,
+  knownRemoteMarkerCounts?: Record<string, number>
 ) {
-  return updateMessagesStatus({ name, markersMap, isOwnMarker, marker })
+  return updateMessagesStatus({
+    name,
+    markersMap,
+    isOwnMarker,
+    marker,
+    ...(knownRemoteMarkerCounts ? { knownRemoteMarkerCounts } : {})
+  })
 }
 
 export function clearMessagesAC() {

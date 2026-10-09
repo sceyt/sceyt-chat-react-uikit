@@ -1,6 +1,7 @@
 import { call, put, select, take } from 'redux-saga/effects'
 import { eventChannel } from 'redux-saga'
 import { getClient } from '../../common/client'
+import { hasRemoteReceipt } from '../../helpers/remoteReceiptProvenance'
 import { IAttachment, IChannel, IMarker, IMember, IMessage, IPollDetails, IReaction, IUser } from '../../types'
 import { CHANNEL_EVENT_TYPES } from '../channel/constants'
 import {
@@ -407,17 +408,34 @@ export function* handleMessageMarkersReceivedEvent(
   }
 
   const isOwnMarker = markerList.user?.id === SceytChatClient.user.id
+  const knownCounts: Record<string, number> = {}
   if (!isOwnMarker && markerList.user?.id) {
-    const knownMarkers = store.getState().MessageReducer.messageMarkers?.[channelId]
-    const messageIds = markerList.messageIds.filter(
-      (id) =>
-        !hasAppliedRemoteMarker(getMessageFromMap(channelId, id), markerList) &&
-        !knownMarkers?.[id]?.[markerList.name]?.some((marker: IMarker) => marker.user?.id === markerList.user?.id)
-    )
+    const receiptState = store.getState().MessageReducer
+    const appliedReceipts = receiptState.appliedMessageReceipts?.[channelId]
+    const messageIds = markerList.messageIds.filter((id) => {
+      const cached = getMessageFromMap(channelId, id)
+      if (
+        hasAppliedRemoteMarker(cached, markerList) ||
+        hasRemoteReceipt(appliedReceipts?.[id], { channelId, id }, markerList)
+      )
+        return false
+      const details = receiptState.messageMarkers?.[channelId]?.[id]?.[markerList.name]
+      if (details?.some((detail: IMarker) => detail.user?.id === markerList.user?.id)) {
+        const snapshotCount = (message?: IMessage | null) =>
+          message?.markerTotals?.find((total) => total.name === markerList.name)?.count || 0
+        knownCounts[id] = Math.max(
+          new Set(details.map((detail: IMarker) => detail.user?.id).filter(Boolean)).size,
+          snapshotCount(cached),
+          snapshotCount(channel.lastMessage?.id === id ? channel.lastMessage : undefined)
+        )
+      }
+      return true
+    })
     if (!messageIds.length) return
     markerList = { ...markerList, messageIds }
   }
   const activeChannelId = yield call(getActiveChannelId)
+  const knownRemoteMarkerCounts = Object.keys(knownCounts).length ? knownCounts : undefined
   let updateLastMessage = false
   const markersMap: any = {}
   const markerUpdateParams = {
@@ -435,7 +453,11 @@ export function* handleMessageMarkersReceivedEvent(
   if (updateLastMessage) {
     const lastMessage = {
       ...channel.lastMessage,
-      ...updateMessageDeliveryStatusAndMarkers(channel.lastMessage, markerUpdateParams, isOwnMarker)
+      ...updateMessageDeliveryStatusAndMarkers(
+        channel.lastMessage,
+        { ...markerUpdateParams, knownRemoteMarkerCount: knownRemoteMarkerCounts?.[channel.lastMessage.id] },
+        isOwnMarker
+      )
     }
 
     updateChannelLastMessageOnAllChannels(channel.id, lastMessage)
@@ -443,10 +465,19 @@ export function* handleMessageMarkersReceivedEvent(
   }
 
   if (activeChannelId === channelId) {
-    yield put(updateMessagesStatusAC(markerList.name, markersMap, isOwnMarker, markerList))
+    yield put(updateMessagesStatusAC(markerList.name, markersMap, isOwnMarker, markerList, knownRemoteMarkerCounts))
   }
 
-  updateMessageStatusOnMap(channel.id, { name: markerList.name, markersMap, marker: markerList }, isOwnMarker)
+  updateMessageStatusOnMap(
+    channel.id,
+    {
+      name: markerList.name,
+      markersMap,
+      marker: markerList,
+      ...(knownRemoteMarkerCounts ? { knownRemoteMarkerCounts } : {})
+    },
+    isOwnMarker
+  )
 
   if (!isOwnMarker) {
     yield put(updateMessagesMarkersAC(channelId, markerList.name, markerList))

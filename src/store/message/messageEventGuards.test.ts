@@ -1,4 +1,10 @@
-import MessageReducer, { setMessages, updateMessage } from './reducers'
+import MessageReducer, {
+  removeChannelMarkers,
+  setMessageMarkers,
+  setMessages,
+  updateMessage,
+  updateMessagesMarkers
+} from './reducers'
 import {
   addMessageToMap,
   clearMessagesMap,
@@ -12,6 +18,8 @@ import { MESSAGE_TYPE } from '../../types/enum'
 import { makeMessage, makeUser } from '../../testUtils/messageFixtures'
 import { IMessage } from '../../types'
 import { shouldSkipMessageContentUpdate } from '../../helpers/messageContentUpdate'
+import { hasRemoteReceipt } from '../../helpers/remoteReceiptProvenance'
+import { DESTROY_SESSION } from '../channel/constants'
 
 const earlier = new Date('2026-04-02T12:00:00Z')
 const later = new Date('2026-04-02T12:01:00Z')
@@ -264,4 +272,107 @@ it('updates a quoted parent with a newer edit even when the source is outside th
   expect(getMessagesFromMap(channelId)[reply.id].parentMessage).toEqual(params)
   expect(next.activeChannelMessages).toHaveLength(1)
   expect(next.activeChannelMessages[0].parentMessage).toEqual(params)
+})
+
+it('copies a bounded amount of receipt metadata when adding a reader in a large group', () => {
+  let message = original()
+  for (let index = 0; index < 2000; index++) {
+    message = { ...message, ...updateMessageDeliveryStatusAndMarkers(message, receipt(message, `reader-${index}`)) }
+  }
+  const metadata = (copy: IMessage): unknown => {
+    const key = Object.getOwnPropertySymbols(copy).find((symbol) => symbol.description === 'remoteReceipts')!
+    return (copy as unknown as Record<symbol, unknown>)[key]
+  }
+  const objects = (root: unknown): Set<object> => {
+    const found = new Set<object>()
+    const visit = (value: unknown) => {
+      if (!value || typeof value !== 'object' || found.has(value)) return
+      found.add(value)
+      Object.values(value).forEach(visit)
+    }
+    visit(root)
+    return found
+  }
+  const before = objects(metadata(message))
+  const next = { ...message, ...updateMessageDeliveryStatusAndMarkers(message, receipt(message, 'new-reader')) }
+  const addedEntries = [...objects(metadata(next))]
+    .filter((object) => !before.has(object))
+    .reduce((sum, object) => sum + Object.keys(object).length, 0)
+  // A full reader-record clone copies 2,001 entries. Shared immutable metadata
+  // must limit new allocation independently of the number of existing readers.
+  expect(addedEntries).toBeLessThanOrEqual(160)
+  expect(next.markerTotals).toEqual(total(2001))
+  expect(message.markerTotals).toEqual(total(2000))
+  expect(updateMessageDeliveryStatusAndMarkers(next, receipt(next, 'reader-0')).markerTotals).toEqual(total(2001))
+  expect(hasAppliedRemoteMarker(message, receipt(message, 'new-reader').marker)).toBe(false)
+})
+
+it('records only applied events as consumed receipts, independently of fetched details', () => {
+  const message = original()
+  const params = receipt(message)
+  const payload = {
+    channelId,
+    messageId: message.id,
+    messageMarkers: { [params.deliveryStatus]: [params.marker] },
+    deliveryStatuses: [params.deliveryStatus]
+  }
+  const fetched = MessageReducer(undefined, setMessageMarkers(payload))
+  expect(fetched.appliedMessageReceipts[channelId]).toBeUndefined()
+  const applied = MessageReducer(
+    fetched,
+    updateMessagesMarkers({ channelId, deliveryStatus: params.deliveryStatus, marker: params.marker })
+  )
+  const refreshed = MessageReducer(
+    applied,
+    setMessageMarkers({ ...payload, messageMarkers: { [params.deliveryStatus]: [] } })
+  )
+  expect(hasRemoteReceipt(refreshed.appliedMessageReceipts[channelId][message.id], message, params.marker)).toBe(true)
+  expect(refreshed.messageMarkers[channelId][message.id][params.deliveryStatus]).toEqual([])
+  expect(fetched.appliedMessageReceipts[channelId]).toBeUndefined()
+})
+
+it('clears applied receipt identities with channel markers without affecting another channel', () => {
+  const message = original()
+  const params = receipt(message)
+  const payload = { channelId, deliveryStatus: params.deliveryStatus, marker: params.marker }
+  let initial = MessageReducer(undefined, updateMessagesMarkers(payload))
+  initial = MessageReducer(initial, updateMessagesMarkers({ ...payload, channelId: 'other-channel' }))
+  const next = MessageReducer(initial, removeChannelMarkers({ channelId }))
+  expect(next.appliedMessageReceipts[channelId]).toBeUndefined()
+  expect(next.messageMarkers[channelId]).toBeUndefined()
+  expect(
+    hasRemoteReceipt(
+      next.appliedMessageReceipts['other-channel'][message.id],
+      { ...message, channelId: 'other-channel' },
+      params.marker
+    )
+  ).toBe(true)
+  expect(initial.appliedMessageReceipts[channelId]).toBeDefined()
+})
+
+it('clears receipt provenance when the user session is destroyed', () => {
+  const message = original()
+  const params = receipt(message)
+  const initial = MessageReducer(
+    undefined,
+    updateMessagesMarkers({ channelId, deliveryStatus: params.deliveryStatus, marker: params.marker })
+  )
+  const next = MessageReducer(initial, { type: DESTROY_SESSION })
+  expect(next.appliedMessageReceipts).toEqual({})
+  expect(next.messageMarkers).toEqual({})
+})
+
+it('retains a larger aggregate when fetched identities provide only a lower bound', () => {
+  const message = { ...original(), markerTotals: total(3) }
+  const params = { ...receipt(message), knownRemoteMarkerCount: 2 }
+  const next = { ...message, ...updateMessageDeliveryStatusAndMarkers(message, params) }
+  expect(next.markerTotals).toEqual(total(3))
+  expect(updateMessageDeliveryStatusAndMarkers(next, params).markerTotals).toEqual(total(3))
+  expect(message.markerTotals).toEqual(total(3))
+})
+
+it('prefers explicit authoritative totals over the fetched-recipient lower bound, including zero', () => {
+  const message = { ...original(), markerTotals: total(3) }
+  const params = { ...receipt(message), knownRemoteMarkerCount: 2, markerTotals: total(0) }
+  expect(updateMessageDeliveryStatusAndMarkers(message, params).markerTotals).toEqual(total(0))
 })
