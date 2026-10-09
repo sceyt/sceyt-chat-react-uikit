@@ -6,13 +6,12 @@
  * the loaded segments, so that no existing latest-window logic changes.
  */
 import {
-  MESSAGES_CACHE_MAX_CHANNELS,
   addMessageToMap,
+  appendMessageToLatestSegment,
   clearAllLatestMessageSnapshots,
   clearLatestMessageSnapshot,
   clearMessagesMap,
   destroyChannelsMap,
-  evictLruChannels,
   getActiveSegment,
   getCachedNearMessages,
   getLatestCachedConfirmedMessageId,
@@ -22,16 +21,10 @@ import {
   hasNextContiguousInMap,
   removeMessagesFromMap,
   setActiveSegment,
-  setLatestMessageSnapshot,
-  trackChannelVisit
+  setLatestMessageSnapshot
 } from './index'
 import { MESSAGE_DELIVERY_STATUS } from '../constants'
 import { makeMessage, makePendingMessage, resetMessageListFixtureIds } from '../../testUtils/messageFixtures'
-
-jest.mock('../messagesIdb', () => ({
-  persistChannelMessages: jest.fn(async () => undefined),
-  restoreChannelMessages: jest.fn(async () => null)
-}))
 
 const channelId = 'channel-snapshot'
 
@@ -172,6 +165,48 @@ describe('latest-message snapshot store', () => {
     })
   })
 
+  describe('reconciliation with the cache', () => {
+    it('clears the snapshot once its message is cached inside a loaded segment', () => {
+      seedCache()
+      setLatestMessageSnapshot(channelId, makeMessage({ id: '706', channelId }))
+
+      addMessageToMap(channelId, makeMessage({ id: '706', channelId }))
+      setActiveSegment(channelId, '700', '706')
+
+      expect(getLatestMessageSnapshot(channelId)).toBeNull()
+    })
+
+    it('clears the snapshot when a live message extends the latest segment to it', () => {
+      seedCache()
+      setLatestMessageSnapshot(channelId, makeMessage({ id: '706', channelId }))
+
+      addMessageToMap(channelId, makeMessage({ id: '706', channelId }))
+      appendMessageToLatestSegment(channelId, '706', '705')
+
+      expect(getLatestMessageSnapshot(channelId)).toBeNull()
+    })
+
+    it('keeps the snapshot while its message is cached but outside any loaded segment', () => {
+      seedCache()
+      setLatestMessageSnapshot(channelId, makeMessage({ id: '706', channelId }))
+
+      addMessageToMap(channelId, makeMessage({ id: '706', channelId }))
+      setActiveSegment(channelId, '700', '705')
+
+      expect(getLatestMessageSnapshot(channelId)?.id).toBe('706')
+    })
+
+    it('keeps a newer snapshot when an older range is loaded', () => {
+      seedCache()
+      setLatestMessageSnapshot(channelId, makeMessage({ id: '707', channelId }))
+
+      addMessageToMap(channelId, makeMessage({ id: '706', channelId }))
+      setActiveSegment(channelId, '700', '706')
+
+      expect(getLatestMessageSnapshot(channelId)?.id).toBe('707')
+    })
+  })
+
   describe('clearing', () => {
     it('clears only the snapshot that was reconciled, not a newer one recorded meanwhile', () => {
       setLatestMessageSnapshot(channelId, makeMessage({ id: '706', channelId }))
@@ -198,20 +233,6 @@ describe('latest-message snapshot store', () => {
       removeMessagesFromMap(channelId)
 
       expect(getLatestMessageSnapshot(channelId)).toBeNull()
-    })
-
-    it('is kept when the channel is only evicted from memory by the LRU cache', () => {
-      const total = MESSAGES_CACHE_MAX_CHANNELS + 2
-      for (let i = 0; i < total; i++) {
-        addMessageToMap(`channel-${i}`, makeMessage({ channelId: `channel-${i}` }))
-        trackChannelVisit(`channel-${i}`)
-      }
-      setLatestMessageSnapshot('channel-0', makeMessage({ id: '900', channelId: 'channel-0' }))
-
-      const evicted = evictLruChannels(`channel-${total - 1}`)
-
-      expect(evicted).toContain('channel-0')
-      expect(getLatestMessageSnapshot('channel-0')?.id).toBe('900')
     })
 
     it('is cleared by the global resets', () => {

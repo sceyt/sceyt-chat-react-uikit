@@ -126,12 +126,12 @@ import watchForEvents from '../evetns/inedx'
 import { CONNECTION_STATUS } from '../user/constants'
 import {
   compareMessageIds,
-  evictLruChannels,
   getMessagesFromMap,
   removeAllMessages,
   removeMessagesFromMap,
   setLatestMessageSnapshot,
   trackChannelVisit,
+  evictLruChannels,
   updateMessageOnMap
 } from '../../helpers/messagesHalper'
 import { setActionIsRestrictedAC, updateMembersPresenceAC } from '../member/actions'

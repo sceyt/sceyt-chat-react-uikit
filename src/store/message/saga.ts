@@ -108,6 +108,7 @@ import {
   setOGMetadataAC,
   fetchOGMetadataForLinkAC,
   setUnreadMessageIdAC,
+  setMessageListGapAC,
   deleteMessageFromListAC,
   setMessagesLoadFailedAC
 } from './actions'
@@ -117,6 +118,7 @@ import {
   channelDetailsTabs,
   DETAILS_TAB_ATTACHMENTS_PAGE_SIZE,
   LOADING_STATE,
+  MESSAGE_DELIVERY_STATUS,
   MESSAGE_STATUS,
   UPLOAD_STATE
 } from '../../helpers/constants'
@@ -149,6 +151,11 @@ import {
   getMessageFromMap,
   getMessagesFromMap,
   getLatestContiguousMessagesFromMap,
+  getLatestMessageSnapshot,
+  getLatestLoadedSegment,
+  extendSegmentForward,
+  isInLoadedSegment,
+  getInMemoryCachedChannelIds,
   getLatestMessagesFromMap,
   getLastConfirmedMessageId,
   getPendingMessagesFromMap,
@@ -169,8 +176,7 @@ import {
   checkIsItSentAlready,
   getMessageLocalRef,
   deletePendingMessage as deletePendingMessageLocally,
-  isPendingMessageDeleted,
-  ensureChannelCacheLoaded
+  isPendingMessageDeleted
 } from '../../helpers/messagesHalper'
 import { navigateToLatest } from '../../helpers/messageListNavigator'
 import { CONNECTION_STATUS } from '../user/constants'
@@ -3043,6 +3049,184 @@ function* clearMessagesLoadFailed(channelId: string | undefined): any {
   yield put(setMessagesLoadFailedAC(null))
 }
 
+// Returns the channel's latest-message snapshot when it is newer than the end
+// of a cached window that has nothing cached after it; otherwise null.
+const getOfflineSnapshotAfterWindow = (
+  channelId: string,
+  windowMessages: IMessage[],
+  windowHasNextCached: boolean
+): IMessage | null => {
+  if (windowHasNextCached) {
+    return null
+  }
+  const snapshot = getLatestMessageSnapshot(channelId)
+  const windowLastConfirmedId = getLastConfirmedMessageId(windowMessages)
+  if (!snapshot?.id || !windowLastConfirmedId || compareMessageIds(snapshot.id, windowLastConfirmedId) <= 0) {
+    return null
+  }
+  return snapshot
+}
+
+// ---- Background prefetch of cached chats after reconnect -------------------
+// Best-effort cache warming: messages that arrived while offline in chats whose
+// messages are cached in memory are fetched once the connection is back (up to
+// 400 per chat), so those chats can later be opened offline with the messages.
+// Chats without cached messages are skipped; they load normally when opened.
+// It does not replace gap handling: hitting the per-chat limit or a new
+// disconnect still leaves messages that are only available online (the
+// latest-message snapshot covers the newest one).
+
+// Per chat: at most 10 pages (400 messages).
+const BACKGROUND_PREFETCH_MAX_PAGES_PER_CHANNEL = 10
+const BACKGROUND_PREFETCH_WAIT_TIMEOUT_MS = 10000
+const BACKGROUND_PREFETCH_CHANNELS_SYNC_GRACE_MS = 1500
+const BACKGROUND_PREFETCH_POLL_MS = 100
+const BACKGROUND_PREFETCH_SETTLED_POLLS = 3
+
+// Number of active-chat message loads currently running (reconnect reload and
+// the load workers it dispatches). The prefetch waits until it is 0.
+let activeChannelLoadsInFlight = 0
+
+const trackActiveChannelLoad = (worker: (action: IAction) => any) =>
+  function* trackedActiveChannelLoad(action: IAction): any {
+    activeChannelLoadsInFlight++
+    try {
+      yield call(worker, action)
+    } finally {
+      activeChannelLoadsInFlight--
+    }
+  }
+
+const isConnectedNow = () => store.getState().UserReducer.connectionStatus === CONNECTION_STATUS.CONNECTED
+
+// Waits until the chat-list sync and the open chat's own reload have finished.
+// Returns false if the connection drops while waiting.
+function* waitForReconnectSyncToSettle(): any {
+  let sawChannelsLoading = false
+  let settledPolls = 0
+  let elapsed = 0
+  while (elapsed < BACKGROUND_PREFETCH_WAIT_TIMEOUT_MS) {
+    if (!isConnectedNow()) {
+      return false
+    }
+    const channelsLoadingState = store.getState().ChannelReducer?.channelsLoadingState
+    if (channelsLoadingState === LOADING_STATE.LOADING) {
+      sawChannelsLoading = true
+    }
+    const channelsSettled = sawChannelsLoading
+      ? channelsLoadingState === LOADING_STATE.LOADED
+      : elapsed >= BACKGROUND_PREFETCH_CHANNELS_SYNC_GRACE_MS
+    if (channelsSettled && activeChannelLoadsInFlight === 0) {
+      settledPolls++
+      if (settledPolls >= BACKGROUND_PREFETCH_SETTLED_POLLS) {
+        return true
+      }
+    } else {
+      settledPolls = 0
+    }
+    yield delay(BACKGROUND_PREFETCH_POLL_MS)
+    elapsed += BACKGROUND_PREFETCH_POLL_MS
+  }
+  return isConnectedNow()
+}
+
+// The chat's confirmed last message, if the chat is known, not open and real.
+const getPrefetchTargetLastMessageId = (channelId: string): string | null => {
+  if (!channelId || channelId === getActiveChannelId()) {
+    return null
+  }
+  const channel = getChannelFromMap(channelId) || getChannelFromAllChannels(channelId)
+  const lastMessage = channel?.lastMessage
+  if (
+    !channel ||
+    channel.isMockChannel ||
+    !lastMessage?.id ||
+    lastMessage.deliveryStatus === MESSAGE_DELIVERY_STATUS.PENDING
+  ) {
+    return null
+  }
+  return lastMessage.id
+}
+
+const channelStillExists = (channelId: string) =>
+  !!getChannelFromMap(channelId) || !!getChannelFromAllChannels(channelId)
+
+// Fetches one page after `fromId` with a dedicated query (the shared
+// active-chat query is not touched). Returns the confirmed messages after it.
+function* fetchPageAfter(channelId: string, fromId: string): any {
+  // Page size of 40 (MESSAGES_MAX_LENGTH). Read here, not in a module-level
+  // constant: messagesHalper and the store import each other, so at module
+  // load time the value can still be undefined (which meant "no limit").
+  const pageSize = MESSAGES_MAX_LENGTH
+  const SceytChatClient = getClient()
+  const messageQueryBuilder = new (SceytChatClient.MessageListQueryBuilder as any)(channelId)
+  messageQueryBuilder.limit(pageSize)
+  messageQueryBuilder.reverse(true)
+  const messageQuery = yield call(messageQueryBuilder.build)
+  messageQuery.reverse = false
+  messageQuery.limit = pageSize
+  const result: { messages: IMessage[]; hasNext: boolean } = yield call(messageQuery.loadNextMessageId, fromId)
+  return (result?.messages || [])
+    .filter((message) => !!message.id && compareMessageIds(message.id, fromId) > 0)
+    .sort((left, right) => compareMessageIds(left.id, right.id))
+}
+
+// Pages forward from the end of the chat's newest cached segment until the
+// chat's last message or 400 messages. Each page is added to the cache right
+// away, so a later stop keeps what already arrived.
+function* prefetchInMemoryChannel(channelId: string): any {
+  for (let page = 0; page < BACKGROUND_PREFETCH_MAX_PAGES_PER_CHANNEL; page++) {
+    const targetId = getPrefetchTargetLastMessageId(channelId)
+    const segment = getLatestLoadedSegment(channelId)
+    if (!targetId || !segment || compareMessageIds(targetId, segment.endId) <= 0) {
+      return
+    }
+    const fromId = segment.endId
+    if (!getMessageFromMap(channelId, fromId) || !isConnectedNow()) {
+      return
+    }
+    const fetched: IMessage[] = yield call(fetchPageAfter, channelId, fromId)
+
+    // The world may have changed while the request was running.
+    if (channelId === getActiveChannelId()) return // the user opened the chat: its own load owns it
+    if (!channelStillExists(channelId)) return // chat deleted or left
+    if (!isInLoadedSegment(channelId, fromId) || !getMessageFromMap(channelId, fromId)) return // history cleared
+    if (!fetched.length) return
+
+    const lastId = fetched[fetched.length - 1].id
+    setMessagesToMap(channelId, fetched, fetched[0].id, lastId)
+    extendSegmentForward(channelId, fromId, lastId)
+  }
+}
+
+function* prefetchCachedChannelsAfterReconnect(action: IAction): any {
+  if (action.payload?.status !== CONNECTION_STATUS.CONNECTED) {
+    return
+  }
+  const settled = yield call(waitForReconnectSyncToSettle)
+  if (!settled) {
+    return
+  }
+  yield call(runBackgroundPrefetch)
+}
+
+// Every chat with messages in memory, most recently visited first, one at a time.
+function* runBackgroundPrefetch(): any {
+  for (const channelId of getInMemoryCachedChannelIds()) {
+    if (!isConnectedNow()) {
+      return
+    }
+    try {
+      yield call(prefetchInMemoryChannel, channelId)
+    } catch (e) {
+      log.info('background prefetch failed for channel', channelId, e)
+      if (!isConnectedNow()) {
+        return
+      }
+    }
+  }
+}
+
 function* loadNearUnread(action: IAction): any {
   try {
     yield call(clearMessagesLoadFailed, action.payload?.channel?.id)
@@ -3050,9 +3234,6 @@ function* loadNearUnread(action: IAction): any {
     const connectionState = store.getState().UserReducer.connectionStatus
 
     if (channel?.id && !channel?.isMockChannel) {
-      // Restore the channel's cache from the IndexedDB spill (if it was
-      // LRU-evicted) before the cache-first checks below.
-      yield call(ensureChannelCacheLoaded, channel.id)
       const cachedNearWindow = getCachedNearMessages(channel.id, channel.lastDisplayedMessageId, MESSAGES_MAX_LENGTH)
       const cacheWasShown = cachedNearWindow.hasEnoughCache && cachedNearWindow.messages.length > 0
       const cachedLastConfirmedMessageId = getLastConfirmedMessageId(cachedNearWindow.messages)
@@ -3064,16 +3245,40 @@ function* loadNearUnread(action: IAction): any {
           compareMessageIds(channel.lastMessage.id, cachedLastConfirmedMessageId) > 0)
 
       if (cacheWasShown) {
+        // WAAF-2904: offline, the newest message may be known only from chat-list
+        // sync (a latest-message snapshot) while the cache ends earlier. Show it
+        // after the cached window with an explicit gap: nothing proves the two
+        // are adjacent (unread counts ignore own messages from other devices).
+        const offlineSnapshot =
+          connectionState !== CONNECTION_STATUS.CONNECTED
+            ? getOfflineSnapshotAfterWindow(channel.id, cachedNearWindow.messages, cachedNearWindow.hasNextMessages)
+            : null
+        const windowMessages = offlineSnapshot
+          ? [...cachedNearWindow.messages, offlineSnapshot]
+          : cachedNearWindow.messages
+        const windowHasNextMessages = offlineSnapshot
+          ? !!channel.lastMessage?.id && compareMessageIds(channel.lastMessage.id, offlineSnapshot.id) > 0
+          : cachedHasNextMessages
+
         yield put(setUnreadMessageIdAC(channel.lastDisplayedMessageId))
         yield put(setMessagesHasPrevAC(cachedHasPrevMessages))
-        yield put(setMessagesHasNextAC(cachedHasNextMessages))
-        yield call(loadOGMetadataForLinkMessages, cachedNearWindow.messages, true)
-        yield put(setMessagesAC(cachedNearWindow.messages, channel.id))
+        yield put(setMessagesHasNextAC(windowHasNextMessages))
+        yield call(loadOGMetadataForLinkMessages, windowMessages, true)
+        yield put(setMessagesAC(windowMessages, channel.id))
+        if (offlineSnapshot) {
+          yield put(
+            setMessageListGapAC({
+              channelId: channel.id,
+              afterMessageId: cachedLastConfirmedMessageId,
+              beforeMessageId: offlineSnapshot.id
+            })
+          )
+        }
         yield put(scrollToNewMessageAC(false))
         yield put(setUnreadScrollToAC(true))
 
-        const filteredPendingMessages = getFilteredPendingMessages(channel, cachedNearWindow.messages, {
-          hasNext: cachedHasNextMessages
+        const filteredPendingMessages = getFilteredPendingMessages(channel, windowMessages, {
+          hasNext: windowHasNextMessages
         })
         yield put(addMessagesAC(filteredPendingMessages, MESSAGE_LOAD_DIRECTION.NEXT))
         yield call(loadOGMetadataForLinkMessages, filteredPendingMessages, true)
@@ -3177,9 +3382,6 @@ function* loadDefaultMessages(action: IAction): any {
     const connectionState = store.getState().UserReducer.connectionStatus
 
     if (channel?.id && !channel?.isMockChannel) {
-      // Restore the channel's cache from the IndexedDB spill (if it was
-      // LRU-evicted) before the cache-first checks below.
-      yield call(ensureChannelCacheLoaded, channel.id)
       const SceytChatClient = getClient()
       const messageQueryBuilder = new (SceytChatClient.MessageListQueryBuilder as any)(channel.id)
       messageQueryBuilder.limit(MESSAGES_MAX_LENGTH)
@@ -3500,6 +3702,10 @@ function* prefetchMessages(channelId: string, fromMessageId: string, direction: 
               continue
             }
           }
+          // Offline the server can't answer: stop here (cached pages above are still used).
+          if (store.getState().UserReducer.connectionStatus !== CONNECTION_STATUS.CONNECTED) {
+            break
+          }
           const mqb = new (SceytChatClient.MessageListQueryBuilder as any)(channelId)
           mqb.limit(LOAD_MAX_MESSAGE_COUNT_PREFETCH)
           mqb.reverse(true)
@@ -3540,6 +3746,10 @@ function* prefetchMessages(channelId: string, fromMessageId: string, direction: 
               currentFromId = cached[cached.length - 1].id
               continue
             }
+          }
+          // Offline the server can't answer: stop here (cached pages above are still used).
+          if (store.getState().UserReducer.connectionStatus !== CONNECTION_STATUS.CONNECTED) {
+            break
           }
           const mqb = new (SceytChatClient.MessageListQueryBuilder as any)(channelId)
           mqb.limit(LOAD_MAX_MESSAGE_COUNT_PREFETCH)
@@ -4738,6 +4948,12 @@ function* loadMorePollVotes(action: IAction): any {
 }
 
 export const __messageSagaTestables = {
+  prefetchCachedChannelsAfterReconnect,
+  prefetchInMemoryChannel,
+  runBackgroundPrefetch,
+  waitForReconnectSyncToSettle,
+  trackActiveChannelLoad,
+  getActiveChannelLoadsInFlight: () => activeChannelLoadsInFlight,
   getReconnectReloadAction,
   sendMessage,
   sendTextMessage,
@@ -4772,6 +4988,7 @@ export const __resetMessageSagaTestState = () => {
   prefetchCancelVersions.clear()
   autoResendAttempts.clear()
   autoResendsInFlight.clear()
+  activeChannelLoadsInFlight = 0
   activeDisplayedCacheKey = null
   activeDisplayedAttachmentScope = null
 }
@@ -4870,18 +5087,19 @@ function* refreshCacheAroundMessage(action: IAction): any {
 export default function* MessageSaga() {
   yield takeEvery(setConnectionStatus.type, resumePendingMessagesAfterReconnect)
   yield takeEvery(setConnectionStatus.type, refreshActiveMediaAttachmentsAfterReconnect)
+  yield takeLatest(setConnectionStatus.type, prefetchCachedChannelsAfterReconnect)
   yield takeEvery(SEND_MESSAGE, sendMessage)
   yield takeEvery(SEND_TEXT_MESSAGE, sendTextMessage)
   yield takeEvery(FORWARD_MESSAGE, forwardMessage)
   yield takeEvery(RESEND_MESSAGE, resendMessage)
   yield takeLatest(EDIT_MESSAGE, editMessage)
   yield takeEvery(DELETE_MESSAGE, deleteMessage)
-  yield takeLatest(RELOAD_ACTIVE_CHANNEL_AFTER_RECONNECT, reloadActiveChannelAfterReconnect)
-  yield takeLatest(LOAD_LATEST_MESSAGES, getMessagesQuery)
-  yield takeLatest(LOAD_AROUND_MESSAGE, loadAroundMessage)
-  yield takeLatest(REFRESH_CACHE_AROUND_MESSAGE, refreshCacheAroundMessage)
-  yield takeLatest(LOAD_NEAR_UNREAD, loadNearUnread)
-  yield takeLatest(LOAD_DEFAULT_MESSAGES, loadDefaultMessages)
+  yield takeLatest(RELOAD_ACTIVE_CHANNEL_AFTER_RECONNECT, trackActiveChannelLoad(reloadActiveChannelAfterReconnect))
+  yield takeLatest(LOAD_LATEST_MESSAGES, trackActiveChannelLoad(getMessagesQuery))
+  yield takeLatest(LOAD_AROUND_MESSAGE, trackActiveChannelLoad(loadAroundMessage))
+  yield takeLatest(REFRESH_CACHE_AROUND_MESSAGE, trackActiveChannelLoad(refreshCacheAroundMessage))
+  yield takeLatest(LOAD_NEAR_UNREAD, trackActiveChannelLoad(loadNearUnread))
+  yield takeLatest(LOAD_DEFAULT_MESSAGES, trackActiveChannelLoad(loadDefaultMessages))
   yield takeEvery(GET_MESSAGE, getMessageQuery)
   yield takeLatest(GET_MESSAGE_MARKERS, getMessageMarkers)
   yield takeLatest(GET_MESSAGES_ATTACHMENTS, getMessageAttachments)

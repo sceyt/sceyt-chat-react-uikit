@@ -112,9 +112,11 @@ import {
   setPendingMessageMutation,
   removePendingMessageMutation,
   setUnreadMessageId,
+  setMessageListGap,
   setStableUnreadAnchor,
   PendingMessageMutation
 } from './reducers'
+import type { MessageListGap } from './reducers'
 import { PendingPollAction } from 'helpers/messagesHalper'
 import { ATTACHMENT_VERSION } from 'helpers/attachmentsCache'
 import { registerBlobUrl } from 'helpers/attachmentBlobUrls'
@@ -801,6 +803,10 @@ export function resendPendingMessageMutationsAC(connectionState: string) {
 
 export function setUnreadMessageIdAC(messageId: string) {
   return setUnreadMessageId({ messageId })
+}
+
+export function setMessageListGapAC(gap: MessageListGap | null) {
+  return setMessageListGap({ gap })
 }
 
 export function setStableUnreadAnchorAC(channelId: string, messageId: string) {

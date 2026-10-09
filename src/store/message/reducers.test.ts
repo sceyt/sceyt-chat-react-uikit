@@ -14,6 +14,7 @@ import MessageReducer, {
   setPinnedMessagesListOpen,
   requestPinnedMessagesListClose,
   addSelectedMessage,
+  setMessageListGap,
   OG_METADATA_MAX
 } from './reducers'
 import { addReactionToMessageAC, deleteReactionFromMessageAC } from './actions'
@@ -988,5 +989,53 @@ describe('regressions', () => {
     state = MessageReducer(state, addMessage({ message: confirmed } as any))
 
     expect(bodiesAndIds(state)).toEqual(['1536000/tid-duplicate-send/hello'])
+  })
+})
+
+describe('message list gap', () => {
+  const initialState = () => MessageReducer(undefined, { type: '@@INIT' } as any)
+  const gap = { channelId: 'channel-gap', afterMessageId: '705', beforeMessageId: '706' }
+
+  beforeEach(() => {
+    resetMessageListFixtureIds()
+    clearMessagesMap()
+  })
+
+  it('starts without a gap', () => {
+    expect(initialState().messageListGap).toBeNull()
+  })
+
+  it('sets and clears the gap', () => {
+    let state = MessageReducer(initialState(), setMessageListGap({ gap }))
+    expect(state.messageListGap).toEqual(gap)
+
+    state = MessageReducer(state, setMessageListGap({ gap: null }))
+    expect(state.messageListGap).toBeNull()
+  })
+
+  it('clears the gap when a new window replaces the list', () => {
+    let state = MessageReducer(initialState(), setMessageListGap({ gap }))
+    state = MessageReducer(state, setMessages({ messages: [makeMessage({ id: '800', channelId: 'channel-gap' })] }))
+
+    expect(state.messageListGap).toBeNull()
+  })
+
+  it('keeps the gap when messages are appended to the current window', () => {
+    let state = MessageReducer(
+      initialState(),
+      setMessages({
+        messages: [
+          makeMessage({ id: '705', channelId: 'channel-gap' }),
+          makeMessage({ id: '706', channelId: 'channel-gap' })
+        ]
+      })
+    )
+    state = MessageReducer(state, setMessageListGap({ gap }))
+    state = MessageReducer(
+      state,
+      addMessages({ messages: [makePendingMessage({ channelId: 'channel-gap' })], direction: 'next' })
+    )
+
+    expect(state.messageListGap).toEqual(gap)
   })
 })

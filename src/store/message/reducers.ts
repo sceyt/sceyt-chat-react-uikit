@@ -49,6 +49,19 @@ export type VisibleMessagesMap = {
   [key: string]: VisibleMessageEntry
 }
 
+/**
+ * A known hole inside the visible message list: messages between
+ * `afterMessageId` and `beforeMessageId` may exist but are not loaded (e.g. the
+ * newest message is known from chat-list sync while the cache ends earlier and
+ * the client is offline). Pagination flags (messagesHasNext/Prev) only describe
+ * the list edges, so the gap is tracked separately.
+ */
+export type MessageListGap = {
+  channelId: string
+  afterMessageId: string
+  beforeMessageId: string
+}
+
 export interface IMessageStore {
   loadingPrevMessagesState: number | null
   loadingNextMessagesState: number | null
@@ -118,6 +131,7 @@ export interface IMessageStore {
     messageId: string
   }
   visibleMessagesMap: VisibleMessagesMap
+  messageListGap: MessageListGap | null
 }
 
 const initialState: IMessageStore = {
@@ -176,7 +190,8 @@ const initialState: IMessageStore = {
     channelId: '',
     messageId: ''
   },
-  visibleMessagesMap: {}
+  visibleMessagesMap: {},
+  messageListGap: null
 }
 
 const isPendingMessage = (message: IMessage) => !message.id && !!message.tid
@@ -342,6 +357,13 @@ const messageSlice = createSlice({
     setMessages: (state, action: PayloadAction<{ messages: IMessage[]; channelId?: string }>) => {
       const { messages } = action.payload
       state.activeChannelMessages = normalizeActiveChannelMessages(messages)
+      // A new window replaces the list; whoever builds a window with a gap sets
+      // it again right after (see setMessageListGap).
+      state.messageListGap = null
+    },
+
+    setMessageListGap: (state, action: PayloadAction<{ gap: MessageListGap | null }>) => {
+      state.messageListGap = action.payload.gap
     },
 
     addMessages: (
@@ -1094,7 +1116,8 @@ export const {
   setPendingMessageMutation,
   removePendingMessageMutation,
   setUnreadMessageId,
-  setStableUnreadAnchor
+  setStableUnreadAnchor,
+  setMessageListGap
 } = messageSlice.actions
 
 // Export reducer

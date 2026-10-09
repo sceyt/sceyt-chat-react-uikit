@@ -7,13 +7,7 @@ import { clearVideoPreparation } from '../attachmentPreparation'
 import { handleVoteDetails } from '../message'
 import store from 'store'
 import { removeChannelMarkersAC, removePendingPollActionAC, setPendingPollActionsMapAC } from 'store/message/actions'
-import {
-  persistChannelMessages,
-  restoreChannelMessages,
-  persistDraft,
-  removePersistedDraft,
-  restoreDrafts
-} from '../messagesIdb'
+import { persistDraft, removePersistedDraft, restoreDrafts } from '../messagesIdb'
 export const MESSAGES_MAX_PAGE_COUNT = 60
 export const MESSAGES_MAX_LENGTH = 40
 export const LOAD_MAX_MESSAGE_COUNT = 20
@@ -299,6 +293,24 @@ function upsertSegment(channelId: string, startId: string, endId: string) {
     loadedSegmentsMap[channelId].push({ startId, endId })
   }
   loadedSegmentsMap[channelId].sort((a, b) => (BigInt(a.startId) < BigInt(b.startId) ? -1 : 1))
+  reconcileLatestMessageSnapshot(channelId)
+}
+
+// A snapshot is reconciled once its message is in the cache inside a loaded
+// (server-contiguous) segment: from then on the normal cache paths show it.
+// Only that snapshot is cleared, so a newer one recorded meanwhile is kept.
+function reconcileLatestMessageSnapshot(channelId: string) {
+  const snapshot = latestMessageSnapshots[channelId]
+  if (!snapshot?.id || !messagesMap[channelId]?.[snapshot.id]) {
+    return
+  }
+  const snapshotId = BigInt(snapshot.id)
+  const isInLoadedSegment = (loadedSegmentsMap[channelId] || []).some(
+    (segment) => BigInt(segment.startId) <= snapshotId && BigInt(segment.endId) >= snapshotId
+  )
+  if (isInLoadedSegment) {
+    clearLatestMessageSnapshot(channelId, snapshot.id)
+  }
 }
 
 export const setActiveSegment = (channelId: string, startId: string, endId: string) => {
@@ -364,6 +376,7 @@ export const appendMessageToLatestSegment = (
     endId: messageId
   }
   loadedSegmentsMap[channelId][latestIndex] = updatedSegment
+  reconcileLatestMessageSnapshot(channelId)
 
   if (
     activeSegment &&
@@ -375,6 +388,45 @@ export const appendMessageToLatestSegment = (
   }
 
   return true
+}
+
+// Background prefetch support (see prefetchCachedChannelsAfterReconnect).
+
+/** The newest loaded segment of a channel, or null. Returns a copy. */
+export const getLatestLoadedSegment = (channelId: string): { startId: string; endId: string } | null => {
+  const latest = loadedSegmentsMap[channelId]?.at(-1)
+  return latest ? { ...latest } : null
+}
+
+/** True when a loaded segment of the channel contains `messageId`. */
+export const isInLoadedSegment = (channelId: string, messageId: string): boolean =>
+  (loadedSegmentsMap[channelId] || []).some(
+    (segment) => compareMessageIds(segment.startId, messageId) <= 0 && compareMessageIds(segment.endId, messageId) >= 0
+  )
+
+/**
+ * Extends the loaded segment that contains `fromId` forward to `newEndId`. Only
+ * for messages fetched from the server directly after `fromId` (so they are
+ * contiguous with it). Does not change the active segment. Returns false when
+ * no loaded segment contains `fromId` any more (e.g. the cache was cleared
+ * while the request was running).
+ */
+export const extendSegmentForward = (channelId: string, fromId: string, newEndId: string): boolean => {
+  const segment = (loadedSegmentsMap[channelId] || []).find(
+    (candidate) => compareMessageIds(candidate.startId, fromId) <= 0 && compareMessageIds(candidate.endId, fromId) >= 0
+  )
+  if (!segment || compareMessageIds(newEndId, segment.endId) <= 0) {
+    return false
+  }
+  upsertSegment(channelId, segment.startId, newEndId)
+  return true
+}
+
+/** Channels whose messages are in memory, most recently visited first. */
+export const getInMemoryCachedChannelIds = (): string[] => {
+  const visited = [...channelVisitOrder].reverse().filter((channelId) => !!messagesMap[channelId])
+  const others = Object.keys(messagesMap).filter((channelId) => !visited.includes(channelId))
+  return [...visited, ...others]
 }
 
 export const clearActiveSegment = () => {
@@ -1104,8 +1156,9 @@ export function getMessageFromMap(channelId: string, messageId: string) {
   return Object.values(channelMessages).find((message) => message.id === messageId || message.tid === messageId) || null
 }
 
-// Drops a channel's in-memory cache. Used directly by LRU eviction, where the
-// channel still exists, so its latest-message snapshot is kept.
+// Drops a channel's in-memory cache (messages, segments, visit order). Used
+// directly by the memory limit, where the chat still exists, so its
+// latest-message snapshot is kept.
 function dropChannelCacheFromMemory(channelId: string) {
   delete messagesMap[channelId]
   delete loadedSegmentsMap[channelId]
@@ -1119,13 +1172,14 @@ export function removeMessagesFromMap(channelId: string) {
   clearLatestMessageSnapshot(channelId)
 }
 
-// ---- In-memory channel-cache LRU with IndexedDB spill ----------------------
-// messagesMap keeps every visited channel's messages; without a bound it grows
-// for the whole session. The active channel plus the most recently visited
-// MESSAGES_CACHE_MAX_CHANNELS channels stay in memory; older channels are
-// persisted to IndexedDB (sans Files/blob URLs) and restored on revisit.
+// ---- In-memory channel-cache limit -------------------------------------------
+// Messages are cached in memory only (nothing is written to IndexedDB). The
+// open chat plus the MESSAGES_CACHE_MAX_CHANNELS most recently visited chats
+// keep their messages; older chats are dropped from memory and load from the
+// server when opened again. The visit order also decides which chats the
+// reconnect prefetch handles first.
 
-export const MESSAGES_CACHE_MAX_CHANNELS = 8
+export const MESSAGES_CACHE_MAX_CHANNELS = 30
 
 let channelVisitOrder: string[] = []
 
@@ -1137,10 +1191,17 @@ export const trackChannelVisit = (channelId: string) => {
   channelVisitOrder.push(channelId)
 }
 
+/**
+ * Drops the messages of the least recently visited chats beyond the limit from
+ * memory. Never drops the open chat or a chat with unsent (pending) messages.
+ * The chat's latest-message snapshot is kept, since the chat still exists.
+ * Returns the dropped chat ids.
+ */
 export const evictLruChannels = (activeChannelId: string) => {
-  // Drop ids whose caches are already gone (leave/delete flows).
-  channelVisitOrder = channelVisitOrder.filter((id) => messagesMap[id])
-  const candidates = channelVisitOrder.filter((id) => id !== activeChannelId)
+  // Only chats with messages in memory can be dropped. Chats without messages
+  // stay in the visit order: a chat that was just opened has no messages yet
+  // (they load right after the switch) and must still be tracked.
+  const candidates = channelVisitOrder.filter((id) => id !== activeChannelId && !!messagesMap[id])
   let overflow = candidates.length - MESSAGES_CACHE_MAX_CHANNELS
   if (overflow <= 0) {
     return []
@@ -1150,51 +1211,15 @@ export const evictLruChannels = (activeChannelId: string) => {
     if (overflow <= 0) {
       break
     }
-    // Unsent messages only live in memory — never spill them.
     if (getPendingMessagesFromMap(channelId).length) {
       continue
     }
-    persistChannelMessages(channelId, Object.values(messagesMap[channelId] || {}), [
-      ...(loadedSegmentsMap[channelId] || [])
-    ])
     dropChannelCacheFromMemory(channelId)
     store.dispatch(removeChannelMarkersAC(channelId))
     evictedIds.push(channelId)
     overflow--
   }
   return evictedIds
-}
-
-// Repopulates messagesMap/loadedSegmentsMap from the IndexedDB spill before
-// the cache-first load paths run, so a previously evicted channel still opens
-// instantly. No-op when the channel is already in memory or nothing is stored.
-export const ensureChannelCacheLoaded = async (channelId: string) => {
-  if (!channelId || messagesMap[channelId]) {
-    return false
-  }
-  const persisted = await restoreChannelMessages(channelId)
-  if (!persisted || !persisted.messages || !persisted.messages.length) {
-    return false
-  }
-  // A live load may have raced the restore — in-memory data wins.
-  if (messagesMap[channelId]) {
-    return true
-  }
-  messagesMap[channelId] = {}
-  persisted.messages.forEach((message: IMessage) => {
-    const key = message.id || message.tid
-    if (key) {
-      messagesMap[channelId][key] = message
-    }
-  })
-  if (persisted.segments) {
-    persisted.segments.forEach((segment) => {
-      if (segment && segment.startId && segment.endId) {
-        upsertSegment(channelId, segment.startId, segment.endId)
-      }
-    })
-  }
-  return true
 }
 // ----------------------------------------------------------------------------
 
