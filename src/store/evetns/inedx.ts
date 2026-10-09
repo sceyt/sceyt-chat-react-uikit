@@ -195,16 +195,13 @@ export function* handleChannelMessageEvent(args: { channel: IChannel; message: I
           (m) => m.id === storedChannel.lastMessage?.id || storedChannel?.lastMessage?.tid === m.tid
         )
       : false
+  // Merge confirmation fields only when the event itself belongs to the latest
+  // message; an older event may resolve to a newer stored preview.
   const isSameLastMessage =
-    storedChannel?.lastMessage &&
-    resolvedLastMessage &&
-    ((resolvedLastMessage.id && storedChannel.lastMessage.id === resolvedLastMessage.id) ||
-      (resolvedLastMessage.tid && storedChannel.lastMessage.tid === resolvedLastMessage.tid))
-  // The SDK can emit a delayed confirmation with SENT after a delivery marker
-  // has already upgraded this same message. Keep the higher local status so a
-  // late event cannot turn the channel-list icon back from two ticks to one.
+    messagesShareReference(storedChannel?.lastMessage, message) && messagesShareReference(resolvedLastMessage, message)
+  // A delayed confirmation must not downgrade the same message's preview.
   const shouldRetainStoredDeliveryStatus =
-    !!isSameLastMessage &&
+    isSameLastMessage &&
     shouldSkipDeliveryStatusUpdate(message.deliveryStatus, storedChannel!.lastMessage!.deliveryStatus)
   const resolvedDeliveryStatus = shouldRetainStoredDeliveryStatus
     ? storedChannel!.lastMessage!.deliveryStatus

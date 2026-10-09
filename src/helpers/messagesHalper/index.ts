@@ -908,7 +908,9 @@ export function addMessageToMap(channelId: string, message: IMessage) {
     const merged = {
       ...existing,
       id: message.id,
-      deliveryStatus: message.deliveryStatus,
+      deliveryStatus: shouldSkipDeliveryStatusUpdate(message.deliveryStatus, existing.deliveryStatus)
+        ? existing.deliveryStatus
+        : message.deliveryStatus,
       state: MESSAGE_STATUS.UNMODIFIED
     }
     // Confirmation promotes the cache key from tid to the server id. Marker
