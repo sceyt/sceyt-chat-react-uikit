@@ -193,7 +193,7 @@
     "@lexical/react": "0.16.0",
     "file-saver": "^2.0.5",
     "lexical": "0.16.0",
-    "linkify-it": "^5.0.1",
+    "linkify-it": "^6.1.0",
     "loglevel": "^1.9.2",
     "mic-recorder-to-mp3": "^2.2.2",
     "pica": "^9.0.1",

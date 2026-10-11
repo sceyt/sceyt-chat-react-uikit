@@ -7,7 +7,7 @@ import { ReactComponent as DeliveredIcon } from '../assets/svg/ticks_delivered.s
 import { ReactComponent as SentIcon } from '../assets/svg/ticks_sent.svg'
 import { ReactComponent as PendingIcon } from '../assets/svg/pending_icon.svg'
 import { IContactsMap, IUser } from '../types'
-import LinkifyIt from 'linkify-it'
+import { LinkifyIt } from 'linkify-it'
 import { getClient } from '../common/client'
 import { StyledText } from '../UIHelper'
 import { combineMessageAttributes, makeUsername } from '../helpers/message'
@@ -141,7 +141,7 @@ function extractUrlMatches(text: string): Array<{ text: string; url: string }> |
     results.push({ text: url, url, index: m.index })
   }
 
-  const linkifyResults = new LinkifyIt().match(text)
+  const linkifyResults = new LinkifyIt({ fuzzyLink: true }).match(text)
   if (linkifyResults) {
     for (const lm of linkifyResults) {
       if (lm.schema === '') {

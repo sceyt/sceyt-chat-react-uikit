@@ -3,7 +3,7 @@ import { shallowEqual } from 'react-redux'
 import { useSelector, useDispatch } from 'store/hooks'
 import { v4 as uuidv4 } from 'uuid'
 import styled, { keyframes } from 'styled-components'
-import LinkifyIt from 'linkify-it'
+import { LinkifyIt } from 'linkify-it'
 
 // Rich text editor
 import { $createParagraphNode, $createTextNode, $getRoot, $getSelection, FORMAT_TEXT_COMMAND } from 'lexical'
@@ -542,7 +542,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
   const [replyLinkPreviewImageFailed, setReplyLinkPreviewImageFailed] = useState(false)
   const [linkPreviewImageFailed, setLinkPreviewImageFailed] = useState(false)
   const addAttachmentByMenu = showChooseFileAttachment && showChooseMediaAttachment
-  const linkify = new LinkifyIt()
+  const linkify = new LinkifyIt({ fuzzyLink: true })
   const oGMetadata = useSelector((state: any) => state.MessageReducer.oGMetadata)
 
   useEffect(() => subscribeToDraftMessages(() => setDraftsHydrated(areDraftMessagesHydrated())), [])
@@ -916,7 +916,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
         let linkAttachment: any
         if (messageTexToSend) {
           const protocolMatch = /https?:\/\/\S+/.exec(messageTexToSend)
-          const linkifyMatchResult = !protocolMatch ? new LinkifyIt().match(messageTexToSend)?.[0] : null
+          const linkifyMatchResult = !protocolMatch ? linkify.match(messageTexToSend)?.[0] : null
           const url = protocolMatch
             ? protocolMatch[0]
             : linkifyMatchResult
@@ -1070,7 +1070,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
       let linkAttachment: any
       if (messageTexToSend) {
         const protocolMatch = /https?:\/\/\S+/.exec(messageTexToSend)
-        const linkifyMatchResult = !protocolMatch ? new LinkifyIt().match(messageTexToSend)?.[0] : null
+        const linkifyMatchResult = !protocolMatch ? linkify.match(messageTexToSend)?.[0] : null
         const url = protocolMatch
           ? protocolMatch[0]
           : linkifyMatchResult
