@@ -143,7 +143,7 @@
     "react-dom": "18.2.0"
   },
   "devDependencies": {
-    "@babel/plugin-transform-classes": "^7.22.15",
+    "@babel/plugin-transform-classes": "^8.0.5",
     "@babel/preset-react": "^7.22.5",
     "@reduxjs/toolkit": "^2.13.0",
     "@testing-library/jest-dom": "^4.2.4",
