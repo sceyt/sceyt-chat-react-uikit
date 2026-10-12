@@ -4855,7 +4855,10 @@ function* resendPendingMessageMutations(action: IAction): any {
 
         // A real-time confirmation may already have removed or replaced this
         // mutation. Its failed request must not roll back the confirmed state.
-        if (getPendingMessageMutations()[mutation.messageId] !== currentMutation) continue
+        if (getPendingMessageMutations()[mutation.messageId] !== currentMutation) {
+          log.error('error in resend pending message mutations (already confirmed, no rollback)', error)
+          continue
+        }
 
         yield call(
           applyLocalMessageUpdate,

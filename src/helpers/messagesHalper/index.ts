@@ -139,6 +139,10 @@ const mergeMarkerTotals = (message: IMessage, markerName: string, params: any) =
 /**
  * Updates a message's delivery status and marker collections.
  * Own markers are merged into userMarkers, while markers from other users update markerTotals.
+ * A remote receipt already applied to this copy is not counted again, and
+ * params.knownRemoteMarkerCount (readers already known from Message info) is a
+ * lower bound for the total. Provided markerTotals replace counts as given,
+ * including an empty list (no change) and a count of 0.
  */
 export const updateMessageDeliveryStatusAndMarkers = (
   message: IMessage,
