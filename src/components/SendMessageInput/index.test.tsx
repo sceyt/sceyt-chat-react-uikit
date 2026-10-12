@@ -12,10 +12,15 @@ import {
   makeUser,
   renderWithSceytProvider
 } from '../../testUtils/messageListHarness'
+import { documentDropCases, mediaDropCases } from '../../testUtils/fileDropFixtures'
+import { clearAttachmentPreparation } from '../../helpers/attachmentPreparation'
+import { releaseAllBlobUrls } from '../../helpers/attachmentBlobUrls'
+import * as imagePreparation from '../../helpers/resizeImage'
 
 jest.mock('../../helpers/messagesHalper', () => {
   const drafts: Record<string, any> = {}
   return {
+    ...jest.requireActual('../../helpers/messagesHalper'),
     __drafts: drafts,
     areDraftMessagesHydrated: () => true,
     checkDraftMessagesIsEmpty: () => Object.keys(drafts).length === 0,
@@ -130,7 +135,314 @@ jest.mock('lexical', () => ({
 jest.mock('./MentionNode', () => ({ MentionNode: class MentionNode {} }))
 
 const SendMessageInput = require('./index').default
+const MessageList = require('../Messages/MessageList').default
 const mockDrafts: Record<string, any> = require('../../helpers/messagesHalper').__drafts
+
+const renderFileDropFlow = (props = {}) => {
+  const channel = makeChannel({ id: 'file-drop-flow-channel' })
+  const store = createMessageListStore({ ChannelReducer: { activeChannel: channel } })
+  const dispatch = jest.spyOn(store, 'dispatch')
+  const view = renderWithSceytProvider(
+    <>
+      <MessageList />
+      <SendMessageInput {...props} CustomSendMessageButton={<button data-testid='send-dropped-files'>Send</button>} />
+    </>,
+    { store }
+  )
+  const drop = async (files: File[], attachmentType = 'file', exposeItems = true) => {
+    const dataTransfer = {
+      types: ['Files'],
+      items: exposeItems ? files.map((file) => ({ kind: 'file', type: file.type })) : [],
+      files,
+      clearData: jest.fn()
+    }
+    const event = (type: string) => {
+      const result = new Event(type, { bubbles: true, cancelable: true })
+      Object.defineProperty(result, 'dataTransfer', { value: dataTransfer })
+      return result
+    }
+    fireEvent(view.container.querySelector('#scrollableDiv')!, event('dragenter'))
+    await act(async () => {
+      fireEvent(screen.getByText(`Drag & drop to send as ${attachmentType}`), event('drop'))
+      jest.advanceTimersByTime(0)
+      await Promise.resolve()
+    })
+    // Preparation is scheduled after the composer consumes the drop action.
+    await act(async () => {
+      jest.advanceTimersByTime(0)
+      await Promise.resolve()
+    })
+  }
+  const send = async () => {
+    await act(async () => {
+      const button = screen.queryByTestId('send-dropped-files')
+      if (button) fireEvent.click(button)
+      await Promise.resolve()
+    })
+  }
+  const outgoing = () => dispatch.mock.calls.map(([action]) => action).filter((action) => action.type === SEND_MESSAGE)
+  return { ...view, store, drop, send, outgoing }
+}
+
+describe('file-drop integration: MessageList, Redux and SendMessageInput', () => {
+  beforeAll(() => {
+    Object.defineProperty(window, 'matchMedia', {
+      configurable: true,
+      writable: true,
+      value: () => ({ matches: false, addEventListener: jest.fn(), removeEventListener: jest.fn() })
+    })
+    Object.defineProperty(URL, 'createObjectURL', { configurable: true, value: jest.fn(() => 'blob:drop-preview') })
+  })
+
+  beforeEach(() => {
+    jest.useFakeTimers()
+    Object.keys(mockDrafts).forEach((channelId) => delete mockDrafts[channelId])
+    require('../../helpers/messagesHalper').clearMessagesMap()
+    setClient({ user: makeUser({ id: 'current-user' }) })
+    require('../../hooks').useDidUpdate.mockImplementation(require('../../hooks/basic/useDidUpdate').default)
+    jest.spyOn(FileReader.prototype, 'readAsDataURL').mockImplementation(() => {
+      throw new Error('A file drop must not read the full file into base64')
+    })
+    jest.spyOn(window, 'atob')
+    jest.spyOn(imagePreparation, 'createImageThumbnail').mockResolvedValue({
+      thumbnail: 'thumbnail',
+      imageWidth: 10,
+      imageHeight: 10
+    })
+    jest.spyOn(imagePreparation, 'resizeImage').mockImplementation(async (file: File) => ({
+      file,
+      blob: null,
+      newWidth: 10,
+      newHeight: 10
+    }))
+    require('../../helpers/videoConversion').remuxVideoFileForUpload.mockImplementation((file: File) =>
+      Promise.resolve(file)
+    )
+    require('../../helpers/getVideoFrame').getFrame.mockResolvedValue({
+      thumb: 'thumbnail',
+      width: 10,
+      height: 10,
+      duration: 1,
+      blob: new Blob(['thumbnail'], { type: 'image/jpeg' })
+    })
+  })
+
+  afterEach(() => {
+    require('../../helpers/messagesHalper').setPendingAttachment.mock.calls.forEach(([tid]: [string]) =>
+      clearAttachmentPreparation(tid)
+    )
+    releaseAllBlobUrls()
+    require('../../hooks').useDidUpdate.mockReset()
+    jest.clearAllTimers()
+    jest.useRealTimers()
+    jest.restoreAllMocks()
+  })
+
+  it.each([['installer.dmg', 'application/x-apple-diskimage'], ['installer.dmg', ''], ...documentDropCases])(
+    'sends dropped %s from the real list through the real composer',
+    async (name, type) => {
+      const view = renderFileDropFlow()
+      const file = new File(['original bytes'], name, { type, lastModified: 1234 })
+      if (name === 'installer.dmg') Object.defineProperty(file, 'size', { value: 2 * 1024 * 1024 * 1024 })
+      await view.drop([file])
+      expect(view.store.getState().ChannelReducer.draggedAttachments).toEqual([])
+      await view.send()
+      expect(view.outgoing()).toHaveLength(1)
+      const attachments = view.outgoing()[0].payload.message.attachments
+      expect(attachments).toHaveLength(1)
+      expect(attachments[0].data).toBe(file)
+      expect(attachments[0].name).toBe(name)
+      expect(attachments[0].size).toBe(file.size)
+      expect(attachments[0].type).toBe(attachmentTypes.file)
+      expect(FileReader.prototype.readAsDataURL).not.toHaveBeenCalled()
+      expect(window.atob).not.toHaveBeenCalled()
+      view.unmount()
+    }
+  )
+
+  it.each(mediaDropCases)('sends dropped %s as media with its original file', async (name, mimeType) => {
+    const view = renderFileDropFlow()
+    const file = new File(['original media bytes'], name, { type: mimeType })
+    await view.drop([file], 'media')
+    await view.send()
+    expect(view.outgoing()).toHaveLength(1)
+    const attachment = view.outgoing()[0].payload.message.attachments[0]
+    expect(attachment.data).toBe(file)
+    expect(attachment.type).toBe(mimeType.startsWith('image/') ? attachmentTypes.image : attachmentTypes.video)
+    expect(attachment.name).toBe(name)
+    expect(attachment.size).toBe(file.size)
+    expect(FileReader.prototype.readAsDataURL).not.toHaveBeenCalled()
+    expect(window.atob).not.toHaveBeenCalled()
+    view.unmount()
+  })
+
+  it.each(mediaDropCases)('keeps dropped %s as a file card when the file target is chosen', async (name, mimeType) => {
+    const view = renderFileDropFlow()
+    const file = new File(['media bytes'], name, { type: mimeType })
+    await view.drop([file], 'file')
+    await view.send()
+    expect(view.outgoing()).toHaveLength(1)
+    const attachment = view.outgoing()[0].payload.message.attachments[0]
+    expect(attachment.data).toBe(file)
+    expect(attachment.type).toBe(attachmentTypes.file)
+    view.unmount()
+  })
+
+  it.each([19, 20, 21, 40])('enforces the 20-file limit for a batch of %s dropped files', async (count) => {
+    const view = renderFileDropFlow()
+    const files = Array.from({ length: count }, (_, index) => new File(['file'], `document-${index}.pdf`))
+    await view.drop(files)
+    if (count > 20) {
+      const skipped = count - 20
+      expect(
+        screen.getByText(`Only 20 files can be added. ${skipped} file${skipped === 1 ? '' : 's'} will be skipped.`)
+      ).toBeVisible()
+    }
+    await view.send()
+    expect(view.outgoing()).toHaveLength(1)
+    const attachments = view.outgoing()[0].payload.message.attachments
+    expect(attachments).toHaveLength(Math.min(count, 20))
+    attachments.forEach((attachment: { data: File; name: string }, index: number) => {
+      expect(attachment.data).toBe(files[index])
+      expect(attachment.name).toBe(files[index].name)
+    })
+    expect(view.store.getState().ChannelReducer.draggedAttachments).toEqual([])
+    view.unmount()
+  })
+
+  it('uses only remaining slots on a later drop and rejects another drop at the limit', async () => {
+    const view = renderFileDropFlow()
+    const first = Array.from({ length: 19 }, (_, index) => new File(['file'], `first-${index}.txt`))
+    const second = [new File(['one'], 'accepted.pdf'), new File(['two'], 'skipped.pdf')]
+    await view.drop(first)
+    await view.drop(second)
+    expect(screen.getByText('Only 1 file can be added. 1 file will be skipped.')).toBeVisible()
+    await view.drop([new File(['extra'], 'extra.zip')])
+    expect(screen.getByText('You have reached the maximum limit of 20 files')).toBeVisible()
+    await view.send()
+    const attachments = view.outgoing()[0].payload.message.attachments
+    expect(attachments).toHaveLength(20)
+    expect(attachments[19].data).toBe(second[0])
+    expect(view.store.getState().ChannelReducer.draggedAttachments).toEqual([])
+    view.unmount()
+  })
+
+  it('keeps distinct files with identical names and appends separate drops once', async () => {
+    const view = renderFileDropFlow()
+    const files = [new File(['first'], 'report.pdf'), new File(['second'], 'report.pdf')]
+    await view.drop([files[0]])
+    await view.drop([files[1]])
+    await view.send()
+    expect(view.outgoing()).toHaveLength(1)
+    const attachments = view.outgoing()[0].payload.message.attachments
+    expect(attachments).toHaveLength(2)
+    expect(attachments[0].data).toBe(files[0])
+    expect(attachments[1].data).toBe(files[1])
+    expect(new Set(attachments.map((attachment: { tid: string }) => attachment.tid)).size).toBe(2)
+    view.unmount()
+  })
+
+  it('clears sent files so the next drop sends only the next file', async () => {
+    const view = renderFileDropFlow()
+    const first = new File(['first'], 'first.pdf')
+    const second = new File(['second'], 'second.zip')
+    await view.drop([first])
+    await view.send()
+    await view.drop([second])
+    await view.send()
+    expect(view.outgoing()).toHaveLength(2)
+    expect(view.outgoing()[0].payload.message.attachments).toHaveLength(1)
+    expect(view.outgoing()[1].payload.message.attachments).toHaveLength(1)
+    expect(view.outgoing()[1].payload.message.attachments[0].data).toBe(second)
+    view.unmount()
+  })
+
+  it('does not carry dropped files into another chat', async () => {
+    const view = renderFileDropFlow()
+    await view.drop([new File(['private'], 'old-chat.pdf')])
+    act(() => view.store.dispatch(setActiveChannelAC(makeChannel({ id: 'new-drop-chat' }))))
+    const next = new File(['new'], 'new-chat.zip')
+    await view.drop([next])
+    await view.send()
+    expect(view.outgoing()).toHaveLength(1)
+    expect(view.outgoing()[0].payload.channelId).toBe('new-drop-chat')
+    expect(view.outgoing()[0].payload.message.attachments).toHaveLength(1)
+    expect(view.outgoing()[0].payload.message.attachments[0].data).toBe(next)
+    view.unmount()
+  })
+
+  it('sends a zero-byte file and ignores an empty drop', async () => {
+    const view = renderFileDropFlow()
+    await view.drop([])
+    await view.send()
+    expect(view.outgoing()).toHaveLength(0)
+    const file = new File([], 'empty.txt')
+    await view.drop([file])
+    await view.send()
+    expect(view.outgoing()).toHaveLength(1)
+    expect(view.outgoing()[0].payload.message.attachments[0].data).toBe(file)
+    expect(view.outgoing()[0].payload.message.attachments[0].size).toBe(0)
+    view.unmount()
+  })
+
+  it.each([
+    ['installer.dmg', 'application/x-apple-diskimage'],
+    ['report.pdf', 'application/pdf'],
+    ['drawing.svg', 'image/svg+xml']
+  ])('rejects unsupported %s in the media target without losing the next valid drop', async (name, type) => {
+    const view = renderFileDropFlow({ allowedMediaExtensionsErrorMessage: 'Unsupported media format' })
+    await view.drop([new File(['file'], name, { type })], 'media', false)
+    expect(screen.getByText('Unsupported media format')).toBeVisible()
+    await view.send()
+    expect(view.outgoing()).toHaveLength(0)
+    expect(view.store.getState().ChannelReducer.draggedAttachments).toEqual([])
+    const valid = new File(['video'], 'next.mp4', { type: 'video/mp4' })
+    await view.drop([valid], 'media')
+    await view.send()
+    expect(view.outgoing()).toHaveLength(1)
+    expect(view.outgoing()[0].payload.message.attachments[0].data).toBe(valid)
+    view.unmount()
+  })
+
+  it('validates each file in a mixed media drop and sends only supported files', async () => {
+    const view = renderFileDropFlow()
+    const video = new File(['video'], 'clip.mp4', { type: 'video/mp4' })
+    await view.drop([new File(['pdf'], 'report.pdf'), video], 'media')
+    expect(screen.getByText('Invalid file type.')).toBeVisible()
+    await view.send()
+    const attachments = view.outgoing()[0].payload.message.attachments
+    expect(attachments).toHaveLength(1)
+    expect(attachments[0].data).toBe(video)
+    view.unmount()
+  })
+
+  it.each([1024, 1025])('validates original media size at %s bytes against a 1 KB limit', async (size) => {
+    const view = renderFileDropFlow({ mediaAttachmentSizeLimit: 1, attachmentSizeLimitErrorMessage: 'Media too large' })
+    const file = new File(['x'.repeat(size)], 'clip.mp4', { type: 'video/mp4' })
+    await view.drop([file], 'media')
+    if (size > 1024) expect(screen.getByText('Media too large')).toBeVisible()
+    await view.send()
+    expect(view.outgoing()).toHaveLength(size > 1024 ? 0 : 1)
+    if (size === 1024) expect(view.outgoing()[0].payload.message.attachments[0].data).toBe(file)
+    expect(view.store.getState().ChannelReducer.draggedAttachments).toEqual([])
+    view.unmount()
+  })
+
+  it('applies the media allowlist without blocking the same file in the file target', async () => {
+    const view = renderFileDropFlow({ allowedMediaExtensions: ['png'], allowedMediaExtensionsErrorMessage: 'PNG only' })
+    const file = new File(['gif'], 'animation.gif', { type: 'image/gif' })
+    await view.drop([file], 'media')
+    expect(screen.getByText('PNG only')).toBeVisible()
+    await view.send()
+    expect(view.outgoing()).toHaveLength(0)
+    await view.drop([file], 'file')
+    await view.send()
+    expect(view.outgoing()).toHaveLength(1)
+    expect(view.outgoing()[0].payload.message.attachments[0].data).toBe(file)
+    expect(view.outgoing()[0].payload.message.attachments[0].type).toBe(attachmentTypes.file)
+    view.unmount()
+  })
+})
 
 describe('SendMessageInput draft ownership', () => {
   beforeAll(() => {
@@ -210,49 +522,58 @@ describe('SendMessageInput attachment sending', () => {
     })
   })
 
-  it('WAAF-3477 sends a dropped DMG using its original File without base64 decoding', async () => {
-    const useDidUpdate = require('../../hooks').useDidUpdate
-    useDidUpdate.mockImplementation(require('../../hooks/basic/useDidUpdate').default)
-    jest.useFakeTimers()
-    const decode = jest.spyOn(window, 'atob')
-    try {
-      const channel = makeChannel({ id: 'dmg-drop-channel' })
-      const store = createMessageListStore({ ChannelReducer: { activeChannel: channel } })
-      const dispatch = jest.spyOn(store, 'dispatch')
-      const file = new File(['disk image fixture'], 'installer.dmg', { type: 'application/x-apple-diskimage' })
-      renderWithSceytProvider(
-        <SendMessageInput CustomSendMessageButton={<button data-testid='send-message'>Send</button>} />,
-        { store }
-      )
-      await act(async () => {
-        store.dispatch(
-          setDraggedAttachmentsAC([{ data: file, name: file.name, type: file.type } as unknown as File], 'file')
+  it.each(['application/x-apple-diskimage', ''])(
+    'WAAF-3477 sends a dropped DMG using its original File without base64 decoding (MIME %s)',
+    async (mimeType) => {
+      const useDidUpdate = require('../../hooks').useDidUpdate
+      useDidUpdate.mockImplementation(require('../../hooks/basic/useDidUpdate').default)
+      jest.useFakeTimers()
+      const decode = jest.spyOn(window, 'atob')
+      try {
+        const channel = makeChannel({ id: 'dmg-drop-channel' })
+        const store = createMessageListStore({
+          ChannelReducer: { activeChannel: channel }
+        })
+        const dispatch = jest.spyOn(store, 'dispatch')
+        const file = new File(['disk image fixture'], 'installer.dmg', {
+          type: mimeType
+        })
+        renderWithSceytProvider(
+          <SendMessageInput CustomSendMessageButton={<button data-testid='send-message'>Send</button>} />,
+          { store }
         )
-        await Promise.resolve()
-      })
-      await act(async () => {
-        jest.runOnlyPendingTimers()
-        await Promise.resolve()
-      })
-      await act(async () => {
-        fireEvent.click(screen.getByTestId('send-message'))
-        await Promise.resolve()
-      })
+        await act(async () => {
+          store.dispatch(setDraggedAttachmentsAC([{ data: file, name: file.name, type: file.type }], 'file'))
+          await Promise.resolve()
+        })
+        await act(async () => {
+          jest.runOnlyPendingTimers()
+          await Promise.resolve()
+        })
+        await act(async () => {
+          fireEvent.click(screen.getByTestId('send-message'))
+          await Promise.resolve()
+        })
 
-      const sendAction = dispatch.mock.calls.map(([action]) => action).find((action) => action.type === SEND_MESSAGE)
-      expect(sendAction).toBeDefined()
-      expect(sendAction!.payload.message.attachments).toEqual([
-        expect.objectContaining({ data: file, name: file.name, type: attachmentTypes.file })
-      ])
-      expect(sendAction!.payload.message.attachments[0].data).toBe(file)
-      expect(decode).not.toHaveBeenCalled()
-      expect(store.getState().ChannelReducer.draggedAttachments).toEqual([])
-    } finally {
-      useDidUpdate.mockReset()
-      decode.mockRestore()
-      jest.useRealTimers()
+        const sendAction = dispatch.mock.calls.map(([action]) => action).find((action) => action.type === SEND_MESSAGE)
+        expect(sendAction).toBeDefined()
+        expect(sendAction!.payload.message.attachments).toEqual([
+          expect.objectContaining({
+            data: file,
+            name: file.name,
+            type: attachmentTypes.file
+          })
+        ])
+        expect(sendAction!.payload.message.attachments[0].data).toBe(file)
+        expect(decode).not.toHaveBeenCalled()
+        expect(store.getState().ChannelReducer.draggedAttachments).toEqual([])
+      } finally {
+        useDidUpdate.mockReset()
+        decode.mockRestore()
+        jest.useRealTimers()
+      }
     }
-  })
+  )
 
   it('keeps a video selected through the File picker as a file attachment', async () => {
     const channel = makeChannel({ id: 'video-file-channel' })

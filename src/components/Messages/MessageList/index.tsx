@@ -726,66 +726,27 @@ const MessageList: React.FC<MessagesProps> = ({
       setIsDragging(false)
     }
   }
-  const readDroppedFiles = (e: any) =>
-    new Promise<any[]>((resolve) => {
-      const fileList: File[] = Object.values(e.dataTransfer.files)
-      const attachmentsFiles: any[] = []
-      let readFiles = 0
-      let errorCount = 0
+  // Keep the browser's File reference. Base64 encoding and decoding a large
+  // dropped file creates several full-size copies before it can be attached.
+  const getDroppedFiles = (e: React.DragEvent<HTMLDivElement>) =>
+    Array.from(e.dataTransfer.files).map((file) => ({ name: file.name, data: file, type: file.type }))
 
-      fileList.forEach((attachment) => {
-        const fileReader = new FileReader()
-
-        fileReader.onload = (event: any) => {
-          const file = event.target.result
-          attachmentsFiles.push({ name: attachment.name, data: file, type: attachment.type })
-          readFiles++
-
-          if (readFiles + errorCount === fileList.length) {
-            resolve(attachmentsFiles)
-          }
-        }
-
-        fileReader.onerror = () => {
-          errorCount++
-
-          if (readFiles + errorCount === fileList.length) {
-            resolve(attachmentsFiles)
-          }
-        }
-
-        fileReader.readAsDataURL(attachment)
-      })
-    })
-
-  const handleDropFile = (e: any) => {
+  const handleDropFile = (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault()
     e.stopPropagation()
     setIsDragging(false)
     if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-      readDroppedFiles(e)
-        .then((result) => {
-          dispatch(setDraggedAttachmentsAC(result as any, 'file'))
-        })
-        .catch((error) => {
-          console.error('Error in handleDropFile:', error)
-        })
+      dispatch(setDraggedAttachmentsAC(getDroppedFiles(e), 'file'))
       e.dataTransfer.clearData()
     }
   }
 
-  const handleDropMedia = (e: any) => {
+  const handleDropMedia = (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault()
     e.stopPropagation()
     setIsDragging(false)
     if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-      readDroppedFiles(e)
-        .then((result) => {
-          dispatch(setDraggedAttachmentsAC(result as any, 'media'))
-        })
-        .catch((error) => {
-          console.error('Error in handleDropMedia:', error)
-        })
+      dispatch(setDraggedAttachmentsAC(getDroppedFiles(e), 'media'))
       e.dataTransfer.clearData()
     }
   }
