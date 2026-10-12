@@ -541,18 +541,32 @@ export function updateMessageAC(
   voteDetails?: {
     type: 'add' | 'delete' | 'addOwn' | 'deleteOwn' | 'close'
     vote?: IPollVote
-  }
+  },
+  allowStaleContent?: boolean
 ) {
-  return updateMessage({ messageId, params, addIfNotExists, voteDetails })
+  return updateMessage({
+    messageId,
+    params,
+    addIfNotExists,
+    voteDetails,
+    ...(allowStaleContent ? { allowStaleContent } : {})
+  })
 }
 
 export function updateMessagesStatusAC(
   name: string,
   markersMap: { [key: string]: IMarker },
   isOwnMarker?: boolean,
-  marker?: IMarker
+  marker?: IMarker,
+  knownRemoteMarkerCounts?: Record<string, number>
 ) {
-  return updateMessagesStatus({ name, markersMap, isOwnMarker, marker })
+  return updateMessagesStatus({
+    name,
+    markersMap,
+    isOwnMarker,
+    marker,
+    ...(knownRemoteMarkerCounts ? { knownRemoteMarkerCounts } : {})
+  })
 }
 
 export function clearMessagesAC() {
