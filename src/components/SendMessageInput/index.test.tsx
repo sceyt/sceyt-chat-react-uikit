@@ -1,7 +1,7 @@
 import React from 'react'
 import { act, fireEvent, screen } from '@testing-library/react'
 import { setClient } from '../../common/client'
-import { setActiveChannelAC } from '../../store/channel/actions'
+import { setActiveChannelAC, setDraggedAttachmentsAC } from '../../store/channel/actions'
 import { addSelectedMessageAC, setPinnedMessagesListOpenAC } from '../../store/message/actions'
 import { SEND_MESSAGE } from '../../store/message/constants'
 import { attachmentTypes } from '../../helpers/constants'
@@ -51,7 +51,7 @@ jest.mock('../../hooks', () => ({
     tooltipBackground: '#111111',
     border: '#dddddd'
   }),
-  useDidUpdate: () => undefined
+  useDidUpdate: jest.fn()
 }))
 
 jest.mock('../../hooks/usePermissions', () => ({
@@ -208,6 +208,50 @@ describe('SendMessageInput attachment sending', () => {
       frameBlobUrl: 'blob:video-thumb',
       blob: new Blob(['thumb'], { type: 'image/jpeg' })
     })
+  })
+
+  it('WAAF-3477 sends a dropped DMG using its original File without base64 decoding', async () => {
+    const useDidUpdate = require('../../hooks').useDidUpdate
+    useDidUpdate.mockImplementation(require('../../hooks/basic/useDidUpdate').default)
+    jest.useFakeTimers()
+    const decode = jest.spyOn(window, 'atob')
+    try {
+      const channel = makeChannel({ id: 'dmg-drop-channel' })
+      const store = createMessageListStore({ ChannelReducer: { activeChannel: channel } })
+      const dispatch = jest.spyOn(store, 'dispatch')
+      const file = new File(['disk image fixture'], 'installer.dmg', { type: 'application/x-apple-diskimage' })
+      renderWithSceytProvider(
+        <SendMessageInput CustomSendMessageButton={<button data-testid='send-message'>Send</button>} />,
+        { store }
+      )
+      await act(async () => {
+        store.dispatch(
+          setDraggedAttachmentsAC([{ data: file, name: file.name, type: file.type } as unknown as File], 'file')
+        )
+        await Promise.resolve()
+      })
+      await act(async () => {
+        jest.runOnlyPendingTimers()
+        await Promise.resolve()
+      })
+      await act(async () => {
+        fireEvent.click(screen.getByTestId('send-message'))
+        await Promise.resolve()
+      })
+
+      const sendAction = dispatch.mock.calls.map(([action]) => action).find((action) => action.type === SEND_MESSAGE)
+      expect(sendAction).toBeDefined()
+      expect(sendAction!.payload.message.attachments).toEqual([
+        expect.objectContaining({ data: file, name: file.name, type: attachmentTypes.file })
+      ])
+      expect(sendAction!.payload.message.attachments[0].data).toBe(file)
+      expect(decode).not.toHaveBeenCalled()
+      expect(store.getState().ChannelReducer.draggedAttachments).toEqual([])
+    } finally {
+      useDidUpdate.mockReset()
+      decode.mockRestore()
+      jest.useRealTimers()
+    }
   })
 
   it('keeps a video selected through the File picker as a file attachment', async () => {

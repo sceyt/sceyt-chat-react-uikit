@@ -408,6 +408,44 @@ describe('MessageList', () => {
     resetMockServerDelay()
   })
 
+  it.each(['application/x-apple-diskimage', ''])(
+    'WAAF-3477 hands a large dropped DMG to the composer without reading its bytes (MIME %s)',
+    async (type) => {
+      const store = buildStore()
+      const file = new File(['small fixture'], 'installer.dmg', { type })
+      // Simulate a large download without allocating gigabytes in the test.
+      Object.defineProperty(file, 'size', { value: 2 * 1024 * 1024 * 1024 })
+      const read = jest.spyOn(FileReader.prototype, 'readAsDataURL').mockImplementation(() => undefined)
+      try {
+        const { container } = renderMessageList(store)
+        const dataTransfer = {
+          types: ['Files'],
+          items: [{ kind: 'file', type }],
+          files: [file],
+          clearData: jest.fn()
+        }
+        const dragEnter = new Event('dragenter', { bubbles: true, cancelable: true })
+        Object.defineProperty(dragEnter, 'dataTransfer', { value: dataTransfer })
+        fireEvent(container.querySelector('#scrollableDiv')!, dragEnter)
+        await act(async () => {
+          const drop = new Event('drop', { bubbles: true, cancelable: true })
+          Object.defineProperty(drop, 'dataTransfer', { value: dataTransfer })
+          fireEvent(screen.getByText('Drag & drop to send as file'), drop)
+        })
+
+        const dropped = store.getState().ChannelReducer.draggedAttachments
+        expect(dropped).toHaveLength(1)
+        expect(dropped[0].name).toBe('installer.dmg')
+        expect(dropped[0].type).toBe(type)
+        expect(dropped[0].attachmentType).toBe('file')
+        expect(dropped[0].data).toBe(file)
+        expect(read).not.toHaveBeenCalled()
+      } finally {
+        read.mockRestore()
+      }
+    }
+  )
+
   it('dispatches the default load flow for a normal channel', () => {
     const channel = makeChannel({
       id: 'channel-normal',
