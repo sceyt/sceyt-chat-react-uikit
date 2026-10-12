@@ -728,8 +728,15 @@ const MessageList: React.FC<MessagesProps> = ({
   }
   // Keep the browser's File reference. Base64 encoding and decoding a large
   // dropped file creates several full-size copies before it can be attached.
-  const getDroppedFiles = (e: React.DragEvent<HTMLDivElement>) =>
-    Array.from(e.dataTransfer.files).map((file) => ({ name: file.name, data: file, type: file.type }))
+  // Dropped folders (and macOS bundles like .app) also appear in `files`, but
+  // cannot be read or uploaded, so skip them. `files` lists the file-kind items
+  // in the same order, which lets the two lists be matched by index.
+  const getDroppedFiles = (e: React.DragEvent<HTMLDivElement>) => {
+    const fileItems = Array.from(e.dataTransfer.items || []).filter((item) => item.kind === 'file')
+    return Array.from(e.dataTransfer.files)
+      .filter((_, index) => !fileItems[index]?.webkitGetAsEntry?.()?.isDirectory)
+      .map((file) => ({ name: file.name, data: file, type: file.type }))
+  }
 
   const handleDropFile = (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault()

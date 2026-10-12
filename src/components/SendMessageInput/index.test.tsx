@@ -1,7 +1,7 @@
 import React from 'react'
 import { act, fireEvent, screen } from '@testing-library/react'
 import { setClient } from '../../common/client'
-import { setActiveChannelAC, setDraggedAttachmentsAC } from '../../store/channel/actions'
+import { setActiveChannelAC } from '../../store/channel/actions'
 import { addSelectedMessageAC, setPinnedMessagesListOpenAC } from '../../store/message/actions'
 import { SEND_MESSAGE } from '../../store/message/constants'
 import { attachmentTypes } from '../../helpers/constants'
@@ -238,6 +238,7 @@ describe('file-drop integration: MessageList, Redux and SendMessageInput', () =>
     jest.restoreAllMocks()
   })
 
+  // WAAF-3477: the installer.dmg rows cover a large dropped DMG, with and without a MIME type.
   it.each([['installer.dmg', 'application/x-apple-diskimage'], ['installer.dmg', ''], ...documentDropCases])(
     'sends dropped %s from the real list through the real composer',
     async (name, type) => {
@@ -521,59 +522,6 @@ describe('SendMessageInput attachment sending', () => {
       blob: new Blob(['thumb'], { type: 'image/jpeg' })
     })
   })
-
-  it.each(['application/x-apple-diskimage', ''])(
-    'WAAF-3477 sends a dropped DMG using its original File without base64 decoding (MIME %s)',
-    async (mimeType) => {
-      const useDidUpdate = require('../../hooks').useDidUpdate
-      useDidUpdate.mockImplementation(require('../../hooks/basic/useDidUpdate').default)
-      jest.useFakeTimers()
-      const decode = jest.spyOn(window, 'atob')
-      try {
-        const channel = makeChannel({ id: 'dmg-drop-channel' })
-        const store = createMessageListStore({
-          ChannelReducer: { activeChannel: channel }
-        })
-        const dispatch = jest.spyOn(store, 'dispatch')
-        const file = new File(['disk image fixture'], 'installer.dmg', {
-          type: mimeType
-        })
-        renderWithSceytProvider(
-          <SendMessageInput CustomSendMessageButton={<button data-testid='send-message'>Send</button>} />,
-          { store }
-        )
-        await act(async () => {
-          store.dispatch(setDraggedAttachmentsAC([{ data: file, name: file.name, type: file.type }], 'file'))
-          await Promise.resolve()
-        })
-        await act(async () => {
-          jest.runOnlyPendingTimers()
-          await Promise.resolve()
-        })
-        await act(async () => {
-          fireEvent.click(screen.getByTestId('send-message'))
-          await Promise.resolve()
-        })
-
-        const sendAction = dispatch.mock.calls.map(([action]) => action).find((action) => action.type === SEND_MESSAGE)
-        expect(sendAction).toBeDefined()
-        expect(sendAction!.payload.message.attachments).toEqual([
-          expect.objectContaining({
-            data: file,
-            name: file.name,
-            type: attachmentTypes.file
-          })
-        ])
-        expect(sendAction!.payload.message.attachments[0].data).toBe(file)
-        expect(decode).not.toHaveBeenCalled()
-        expect(store.getState().ChannelReducer.draggedAttachments).toEqual([])
-      } finally {
-        useDidUpdate.mockReset()
-        decode.mockRestore()
-        jest.useRealTimers()
-      }
-    }
-  )
 
   it('keeps a video selected through the File picker as a file attachment', async () => {
     const channel = makeChannel({ id: 'video-file-channel' })

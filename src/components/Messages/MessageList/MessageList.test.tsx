@@ -432,14 +432,8 @@ describe('MessageList', () => {
           files: [file],
           clearData: jest.fn()
         }
-        const dragEnter = new Event('dragenter', { bubbles: true, cancelable: true })
-        Object.defineProperty(dragEnter, 'dataTransfer', { value: dataTransfer })
-        fireEvent(container.querySelector('#scrollableDiv')!, dragEnter)
-        await act(async () => {
-          const drop = new Event('drop', { bubbles: true, cancelable: true })
-          Object.defineProperty(drop, 'dataTransfer', { value: dataTransfer })
-          fireEvent(screen.getByText('Drag & drop to send as file'), drop)
-        })
+        fireDragEvent(container.querySelector('#scrollableDiv')!, 'dragenter', dataTransfer)
+        fireDragEvent(screen.getByText('Drag & drop to send as file'), 'drop', dataTransfer)
 
         const dropped = store.getState().ChannelReducer.draggedAttachments
         expect(dropped).toHaveLength(1)
@@ -474,14 +468,8 @@ describe('MessageList', () => {
           // Model the browser releasing access to the drag data after drop.
           clearData: jest.fn(() => transferredFiles.splice(0))
         }
-        const dragEnter = new Event('dragenter', { bubbles: true, cancelable: true })
-        Object.defineProperty(dragEnter, 'dataTransfer', { value: dataTransfer })
-        fireEvent(container.querySelector('#scrollableDiv')!, dragEnter)
-        await act(async () => {
-          const drop = new Event('drop', { bubbles: true, cancelable: true })
-          Object.defineProperty(drop, 'dataTransfer', { value: dataTransfer })
-          fireEvent(screen.getByText(`Drag & drop to send as ${attachmentType}`), drop)
-        })
+        fireDragEvent(container.querySelector('#scrollableDiv')!, 'dragenter', dataTransfer)
+        fireDragEvent(screen.getByText(`Drag & drop to send as ${attachmentType}`), 'drop', dataTransfer)
 
         const dropped = store.getState().ChannelReducer.draggedAttachments
         expect(dropped).toHaveLength(2)
@@ -583,6 +571,46 @@ describe('MessageList', () => {
     fireDragEvent(screen.getByText('Drag & drop to send as file'), 'drop', dataTransfer)
     expect(store.getState().ChannelReducer.draggedAttachments).toEqual([])
     expect(dataTransfer.clearData).not.toHaveBeenCalled()
+    await act(async () => view.unmount())
+  })
+
+  it.each(['file', 'media'])('dropped folder is not added as a %s attachment', async (attachmentType) => {
+    const store = buildStore()
+    const view = renderMessageList(store)
+    // Browsers list a dropped folder in dataTransfer.files, but it cannot be read or uploaded.
+    const folder = new File([], 'Photos.jpg')
+    const file = new File(['png'], 'photo.png', { type: 'image/png' })
+    const dataTransfer = {
+      types: ['text/uri-list', 'Files'],
+      items: [
+        { kind: 'string', type: 'text/uri-list' },
+        { kind: 'file', type: '', webkitGetAsEntry: () => ({ isFile: false, isDirectory: true }) },
+        { kind: 'file', type: file.type, webkitGetAsEntry: () => ({ isFile: true, isDirectory: false }) }
+      ],
+      files: [folder, file],
+      clearData: jest.fn()
+    }
+    fireDragEvent(view.container.querySelector('#scrollableDiv')!, 'dragenter', dataTransfer)
+    fireDragEvent(screen.getByText(`Drag & drop to send as ${attachmentType}`), 'drop', dataTransfer)
+    const queued = store.getState().ChannelReducer.draggedAttachments
+    // Compare names: a failed match on jsdom File objects exhausts Jest's diff printer.
+    expect(queued.map((attachment) => attachment.name)).toEqual(['photo.png'])
+    expect(queued[0].data).toBe(file)
+    await act(async () => view.unmount())
+  })
+
+  it('does not queue anything when only a folder is dropped', async () => {
+    const store = buildStore()
+    const view = renderMessageList(store)
+    const dataTransfer = {
+      types: ['Files'],
+      items: [{ kind: 'file', type: '', webkitGetAsEntry: () => ({ isFile: false, isDirectory: true }) }],
+      files: [new File([], 'Projects')],
+      clearData: jest.fn()
+    }
+    fireDragEvent(view.container.querySelector('#scrollableDiv')!, 'dragenter', dataTransfer)
+    fireDragEvent(screen.getByText('Drag & drop to send as file'), 'drop', dataTransfer)
+    expect(store.getState().ChannelReducer.draggedAttachments.map((attachment) => attachment.name)).toEqual([])
     await act(async () => view.unmount())
   })
 
