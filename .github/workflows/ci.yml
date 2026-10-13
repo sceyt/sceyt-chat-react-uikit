@@ -54,3 +54,44 @@ jobs:
           name: coverage
           path: coverage/
           retention-days: 14
+
+  # One check for branch protection: fails if any job above did not pass.
+  all-checks:
+    name: All checks
+    needs: [test]
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Verify all checks passed
+        env:
+          RESULTS: ${{ join(needs.*.result, ' ') }}
+        run: |
+          for result in $RESULTS; do
+            if [ "$result" != "success" ]; then
+              echo "One or more checks did not pass: $RESULTS"
+              exit 1
+            fi
+          done
+          echo "All checks passed."
+
+  # Posts the result to the team's Waafi channel (see channel-alerts.yml).
+  # Skipped for cancelled runs, fork pull requests and Dependabot (they
+  # cannot read the secret).
+  waafi-alerts:
+    name: Waafi Alerts
+    needs: [test, all-checks]
+    if: >-
+      always() && !cancelled() && github.actor != 'dependabot[bot]' &&
+      (github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository)
+    permissions:
+      actions: read
+      contents: read
+      pull-requests: read
+    uses: ./.github/workflows/channel-alerts.yml
+    with:
+      project: Chat React UIKit
+      channel-id: '869431927627001856'
+      failed: ${{ contains(needs.*.result, 'failure') }}
+    secrets:
+      WAAFI_PLATFORM_API_KEY: ${{ secrets.WAAFI_PLATFORM_API_KEY }}

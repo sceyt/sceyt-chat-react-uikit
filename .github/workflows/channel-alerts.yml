@@ -1,0 +1,63 @@
+name: Waafi Alerts
+
+# Reusable workflow: posts the CI result to a Waafi channel.
+# Called from the end of ci.yml. The message is built and sent by
+# .github/scripts/waafi-alert.js (the same script is used in every repo).
+#
+# Settings:
+# - Secret WAAFI_PLATFORM_API_KEY (organization or repository secret).
+#   If it is missing the alert is skipped with a warning; CI is not affected.
+# - Channel id: the `channel-id` input; the repository variable
+#   WAAFI_CHANNEL_ID overrides it.
+# - Variable WAAFI_ALERT_SUCCESS (optional): "changes" (default) posts passes
+#   only on the default branch or when a failing branch is fixed;
+#   "always" posts every pass. Failures are always posted.
+
+on:
+  workflow_call:
+    inputs:
+      failed:
+        required: true
+        type: boolean
+      project:
+        description: Name shown in the message
+        required: true
+        type: string
+      channel-id:
+        description: Waafi channel id
+        required: true
+        type: string
+    secrets:
+      WAAFI_PLATFORM_API_KEY:
+        required: false
+
+permissions:
+  actions: read
+  contents: read
+  pull-requests: read
+
+jobs:
+  notify:
+    name: notify
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          sparse-checkout: .github/scripts/waafi-alert.js
+          sparse-checkout-cone-mode: false
+          persist-credentials: false
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+
+      - name: Send the result to Waafi
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          WAAFI_PLATFORM_API_KEY: ${{ secrets.WAAFI_PLATFORM_API_KEY }}
+          WAAFI_CHANNEL_ID: ${{ vars.WAAFI_CHANNEL_ID || inputs.channel-id }}
+          WAAFI_PROJECT: ${{ inputs.project }}
+          WAAFI_FAILED: ${{ inputs.failed }}
+          WAAFI_ALERT_SUCCESS: ${{ vars.WAAFI_ALERT_SUCCESS }}
+        run: node .github/scripts/waafi-alert.js
