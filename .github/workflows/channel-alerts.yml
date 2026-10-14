@@ -60,4 +60,8 @@ jobs:
           WAAFI_PROJECT: ${{ inputs.project }}
           WAAFI_FAILED: ${{ inputs.failed }}
           WAAFI_ALERT_SUCCESS: ${{ vars.WAAFI_ALERT_SUCCESS }}
+          # Passed as values (not read from the event file) so the script sends
+          # nothing it read from disk.
+          WAAFI_PR_NUMBER: ${{ github.event.pull_request.number }}
+          WAAFI_DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
         run: node .github/scripts/waafi-alert.js
