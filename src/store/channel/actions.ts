@@ -344,7 +344,7 @@ export const joinChannelAC = (channelId: string) => ({
 
 export const setIsDraggingAC = (isDragging: boolean) => setIsDragging({ isDragging })
 
-export const setDraggedAttachmentsAC = (attachments: File[], type: string) =>
+export const setDraggedAttachmentsAC = (attachments: { data: File; name: string; type: string }[], type: string) =>
   setDraggedAttachments({ attachments, type })
 
 export const setHideChannelListAC = (hide: boolean) => setHideChannelList({ hide })

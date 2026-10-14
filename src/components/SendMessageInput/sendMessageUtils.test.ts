@@ -68,6 +68,24 @@ describe('getClipboardFiles', () => {
 })
 
 describe('getMediaAttachmentValidationError', () => {
+  it.each([1023, 1024, 1025])('checks the size-limit boundary using the original %s-byte file size', (size) => {
+    const error = getMediaAttachmentValidationError({ name: 'clip.mp4', size }, { sizeLimitKb: 1 })
+    expect(error).toBe(size > 1024 ? 'File size exceeds the limit of 1 KB.' : null)
+  })
+
+  it.each(['README', 'photo.jpg.zip', 'archive.tar.gz'])('rejects %s as media by its final extension', (name) => {
+    expect(getMediaAttachmentValidationError({ name, size: 10 }, {})).toBe('Invalid file type.')
+  })
+
+  it('accepts uppercase and Unicode filenames under a dotted custom media allowlist', () => {
+    expect(
+      getMediaAttachmentValidationError(
+        { name: 'լուսանկար 📷.PNG', size: 0 },
+        { allowedExtensions: ['.PnG'], sizeLimitKb: 1 }
+      )
+    ).toBeNull()
+  })
+
   it('rejects SVG when sent as media with the default Choose Media extensions', () => {
     expect(getMediaAttachmentValidationError({ name: 'vector.svg', size: 1024 }, {})).toContain('Invalid file type')
   })
