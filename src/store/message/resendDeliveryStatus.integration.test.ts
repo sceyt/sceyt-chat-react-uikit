@@ -1,7 +1,7 @@
 import { runSaga, Task } from 'redux-saga'
 import log from 'loglevel'
 import { setClient } from '../../common/client'
-import { attachmentTypes, MESSAGE_DELIVERY_STATUS, MESSAGE_STATUS } from '../../helpers/constants'
+import { attachmentTypes, LOADING_STATE, MESSAGE_DELIVERY_STATUS, MESSAGE_STATUS } from '../../helpers/constants'
 import * as messagesHalper from '../../helpers/messagesHalper'
 import { addMessageToMap, clearMessagesMap, getMessagesFromMap } from '../../helpers/messagesHalper'
 import { setCustomUploader } from '../../helpers/customUploader'
@@ -9,9 +9,10 @@ import { destroyChannelsMap, getChannelFromMap, setActiveChannelId, setChannelIn
 import { FakeMessageServer } from '../../testUtils/fakeMessageServer'
 import { createMessageListStore } from '../../testUtils/messageListHarness'
 import { makeMessage, makeUser, resetMessageListFixtureIds } from '../../testUtils/messageFixtures'
-import { IMessage } from '../../types'
+import { IChannel, IMessage } from '../../types'
 import { setConnectionStatusAC } from '../user/actions'
-import { updateChannelDataAC } from '../channel/actions'
+import { getChannelsAC, updateChannelDataAC } from '../channel/actions'
+import { __channelSagaTestables } from '../channel/saga'
 import { CONNECTION_STATUS } from '../user/constants'
 import { handleChannelMessageEvent, handleMessageMarkersReceivedEvent } from '../evetns/inedx'
 import {
@@ -272,6 +273,67 @@ describe('WAAF-3290: delivery status after sending or retrying a text', () => {
     expectConsistentStatus(confirmed, MESSAGE_DELIVERY_STATUS.SENT)
   })
 
+  it('keeps delivered when a live receipt overtakes the stale reconnect channels response after a successful send', async () => {
+    const { confirmed, finish } = await startSend('text')
+    await finish()
+    expectConsistentStatus(confirmed, MESSAGE_DELIVERY_STATUS.SENT)
+
+    mockStore.dispatch(setConnectionStatusAC(CONNECTION_STATUS.DISCONNECTED))
+    mockStore.dispatch(setConnectionStatusAC(CONNECTION_STATUS.CONNECTING))
+    mockStore.dispatch(setConnectionStatusAC(CONNECTION_STATUS.CONNECTED))
+
+    // Capture the response before the receipt. Keep its message independent
+    // from the live SDK/cache copies so the receipt cannot update this snapshot.
+    const staleChannel = {
+      ...server.channels[channelId],
+      lastMessage: JSON.parse(JSON.stringify(confirmed)) as IMessage
+    }
+    expect(staleChannel.lastMessage.deliveryStatus).toBe(MESSAGE_DELIVERY_STATUS.SENT)
+    expect(staleChannel.lastMessage.markerTotals).toEqual([])
+    const response = deferred<{ channels: IChannel[]; hasNext: boolean }>()
+    const loadNextPage = jest.fn(() => response.promise)
+    const client = server.client()
+    const build = jest
+      .fn(() => new client.ChannelListQueryBuilder().build())
+      .mockResolvedValueOnce({
+        hasNext: false,
+        loadNextPage
+      })
+    setClient({
+      ...client,
+      ChannelListQueryBuilder: class extends client.ChannelListQueryBuilder {
+        build = build
+      }
+    })
+    const refreshing = runSaga(options(), __channelSagaTestables.getChannels, getChannelsAC({ search: '', limit: 50 }))
+    tasks.push(refreshing)
+    for (let attempt = 0; attempt < 20 && !loadNextPage.mock.calls.length; attempt++) {
+      await Promise.resolve()
+    }
+    expect(loadNextPage).toHaveBeenCalledTimes(1)
+    expect(refreshing.isRunning()).toBe(true)
+    expect(mockStore.getState().ChannelReducer.channelsLoadingState).toBe(LOADING_STATE.LOADING)
+
+    await emitReceipt(confirmed, MESSAGE_DELIVERY_STATUS.DELIVERED)
+    expectConsistentStatus(confirmed, MESSAGE_DELIVERY_STATUS.DELIVERED)
+    expect(staleChannel.lastMessage.deliveryStatus).toBe(MESSAGE_DELIVERY_STATUS.SENT)
+    expect(staleChannel.lastMessage.markerTotals).toEqual([])
+
+    response.resolve({ channels: [staleChannel, { ...server.channels[otherChannelId] }], hasNext: false })
+    await refreshing.toPromise()
+    expect(mockStore.getState().ChannelReducer.channelsLoadingState).toBe(LOADING_STATE.LOADED)
+    expect(log.error).not.toHaveBeenCalled()
+    expectConsistentStatus(confirmed, MESSAGE_DELIVERY_STATUS.DELIVERED)
+    for (const copy of [
+      preview(),
+      getChannelFromMap(channelId)?.lastMessage,
+      getMessagesFromMap(channelId)[confirmed.id],
+      visible().find((message) => message.id === confirmed.id)
+    ]) {
+      expect(copy?.markerTotals.find((total) => total.name === MESSAGE_DELIVERY_STATUS.DELIVERED)?.count).toBe(1)
+    }
+  })
+
   it.each([MESSAGE_DELIVERY_STATUS.DELIVERED, MESSAGE_DELIVERY_STATUS.READ])(
     'updates the chat-list preview when %s arrives after the retry response',
     async (status) => {
@@ -528,5 +590,142 @@ describe('WAAF-3290: delivery status after sending or retrying a text', () => {
     await finish()
     expect(reduxChannel()?.newMentionCount).toBe(2)
     expectConsistentStatus(confirmed, MESSAGE_DELIVERY_STATUS.READ)
+  })
+
+  describe('chat-list refresh after reconnect (stale channels response)', () => {
+    const readerId = 'recipient'
+    const counts = (message: IMessage | null | undefined, name: string) =>
+      message?.markerTotals?.find((total) => total.name === name)?.count || 0
+    const everyCopy = (messageId: string) => [
+      preview(),
+      getChannelFromMap(channelId)?.lastMessage,
+      getMessagesFromMap(channelId)[messageId],
+      visible().find((message) => message.id === messageId)
+    ]
+
+    // Starts a reconnect chat-list refresh and holds its response. The response
+    // is built from the snapshot passed to `respond`, so it can be older than
+    // anything that happens locally meanwhile.
+    const startChannelsRefresh = async () => {
+      mockStore.dispatch(setConnectionStatusAC(CONNECTION_STATUS.DISCONNECTED))
+      mockStore.dispatch(setConnectionStatusAC(CONNECTION_STATUS.CONNECTING))
+      mockStore.dispatch(setConnectionStatusAC(CONNECTION_STATUS.CONNECTED))
+      const response = deferred<{ channels: IChannel[]; hasNext: boolean }>()
+      const loadNextPage = jest.fn(() => response.promise)
+      const client = server.client()
+      const build = jest
+        .fn(() => new client.ChannelListQueryBuilder().build())
+        .mockResolvedValueOnce({ hasNext: false, loadNextPage })
+      setClient({
+        ...client,
+        ChannelListQueryBuilder: class extends client.ChannelListQueryBuilder {
+          build = build
+        }
+      })
+      const refreshing = runSaga(
+        options(),
+        __channelSagaTestables.getChannels,
+        getChannelsAC({ search: '', limit: 50 })
+      )
+      tasks.push(refreshing)
+      for (let attempt = 0; attempt < 20 && !loadNextPage.mock.calls.length; attempt++) {
+        await Promise.resolve()
+      }
+      expect(loadNextPage).toHaveBeenCalledTimes(1)
+      expect(refreshing.isRunning()).toBe(true)
+      return async (lastMessage: IMessage) => {
+        const snapshot = JSON.parse(JSON.stringify(lastMessage)) as IMessage
+        response.resolve({
+          channels: [{ ...server.channels[channelId], lastMessage: snapshot }, { ...server.channels[otherChannelId] }],
+          hasNext: false
+        })
+        await refreshing.toPromise()
+        expect(mockStore.getState().ChannelReducer.channelsLoadingState).toBe(LOADING_STATE.LOADED)
+        expect(log.error).not.toHaveBeenCalled()
+      }
+    }
+
+    it('keeps read when the stale response still says delivered', async () => {
+      const { confirmed, finish } = await startSend('text')
+      await finish()
+      await emitReceipt(confirmed, MESSAGE_DELIVERY_STATUS.DELIVERED, readerId)
+      const respond = await startChannelsRefresh()
+      const staleDelivered = server.lastMessage(channelId)!
+      expect(staleDelivered.deliveryStatus).toBe(MESSAGE_DELIVERY_STATUS.DELIVERED)
+      await emitReceipt(confirmed, MESSAGE_DELIVERY_STATUS.READ, readerId)
+      await respond(staleDelivered)
+      expectConsistentStatus(confirmed, MESSAGE_DELIVERY_STATUS.READ)
+      for (const copy of everyCopy(confirmed.id)) {
+        expect(counts(copy, MESSAGE_DELIVERY_STATUS.READ)).toBe(1)
+      }
+    })
+
+    it('upgrades every local copy when the server reports a newer status', async () => {
+      const { confirmed, finish } = await startSend('text')
+      await finish()
+      const respond = await startChannelsRefresh()
+      // Delivered while this client was offline: no live event, only the refresh.
+      server.setDeliveryStatus(channelId, confirmed.id, MESSAGE_DELIVERY_STATUS.DELIVERED)
+      await respond(server.lastMessage(channelId)!)
+      expectConsistentStatus(confirmed, MESSAGE_DELIVERY_STATUS.DELIVERED)
+    })
+
+    it('gives a newer different message its own status, not the previous message receipts', async () => {
+      const { confirmed, finish } = await startSend('text')
+      await finish()
+      await emitReceipt(confirmed, MESSAGE_DELIVERY_STATUS.READ, readerId)
+      const respond = await startChannelsRefresh()
+      const reply = makeMessage({ id: '9007199254741020', channelId, body: 'reply', incoming: true })
+      server.histories[channelId] = [...server.histories[channelId], reply]
+      server.channels[channelId] = { ...server.channels[channelId], lastMessage: reply }
+      await respond(reply)
+      for (const copy of [preview(), getChannelFromMap(channelId)?.lastMessage]) {
+        expect(copy?.id).toBe(reply.id)
+        expect(copy?.deliveryStatus).toBe(MESSAGE_DELIVERY_STATUS.SENT)
+        expect(copy?.markerTotals).toEqual([])
+      }
+      expect(getMessagesFromMap(channelId)[confirmed.id]?.deliveryStatus).toBe(MESSAGE_DELIVERY_STATUS.READ)
+    })
+
+    it('keeps a send confirmed during the refresh when the response predates it', async () => {
+      const respond = await startChannelsRefresh()
+      const beforeSend = server.lastMessage(channelId)!
+      expect(beforeSend.id).toBe(previous.id)
+      const { confirmed, finish } = await startSend('text')
+      await finish()
+      await respond(beforeSend)
+      expectConsistentStatus(confirmed, MESSAGE_DELIVERY_STATUS.SENT)
+    })
+
+    it('shows an older server message when the local preview did not change during the refresh', async () => {
+      // e.g. the latest message was deleted for everyone while this client was offline.
+      const { confirmed, finish } = await startSend('text')
+      await finish()
+      const respond = await startChannelsRefresh()
+      server.histories[channelId] = [previous]
+      server.channels[channelId] = { ...server.channels[channelId], lastMessage: previous }
+      await respond(previous)
+      expect(preview()?.id).toBe(previous.id)
+      expect(getChannelFromMap(channelId)?.lastMessage?.id).toBe(previous.id)
+      expect(confirmed.id).not.toBe(previous.id)
+    })
+
+    it('counts a replayed receipt once after the refresh, and a new reader once more', async () => {
+      const { confirmed, finish } = await startSend('text')
+      await finish()
+      await emitReceipt(confirmed, MESSAGE_DELIVERY_STATUS.DELIVERED, readerId)
+      const respond = await startChannelsRefresh()
+      // The response knows the status but carries no receipt totals.
+      await respond(server.lastMessage(channelId)!)
+      await emitReceipt(confirmed, MESSAGE_DELIVERY_STATUS.DELIVERED, readerId)
+      expectConsistentStatus(confirmed, MESSAGE_DELIVERY_STATUS.DELIVERED)
+      for (const copy of everyCopy(confirmed.id)) {
+        expect(counts(copy, MESSAGE_DELIVERY_STATUS.DELIVERED)).toBe(1)
+      }
+      await emitReceipt(confirmed, MESSAGE_DELIVERY_STATUS.DELIVERED, 'second-recipient')
+      for (const copy of everyCopy(confirmed.id)) {
+        expect(counts(copy, MESSAGE_DELIVERY_STATUS.DELIVERED)).toBe(2)
+      }
+    })
   })
 })

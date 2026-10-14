@@ -9,7 +9,7 @@ import store from 'store'
 import { removeChannelMarkersAC, removePendingPollActionAC, setPendingPollActionsMapAC } from 'store/message/actions'
 import { persistDraft, removePersistedDraft, restoreDrafts } from '../messagesIdb'
 import { shouldSkipMessageContentUpdate } from '../messageContentUpdate'
-import { addRemoteReceipt, hasRemoteReceipt, RemoteReceiptState } from '../remoteReceiptProvenance'
+import { addRemoteReceipt, hasRemoteReceipt, mergeRemoteReceipts, RemoteReceiptState } from '../remoteReceiptProvenance'
 export const MESSAGES_MAX_PAGE_COUNT = 60
 export const MESSAGES_MAX_LENGTH = 40
 export const LOAD_MAX_MESSAGE_COUNT = 20
@@ -75,6 +75,83 @@ export const shouldSkipDeliveryStatusUpdate = (markerName: string, currentDelive
     return true
   }
   return false
+}
+
+// Copies of one confirmed message can disagree: a slow send response or a
+// stale chat-list refresh is an older snapshot than the live receipts already
+// applied to the preview or the message cache. Keep the highest delivery
+// status, the highest count per receipt type and every recorded reader.
+// Copies of other messages are ignored. Pure: returns `incoming` itself when
+// nothing changes and never mutates its inputs.
+export const mergeConfirmedMessageDeliveryState = <T extends IMessage>(
+  incoming: T,
+  copies: (IMessage | null | undefined)[]
+): T => {
+  if (!incoming?.id) return incoming
+  let deliveryStatus = incoming.deliveryStatus
+  const totals = new Map((incoming.markerTotals || []).map((total) => [total.name, total]))
+  let receipts = (incoming as T & MessageReceiptMetadata)[remoteReceipts]
+  let changed = false
+  for (const copy of copies) {
+    if (!copy || copy.id !== incoming.id) continue
+    if (
+      copy.deliveryStatus &&
+      copy.deliveryStatus !== deliveryStatus &&
+      shouldSkipDeliveryStatusUpdate(deliveryStatus, copy.deliveryStatus)
+    ) {
+      deliveryStatus = copy.deliveryStatus
+      changed = true
+    }
+    for (const total of copy.markerTotals || []) {
+      const current = totals.get(total.name)
+      if (!current || total.count > current.count) {
+        totals.set(total.name, total)
+        changed = true
+      }
+    }
+    const merged = mergeRemoteReceipts(receipts, (copy as IMessage & MessageReceiptMetadata)[remoteReceipts])
+    if (merged !== receipts) {
+      receipts = merged
+      changed = true
+    }
+  }
+  if (!changed) return incoming
+  return {
+    ...incoming,
+    deliveryStatus,
+    markerTotals: Array.from(totals.values()),
+    ...(receipts ? { [remoteReceipts]: receipts } : {})
+  }
+}
+
+const isNewerMessage = (candidate: IMessage, reference: IMessage) => {
+  try {
+    return compareMessageIds(candidate.id, reference.id) > 0
+  } catch {
+    return new Date(candidate.createdAt).getTime() > new Date(reference.createdAt).getTime()
+  }
+}
+
+// Picks a chat's last message after a chat-list refresh. `current` is the
+// preview shown now; `previewIdBeforeRequest` is the message it showed when
+// the request was sent. A preview that changed to a newer message while the
+// request was pending (a send confirmed or a message received meanwhile) is
+// newer than the response. Any other difference follows the server, which can
+// legitimately show an older message (e.g. the latest one was deleted).
+export const resolveRefreshedLastMessage = (
+  response: IMessage | null | undefined,
+  current: IMessage | null | undefined,
+  cachedCopy: IMessage | null | undefined,
+  previewIdBeforeRequest: string | undefined
+): IMessage | null | undefined => {
+  if (!response) return response
+  if (current?.id && current.id !== response.id) {
+    const changedDuringRequest = current.id !== previewIdBeforeRequest
+    return changedDuringRequest && current.state !== MESSAGE_STATUS.DELETE && isNewerMessage(current, response)
+      ? current
+      : response
+  }
+  return mergeConfirmedMessageDeliveryState(response, [current, cachedCopy])
 }
 
 const getMessageMarker = (markerName: string, messageId: string, params: any) => {

@@ -17,7 +17,12 @@ import { destroyChannelsMap, getChannelFromMap, setActiveChannelId } from '../he
 import { CONNECTION_STATUS } from '../store/user/constants'
 import { LOADING_STATE } from '../helpers/constants'
 import { setConnectionStatusAC } from '../store/user/actions'
-import { getChannelsAC, resendPendingChannelReadsAC, switchChannelActionAC } from '../store/channel/actions'
+import {
+  destroySession,
+  getChannelsAC,
+  resendPendingChannelReadsAC,
+  switchChannelActionAC
+} from '../store/channel/actions'
 import { resendPendingPinMutationsAC } from '../store/pinned/actions'
 import {
   addMessagesAC,
@@ -154,6 +159,10 @@ export const setupPrefetchIntegration = () => {
   beforeEach(async () => {
     resetMessageListFixtureIds()
     clearMessagesMap()
+    // A fresh fake server is a new session: reset Redux like SceytChat does when
+    // the client changes. Otherwise the previous test's chat list (same ids)
+    // looks like live local state to the next chat-list refresh.
+    store.dispatch(destroySession())
     // Receipt identities are session state too; repeated test IDs must not
     // inherit the previous fake server's readers.
     for (const channelId of Object.keys(store.getState().MessageReducer.messageMarkers)) {

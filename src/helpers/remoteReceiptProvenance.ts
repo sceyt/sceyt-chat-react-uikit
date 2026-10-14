@@ -76,3 +76,26 @@ export const addRemoteReceipt = (
     ? state
     : { channelId: message.channelId, messageId: message.id || message.tid || '', receipts }
 }
+
+const collectKeys = (node: ReceiptNode | undefined, keys: string[] = []): string[] => {
+  if (!node) return keys
+  if ('key' in node) keys.push(node.key)
+  else if ('collisions' in node) keys.push(...node.collisions)
+  else Object.values(node.children).forEach((child) => collectKeys(child, keys))
+  return keys
+}
+
+// Union of the readers recorded on two copies of the same message (e.g. the
+// chat-list preview and the message cache). A record for another message is
+// ignored. Like addRemoteReceipt, it never mutates either input.
+export const mergeRemoteReceipts = (
+  target: RemoteReceiptState | undefined,
+  source: RemoteReceiptState | undefined
+): RemoteReceiptState | undefined => {
+  if (!source) return target
+  if (!target) return source
+  if (target.channelId !== source.channelId || target.messageId !== source.messageId) return target
+  let receipts = target.receipts
+  for (const key of collectKeys(source.receipts)) receipts = insert(receipts, key, hashKey(key))
+  return receipts === target.receipts ? target : { ...target, receipts }
+}

@@ -127,9 +127,11 @@ import watchForEvents from '../evetns/inedx'
 import { CONNECTION_STATUS } from '../user/constants'
 import {
   compareMessageIds,
+  getMessageFromMap,
   getMessagesFromMap,
   removeAllMessages,
   removeMessagesFromMap,
+  resolveRefreshedLastMessage,
   setLatestMessageSnapshot,
   shouldSkipDeliveryStatusUpdate,
   syncCachedMessagesDeliveryStatus,
@@ -472,6 +474,41 @@ function* recordLatestMessageSnapshots(channels: IChannel[] = []): any {
   }
 }
 
+const getPreviewIdsBeforeRequest = () =>
+  new Map<string, string | undefined>(
+    ((store.getState().ChannelReducer?.channels || []) as IChannel[]).map((channel) => [
+      channel.id,
+      channel.lastMessage?.id
+    ])
+  )
+
+// A chat-list response can be older than what happened while it was in
+// flight: live receipts, or a send confirmed meanwhile. setChannelsInMap has
+// already JSON-copied the response, so merge here (after it, keeping receipt
+// bookkeeping) and before recordLatestMessageSnapshots, then align the
+// channel cache with the list that goes to Redux.
+const reconcileRefreshedPreviews = (
+  channels: IChannel[],
+  previewIdsBeforeRequest: Map<string, string | undefined>
+): IChannel[] => {
+  const reduxChannels = (store.getState().ChannelReducer?.channels || []) as IChannel[]
+  return channels.map((channel) => {
+    const response = channel?.lastMessage
+    if (!response) return channel
+    const current = reduxChannels.find((candidate) => candidate.id === channel.id)?.lastMessage
+    const resolved = resolveRefreshedLastMessage(
+      response,
+      current,
+      response.id ? getMessageFromMap(channel.id, response.id) : null,
+      previewIdsBeforeRequest.get(channel.id)
+    )
+    if (!resolved || resolved === response) return channel
+    const mapEntry = getChannelFromMap(channel.id)
+    if (mapEntry) setChannelInMap({ ...mapEntry, lastMessage: resolved })
+    return { ...channel, lastMessage: resolved }
+  })
+}
+
 function* getChannels(action: IAction): any {
   log.info(`${new Date().toISOString()} [getChannels] start get channels`)
   let mainListLoaded = false
@@ -515,6 +552,8 @@ function* getChannels(action: IAction): any {
     channelQueryBuilder.limit(limit)
     const channelQuery = yield call(channelQueryBuilder.build)
     log.info(`${new Date().toISOString()} [getChannels] query built successfully`)
+    // The message each chat shows now; see reconcileRefreshedPreviews.
+    const previewIdsBeforeRequest = getPreviewIdsBeforeRequest()
     const channelsData = yield call(channelQuery.loadNextPage)
     const channelList = channelsData.channels
     log.info(
@@ -625,6 +664,7 @@ function* getChannels(action: IAction): any {
     log.info(
       `${new Date().toISOString()} [getChannels] setting channels in state, count: ${mappedChannels?.length || 0}`
     )
+    mappedChannels = reconcileRefreshedPreviews(mappedChannels, previewIdsBeforeRequest)
     yield call(recordLatestMessageSnapshots, mappedChannels)
     yield put(setChannelsAC(mappedChannels))
     for (const ch of mappedChannels) {

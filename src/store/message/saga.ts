@@ -154,6 +154,7 @@ import {
   getFirstConfirmedMessageId,
   getMessageFromMap,
   hasAppliedRemoteMarker,
+  mergeConfirmedMessageDeliveryState,
   getMessagesFromMap,
   getLatestContiguousMessagesFromMap,
   getLatestMessageSnapshot,
@@ -168,7 +169,6 @@ import {
   messagesShareReference,
   getCenterTwoMessages,
   shouldReplaceLastMessage,
-  shouldSkipDeliveryStatusUpdate,
   updateMessageStatusOnMap,
   setActiveSegment,
   extendActiveSegment,
@@ -835,21 +835,12 @@ const getReduxChannelLastMessage = (channelId: string): IMessage | null =>
     ?.lastMessage || null
 
 const getConfirmedDeliveryState = (channelId: string, message: IMessage) => {
-  let deliveryStatus = message.deliveryStatus
-  const totals = new Map((message.markerTotals || []).map((total) => [total.name, total]))
-  for (const existing of [
+  const merged = mergeConfirmedMessageDeliveryState(message, [
     getStoredChannel(channelId)?.lastMessage,
     getReduxChannelLastMessage(channelId),
     getMessageFromMap(channelId, message.id)
-  ]) {
-    if (!message.id || existing?.id !== message.id) continue
-    if (shouldSkipDeliveryStatusUpdate(deliveryStatus, existing.deliveryStatus))
-      deliveryStatus = existing.deliveryStatus
-    for (const total of existing.markerTotals || []) {
-      if (!totals.has(total.name) || total.count > (totals.get(total.name)?.count || 0)) totals.set(total.name, total)
-    }
-  }
-  return { deliveryStatus, markerTotals: Array.from(totals.values()) }
+  ])
+  return { deliveryStatus: merged.deliveryStatus, markerTotals: merged.markerTotals || [] }
 }
 
 // The channel was already moved when its optimistic message was added. The
