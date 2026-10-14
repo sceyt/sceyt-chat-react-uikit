@@ -468,6 +468,45 @@ describe('channel reducer - updateChannelLastMessageStatus', () => {
     expect(state.channels[0].newMentionCount).toBe(2)
     expect(state.channels[0].lastMessage.deliveryStatus).toBe(MESSAGE_DELIVERY_STATUS.READ)
   })
+
+  it('does not replace a newer preview with the message whose status changed', () => {
+    const older = makeMessage({
+      id: '9007199254741300',
+      channelId: 'ch-1',
+      deliveryStatus: MESSAGE_DELIVERY_STATUS.SENT
+    })
+    const newer = makeMessage({ id: '9007199254741301', channelId: 'ch-1', body: 'received during a refresh' })
+    const cachedChannel = makeChannel({ id: 'ch-1', lastMessage: older })
+    let state = ChannelReducer(getInitialState(), setChannels({ channels: [{ ...cachedChannel, lastMessage: newer }] }))
+    state = ChannelReducer(
+      state,
+      updateChannelLastMessageStatus({
+        channel: cachedChannel,
+        message: { ...older, deliveryStatus: MESSAGE_DELIVERY_STATUS.READ }
+      })
+    )
+
+    expect(state.channels[0].lastMessage).toEqual(newer)
+  })
+
+  it('keeps the chat-list copy of the same message and changes only its status', () => {
+    const lastMsg = makeMessage({ id: '9007199254741310', channelId: 'ch-1', body: 'original' })
+    const cachedChannel = makeChannel({ id: 'ch-1', lastMessage: lastMsg })
+    let state = ChannelReducer(
+      getInitialState(),
+      setChannels({ channels: [{ ...cachedChannel, lastMessage: { ...lastMsg, body: 'edited' } }] })
+    )
+    state = ChannelReducer(
+      state,
+      updateChannelLastMessageStatus({
+        channel: cachedChannel,
+        message: { ...lastMsg, deliveryStatus: MESSAGE_DELIVERY_STATUS.READ }
+      })
+    )
+
+    expect(state.channels[0].lastMessage.body).toBe('edited')
+    expect(state.channels[0].lastMessage.deliveryStatus).toBe(MESSAGE_DELIVERY_STATUS.READ)
+  })
 })
 
 describe('channel reducer - searched channels sync', () => {

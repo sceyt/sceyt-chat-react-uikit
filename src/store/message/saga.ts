@@ -812,7 +812,10 @@ function* applyConfirmedMessageReceipts(channelId: string, message: IMessage) {
 
 // The server has already accepted the message. A reconciliation failure must
 // not reach the send error handler, which restores the pending preview.
-function* reconcileConfirmedMessageReceipts(channelId: string, message: IMessage): any {
+function* reconcileConfirmedMessageReceipts(
+  channelId: string,
+  message: IMessage
+): Generator<unknown, IMessage, IMessage> {
   try {
     return yield call(applyConfirmedMessageReceipts, channelId, message)
   } catch (e) {
@@ -835,11 +838,15 @@ const getReduxChannelLastMessage = (channelId: string): IMessage | null =>
     ?.lastMessage || null
 
 const getConfirmedDeliveryState = (channelId: string, message: IMessage) => {
-  const merged = mergeConfirmedMessageDeliveryState(message, [
-    getStoredChannel(channelId)?.lastMessage,
-    getReduxChannelLastMessage(channelId),
-    getMessageFromMap(channelId, message.id)
-  ])
+  const merged = mergeConfirmedMessageDeliveryState(
+    message,
+    [
+      getStoredChannel(channelId)?.lastMessage,
+      getReduxChannelLastMessage(channelId),
+      getMessageFromMap(channelId, message.id)
+    ],
+    { receipts: false }
+  )
   return { deliveryStatus: merged.deliveryStatus, markerTotals: merged.markerTotals || [] }
 }
 

@@ -29,7 +29,6 @@ import {
   clearVisibleMessagesMapAC,
   loadDefaultMessagesAC,
   loadNearUnreadAC,
-  removeChannelMarkersAC,
   resendPendingMessageMutationsAC
 } from '../store/message/actions'
 import { __resetMessageSagaTestState } from '../store/message/saga'
@@ -159,15 +158,11 @@ export const setupPrefetchIntegration = () => {
   beforeEach(async () => {
     resetMessageListFixtureIds()
     clearMessagesMap()
-    // A fresh fake server is a new session: reset Redux like SceytChat does when
-    // the client changes. Otherwise the previous test's chat list (same ids)
-    // looks like live local state to the next chat-list refresh.
+    // A fresh fake server is a new session: reset Redux, including receipt
+    // markers, as SceytChat does when the client is cleared on logout.
+    // Otherwise the previous test's chat list (same ids) looks like live local
+    // state to the next chat-list refresh.
     store.dispatch(destroySession())
-    // Receipt identities are session state too; repeated test IDs must not
-    // inherit the previous fake server's readers.
-    for (const channelId of Object.keys(store.getState().MessageReducer.messageMarkers)) {
-      store.dispatch(removeChannelMarkersAC(channelId))
-    }
     destroyChannelsMap()
     setActiveChannelId('')
     __resetMessageSagaTestState()

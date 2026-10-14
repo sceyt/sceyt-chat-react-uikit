@@ -127,7 +127,6 @@ import watchForEvents from '../evetns/inedx'
 import { CONNECTION_STATUS } from '../user/constants'
 import {
   compareMessageIds,
-  getMessageFromMap,
   getMessagesFromMap,
   removeAllMessages,
   removeMessagesFromMap,
@@ -474,38 +473,66 @@ function* recordLatestMessageSnapshots(channels: IChannel[] = []): any {
   }
 }
 
-const getPreviewIdsBeforeRequest = () =>
-  new Map<string, string | undefined>(
+// Unread counters a live message event copies from the SDK channel. When one
+// changes while a refresh is pending, the Redux value is newer than the response.
+const REFRESH_COUNTER_FIELDS = ['newMessageCount', 'newMentionCount', 'unread'] as const
+type RefreshCounters = Pick<IChannel, (typeof REFRESH_COUNTER_FIELDS)[number]>
+type ChatListBeforeRequest = Map<string, { previewId?: string; counters: RefreshCounters }>
+
+const pickRefreshCounters = (channel: IChannel): RefreshCounters => ({
+  newMessageCount: channel.newMessageCount,
+  newMentionCount: channel.newMentionCount,
+  unread: channel.unread
+})
+
+// The preview and unread counters each chat shows when the request is sent.
+const getChatListBeforeRequest = (): ChatListBeforeRequest =>
+  new Map(
     ((store.getState().ChannelReducer?.channels || []) as IChannel[]).map((channel) => [
       channel.id,
-      channel.lastMessage?.id
+      { previewId: channel.lastMessage?.id, counters: pickRefreshCounters(channel) }
     ])
   )
 
 // A chat-list response can be older than what happened while it was in
-// flight: live receipts, or a send confirmed meanwhile. setChannelsInMap has
-// already JSON-copied the response, so merge here (after it, keeping receipt
-// bookkeeping) and before recordLatestMessageSnapshots, then align the
-// channel cache with the list that goes to Redux.
-const reconcileRefreshedPreviews = (
-  channels: IChannel[],
-  previewIdsBeforeRequest: Map<string, string | undefined>
-): IChannel[] => {
-  const reduxChannels = (store.getState().ChannelReducer?.channels || []) as IChannel[]
+// flight: live receipts, or a send confirmed or a message received meanwhile.
+// setChannelsInMap has already JSON-copied the response, so merge here (after
+// it, keeping receipt bookkeeping) and before recordLatestMessageSnapshots,
+// then align the channel cache with the list that goes to Redux.
+// Only the first page of getChannels is reconciled; channelsLoadMore and the
+// all-channels query still store the response as is.
+const reconcileRefreshedPreviews = (channels: IChannel[], beforeRequest: ChatListBeforeRequest): IChannel[] => {
+  const reduxChannels = new Map(
+    ((store.getState().ChannelReducer?.channels || []) as IChannel[]).map((channel) => [channel.id, channel])
+  )
   return channels.map((channel) => {
     const response = channel?.lastMessage
-    if (!response) return channel
-    const current = reduxChannels.find((candidate) => candidate.id === channel.id)?.lastMessage
+    const reduxChannel = reduxChannels.get(channel.id)
+    const current = reduxChannel?.lastMessage
+    if (!response && !current?.id) return channel
+    const cachedMessages = getMessagesFromMap(channel.id)
+    const before = beforeRequest.get(channel.id)
     const resolved = resolveRefreshedLastMessage(
       response,
       current,
-      response.id ? getMessageFromMap(channel.id, response.id) : null,
-      previewIdsBeforeRequest.get(channel.id)
+      response?.id ? cachedMessages?.[response.id] : null,
+      before?.previewId,
+      current?.id ? cachedMessages?.[current.id] : null
     )
     if (!resolved || resolved === response) return channel
+    const update: Partial<IChannel> = { lastMessage: resolved }
+    // A local preview kept over the response: a counter a live event updated
+    // during the request is newer; an unchanged one is older than the response.
+    if (reduxChannel && resolved.id !== response?.id) {
+      for (const field of REFRESH_COUNTER_FIELDS) {
+        if (!before || reduxChannel[field] !== before.counters[field]) {
+          ;(update as Record<string, unknown>)[field] = reduxChannel[field]
+        }
+      }
+    }
     const mapEntry = getChannelFromMap(channel.id)
-    if (mapEntry) setChannelInMap({ ...mapEntry, lastMessage: resolved })
-    return { ...channel, lastMessage: resolved }
+    if (mapEntry) setChannelInMap({ ...mapEntry, ...update })
+    return { ...channel, ...update }
   })
 }
 
@@ -552,8 +579,8 @@ function* getChannels(action: IAction): any {
     channelQueryBuilder.limit(limit)
     const channelQuery = yield call(channelQueryBuilder.build)
     log.info(`${new Date().toISOString()} [getChannels] query built successfully`)
-    // The message each chat shows now; see reconcileRefreshedPreviews.
-    const previewIdsBeforeRequest = getPreviewIdsBeforeRequest()
+    // What each chat shows now; see reconcileRefreshedPreviews.
+    const chatListBeforeRequest = getChatListBeforeRequest()
     const channelsData = yield call(channelQuery.loadNextPage)
     const channelList = channelsData.channels
     log.info(
@@ -664,14 +691,19 @@ function* getChannels(action: IAction): any {
     log.info(
       `${new Date().toISOString()} [getChannels] setting channels in state, count: ${mappedChannels?.length || 0}`
     )
-    mappedChannels = reconcileRefreshedPreviews(mappedChannels, previewIdsBeforeRequest)
+    // Mark what arrived while offline as delivered: the server's last message,
+    // not a local preview kept by reconciliation (e.g. the user's own send
+    // confirmed during the request). Live message events mark their own message.
+    const responseLastMessages = mappedChannels.map((ch: IChannel) => ch.lastMessage)
+    mappedChannels = reconcileRefreshedPreviews(mappedChannels, chatListBeforeRequest)
     yield call(recordLatestMessageSnapshots, mappedChannels)
     yield put(setChannelsAC(mappedChannels))
-    for (const ch of mappedChannels) {
-      const lastMsg = ch.lastMessage
+    for (const [index, ch] of mappedChannels.entries()) {
+      const lastMsg = responseLastMessages[index]
       if (
         ch.newMessageCount > 0 &&
         lastMsg?.id &&
+        lastMsg.incoming !== false &&
         lastMsg.type !== MESSAGE_TYPE.SYSTEM &&
         !lastMsg.userMarkers?.find((marker: any) => marker.name === MESSAGE_DELIVERY_STATUS.DELIVERED)
       ) {

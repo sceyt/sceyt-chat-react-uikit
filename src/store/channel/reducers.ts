@@ -3,6 +3,7 @@ import { IChannel, IContact, IMember, IUser, ChannelQueryParams, IMessage } from
 import { DEFAULT_CHANNEL_TYPE, MESSAGE_STATUS } from '../../helpers/constants'
 import { getClient } from '../../common/client'
 import { sortChannelByLastMessage } from '../../helpers/channelHalper'
+import { compareMessageIds } from '../../helpers/messagesHalper'
 import { updateMessage } from '../message/reducers'
 
 export interface IChannelState {
@@ -62,6 +63,17 @@ export interface IChannelState {
   mutualChannels: IChannel[]
   mutualChannelsHasNext: boolean
   mutualChannelsLoadingState: number | null
+}
+
+// A confirmed preview newer than `message` (e.g. received while a chat-list
+// refresh was pending). Ids that cannot be compared never block the update.
+const isNewerPreview = (preview: IMessage | null | undefined, message: IMessage) => {
+  if (!preview?.id || !message?.id || preview.id === message.id) return false
+  try {
+    return compareMessageIds(preview.id, message.id) > 0
+  } catch {
+    return false
+  }
 }
 
 const initialState: IChannelState = {
@@ -445,11 +457,15 @@ const channelSlice = createSlice({
       state.channels = state.channels.map((chan) => {
         if (chan.id === channel.id) {
           // Only the last message status changes. The passed channel can be an
-          // older cached copy; keep fields the chat list has updated since.
+          // older cached copy; keep fields the chat list has updated since, and
+          // never replace a newer preview with the message this status is for.
+          if (isNewerPreview(chan.lastMessage, message)) return chan
+          const base =
+            chan.lastMessage?.id && chan.lastMessage.id === message.id ? chan.lastMessage : channel.lastMessage
           return {
             ...chan,
             lastMessage: {
-              ...channel.lastMessage,
+              ...base,
               deliveryStatus: message.deliveryStatus,
               userMarkers: message.userMarkers,
               markerTotals: message.markerTotals,

@@ -94,6 +94,7 @@ export const mergeRemoteReceipts = (
 ): RemoteReceiptState | undefined => {
   if (!source) return target
   if (!target) return source
+  if (source === target || source.receipts === target.receipts) return target
   if (target.channelId !== source.channelId || target.messageId !== source.messageId) return target
   let receipts = target.receipts
   for (const key of collectKeys(source.receipts)) receipts = insert(receipts, key, hashKey(key))

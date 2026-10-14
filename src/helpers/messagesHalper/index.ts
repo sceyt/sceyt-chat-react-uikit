@@ -82,11 +82,14 @@ export const shouldSkipDeliveryStatusUpdate = (markerName: string, currentDelive
 // applied to the preview or the message cache. Keep the highest delivery
 // status, the highest count per receipt type and every recorded reader.
 // Copies of other messages are ignored. Pure: returns `incoming` itself when
-// nothing changes and never mutates its inputs.
+// nothing changes and never mutates its inputs. Callers that only read the
+// status and totals pass `{ receipts: false }` to skip the reader merge.
 export const mergeConfirmedMessageDeliveryState = <T extends IMessage>(
   incoming: T,
-  copies: (IMessage | null | undefined)[]
+  copies: (IMessage | null | undefined)[],
+  options: { receipts?: boolean } = {}
 ): T => {
+  const mergeReceipts = options.receipts !== false
   if (!incoming?.id) return incoming
   let deliveryStatus = incoming.deliveryStatus
   const totals = new Map((incoming.markerTotals || []).map((total) => [total.name, total]))
@@ -109,6 +112,7 @@ export const mergeConfirmedMessageDeliveryState = <T extends IMessage>(
         changed = true
       }
     }
+    if (!mergeReceipts) continue
     const merged = mergeRemoteReceipts(receipts, (copy as IMessage & MessageReceiptMetadata)[remoteReceipts])
     if (merged !== receipts) {
       receipts = merged
@@ -136,21 +140,29 @@ const isNewerMessage = (candidate: IMessage, reference: IMessage) => {
 // preview shown now; `previewIdBeforeRequest` is the message it showed when
 // the request was sent. A preview that changed to a newer message while the
 // request was pending (a send confirmed or a message received meanwhile) is
-// newer than the response. Any other difference follows the server, which can
-// legitimately show an older message (e.g. the latest one was deleted).
+// newer than the response, including an empty response. Any other difference
+// follows the server, which can legitimately show an older message (e.g. the
+// latest one was deleted). `cachedCopy` and `cachedCurrent` are the message
+// cache's copies of the response and current messages: the cache can hold a
+// status a live receipt applied while the request was pending.
+// Only delivery state is merged; an edit or delete made during the request is
+// not yet reconciled here.
 export const resolveRefreshedLastMessage = (
   response: IMessage | null | undefined,
   current: IMessage | null | undefined,
   cachedCopy: IMessage | null | undefined,
-  previewIdBeforeRequest: string | undefined
+  previewIdBeforeRequest: string | undefined,
+  cachedCurrent?: IMessage | null
 ): IMessage | null | undefined => {
-  if (!response) return response
-  if (current?.id && current.id !== response.id) {
-    const changedDuringRequest = current.id !== previewIdBeforeRequest
-    return changedDuringRequest && current.state !== MESSAGE_STATUS.DELETE && isNewerMessage(current, response)
-      ? current
-      : response
+  if (current?.id && current.id !== response?.id) {
+    const keepCurrent =
+      current.id !== previewIdBeforeRequest &&
+      current.state !== MESSAGE_STATUS.DELETE &&
+      (!response || isNewerMessage(current, response))
+    if (keepCurrent) return mergeConfirmedMessageDeliveryState(current, [cachedCurrent])
+    return response && mergeConfirmedMessageDeliveryState(response, [cachedCopy])
   }
+  if (!response) return response
   return mergeConfirmedMessageDeliveryState(response, [current, cachedCopy])
 }
 

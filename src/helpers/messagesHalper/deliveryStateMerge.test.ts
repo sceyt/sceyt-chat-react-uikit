@@ -59,6 +59,14 @@ describe('mergeConfirmedMessageDeliveryState', () => {
     expect(hasAppliedRemoteMarker(merged, receipt(DELIVERED, 'someone-else'))).toBe(false)
   })
 
+  it('can merge status and totals without merging readers', () => {
+    const live = { ...withLiveReceipt(sent, READ, 'reader'), markerTotals: totals([READ, 1]) }
+    const merged = mergeConfirmedMessageDeliveryState(JSON.parse(JSON.stringify(sent)), [live], { receipts: false })
+    expect(merged.deliveryStatus).toBe(READ)
+    expect(merged.markerTotals).toEqual([{ name: READ, count: 1 }])
+    expect(hasAppliedRemoteMarker(merged, receipt(READ, 'reader'))).toBe(false)
+  })
+
   it('unions the readers recorded on different copies', () => {
     const preview = withLiveReceipt(sent, DELIVERED, 'first')
     const cached = withLiveReceipt(sent, DELIVERED, 'second')
@@ -91,18 +99,41 @@ describe('resolveRefreshedLastMessage', () => {
     expect(resolveRefreshedLastMessage(older, deleted, null, older.id)).toBe(older)
   })
 
+  it('follows the server when the preview changed to an older message during the request', () => {
+    expect(resolveRefreshedLastMessage(newer, older, null, 'another-message')).toBe(newer)
+  })
+
+  it('merges the cached status when the server falls back to an older message', () => {
+    const cached = { ...older, deliveryStatus: READ, markerTotals: totals([READ, 1]) }
+    const resolved = resolveRefreshedLastMessage({ ...older, deliveryStatus: SENT }, newer, cached, newer.id)
+    expect(resolved).toEqual(expect.objectContaining({ id: older.id, deliveryStatus: READ }))
+  })
+
+  it('merges the cached status of a kept newer preview', () => {
+    const cachedNewer = { ...newer, deliveryStatus: DELIVERED, markerTotals: totals([DELIVERED, 1]) }
+    const resolved = resolveRefreshedLastMessage(older, newer, null, older.id, cachedNewer)
+    expect(resolved).toEqual(expect.objectContaining({ id: newer.id, deliveryStatus: DELIVERED }))
+  })
+
   it('follows the server when its message is the newer one', () => {
     expect(resolveRefreshedLastMessage(newer, older, null, undefined)).toBe(newer)
   })
 
   it('compares creation times when ids are not numeric', () => {
-    const before = makeMessage({ id: 'local-a', channelId, createdAt: new Date(1000) })
-    const after = makeMessage({ id: 'local-b', channelId, createdAt: new Date(2000) })
+    // Id order is the opposite of time order, so comparing ids as text fails.
+    const before = makeMessage({ id: 'local-b', channelId, createdAt: new Date(1000) })
+    const after = makeMessage({ id: 'local-a', channelId, createdAt: new Date(2000) })
     expect(resolveRefreshedLastMessage(before, after, null, undefined)).toBe(after)
     expect(resolveRefreshedLastMessage(after, before, null, undefined)).toBe(after)
   })
 
-  it('returns an empty response unchanged', () => {
-    expect(resolveRefreshedLastMessage(null, newer, null, undefined)).toBeNull()
+  it('returns an empty response when the preview did not change during the request', () => {
+    expect(resolveRefreshedLastMessage(null, newer, null, newer.id)).toBeNull()
+    expect(resolveRefreshedLastMessage(null, null, null, undefined)).toBeNull()
+  })
+
+  it('keeps a preview that appeared during the request when the response is empty', () => {
+    expect(resolveRefreshedLastMessage(null, newer, null, older.id)).toBe(newer)
+    expect(resolveRefreshedLastMessage(null, newer, null, undefined)).toBe(newer)
   })
 })
