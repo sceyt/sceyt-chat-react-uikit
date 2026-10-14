@@ -10,10 +10,10 @@
  *   WAAFI_PROJECT           name shown in the message, e.g. "Chat JS SDK"
  *   WAAFI_FAILED            "true" when a check failed
  * Optional:
- *   WAAFI_ALERT_SUCCESS     "changes" (default): passes are posted only on the
- *                           default branch, or when the previous run on the same
- *                           branch failed ("fixed"). "always": every pass.
- *                           Failures are always posted.
+ *   WAAFI_ALERT_SUCCESS     "always" (default): every run is posted, pass or fail.
+ *                           "changes": passes are posted only on the default
+ *                           branch, or when the previous run on the same branch
+ *                           failed ("fixed"). Failures are always posted.
  *   WAAFI_SENDER_ID         sender user id (default 37494000000)
  *   WAAFI_GITLAB_API_TOKEN  GitLab only: read_api token. Adds the job lists, the
  *                           "fixed" check and the stale-MR skip.
@@ -247,7 +247,7 @@ async function main() {
   const channelId = env('WAAFI_CHANNEL_ID')
   const project = env('WAAFI_PROJECT') || 'CI'
   const failed = env('WAAFI_FAILED') === 'true'
-  const successMode = env('WAAFI_ALERT_SUCCESS') || 'changes'
+  const successMode = env('WAAFI_ALERT_SUCCESS') || 'always'
 
   if (!apiKey) return warn('WAAFI_PLATFORM_API_KEY is not set; skipping the Waafi alert.')
   if (!/^\d+$/.test(channelId)) return warn('WAAFI_CHANNEL_ID is not set or not numeric; skipping the Waafi alert.')

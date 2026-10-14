@@ -9,9 +9,9 @@ name: Waafi Alerts
 #   If it is missing the alert is skipped with a warning; CI is not affected.
 # - Channel id: the `channel-id` input; the repository variable
 #   WAAFI_CHANNEL_ID overrides it.
-# - Variable WAAFI_ALERT_SUCCESS (optional): "changes" (default) posts passes
-#   only on the default branch or when a failing branch is fixed;
-#   "always" posts every pass. Failures are always posted.
+# - Every run is posted, pass or fail. Optional variable WAAFI_ALERT_SUCCESS:
+#   "changes" posts passes only on the default branch or when a failing
+#   branch is fixed (failures are always posted).
 
 on:
   workflow_call:
