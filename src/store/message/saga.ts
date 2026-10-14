@@ -1,6 +1,7 @@
 import { put, call, delay, spawn, takeLatest, takeEvery, take, race } from 'redux-saga/effects'
 import { v4 as uuidv4 } from 'uuid'
 import { shouldSkipMessageContentUpdate } from '../../helpers/messageContentUpdate'
+import { hasRemoteReceipt } from '../../helpers/remoteReceiptProvenance'
 import {
   ADD_REACTION,
   DELETE_MESSAGE,
@@ -84,6 +85,7 @@ import {
   updateAttachmentUploadingProgressAC,
   updateAttachmentUploadingStateAC,
   updateMessageAC,
+  updateMessagesStatusAC,
   patchMessagesAC,
   setMessagesMarkersLoadingStateAC,
   setPollVotesListAC,
@@ -128,6 +130,7 @@ import {
   markChannelAsReadAC,
   switchChannelActionAC,
   updateChannelDataAC,
+  updateChannelLastMessageStatusAC,
   updateChannelLastMessageAC
 } from '../channel/actions'
 import {
@@ -150,6 +153,7 @@ import {
   getAllPendingFromMap,
   getFirstConfirmedMessageId,
   getMessageFromMap,
+  hasAppliedRemoteMarker,
   getMessagesFromMap,
   getLatestContiguousMessagesFromMap,
   getLatestMessageSnapshot,
@@ -164,6 +168,8 @@ import {
   messagesShareReference,
   getCenterTwoMessages,
   shouldReplaceLastMessage,
+  shouldSkipDeliveryStatusUpdate,
+  updateMessageStatusOnMap,
   setActiveSegment,
   extendActiveSegment,
   getContiguousPrevMessages,
@@ -723,6 +729,87 @@ const addConfirmedMessageToCache = (channelId: string, message: IMessage) => {
   appendMessageToLatestSegment(channelId, message.id)
 }
 
+// Receipts can arrive before a pending message gets its server id. The event
+// index already retains them; apply them after promotion using the same cache
+// and Redux helpers as live events. Fetched Message info alone is not an event.
+function* reconcileConfirmedMessageReceipts(channelId: string, message: IMessage) {
+  const delivery = getConfirmedDeliveryState(channelId, message)
+  const before = getMessageFromMap(channelId, message.id)
+  // Ordinary confirmations need no extra cache traversal. Only reconcile a
+  // status/count learned from another copy or a newer server snapshot.
+  if (
+    before &&
+    (delivery.deliveryStatus !== before.deliveryStatus ||
+      delivery.markerTotals.some((total) => {
+        const current = before.markerTotals?.find((candidate) => candidate.name === total.name)
+        return !current || total.count > current.count
+      }))
+  ) {
+    updateMessageOnMap(channelId, { messageId: message.id, params: delivery })
+  }
+  const receiptState = store.getState().MessageReducer
+  const appliedReceipts = receiptState.appliedMessageReceipts?.[channelId]?.[message.id]
+  const recordedMarkers: Record<string, IMarker[]> = receiptState.messageMarkers?.[channelId]?.[message.id] || {}
+  let hasRecordedReceipts = false
+  for (const [name, details] of Object.entries(recordedMarkers)) {
+    const receipts = details.filter((marker) =>
+      hasRemoteReceipt(appliedReceipts, { channelId, id: message.id }, marker)
+    )
+    if (!receipts.length) continue
+    hasRecordedReceipts = true
+    // An SDK snapshot may already include these recipients. Treat known
+    // identities and the snapshot total as lower bounds, not extra readers.
+    const knownRemoteMarkerCounts = {
+      [message.id]: Math.max(
+        new Set(details.map((marker) => marker.user?.id).filter(Boolean)).size,
+        message.markerTotals?.find((total) => total.name === name)?.count || 0
+      )
+    }
+    const cachedTotal =
+      getMessageFromMap(channelId, message.id)?.markerTotals?.find((total) => total.name === name)?.count || 0
+    updateMessageOnMap(channelId, {
+      messageId: message.id,
+      params: {
+        deliveryStatus: name,
+        markerTotals: [{ name, count: Math.max(cachedTotal, knownRemoteMarkerCounts[message.id]) }]
+      }
+    })
+    for (const receipt of receipts) {
+      // Do not re-walk the channel's history for every reader whose live
+      // receipt already updated this copy while the send response was pending.
+      if (hasAppliedRemoteMarker(getMessageFromMap(channelId, message.id), receipt)) continue
+      const marker = { ...receipt, messageId: message.id, messageIds: [message.id] }
+      const markersMap = { [message.id]: marker }
+      updateMessageStatusOnMap(channelId, { name, markersMap, marker, knownRemoteMarkerCounts }, false)
+      if (getActiveChannelId() === channelId) {
+        yield put(updateMessagesStatusAC(name, markersMap, false, marker, knownRemoteMarkerCounts))
+      }
+    }
+  }
+  const hasNewerDelivery =
+    delivery.deliveryStatus !== message.deliveryStatus ||
+    delivery.markerTotals.some(
+      (total) => total.count > (message.markerTotals?.find((snapshot) => snapshot.name === total.name)?.count || 0)
+    )
+  const cached = hasRecordedReceipts || hasNewerDelivery ? getMessageFromMap(channelId, message.id) : null
+  if (cached && getActiveChannelId() === channelId) {
+    // A send response may contain older aggregate counts. Apply the reconciled
+    // totals without counting any receipt again or changing message content.
+    yield put(updateMessageAC(message.id, { deliveryStatus: cached.deliveryStatus, markerTotals: cached.markerTotals }))
+  }
+  const channel = getStoredChannel(channelId)
+  if (cached && channel?.lastMessage?.id === message.id && getReduxChannelLastMessage(channelId)?.id === message.id) {
+    const lastMessage = {
+      ...channel.lastMessage,
+      deliveryStatus: cached.deliveryStatus,
+      markerTotals: cached.markerTotals
+    }
+    updateChannelLastMessageOnAllChannels(channelId, lastMessage)
+    yield put(updateChannelLastMessageStatusAC(lastMessage, channel))
+  }
+  return cached ? { ...message, deliveryStatus: cached.deliveryStatus, markerTotals: cached.markerTotals } : message
+}
+
 const getStoredChannel = (channelId: string): IChannel | null =>
   getChannelFromMap(channelId) ||
   getChannelFromAllChannels(channelId) ||
@@ -735,6 +822,24 @@ const getStoredChannel = (channelId: string): IChannel | null =>
 const getReduxChannelLastMessage = (channelId: string): IMessage | null =>
   (store.getState().ChannelReducer?.channels || []).find((channel: IChannel) => channel.id === channelId)
     ?.lastMessage || null
+
+const getConfirmedDeliveryState = (channelId: string, message: IMessage) => {
+  let deliveryStatus = message.deliveryStatus
+  const totals = new Map((message.markerTotals || []).map((total) => [total.name, total]))
+  for (const existing of [
+    getStoredChannel(channelId)?.lastMessage,
+    getReduxChannelLastMessage(channelId),
+    getMessageFromMap(channelId, message.id)
+  ]) {
+    if (!message.id || existing?.id !== message.id) continue
+    if (shouldSkipDeliveryStatusUpdate(deliveryStatus, existing.deliveryStatus))
+      deliveryStatus = existing.deliveryStatus
+    for (const total of existing.markerTotals || []) {
+      if (!totals.has(total.name) || total.count > (totals.get(total.name)?.count || 0)) totals.set(total.name, total)
+    }
+  }
+  return { deliveryStatus, markerTotals: Array.from(totals.values()) }
+}
 
 // The channel was already moved when its optimistic message was added. The
 // server timestamp on the confirmation is later than the local pending
@@ -778,7 +883,9 @@ const getResolvedChannelLastMessage = (
   }
 
   if (shouldReplaceChannelLastMessage(channelId, nextLastMessage, sourceMessage)) {
-    return nextLastMessage
+    // A slow send response is an older snapshot of the same message. Keep the
+    // highest status from every local copy without changing preview ordering.
+    return { ...nextLastMessage, deliveryStatus: getConfirmedDeliveryState(channelId, nextLastMessage).deliveryStatus }
   }
 
   return currentLastMessage?.id ? currentLastMessage : null
@@ -1632,8 +1739,11 @@ function* sendMessage(action: IAction): any {
             if (activeChannelId === channel.id) {
               yield put(updateMessageAC(messageToSend.tid as string, messageUpdateData, true))
             }
-            const messageToUpdate = JSON.parse(JSON.stringify({ ...messageResponse, attachments: attachmentsToUpdate }))
+            let messageToUpdate: IMessage = JSON.parse(
+              JSON.stringify({ ...messageResponse, attachments: attachmentsToUpdate })
+            )
             addConfirmedMessageToCache(channel.id, messageToUpdate)
+            messageToUpdate = yield call(reconcileConfirmedMessageReceipts, channel.id, messageToUpdate)
             updateTabAttachmentCache(channel.id, attachmentsToUpdate, messageResponse.user)
             if (channel.unread) {
               yield put(markChannelAsReadAC(channel.id))
@@ -1797,7 +1907,11 @@ function* sendTextMessage(action: IAction): any {
       if (messageResponse.attachments?.length) {
         updateTabAttachmentCache(channel.id, messageResponse.attachments, messageResponse.user)
       }
-      const messageToUpdate = JSON.parse(JSON.stringify(messageResponse))
+      const messageToUpdate: IMessage = yield call(
+        reconcileConfirmedMessageReceipts,
+        channel.id,
+        JSON.parse(JSON.stringify(messageResponse))
+      )
       if (channel.unread) {
         yield put(markChannelAsReadAC(channel.id))
       }
@@ -2013,7 +2127,7 @@ function* forwardMessage(action: IAction): any {
         addConfirmedMessageToCache(channel.id, confirmedForward)
         // Keep the channel preview in sync with the enriched cache entry. The
         // raw response can omit forwarding attribution until history reloads.
-        const messageToUpdate = JSON.parse(JSON.stringify(messageUpdateData))
+        const messageToUpdate: IMessage = yield call(reconcileConfirmedMessageReceipts, channel.id, confirmedForward)
         if (channel.unread) {
           yield put(markChannelAsReadAC(channel.id))
         }

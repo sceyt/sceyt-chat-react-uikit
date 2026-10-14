@@ -78,6 +78,13 @@ export class FakeMessageServer {
     }
   }
 
+  /** A recipient receives/reads a message before the sender learns about it. */
+  setDeliveryStatus(channelId: string, messageId: string, deliveryStatus: string) {
+    const message = (this.histories[channelId] || []).find((item) => item.id === messageId)
+    if (!message) throw new Error(`Unknown message ${messageId} in ${channelId}`)
+    this.replaceMessage(channelId, { ...message, deliveryStatus })
+  }
+
   /** The remote user reacts to a message (as the chat list reports it afterwards). */
   react(channelId: string, messageId: string, key = '👍') {
     const message = (this.histories[channelId] || []).find((item) => item.id === messageId)!
