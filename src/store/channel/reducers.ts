@@ -444,8 +444,10 @@ const channelSlice = createSlice({
       const { channel, message } = action.payload
       state.channels = state.channels.map((chan) => {
         if (chan.id === channel.id) {
+          // Only the last message status changes. The passed channel can be an
+          // older cached copy; keep fields the chat list has updated since.
           return {
-            ...channel,
+            ...chan,
             lastMessage: {
               ...channel.lastMessage,
               deliveryStatus: message.deliveryStatus,

@@ -732,7 +732,7 @@ const addConfirmedMessageToCache = (channelId: string, message: IMessage) => {
 // Receipts can arrive before a pending message gets its server id. The event
 // index already retains them; apply them after promotion using the same cache
 // and Redux helpers as live events. Fetched Message info alone is not an event.
-function* reconcileConfirmedMessageReceipts(channelId: string, message: IMessage) {
+function* applyConfirmedMessageReceipts(channelId: string, message: IMessage) {
   const delivery = getConfirmedDeliveryState(channelId, message)
   const before = getMessageFromMap(channelId, message.id)
   // Ordinary confirmations need no extra cache traversal. Only reconcile a
@@ -808,6 +808,17 @@ function* reconcileConfirmedMessageReceipts(channelId: string, message: IMessage
     yield put(updateChannelLastMessageStatusAC(lastMessage, channel))
   }
   return cached ? { ...message, deliveryStatus: cached.deliveryStatus, markerTotals: cached.markerTotals } : message
+}
+
+// The server has already accepted the message. A reconciliation failure must
+// not reach the send error handler, which restores the pending preview.
+function* reconcileConfirmedMessageReceipts(channelId: string, message: IMessage): any {
+  try {
+    return yield call(applyConfirmedMessageReceipts, channelId, message)
+  } catch (e) {
+    log.error('failed to reconcile receipts of a confirmed message', e)
+    return message
+  }
 }
 
 const getStoredChannel = (channelId: string): IChannel | null =>
@@ -2127,7 +2138,11 @@ function* forwardMessage(action: IAction): any {
         addConfirmedMessageToCache(channel.id, confirmedForward)
         // Keep the channel preview in sync with the enriched cache entry. The
         // raw response can omit forwarding attribution until history reloads.
-        const messageToUpdate: IMessage = yield call(reconcileConfirmedMessageReceipts, channel.id, confirmedForward)
+        const messageToUpdate: IMessage = yield call(
+          reconcileConfirmedMessageReceipts,
+          channel.id,
+          JSON.parse(JSON.stringify(confirmedForward))
+        )
         if (channel.unread) {
           yield put(markChannelAsReadAC(channel.id))
         }

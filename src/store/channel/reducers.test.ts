@@ -452,6 +452,22 @@ describe('channel reducer - updateChannelLastMessageStatus', () => {
 
     expect(state.channels[0].lastMessage.deliveryStatus).toBe(MESSAGE_DELIVERY_STATUS.READ)
   })
+
+  it('keeps chat-list fields that are newer than the passed channel copy', () => {
+    const lastMsg = makeMessage({ id: 'last-msg', channelId: 'ch-1', deliveryStatus: MESSAGE_DELIVERY_STATUS.SENT })
+    const cachedChannel = makeChannel({ id: 'ch-1', lastMessage: lastMsg, newMentionCount: 0 })
+    let state = ChannelReducer(getInitialState(), setChannels({ channels: [{ ...cachedChannel, newMentionCount: 2 }] }))
+    state = ChannelReducer(
+      state,
+      updateChannelLastMessageStatus({
+        channel: cachedChannel,
+        message: { ...lastMsg, deliveryStatus: MESSAGE_DELIVERY_STATUS.READ }
+      })
+    )
+
+    expect(state.channels[0].newMentionCount).toBe(2)
+    expect(state.channels[0].lastMessage.deliveryStatus).toBe(MESSAGE_DELIVERY_STATUS.READ)
+  })
 })
 
 describe('channel reducer - searched channels sync', () => {
