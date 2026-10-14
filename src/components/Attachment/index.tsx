@@ -1532,7 +1532,7 @@ const Attachment = ({
               <AttachmentName color={selectedFileAttachmentsTitleColor || textPrimary} ref={fileNameRef}>
                 {formatLargeText(
                   isPreview ? attachment.data.name : attachment.name,
-                  fileAttachmentWidth ? fileAttachmentWidth / 12.5 : isPreview ? 18 : 30
+                  fileAttachmentWidth ? fileAttachmentWidth / 12.5 : isPreview ? 18 : 25
                 )}
               </AttachmentName>
               <AttachmentSize color={selectedFileAttachmentsSizeColor || textSecondary} errorColor={errorColor}>
