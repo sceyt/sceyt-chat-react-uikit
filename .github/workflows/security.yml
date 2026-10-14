@@ -2,7 +2,7 @@ name: Security
 
 on:
   push:
-    branches: [main]
+    branches: [main, dev]
   pull_request:
   schedule:
     # Weekly full CodeQL scan (Mondays 06:17 UTC) to catch newly published query rules.

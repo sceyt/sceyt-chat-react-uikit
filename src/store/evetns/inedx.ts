@@ -1,6 +1,7 @@
 import { call, put, select, take } from 'redux-saga/effects'
 import { eventChannel } from 'redux-saga'
 import { getClient } from '../../common/client'
+import { hasRemoteReceipt } from '../../helpers/remoteReceiptProvenance'
 import { IAttachment, IChannel, IMarker, IMember, IMessage, IPollDetails, IReaction, IUser } from '../../types'
 import { CHANNEL_EVENT_TYPES } from '../channel/constants'
 import {
@@ -71,6 +72,9 @@ import {
   appendMessageToLatestSegment,
   addReactionToMessageOnMap,
   checkChannelExistsOnMessagesMap,
+  getMessageFromMap,
+  getMessagesFromMap,
+  hasAppliedRemoteMarker,
   messagesShareReference,
   removeAllMessages,
   removeMessagesFromMap,
@@ -95,6 +99,7 @@ import { attachmentTypes, DEFAULT_CHANNEL_TYPE, MESSAGE_STATUS } from '../../hel
 import { updateTabAttachmentCache } from '../message/saga'
 import { MessageTextFormat } from '../../messageUtils'
 import { isJSON } from '../../helpers/message'
+import { shouldSkipMessageContentUpdate } from '../../helpers/messageContentUpdate'
 import log from 'loglevel'
 import store from 'store'
 import { updateActiveChannelMembersAdd, updateActiveChannelMembersRemove } from '../member/helpers'
@@ -395,14 +400,42 @@ export function* handleMessageMarkersReceivedEvent(
   args: { channelId: string; markerList: IMarker },
   SceytChatClient: any
 ): any {
-  const { channelId, markerList } = args
+  const { channelId } = args
+  let { markerList } = args
   const channel = getStoredChannel(channelId)
   if (!channel) {
     return
   }
 
   const isOwnMarker = markerList.user?.id === SceytChatClient.user.id
+  const knownCounts: Record<string, number> = {}
+  if (!isOwnMarker && markerList.user?.id) {
+    const receiptState = store.getState().MessageReducer
+    const appliedReceipts = receiptState.appliedMessageReceipts?.[channelId]
+    const messageIds = markerList.messageIds.filter((id) => {
+      const cached = getMessageFromMap(channelId, id)
+      if (
+        hasAppliedRemoteMarker(cached, markerList) ||
+        hasRemoteReceipt(appliedReceipts?.[id], { channelId, id }, markerList)
+      )
+        return false
+      const details = receiptState.messageMarkers?.[channelId]?.[id]?.[markerList.name]
+      if (details?.some((detail: IMarker) => detail.user?.id === markerList.user?.id)) {
+        const snapshotCount = (message?: IMessage | null) =>
+          message?.markerTotals?.find((total) => total.name === markerList.name)?.count || 0
+        knownCounts[id] = Math.max(
+          new Set(details.map((detail: IMarker) => detail.user?.id).filter(Boolean)).size,
+          snapshotCount(cached),
+          snapshotCount(channel.lastMessage?.id === id ? channel.lastMessage : undefined)
+        )
+      }
+      return true
+    })
+    if (!messageIds.length) return
+    markerList = { ...markerList, messageIds }
+  }
   const activeChannelId = yield call(getActiveChannelId)
+  const knownRemoteMarkerCounts = Object.keys(knownCounts).length ? knownCounts : undefined
   let updateLastMessage = false
   const markersMap: any = {}
   const markerUpdateParams = {
@@ -420,7 +453,11 @@ export function* handleMessageMarkersReceivedEvent(
   if (updateLastMessage) {
     const lastMessage = {
       ...channel.lastMessage,
-      ...updateMessageDeliveryStatusAndMarkers(channel.lastMessage, markerUpdateParams, isOwnMarker)
+      ...updateMessageDeliveryStatusAndMarkers(
+        channel.lastMessage,
+        { ...markerUpdateParams, knownRemoteMarkerCount: knownRemoteMarkerCounts?.[channel.lastMessage.id] },
+        isOwnMarker
+      )
     }
 
     updateChannelLastMessageOnAllChannels(channel.id, lastMessage)
@@ -428,10 +465,19 @@ export function* handleMessageMarkersReceivedEvent(
   }
 
   if (activeChannelId === channelId) {
-    yield put(updateMessagesStatusAC(markerList.name, markersMap, isOwnMarker, markerList))
+    yield put(updateMessagesStatusAC(markerList.name, markersMap, isOwnMarker, markerList, knownRemoteMarkerCounts))
   }
 
-  updateMessageStatusOnMap(channel.id, { name: markerList.name, markersMap, marker: markerList }, isOwnMarker)
+  updateMessageStatusOnMap(
+    channel.id,
+    {
+      name: markerList.name,
+      markersMap,
+      marker: markerList,
+      ...(knownRemoteMarkerCounts ? { knownRemoteMarkerCounts } : {})
+    },
+    isOwnMarker
+  )
 
   if (!isOwnMarker) {
     yield put(updateMessagesMarkersAC(channelId, markerList.name, markerList))
@@ -484,6 +530,18 @@ export function* handleEditMessageEvent(args: { channel: IChannel; message: IMes
   const reduxChannel = (store.getState().ChannelReducer?.channels || []).find(
     (stored: IChannel) => stored.id === channel.id
   )
+  const cached = getMessagesFromMap(channel.id) || {}
+  const visible: IMessage[] = store.getState().MessageReducer.activeChannelMessages || []
+  const knownCopies = [
+    getMessageFromMap(channel.id, message.id),
+    storedChannel?.lastMessage,
+    storedChannel?.lastReactedMessage,
+    reduxChannel?.lastMessage,
+    reduxChannel?.lastReactedMessage,
+    ...visible.flatMap((item) => [item, item.parentMessage]),
+    ...(!cached[message.id] ? Object.values(cached).map((item) => item.parentMessage) : [])
+  ]
+  if (knownCopies.some((known) => known?.id === message.id && shouldSkipMessageContentUpdate(known, message))) return
   const isLastMessage = channel.lastMessage?.id === message.id
   const isLastReactedMessage =
     storedChannel?.lastReactedMessage?.id === message.id || reduxChannel?.lastReactedMessage?.id === message.id

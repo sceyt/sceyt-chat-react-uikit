@@ -24,6 +24,7 @@ import {
   clearVisibleMessagesMapAC,
   loadDefaultMessagesAC,
   loadNearUnreadAC,
+  removeChannelMarkersAC,
   resendPendingMessageMutationsAC
 } from '../store/message/actions'
 import { __resetMessageSagaTestState } from '../store/message/saga'
@@ -153,6 +154,11 @@ export const setupPrefetchIntegration = () => {
   beforeEach(async () => {
     resetMessageListFixtureIds()
     clearMessagesMap()
+    // Receipt identities are session state too; repeated test IDs must not
+    // inherit the previous fake server's readers.
+    for (const channelId of Object.keys(store.getState().MessageReducer.messageMarkers)) {
+      store.dispatch(removeChannelMarkersAC(channelId))
+    }
     destroyChannelsMap()
     setActiveChannelId('')
     __resetMessageSagaTestState()
