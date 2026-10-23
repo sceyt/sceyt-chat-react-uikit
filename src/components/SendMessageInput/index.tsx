@@ -1622,16 +1622,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
         return
       }
 
-      const attachmentsFiles = draggedAttachments.map((draggedData: any) => {
-        const arr = draggedData.data.split(',')
-        const bstr = atob(arr[1])
-        let n = bstr.length
-        const u8arr = new Uint8Array(n)
-        while (n--) {
-          u8arr[n] = bstr.charCodeAt(n)
-        }
-        return new File([u8arr], draggedData.name, { type: draggedData.type })
-      })
+      const attachmentsFiles = draggedAttachments.map((draggedData: { data: File }) => draggedData.data)
 
       // Only process files that fit within remaining slots
       const filesToProcess = attachmentsFiles.slice(0, remainingSlots)
@@ -1646,7 +1637,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
       }
 
       const isMediaAttachment = draggedAttachments[0].attachmentType === 'media'
-      filesToProcess.forEach(async (file: any) => {
+      filesToProcess.forEach(async (file: File) => {
         const validationError = isMediaAttachment ? validateMediaAttachment(file) : null
         if (!validationError) {
           await handleAddAttachmentWithViewOnceCheck(file, isMediaAttachment)

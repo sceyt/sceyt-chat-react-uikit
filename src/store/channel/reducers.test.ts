@@ -40,7 +40,7 @@ import ChannelReducer, {
   IChannelState,
   getChannels
 } from './reducers'
-import { setActiveChannelAC } from './actions'
+import { setActiveChannelAC, setDraggedAttachmentsAC } from './actions'
 import { updateMessage } from '../message/reducers'
 import { DEFAULT_CHANNEL_TYPE, LOADING_STATE, MESSAGE_DELIVERY_STATUS, MESSAGE_STATUS } from '../../helpers/constants'
 import { makeChannel, makeMessage, makeUser, resetMessageListFixtureIds } from '../../testUtils/messageFixtures'
@@ -452,6 +452,61 @@ describe('channel reducer - updateChannelLastMessageStatus', () => {
 
     expect(state.channels[0].lastMessage.deliveryStatus).toBe(MESSAGE_DELIVERY_STATUS.READ)
   })
+
+  it('keeps chat-list fields that are newer than the passed channel copy', () => {
+    const lastMsg = makeMessage({ id: 'last-msg', channelId: 'ch-1', deliveryStatus: MESSAGE_DELIVERY_STATUS.SENT })
+    const cachedChannel = makeChannel({ id: 'ch-1', lastMessage: lastMsg, newMentionCount: 0 })
+    let state = ChannelReducer(getInitialState(), setChannels({ channels: [{ ...cachedChannel, newMentionCount: 2 }] }))
+    state = ChannelReducer(
+      state,
+      updateChannelLastMessageStatus({
+        channel: cachedChannel,
+        message: { ...lastMsg, deliveryStatus: MESSAGE_DELIVERY_STATUS.READ }
+      })
+    )
+
+    expect(state.channels[0].newMentionCount).toBe(2)
+    expect(state.channels[0].lastMessage.deliveryStatus).toBe(MESSAGE_DELIVERY_STATUS.READ)
+  })
+
+  it('does not replace a newer preview with the message whose status changed', () => {
+    const older = makeMessage({
+      id: '9007199254741300',
+      channelId: 'ch-1',
+      deliveryStatus: MESSAGE_DELIVERY_STATUS.SENT
+    })
+    const newer = makeMessage({ id: '9007199254741301', channelId: 'ch-1', body: 'received during a refresh' })
+    const cachedChannel = makeChannel({ id: 'ch-1', lastMessage: older })
+    let state = ChannelReducer(getInitialState(), setChannels({ channels: [{ ...cachedChannel, lastMessage: newer }] }))
+    state = ChannelReducer(
+      state,
+      updateChannelLastMessageStatus({
+        channel: cachedChannel,
+        message: { ...older, deliveryStatus: MESSAGE_DELIVERY_STATUS.READ }
+      })
+    )
+
+    expect(state.channels[0].lastMessage).toEqual(newer)
+  })
+
+  it('keeps the chat-list copy of the same message and changes only its status', () => {
+    const lastMsg = makeMessage({ id: '9007199254741310', channelId: 'ch-1', body: 'original' })
+    const cachedChannel = makeChannel({ id: 'ch-1', lastMessage: lastMsg })
+    let state = ChannelReducer(
+      getInitialState(),
+      setChannels({ channels: [{ ...cachedChannel, lastMessage: { ...lastMsg, body: 'edited' } }] })
+    )
+    state = ChannelReducer(
+      state,
+      updateChannelLastMessageStatus({
+        channel: cachedChannel,
+        message: { ...lastMsg, deliveryStatus: MESSAGE_DELIVERY_STATUS.READ }
+      })
+    )
+
+    expect(state.channels[0].lastMessage.body).toBe('edited')
+    expect(state.channels[0].lastMessage.deliveryStatus).toBe(MESSAGE_DELIVERY_STATUS.READ)
+  })
 })
 
 describe('channel reducer - searched channels sync', () => {
@@ -703,6 +758,52 @@ describe('channel reducer - drag and drop', () => {
     state = ChannelReducer(state, setDraggedAttachments({ attachments: [], type: 'file' }))
 
     expect(state.draggedAttachments.length).toBe(0)
+  })
+})
+
+describe('channel reducer - native dropped files', () => {
+  it.each(['application/pdf', '', 'application/octet-stream'])(
+    'retains original File identity, MIME and lastModified without serializing (%s)',
+    (type) => {
+      const file = new File(['original file bytes'], 'report.pdf', { type, lastModified: 1234 })
+      const attachment = Object.freeze({ data: file, name: file.name, type: file.type })
+      const state = ChannelReducer(getInitialState(), setDraggedAttachmentsAC([attachment], 'file'))
+      expect(state.draggedAttachments).toHaveLength(1)
+      expect(state.draggedAttachments[0].data).toBe(file)
+      expect(state.draggedAttachments[0].name).toBe(file.name)
+      expect(state.draggedAttachments[0].type).toBe(type)
+      expect(state.draggedAttachments[0].data.lastModified).toBe(1234)
+      expect(attachment.data).toBe(file)
+      expect(file.size).toBe('original file bytes'.length)
+    }
+  )
+
+  it('keeps distinct native Files with identical names in their original order', () => {
+    const files = [new File(['first'], 'same.txt'), new File(['second'], 'same.txt')]
+    const state = ChannelReducer(
+      getInitialState(),
+      setDraggedAttachmentsAC(
+        files.map((file) => ({ data: file, name: file.name, type: file.type })),
+        'media'
+      )
+    )
+    expect(state.draggedAttachments).toHaveLength(2)
+    expect(state.draggedAttachments[0].data).toBe(files[0])
+    expect(state.draggedAttachments[1].data).toBe(files[1])
+    expect(state.draggedAttachments.every((attachment) => attachment.attachmentType === 'media')).toBe(true)
+  })
+
+  it('clears the queue without mutating its previous state or original File', () => {
+    const file = new File([], 'empty.txt')
+    const previous = ChannelReducer(
+      getInitialState(),
+      setDraggedAttachmentsAC([{ data: file, name: file.name, type: file.type }], 'file')
+    )
+    const cleared = ChannelReducer(previous, setDraggedAttachmentsAC([], ''))
+    expect(cleared.draggedAttachments).toEqual([])
+    expect(previous.draggedAttachments).toHaveLength(1)
+    expect(previous.draggedAttachments[0].data).toBe(file)
+    expect(file.size).toBe(0)
   })
 })
 

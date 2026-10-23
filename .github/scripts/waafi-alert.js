@@ -17,14 +17,14 @@
  *   WAAFI_SENDER_ID         sender user id (default 37494000000)
  *   WAAFI_GITLAB_API_TOKEN  GitLab only: read_api token. Adds the job lists, the
  *                           "fixed" check and the stale-MR skip.
- * GitHub also needs GITHUB_TOKEN (actions: read, pull-requests: read).
+ * GitHub also needs GITHUB_TOKEN (actions: read, pull-requests: read) and, from the
+ * workflow, WAAFI_PR_NUMBER (github.event.pull_request.number, empty on push) and
+ * WAAFI_DEFAULT_BRANCH (github.event.repository.default_branch).
  *
  * A missing key or channel id skips the alert with a warning, so CI does not
  * break before the settings exist. A failed delivery exits 1.
  */
 'use strict'
-
-const fs = require('fs')
 
 const API_BASE = process.env.WAAFI_API_BASE || 'https://uk-london-south-api-v2.waafi.com/v1/dwpe7qzx1k'
 const SENDER_ID = process.env.WAAFI_SENDER_ID || '37494000000'
@@ -50,22 +50,23 @@ async function githubContext() {
   const repo = env('GITHUB_REPOSITORY')
   const runId = env('GITHUB_RUN_ID')
   const headers = { Authorization: `Bearer ${env('GITHUB_TOKEN')}`, Accept: 'application/vnd.github+json' }
-  const payload = env('GITHUB_EVENT_PATH') ? JSON.parse(fs.readFileSync(env('GITHUB_EVENT_PATH'), 'utf8')) : {}
+  const prNumber = env('WAAFI_PR_NUMBER')
 
   const run = await getJson(`${api}/repos/${repo}/actions/runs/${runId}`, headers)
   const ctx = {
     platform: 'GitHub',
     repo,
     branch: run.head_branch,
-    defaultBranch: payload.repository?.default_branch,
-    sha: payload.pull_request?.head?.sha || run.head_sha,
+    defaultBranch: env('WAAFI_DEFAULT_BRANCH'),
+    // For pull_request runs this is the PR head commit.
+    sha: run.head_sha,
     runLabel: `Run #${run.run_number}`,
     runUrl: run.html_url,
     actor: run.triggering_actor?.login || run.actor?.login
   }
 
-  if (payload.pull_request) {
-    const pr = await getJson(`${api}/repos/${repo}/pulls/${payload.pull_request.number}`, headers)
+  if (/^\d+$/.test(prNumber)) {
+    const pr = await getJson(`${api}/repos/${repo}/pulls/${prNumber}`, headers)
     if (pr.head.sha !== ctx.sha || pr.state !== 'open') return { skip: 'PR closed or newer commits exist.' }
     ctx.change = {
       label: `PR #${pr.number}`,
