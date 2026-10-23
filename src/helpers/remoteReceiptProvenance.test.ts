@@ -1,4 +1,4 @@
-import { addRemoteReceipt, hasRemoteReceipt } from './remoteReceiptProvenance'
+import { addRemoteReceipt, hasRemoteReceipt, mergeRemoteReceipts } from './remoteReceiptProvenance'
 import { MESSAGE_DELIVERY_STATUS } from './constants'
 import { makeMessage, makeUser } from '../testUtils/messageFixtures'
 
@@ -50,4 +50,27 @@ it('isolates pending temporary identities and resets provenance when the message
   expect(hasRemoteReceipt(next, another, receipt)).toBe(false)
   expect(hasRemoteReceipt(next, another, marker('other-reader'))).toBe(true)
   expect(hasRemoteReceipt(one, pending, receipt)).toBe(true)
+})
+
+it('merges the readers of two copies of the same message without mutating either', () => {
+  const readers = Array.from({ length: 40 }, (_, index) => marker(`reader-${index}`))
+  const left = readers.slice(0, 25).reduce((state, receipt) => addRemoteReceipt(state, message, receipt), undefined)!
+  const right = readers.slice(15).reduce((state, receipt) => addRemoteReceipt(state, message, receipt), undefined)!
+  Object.freeze(left)
+  Object.freeze(right)
+  const merged = mergeRemoteReceipts(left, right)!
+  for (const receipt of readers) expect(hasRemoteReceipt(merged, message, receipt)).toBe(true)
+  expect(hasRemoteReceipt(left, message, readers[39])).toBe(false)
+  expect(hasRemoteReceipt(right, message, readers[0])).toBe(false)
+  // Nothing new to add returns the same record.
+  expect(mergeRemoteReceipts(merged, left)).toBe(merged)
+  expect(mergeRemoteReceipts(undefined, left)).toBe(left)
+  expect(mergeRemoteReceipts(left, undefined)).toBe(left)
+})
+
+it('does not merge readers recorded for a different message', () => {
+  const other = makeMessage({ id: '9007199254741002', channelId: 'receipt-index' })
+  const mine = addRemoteReceipt(undefined, message, marker('reader'))!
+  const theirs = addRemoteReceipt(undefined, other, marker('someone-else'))!
+  expect(mergeRemoteReceipts(mine, theirs)).toBe(mine)
 })

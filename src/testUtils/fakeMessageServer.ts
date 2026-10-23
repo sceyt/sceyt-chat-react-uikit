@@ -8,6 +8,7 @@
  */
 import { IChannel, IMessage } from '../types'
 import { MESSAGE_DELIVERY_STATUS, MESSAGE_STATUS } from '../helpers/constants'
+import { shouldSkipDeliveryStatusUpdate } from '../helpers/messagesHalper'
 import { makeChannel, makeMessage, makeUser } from './messageFixtures'
 
 export type FakeServerRequest = {
@@ -78,6 +79,15 @@ export class FakeMessageServer {
     }
   }
 
+  /** A recipient receives/reads a message before the sender learns about it. */
+  setDeliveryStatus(channelId: string, messageId: string, deliveryStatus: string) {
+    const message = (this.histories[channelId] || []).find((item) => item.id === messageId)
+    if (!message) throw new Error(`Unknown message ${messageId} in ${channelId}`)
+    // The server never lowers a status (a late "delivered" after "read").
+    if (shouldSkipDeliveryStatusUpdate(deliveryStatus, message.deliveryStatus)) return
+    this.replaceMessage(channelId, { ...message, deliveryStatus })
+  }
+
   /** The remote user reacts to a message (as the chat list reports it afterwards). */
   react(channelId: string, messageId: string, key = '👍') {
     const message = (this.histories[channelId] || []).find((item) => item.id === messageId)!
@@ -119,7 +129,8 @@ export class FakeMessageServer {
           'setParentMessageId',
           'setReplyInThread',
           'setDisableMentionsCount',
-          'setViewOnce'
+          'setViewOnce',
+          'setForwardingMessageId'
         ].forEach((method) => {
           builder[method] = chain(method.replace(/^set/, '').replace(/^./, (c) => c.toLowerCase()))
         })
@@ -129,7 +140,7 @@ export class FakeMessageServer {
           body: fields.body,
           bodyAttributes: fields.bodyAttributes || [],
           metadata: fields.metadata || '',
-          attachments: [],
+          attachments: fields.attachments || [],
           mentionedUsers: [],
           user: makeUser({ id: 'current-user' }),
           createdAt: new Date(),
@@ -137,7 +148,21 @@ export class FakeMessageServer {
           state: MESSAGE_STATUS.UNMODIFIED,
           incoming: false,
           type: fields.type || 'text',
-          channelId
+          channelId,
+          ...(fields.forwardingMessageId
+            ? { forwardingDetails: { messageId: fields.forwardingMessageId, channelId: '', user: null, hops: 0 } }
+            : {})
+        })
+        return builder
+      },
+      createAttachmentBuilder: (url: any, type: string) => {
+        const fields: any = { url, type, metadata: '', upload: false }
+        const builder: any = { create: () => ({ ...fields, data: url }) }
+        ;['setName', 'setMetadata', 'setFileSize', 'setUpload'].forEach((method) => {
+          builder[method] = (value: any) => {
+            fields[method.replace(/^set/, '').replace(/^./, (c) => c.toLowerCase())] = value
+            return builder
+          }
         })
         return builder
       },
