@@ -339,21 +339,10 @@ const Attachment = ({
     e.stopPropagation()
     if (downloadIsCancelled) {
       setDownloadIsCancelled(false)
-      if (customDownloader) {
-        customDownloader(
-          attachment.url,
-          false,
-          (progress) => {
-            const loadedRes = progress.loaded && progress.loaded / progress.total
-            const uploadPercent = loadedRes && loadedRes * 100
-            setSizeProgress({ loaded: progress.loaded || 0, total: progress.total || 0 })
-            setProgress(uploadPercent)
-          },
-          messageType,
-          attachment.messageId
-        ).then((url) => {
-          downloadImage(url)
-        })
+      if (getCustomUploader()) {
+        // Resume through the shared full download. Asking the custom downloader
+        // for a bare URL would load the image without its authorization headers.
+        handleResumeOriginalImageDownload(e)
       } else {
         downloadImage(attachment.url)
       }
@@ -770,7 +759,7 @@ const Attachment = ({
       })
   }
 
-  const handleResumeOriginalImageDownload = (event: React.MouseEvent) => {
+  const handleResumeOriginalImageDownload = (event: Pick<Event, 'stopPropagation'>) => {
     event.stopPropagation()
     if (!attachment.url) return
 

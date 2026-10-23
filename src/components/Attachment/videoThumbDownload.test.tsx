@@ -790,6 +790,22 @@ describe('custom downloader receives the message ID', () => {
     expect(download).toHaveBeenCalledWith('https://cdn/voice.mp3', true, expect.any(Function), undefined, 'message-id')
   })
 
+  it('resuming a cancelled image download asks for the full file, never a bare URL', async () => {
+    mockGetAttachmentUrlFromCache.mockResolvedValue(false)
+
+    renderMediaAttachment(imageAttachment)
+    await flushAttachmentEffects()
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel image download' }))
+    await flushAttachmentEffects()
+    fireEvent.click(screen.getByRole('button', { name: 'Download image' }))
+    await flushAttachmentEffects()
+
+    expect(download).toHaveBeenCalledTimes(2)
+    download.mock.calls.forEach((call: any[]) => {
+      expect(call).toEqual(['https://cdn/image.jpg', true, expect.any(Function), undefined, 'message-id'])
+    })
+  })
+
   it('direct download after a failed cache lookup', async () => {
     mockGetAttachmentUrlFromCache.mockRejectedValue(new Error('cache unavailable'))
 
