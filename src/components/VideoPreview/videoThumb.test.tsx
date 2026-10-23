@@ -91,7 +91,12 @@ describe('VideoPreview video_thumb rendering', () => {
 
     await flushPreviewEffects()
 
-    expect(mockDownloadVideoThumb).toHaveBeenCalledWith('https://cdn/video-thumb.jpg', undefined, undefined)
+    expect(mockDownloadVideoThumb).toHaveBeenCalledWith(
+      'https://cdn/video-thumb.jpg',
+      undefined,
+      undefined,
+      'message-id'
+    )
     expect(mockGetVideoFirstFrame).not.toHaveBeenCalled()
     const pendingPreview = Array.from(container.querySelectorAll('img')).find(
       (image) => image.getAttribute('src') === 'blob:downloaded-video-thumb'

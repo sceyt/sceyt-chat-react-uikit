@@ -42,7 +42,8 @@ export interface ICustomUploader {
     uri: string,
     download: boolean,
     progressCallback: (progress: any) => void,
-    messageType: string | null | undefined
+    messageType: string | null | undefined,
+    messageId?: string | null
   ) => Promise<any>
   // eslint-disable-next-line no-unused-vars
   cancelRequest: (requestPromise: any) => void

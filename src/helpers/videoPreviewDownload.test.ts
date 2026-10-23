@@ -23,9 +23,11 @@ describe('downloadVideoThumb', () => {
     const preview = new Blob(['preview'], { type: 'image/jpeg' })
     const downloader = jest.fn().mockResolvedValue({ Body: preview })
 
-    await expect(downloadVideoThumb('https://cdn/preview.jpg', downloader, 'text')).resolves.toBe('blob:preview')
+    await expect(downloadVideoThumb('https://cdn/preview.jpg', downloader, 'text', 'message-id')).resolves.toBe(
+      'blob:preview'
+    )
 
-    expect(downloader).toHaveBeenCalledWith('https://cdn/preview.jpg', true, expect.any(Function), 'text')
+    expect(downloader).toHaveBeenCalledWith('https://cdn/preview.jpg', true, expect.any(Function), 'text', 'message-id')
     expect(mockSetAttachmentToCache).toHaveBeenCalledWith('https://cdn/preview.jpg', expect.any(Response))
   })
 

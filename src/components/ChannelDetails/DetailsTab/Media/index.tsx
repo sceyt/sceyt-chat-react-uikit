@@ -41,6 +41,7 @@ const startMediaVideoDownload = (file: IAttachment) => {
     url: file.url,
     cacheKey: originalVideo,
     kind: 'original-video',
+    messageId: file.messageId,
     size: Number(file.size) || 0
   })
 }

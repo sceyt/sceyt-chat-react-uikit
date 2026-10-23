@@ -122,7 +122,7 @@ const VideoPreview = memo(
       if (!videoThumb || downloadedPreviewImage) return
 
       let cancelled = false
-      downloadVideoThumb(videoThumb, getCustomDownloader(), messageType)
+      downloadVideoThumb(videoThumb, getCustomDownloader(), messageType, file.messageId)
         .then((localPreviewUrl) => {
           if (!cancelled) {
             dispatch(setUpdateMessageAttachmentAC(videoThumb, localPreviewUrl))

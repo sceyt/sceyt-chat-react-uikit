@@ -349,7 +349,8 @@ const Attachment = ({
             setSizeProgress({ loaded: progress.loaded || 0, total: progress.total || 0 })
             setProgress(uploadPercent)
           },
-          messageType
+          messageType,
+          attachment.messageId
         ).then((url) => {
           downloadImage(url)
         })
@@ -449,7 +450,8 @@ const Attachment = ({
           setSizeProgress({ loaded: progress.loaded || 0, total: progress.total || 0 })
           setProgress(uploadPercent)
         },
-        messageType
+        messageType,
+        attachment.messageId
       )
       setDownloadFilePromise(attachment.id!, urlPromise)
       const result = await urlPromise
@@ -691,6 +693,7 @@ const Attachment = ({
         cacheKey: originalVideoCacheKey,
         kind: 'original-video',
         messageType,
+        messageId: attachment.messageId,
         size: Number(attachment.size) || 0
       })
         .then(({ objectUrl }) => {
@@ -749,6 +752,7 @@ const Attachment = ({
       cacheKey: originalVideoCacheKey,
       kind: 'original-video',
       messageType,
+      messageId: attachment.messageId,
       size: Number(attachment.size) || 0
     })
       .then(({ objectUrl }) => {
@@ -783,6 +787,7 @@ const Attachment = ({
       cacheKeys: [attachment.url + '_original_image_url'],
       kind: 'original-image',
       messageType,
+      messageId: attachment.messageId,
       size: Number(attachment.size) || 0
     })
       .then(async ({ objectUrl }) => {
@@ -854,6 +859,7 @@ const Attachment = ({
                 cacheKeys: [attachment.url + '_original_image_url'],
                 kind: 'original-image',
                 messageType,
+                messageId: attachment.messageId,
                 size: Number(attachment.size) || 0
               })
                 .then(async ({ objectUrl }) => {
@@ -906,6 +912,7 @@ const Attachment = ({
                 cacheKey: attachment.url,
                 kind,
                 messageType,
+                messageId: attachment.messageId,
                 size: Number(attachment.size) || 0
               })
                 .then(({ objectUrl }) => {
@@ -935,7 +942,8 @@ const Attachment = ({
                 setSizeProgress({ loaded: progress.loaded || 0, total: progress.total || 0 })
                 setProgress(uploadPercent)
               },
-              messageType
+              messageType,
+              attachment.messageId
             ).then(async (url) => {
               let downloadingUrl = url
               if (attachment.type === attachmentTypes.image) {
