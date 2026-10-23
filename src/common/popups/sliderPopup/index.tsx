@@ -468,6 +468,7 @@ const SliderPopup: React.FC<IProps> = ({
                 cacheKey: attachmentKey,
                 kind,
                 messageType,
+                messageId: currentFile?.messageId,
                 size: Number(currentFileSize) || 0
               })
                 .then(({ objectUrl }) => {

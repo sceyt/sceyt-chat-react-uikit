@@ -738,3 +738,64 @@ describe('video attachment preview and download states', () => {
     expect(global.fetch).toHaveBeenCalledTimes(2)
   })
 })
+
+describe('custom downloader receives the message ID', () => {
+  const imageAttachment = {
+    ...videoAttachment,
+    id: 'image-attachment-id',
+    tid: 'image-attachment-tid',
+    type: attachmentTypes.image,
+    url: 'https://cdn/image.jpg',
+    attachmentUrl: '',
+    metadata: JSON.stringify({ szw: 1280, szh: 720, tmb: 'a'.repeat(80) })
+  }
+  let download: jest.Mock
+
+  beforeEach(() => {
+    jest.clearAllMocks()
+    resetMediaDownloadCoordinatorForTests()
+    mockSetAttachmentToCache.mockResolvedValue(undefined)
+    download = jest.fn(() => new Promise(() => undefined))
+    mockCustomUploader = { download, cancelRequest: jest.fn(), upload: jest.fn() }
+  })
+
+  afterEach(() => {
+    mockCustomUploader = undefined
+  })
+
+  it('original image', async () => {
+    mockGetAttachmentUrlFromCache.mockResolvedValue(false)
+
+    renderMediaAttachment(imageAttachment)
+    await flushAttachmentEffects()
+
+    expect(download).toHaveBeenCalledWith('https://cdn/image.jpg', true, expect.any(Function), undefined, 'message-id')
+  })
+
+  it('original video', async () => {
+    mockGetAttachmentUrlFromCache.mockResolvedValueOnce('blob:cached-thumb').mockResolvedValueOnce(false)
+
+    renderAttachment()
+    await flushAttachmentEffects()
+
+    expect(download).toHaveBeenCalledWith('https://cdn/video.mp4', true, expect.any(Function), undefined, 'message-id')
+  })
+
+  it('voice message', async () => {
+    mockGetAttachmentUrlFromCache.mockResolvedValue(false)
+
+    renderMediaAttachment({ ...imageAttachment, type: attachmentTypes.voice, url: 'https://cdn/voice.mp3' })
+    await flushAttachmentEffects()
+
+    expect(download).toHaveBeenCalledWith('https://cdn/voice.mp3', true, expect.any(Function), undefined, 'message-id')
+  })
+
+  it('direct download after a failed cache lookup', async () => {
+    mockGetAttachmentUrlFromCache.mockRejectedValue(new Error('cache unavailable'))
+
+    renderMediaAttachment(imageAttachment)
+    await flushAttachmentEffects()
+
+    expect(download).toHaveBeenCalledWith('https://cdn/image.jpg', true, expect.any(Function), undefined, 'message-id')
+  })
+})

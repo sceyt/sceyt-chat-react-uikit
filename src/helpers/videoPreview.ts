@@ -49,7 +49,8 @@ export const getVideoAttachmentCacheKeys = (videoUrl: string, metadata: any) => 
 export const downloadVideoThumb = async (
   videoThumb: string,
   downloader?: any,
-  messageType?: string | null
+  messageType?: string | null,
+  messageId?: string | null
 ): Promise<string> => {
   const cachedUrl = await getAttachmentUrlFromCache(videoThumb).catch(() => false)
   if (typeof cachedUrl === 'string') return cachedUrl
@@ -60,6 +61,7 @@ export const downloadVideoThumb = async (
     cacheKey: videoThumb,
     kind: 'video-thumbnail',
     messageType,
+    messageId,
     downloader,
     customDownload: true,
     // This helper already checked the preview cache above. Avoid consuming a

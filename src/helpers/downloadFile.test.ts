@@ -52,3 +52,35 @@ describe('downloadFile default downloader', () => {
     expect(mockSaveAs).not.toHaveBeenCalled()
   })
 })
+
+describe('downloadFile custom downloader', () => {
+  beforeEach(() => {
+    jest.clearAllMocks()
+  })
+
+  afterEach(() => {
+    setCustomUploader(undefined)
+  })
+
+  it('passes the message id of the attachment to a custom downloader', async () => {
+    const download = jest.fn().mockResolvedValue({ Body: new Blob(['file']) })
+    setCustomUploader({ download, cancelRequest: jest.fn(), upload: jest.fn() } as any)
+
+    await downloadFile(
+      { id: 'file-id', messageId: '9223372036854775807', url: 'https://cdn/file.pdf', name: 'file.pdf' } as any,
+      true,
+      undefined,
+      undefined,
+      'text'
+    )
+
+    expect(download).toHaveBeenCalledWith(
+      'https://cdn/file.pdf',
+      true,
+      expect.any(Function),
+      'text',
+      '9223372036854775807'
+    )
+    expect(mockSaveAs).toHaveBeenCalledWith(expect.any(Blob), 'file.pdf')
+  })
+})
