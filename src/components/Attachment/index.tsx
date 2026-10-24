@@ -339,7 +339,7 @@ const Attachment = ({
     e.stopPropagation()
     if (downloadIsCancelled) {
       setDownloadIsCancelled(false)
-      if (getCustomUploader()) {
+      if (customDownloader) {
         // Resume through the shared full download. Asking the custom downloader
         // for a bare URL would load the image without its authorization headers.
         handleResumeOriginalImageDownload(e)

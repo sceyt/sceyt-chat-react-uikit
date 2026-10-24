@@ -37,6 +37,19 @@ export interface IUploadTask {
 export interface ICustomUploader {
   // eslint-disable-next-line no-unused-vars
   upload: (attachment: IAttachment, uploadTask: IUploadTask, messageType: string | null | undefined) => void
+  /**
+   * `messageId` is the ID of a message the attachment appears in, supplied by
+   * the client. Treat it as a hint, not proof of access:
+   * - Media previews (images, videos, voice, video thumbnails) are shared and
+   *   cached by `uri`. When several messages use the same file (e.g. forwards),
+   *   only the first request's ID is sent, and its failure is shared too.
+   * - A file already in the browser's attachment cache is served without
+   *   calling `download`; that cache is per origin, not per user.
+   * - It may be empty (`''`) or missing for messages that are not confirmed yet.
+   * The backend must verify that the caller can read the message and that
+   * `uri` legitimately belongs to it (e.g. traced to its original upload),
+   * before serving the file.
+   */
   // eslint-disable-next-line no-unused-vars
   download: (
     uri: string,

@@ -12,6 +12,16 @@ import {
 } from '../../helpers/mediaDownloadCoordinator'
 
 let mockCustomUploader: any
+let mockCompressAndCacheImage: ((...args: any[]) => Promise<any>) | undefined
+
+jest.mock('../../helpers/getVideoFrame', () => {
+  const actual = jest.requireActual('../../helpers/getVideoFrame')
+  return {
+    ...actual,
+    compressAndCacheImage: (...args: any[]) =>
+      mockCompressAndCacheImage ? mockCompressAndCacheImage(...args) : actual.compressAndCacheImage(...args)
+  }
+})
 
 jest.mock('../../hooks', () => {
   const { THEME_COLORS } = require('../../UIHelper/constants')
@@ -790,7 +800,7 @@ describe('custom downloader receives the message ID', () => {
     expect(download).toHaveBeenCalledWith('https://cdn/voice.mp3', true, expect.any(Function), undefined, 'message-id')
   })
 
-  it('resuming a cancelled image download asks for the full file, never a bare URL', async () => {
+  it('retrying a cancelled image download sends the message ID', async () => {
     mockGetAttachmentUrlFromCache.mockResolvedValue(false)
 
     renderMediaAttachment(imageAttachment)
@@ -804,6 +814,41 @@ describe('custom downloader receives the message ID', () => {
     download.mock.calls.forEach((call: any[]) => {
       expect(call).toEqual(['https://cdn/image.jpg', true, expect.any(Function), undefined, 'message-id'])
     })
+  })
+
+  it('resuming from the cancel control asks for the full file, never a bare URL', async () => {
+    const originalCreateObjectURL = URL.createObjectURL
+    URL.createObjectURL = jest.fn(() => 'blob:image')
+    // Hold compression open so the retry stays in its restarting state after
+    // the bytes arrive; the cancel control then toggles cancel/resume locally.
+    mockCompressAndCacheImage = () => new Promise(() => undefined)
+    mockGetAttachmentUrlFromCache.mockResolvedValue(false)
+    try {
+      renderMediaAttachment(imageAttachment)
+      await flushAttachmentEffects()
+      fireEvent.click(screen.getByRole('button', { name: 'Cancel image download' }))
+      await flushAttachmentEffects()
+      download.mockResolvedValueOnce({ Body: new Blob(['image'], { type: 'image/jpeg' }) })
+      fireEvent.click(screen.getByRole('button', { name: 'Download image' }))
+      await flushAttachmentEffects()
+      await flushAttachmentEffects()
+      fireEvent.click(screen.getByRole('button', { name: 'Cancel image download' }))
+      await flushAttachmentEffects()
+      fireEvent.click(screen.getByRole('button', { name: 'Cancel image download' }))
+      await flushAttachmentEffects()
+
+      expect(download).toHaveBeenCalledTimes(3)
+      expect(download.mock.calls[2]).toEqual([
+        'https://cdn/image.jpg',
+        true,
+        expect.any(Function),
+        undefined,
+        'message-id'
+      ])
+    } finally {
+      mockCompressAndCacheImage = undefined
+      URL.createObjectURL = originalCreateObjectURL
+    }
   })
 
   it('direct download after a failed cache lookup', async () => {

@@ -4,6 +4,7 @@ import VideoPreview from './index'
 import { attachmentTypes } from '../../helpers/constants'
 import { getVideoFirstFrame } from '../../helpers/getVideoFrame'
 import { downloadVideoThumb } from '../../helpers/videoPreview'
+import { getAttachmentUrlFromCache } from '../../helpers/attachmentsCache'
 import { createMessageListStore, renderWithSceytProvider } from '../../testUtils/messageListHarness'
 
 jest.mock('../../hooks', () => {
@@ -18,8 +19,10 @@ jest.mock('../../hooks', () => {
   }
 })
 
+let mockCustomDownloader: any
+
 jest.mock('../../helpers/customUploader', () => ({
-  getCustomDownloader: () => undefined
+  getCustomDownloader: () => mockCustomDownloader
 }))
 
 jest.mock('../../helpers/getVideoFrame', () => ({
@@ -44,6 +47,7 @@ jest.mock('../../helpers/videoPreview', () => {
 })
 
 const mockGetVideoFirstFrame = getVideoFirstFrame as jest.Mock
+const mockGetAttachmentUrlFromCache = getAttachmentUrlFromCache as jest.Mock
 const mockDownloadVideoThumb = downloadVideoThumb as jest.Mock
 
 const flushPreviewEffects = async () => {
@@ -407,5 +411,75 @@ describe('VideoPreview video_thumb rendering', () => {
     )
 
     expect(container.querySelector('.video-controls')).not.toBeInTheDocument()
+  })
+})
+
+describe('VideoPreview video_thumb with a custom downloader', () => {
+  // A forwarded video is rendered before the send is confirmed: the SDK gives
+  // the pending attachment an empty message ID.
+  const pendingFile = {
+    id: 'video-id',
+    tid: 'video-tid',
+    messageId: '',
+    name: 'video.mp4',
+    type: attachmentTypes.video,
+    url: 'https://cdn/video.mp4',
+    metadata: JSON.stringify({ szw: 1280, szh: 720, dur: 17, video_thumb: 'https://cdn/video-thumb.jpg' }),
+    attachmentUrl: '',
+    size: 100,
+    createdAt: new Date()
+  }
+  const renderPreview = (file: any) => (
+    <VideoPreview
+      width='420px'
+      height='240px'
+      file={file}
+      src='https://cdn/video.mp4'
+      backgroundColor='#ffffff'
+      downloading={false}
+    />
+  )
+
+  beforeEach(() => {
+    jest.clearAllMocks()
+    mockCustomDownloader = jest.fn()
+    mockGetAttachmentUrlFromCache.mockResolvedValue(false)
+  })
+
+  afterEach(() => {
+    mockCustomDownloader = undefined
+  })
+
+  it('shows a cached preview of a pending forwarded video', async () => {
+    mockGetAttachmentUrlFromCache.mockResolvedValue('blob:cached-video-thumb')
+
+    const { container } = renderWithSceytProvider(renderPreview(pendingFile), { store: createMessageListStore() })
+    await flushPreviewEffects()
+
+    expect(mockDownloadVideoThumb).not.toHaveBeenCalled()
+    const cachedPreview = Array.from(container.querySelectorAll('img')).find(
+      (image) => image.getAttribute('src') === 'blob:cached-video-thumb'
+    )
+    expect(cachedPreview).toBeDefined()
+  })
+
+  it('downloads the preview once the message ID of a pending forwarded video arrives', async () => {
+    mockDownloadVideoThumb.mockResolvedValue('blob:downloaded-video-thumb')
+
+    const { rerender } = renderWithSceytProvider(renderPreview(pendingFile), { store: createMessageListStore() })
+    await flushPreviewEffects()
+
+    expect(mockDownloadVideoThumb).not.toHaveBeenCalled()
+
+    rerender(renderPreview({ ...pendingFile, messageId: '9223372036854775807' }))
+    await flushPreviewEffects()
+
+    expect(mockDownloadVideoThumb).toHaveBeenCalledTimes(1)
+    expect(mockDownloadVideoThumb).toHaveBeenCalledWith(
+      'https://cdn/video-thumb.jpg',
+      mockCustomDownloader,
+      undefined,
+      '9223372036854775807'
+    )
   })
 })

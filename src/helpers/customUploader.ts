@@ -19,7 +19,8 @@ export const getSendAttachmentsAsSeparateMessages = () => sendAttachmentsAsSepar
 
 export const getCustomUploader = () => CustomUploader
 
-export const getCustomDownloader = () => CustomUploader && CustomUploader.download
+export const getCustomDownloader = (): ICustomUploader['download'] | undefined =>
+  CustomUploader && CustomUploader.download
 
 export const customUpload = (
   attachment: IAttachment,
