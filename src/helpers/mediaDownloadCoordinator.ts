@@ -13,12 +13,14 @@ export interface MediaDownloadRequest {
   cacheKeys?: string[]
   kind: MediaDownloadKind
   messageType?: string | null
+  messageId?: string | null
   size?: number
   downloader?: (
     url: string,
     download: boolean,
     progress: (progress: any) => void,
-    messageType?: string | null
+    messageType?: string | null,
+    messageId?: string | null
   ) => Promise<any>
   customDownload?: boolean
   skipCacheLookup?: boolean
@@ -134,7 +136,13 @@ const download = async (request: MediaDownloadRequest, job: MediaDownloadJob): P
     // use `download: true` for that full-download path; `false` only returns
     // a short-lived URL which the coordinator would have to fetch again.
     const requestBlob = request.customDownload ?? true
-    const customRequest = customDownloader(request.url, requestBlob, reportProgress, request.messageType)
+    const customRequest = customDownloader(
+      request.url,
+      requestBlob,
+      reportProgress,
+      request.messageType,
+      request.messageId
+    )
     job.customRequest = customRequest
     const result = await customRequest
     const body = result?.Body || result

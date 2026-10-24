@@ -120,11 +120,21 @@ const VideoPreview = memo(
 
     useEffect(() => {
       if (!videoThumb || downloadedPreviewImage) return
+      const customDownloader = getCustomDownloader()
+      // A custom downloader authorizes by message ID. A pending (e.g. forwarded)
+      // video has none yet: show a cached preview, but download only once the
+      // confirmed message ID arrives instead of sending a request that fails.
+      const previewRequest: Promise<string | undefined> =
+        customDownloader && !file.messageId
+          ? getAttachmentUrlFromCache(videoThumb)
+              .catch(() => false)
+              .then((cachedUrl) => (typeof cachedUrl === 'string' ? cachedUrl : undefined))
+          : downloadVideoThumb(videoThumb, customDownloader, messageType, file.messageId)
 
       let cancelled = false
-      downloadVideoThumb(videoThumb, getCustomDownloader(), messageType)
+      previewRequest
         .then((localPreviewUrl) => {
-          if (!cancelled) {
+          if (!cancelled && localPreviewUrl) {
             dispatch(setUpdateMessageAttachmentAC(videoThumb, localPreviewUrl))
           }
         })
@@ -137,7 +147,7 @@ const VideoPreview = memo(
       return () => {
         cancelled = true
       }
-    }, [videoThumb, downloadedPreviewImage, dispatch, messageType])
+    }, [videoThumb, downloadedPreviewImage, dispatch, messageType, file.messageId])
 
     useEffect(() => {
       const videoSource = src
@@ -313,6 +323,8 @@ const VideoPreview = memo(
   (prev, next) =>
     prev.src === next.src &&
     prev.file.id === next.file.id &&
+    prev.file.messageId === next.file.messageId &&
+    prev.messageType === next.messageType &&
     prev.file.url === next.file.url &&
     prev.file.metadata === next.file.metadata &&
     prev.uploading === next.uploading &&

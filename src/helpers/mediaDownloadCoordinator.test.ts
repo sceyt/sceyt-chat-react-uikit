@@ -99,7 +99,49 @@ describe('mediaDownloadCoordinator', () => {
       kind: 'original-image'
     })
 
-    expect(download).toHaveBeenCalledWith('https://cdn/image.jpg', true, expect.any(Function), undefined)
+    expect(download).toHaveBeenCalledWith('https://cdn/image.jpg', true, expect.any(Function), undefined, undefined)
+  })
+
+  it('passes the message id of the attachment to a custom downloader', async () => {
+    const download = jest.fn().mockResolvedValue({ Body: new Blob(['image'], { type: 'image/jpeg' }) })
+    setCustomUploader({ download, cancelRequest: jest.fn(), upload: jest.fn() } as any)
+
+    await requestMediaDownload({
+      key: 'original-image:https://cdn/image.jpg',
+      url: 'https://cdn/image.jpg',
+      cacheKey: 'https://cdn/image.jpg',
+      kind: 'original-image',
+      messageType: 'text',
+      messageId: '9223372036854775807'
+    })
+
+    expect(download).toHaveBeenCalledWith(
+      'https://cdn/image.jpg',
+      true,
+      expect.any(Function),
+      'text',
+      '9223372036854775807'
+    )
+  })
+
+  it('shares one download between two messages using the same file, sent with the first message ID', async () => {
+    const download = jest.fn().mockResolvedValue({ Body: new Blob(['image'], { type: 'image/jpeg' }) })
+    setCustomUploader({ download, cancelRequest: jest.fn(), upload: jest.fn() } as any)
+    const request = {
+      key: 'original-image:https://cdn/shared.jpg',
+      url: 'https://cdn/shared.jpg',
+      cacheKey: 'https://cdn/shared.jpg',
+      kind: 'original-image' as const
+    }
+
+    await Promise.all([
+      requestMediaDownload({ ...request, messageId: '9223372036854775807' }),
+      requestMediaDownload({ ...request, messageId: '9223372036854775808' })
+    ])
+
+    // Forwarded messages point at the same file; the backend authorizes either ID.
+    expect(download).toHaveBeenCalledTimes(1)
+    expect(download.mock.calls[0][4]).toBe('9223372036854775807')
   })
 
   it('reuses a completed browser-cache blob without invoking the downloader', async () => {

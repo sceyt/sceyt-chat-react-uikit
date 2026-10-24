@@ -65,7 +65,8 @@ export const downloadFile = async (
             progressCallback(progress)
           }
         },
-        messageType
+        messageType,
+        attachment.messageId
       )
       filesPromisesOnDownload[attachment.id!] = urlPromise
       const result = await urlPromise

@@ -340,19 +340,9 @@ const Attachment = ({
     if (downloadIsCancelled) {
       setDownloadIsCancelled(false)
       if (customDownloader) {
-        customDownloader(
-          attachment.url,
-          false,
-          (progress) => {
-            const loadedRes = progress.loaded && progress.loaded / progress.total
-            const uploadPercent = loadedRes && loadedRes * 100
-            setSizeProgress({ loaded: progress.loaded || 0, total: progress.total || 0 })
-            setProgress(uploadPercent)
-          },
-          messageType
-        ).then((url) => {
-          downloadImage(url)
-        })
+        // Resume through the shared full download. Asking the custom downloader
+        // for a bare URL would load the image without its authorization headers.
+        handleResumeOriginalImageDownload(e)
       } else {
         downloadImage(attachment.url)
       }
@@ -449,7 +439,8 @@ const Attachment = ({
           setSizeProgress({ loaded: progress.loaded || 0, total: progress.total || 0 })
           setProgress(uploadPercent)
         },
-        messageType
+        messageType,
+        attachment.messageId
       )
       setDownloadFilePromise(attachment.id!, urlPromise)
       const result = await urlPromise
@@ -691,6 +682,7 @@ const Attachment = ({
         cacheKey: originalVideoCacheKey,
         kind: 'original-video',
         messageType,
+        messageId: attachment.messageId,
         size: Number(attachment.size) || 0
       })
         .then(({ objectUrl }) => {
@@ -749,6 +741,7 @@ const Attachment = ({
       cacheKey: originalVideoCacheKey,
       kind: 'original-video',
       messageType,
+      messageId: attachment.messageId,
       size: Number(attachment.size) || 0
     })
       .then(({ objectUrl }) => {
@@ -766,7 +759,7 @@ const Attachment = ({
       })
   }
 
-  const handleResumeOriginalImageDownload = (event: React.MouseEvent) => {
+  const handleResumeOriginalImageDownload = (event: Pick<Event, 'stopPropagation'>) => {
     event.stopPropagation()
     if (!attachment.url) return
 
@@ -783,6 +776,7 @@ const Attachment = ({
       cacheKeys: [attachment.url + '_original_image_url'],
       kind: 'original-image',
       messageType,
+      messageId: attachment.messageId,
       size: Number(attachment.size) || 0
     })
       .then(async ({ objectUrl }) => {
@@ -854,6 +848,7 @@ const Attachment = ({
                 cacheKeys: [attachment.url + '_original_image_url'],
                 kind: 'original-image',
                 messageType,
+                messageId: attachment.messageId,
                 size: Number(attachment.size) || 0
               })
                 .then(async ({ objectUrl }) => {
@@ -906,6 +901,7 @@ const Attachment = ({
                 cacheKey: attachment.url,
                 kind,
                 messageType,
+                messageId: attachment.messageId,
                 size: Number(attachment.size) || 0
               })
                 .then(({ objectUrl }) => {
@@ -935,7 +931,8 @@ const Attachment = ({
                 setSizeProgress({ loaded: progress.loaded || 0, total: progress.total || 0 })
                 setProgress(uploadPercent)
               },
-              messageType
+              messageType,
+              attachment.messageId
             ).then(async (url) => {
               let downloadingUrl = url
               if (attachment.type === attachmentTypes.image) {

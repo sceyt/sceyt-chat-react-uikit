@@ -109,8 +109,8 @@
         "branches": 78
       },
       "./src/helpers/index.tsx": {
-        "lines": 49,
-        "branches": 46
+        "lines": 52,
+        "branches": 49
       },
       "./src/helpers/notifications.ts": {
         "lines": 95,

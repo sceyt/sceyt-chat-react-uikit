@@ -114,6 +114,7 @@ const VoiceItem = ({
           cacheKey: file.url,
           kind: 'voice',
           messageType,
+          messageId: file.messageId,
           size: Number(file.size) || 0
         })
       })
