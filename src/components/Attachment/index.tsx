@@ -181,6 +181,9 @@ const Attachment = ({
   // const [linkDescription, setLinkDescription] = useState('')
   // const [linkImage, setLinkImage] = useState('')
   const [downloadIsCancelled, setDownloadIsCancelled] = useState(false)
+  const [fileDownloadFailed, setFileDownloadFailed] = useState(false)
+  // Read by the download's completion callback, which outlives the render that started it.
+  const fileDownloadCancelledRef = useRef(false)
   const [videoDownloadRetry, setVideoDownloadRetry] = useState(0)
   const [imageDownloadRetry, setImageDownloadRetry] = useState(0)
   const [isOriginalImageRestarting, setIsOriginalImageRestarting] = useState(false)
@@ -241,6 +244,9 @@ const Attachment = ({
   const isPreparingVideo = attachmentCompilationState[attachment.tid!] === UPLOAD_STATE.PREPARING
   const isSharedOriginalVideoDownloading = sharedOriginalVideoDownload.state === 'loading'
   const isSharedOriginalVideoCancelled = sharedOriginalVideoDownload.state === 'cancelled'
+  // A failed download offers the same Download control as a cancelled one, so
+  // it is never mistaken for a downloaded video.
+  const isSharedOriginalVideoFailed = sharedOriginalVideoDownload.state === 'failed'
   // Keep the control responsive in the attachment that initiated cancellation;
   // other mounted chat/media-tab tiles receive the shared cancelled snapshot.
   const shouldShowVideoDownloadRetry =
@@ -250,7 +256,9 @@ const Attachment = ({
     // local cancellation flag in one tile mask the shared loading state in
     // another tile after a second (or later) retry. The local fallback only
     // applies to legacy attachments without a coordinator key.
-    (isSharedOriginalVideoCancelled || (!originalVideoDownloadKey && downloadIsCancelled))
+    (isSharedOriginalVideoCancelled ||
+      isSharedOriginalVideoFailed ||
+      (!originalVideoDownloadKey && downloadIsCancelled))
   const isVideoDownloading = downloadingFile || isSharedOriginalVideoDownloading
   const isVideoDownloadActive = isVideoDownloading || isOriginalVideoRestarting
   const shouldRenderVideoDownloadProgress = Boolean(
@@ -373,9 +381,11 @@ const Attachment = ({
   }
 
   // const ext = getFileExtension(attachment.name || (attachment.data ? attachment.data.name : ''))
-  const handleCompleteDownload = (attachmentId: string) => {
+  const handleCompleteDownload = (attachmentId: string, failed?: boolean) => {
     if (attachmentId === attachment.id) {
       setDownloadingFile(false)
+      // A cancel also ends as a failure; only a real one keeps the retry control shown.
+      setFileDownloadFailed(!!failed && !fileDownloadCancelledRef.current)
     }
   }
   const handleStopStartDownloadFile = (att?: IAttachment) => {
@@ -389,6 +399,7 @@ const Attachment = ({
         }
       } else {
         setDownloadIsCancelled(true)
+        fileDownloadCancelledRef.current = true
         const attachmentId = att ? att.id : attachment.id
         cancelDownloadFile(attachmentId || '')
       }
@@ -405,6 +416,8 @@ const Attachment = ({
   const handleDownloadFileToDevice = (attachment: IAttachment) => {
     setDownloadingFile(true)
     setDownloadIsCancelled(false)
+    setFileDownloadFailed(false)
+    fileDownloadCancelledRef.current = false
     downloadFile(
       attachment,
       true,
@@ -1466,8 +1479,10 @@ const Attachment = ({
           </AttachmentIconCont> */}
           {!isRepliedMessage && !isPreview && (
             <DownloadFile
-              // visible={downloadingFile}
-              // absolutePosition={downloadingFile}
+              role='button'
+              aria-label={fileDownloadFailed ? 'Download failed, retry' : 'Download file'}
+              // Shown on hover only, except after a failed download.
+              visible={fileDownloadFailed && !downloadingFile}
               widthThumb={!!attachmentThumb}
               backgroundColor={attachmentThumb ? overlayBackground2 : accentColor}
               onClick={() => handleStopStartDownloadFile(attachment)}
@@ -1675,8 +1690,8 @@ export const FileThumbnailSkeleton = styled.div<{ color: string }>`
   animation: ${fileThumbnailShimmer} 1.1s ease infinite;
 `
 
-const DownloadFile = styled.span<{ backgroundColor: string; widthThumb?: boolean }>`
-  display: none;
+const DownloadFile = styled.span<{ backgroundColor: string; widthThumb?: boolean; visible?: boolean }>`
+  display: ${(props) => (props.visible ? 'flex' : 'none')};
   align-items: center;
   justify-content: center;
   cursor: pointer;

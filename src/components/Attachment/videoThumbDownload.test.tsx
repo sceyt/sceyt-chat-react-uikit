@@ -86,6 +86,12 @@ jest.mock('../../helpers/customUploader', () => ({
   getCustomUploader: () => mockCustomUploader
 }))
 
+const mockSaveAs = jest.fn()
+jest.mock('file-saver', () => ({
+  __esModule: true,
+  default: { saveAs: (...args: any[]) => mockSaveAs(...args) }
+}))
+
 jest.mock('../../helpers/videoConversion', () => ({
   ensurePlayableVideoBlob: async (blob: Blob) => blob
 }))
@@ -858,5 +864,108 @@ describe('custom downloader receives the message ID', () => {
     await flushAttachmentEffects()
 
     expect(download).toHaveBeenCalledWith('https://cdn/image.jpg', true, expect.any(Function), undefined, 'message-id')
+  })
+})
+
+describe('a failed download is not shown as downloaded', () => {
+  const fileAttachment = {
+    ...videoAttachment,
+    id: 'file-attachment-id',
+    tid: 'file-attachment-tid',
+    name: 'report.pdf',
+    type: attachmentTypes.file,
+    url: 'https://cdn/report.pdf',
+    metadata: ''
+  }
+  const forbidden = () => Object.assign(new Error('DOWNLOAD_FORBIDDEN'), { status: 403 })
+  let download: jest.Mock
+
+  beforeEach(() => {
+    jest.clearAllMocks()
+    resetMediaDownloadCoordinatorForTests()
+    mockSetAttachmentToCache.mockResolvedValue(undefined)
+    download = jest.fn(() => new Promise(() => undefined))
+    mockCustomUploader = { download, cancelRequest: jest.fn(), upload: jest.fn() }
+  })
+
+  afterEach(() => {
+    mockCustomUploader = undefined
+  })
+
+  it('a failed video download shows the Download control, which retries it', async () => {
+    mockGetAttachmentUrlFromCache.mockResolvedValueOnce('blob:cached-thumb').mockResolvedValue(false)
+    download.mockRejectedValueOnce(forbidden())
+
+    renderAttachment()
+    await flushAttachmentEffects()
+    await flushAttachmentEffects()
+
+    fireEvent.click(screen.getByLabelText('Download video'))
+    await flushAttachmentEffects()
+
+    expect(download).toHaveBeenCalledTimes(2)
+    expect(download.mock.calls[1]).toEqual([
+      'https://cdn/video.mp4',
+      true,
+      expect.any(Function),
+      undefined,
+      'message-id'
+    ])
+    expect(screen.queryByLabelText('Download video')).not.toBeInTheDocument()
+  })
+
+  it('a failed file download stays visible as failed, and retrying it downloads the file', async () => {
+    let finishRetry: (result: { Body: Blob }) => void = () => undefined
+    download.mockRejectedValueOnce(forbidden()).mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          finishRetry = resolve
+        })
+    )
+
+    renderMediaAttachment(fileAttachment)
+    await flushAttachmentEffects()
+    expect(screen.getByLabelText('Download file')).not.toBeVisible()
+
+    fireEvent.click(screen.getByLabelText('Download file'))
+    await flushAttachmentEffects()
+
+    const retry = screen.getByLabelText('Download failed, retry')
+    expect(retry).toBeVisible()
+    expect(mockSaveAs).not.toHaveBeenCalled()
+
+    fireEvent.click(retry)
+    await flushAttachmentEffects()
+    // While the retry runs it is an ordinary download again, not a failed one.
+    expect(screen.queryByLabelText('Download failed, retry')).not.toBeInTheDocument()
+
+    await act(async () => finishRetry({ Body: new Blob(['pdf']) }))
+    await flushAttachmentEffects()
+
+    expect(download).toHaveBeenCalledTimes(2)
+    expect(mockSaveAs).toHaveBeenCalledWith(expect.any(Blob), 'report.pdf')
+    expect(screen.getByLabelText('Download file')).not.toBeVisible()
+  })
+
+  it('a file download the user cancels is not shown as failed', async () => {
+    const cancelled = Object.assign(new Error('DOWNLOAD_CANCELLED'), { name: 'Error' })
+    let rejectDownload: (error: Error) => void = () => undefined
+    download.mockImplementationOnce(
+      () =>
+        new Promise((_resolve, reject) => {
+          rejectDownload = reject
+        })
+    )
+    mockCustomUploader.cancelRequest = jest.fn(() => rejectDownload(cancelled))
+
+    renderMediaAttachment(fileAttachment)
+    await flushAttachmentEffects()
+    fireEvent.click(screen.getByLabelText('Download file'))
+    await flushAttachmentEffects()
+    fireEvent.click(screen.getByLabelText('Download file'))
+    await flushAttachmentEffects()
+
+    expect(mockCustomUploader.cancelRequest).toHaveBeenCalledTimes(1)
+    expect(screen.queryByLabelText('Download failed, retry')).not.toBeInTheDocument()
   })
 })
