@@ -29,8 +29,14 @@ import {
   updateMessageAC
 } from './actions'
 import { RESEND_MESSAGE } from './constants'
-import { setCustomUploader, setSendAttachmentsAsSeparateMessages } from '../../helpers/customUploader'
+import {
+  markUploadNotStarted,
+  pauseUpload,
+  setCustomUploader,
+  setSendAttachmentsAsSeparateMessages
+} from '../../helpers/customUploader'
 import { handleUploadAttachments, __messageSagaTestables, __resetMessageSagaTestState } from './saga'
+import store from '../index'
 import { beginVideoPreparation, completeVideoPreparation } from '../../helpers/attachmentPreparation'
 
 const mockGetVideoFirstFrame = jest.fn()
@@ -860,6 +866,73 @@ describe('attachment upload recovery', () => {
     expect((channel as any).__attachmentBuilder.setMetadata).toHaveBeenCalledWith(
       expect.stringContaining('"video_thumb":"https://cdn.example/clip-preview.jpg"')
     )
+  })
+
+  it('a stop pressed while the video preview uploads keeps the video upload stopped when it starts', async () => {
+    const channel = makeUploaderChannel('channel-video-preview-stop')
+    const video = new File(['video-bytes'], 'clip.mp4', { type: 'video/mp4' })
+    mockGetVideoFirstFrame.mockResolvedValue({ blob: new Blob(['preview-bytes'], { type: 'image/jpeg' }) })
+    let videoTask: any
+    const videoStopped = jest.fn()
+    const pauseDispatched: any[] = []
+    setCustomUploader({
+      upload: (uploadedAttachment: any, uploadTask: any) => {
+        if (uploadedAttachment.type === attachmentTypes.image) {
+          // The user presses stop while the preview is uploading.
+          runSaga(
+            { dispatch: (action: any) => pauseDispatched.push(action), getState: () => ({}) },
+            __messageSagaTestables.pauseAttachmentUploading as any,
+            { payload: { attachmentId: 'video-stop-tid' } }
+          )
+          uploadTask.success({ uri: 'https://cdn.example/clip-preview.jpg', blob: null })
+          return
+        }
+        videoTask = uploadTask
+        uploadTask.stop = videoStopped
+      },
+      download: jest.fn()
+    })
+    const attachment = {
+      tid: 'video-stop-tid',
+      type: attachmentTypes.video,
+      name: 'clip.mp4',
+      size: video.size,
+      url: video,
+      data: video,
+      metadata: '{"tmb":"thumb","szw":1280,"szh":720,"dur":12}',
+      upload: false
+    } as any
+
+    const storeDispatch = jest.spyOn(store, 'dispatch')
+    const sending = handleUploadAttachments([attachment], { type: 'text' } as any, channel)
+    // Let the preview upload, the state change and the video upload's start run.
+    for (let i = 0; i < 20; i += 1) await Promise.resolve()
+
+    expect(pauseDispatched).toEqual([updateAttachmentUploadingStateAC(UPLOAD_STATE.PAUSED, 'video-stop-tid')])
+    expect(videoStopped).toHaveBeenCalledTimes(1)
+    // After the preview, the video shows as paused, not uploading.
+    expect(storeDispatch).toHaveBeenCalledWith(updateAttachmentUploadingStateAC(UPLOAD_STATE.PAUSED, 'video-stop-tid'))
+    expect(storeDispatch).not.toHaveBeenCalledWith(
+      updateAttachmentUploadingStateAC(UPLOAD_STATE.UPLOADING, 'video-stop-tid')
+    )
+
+    videoTask?.success({ uri: 'https://cdn.example/clip.mp4', blob: null })
+    await sending
+  })
+
+  it('a resume pressed while the video preview still uploads shows it as preparing again', () => {
+    markUploadNotStarted('video-resume-tid')
+    pauseUpload('video-resume-tid')
+    setCustomUploader({ upload: jest.fn(), download: jest.fn() })
+    const dispatched: any[] = []
+
+    runSaga(
+      { dispatch: (action: any) => dispatched.push(action), getState: () => ({}) },
+      __messageSagaTestables.resumeAttachmentUploading as any,
+      { payload: { attachmentId: 'video-resume-tid' } }
+    )
+
+    expect(dispatched).toEqual([updateAttachmentUploadingStateAC(UPLOAD_STATE.PREPARING, 'video-resume-tid')])
   })
 
   it('uploads the JPEG already generated for the compose preview without extracting a second frame', async () => {

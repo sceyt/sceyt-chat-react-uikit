@@ -6,6 +6,17 @@ let CustomUploader: ICustomUploader
 let sendAttachmentsAsSeparateMessages: boolean = false
 
 const pendingUploaders: { [key: string]: IUploadTask } = {}
+// Uploads that show a stop control before they start (a video while its preview
+// is uploaded): a pause pressed meanwhile is kept here and applied when it starts.
+const notStartedUploads = new Map<string, { paused: boolean }>()
+
+export const markUploadNotStarted = (attachmentId: string) => {
+  notStartedUploads.set(attachmentId, { paused: false })
+}
+
+export const isUploadNotStarted = (attachmentId: string) => notStartedUploads.has(attachmentId)
+
+export const isUploadPausedBeforeStart = (attachmentId: string) => !!notStartedUploads.get(attachmentId)?.paused
 
 export const setCustomUploader = (uploader: any) => {
   CustomUploader = uploader
@@ -63,7 +74,13 @@ export const customUpload = (
         }
       } */
       pendingUploaders[attachment.tid!] = uploadTask
+      const pausedBeforeStart = isUploadPausedBeforeStart(attachment.tid!)
+      notStartedUploads.delete(attachment.tid!)
       CustomUploader.upload(attachment, uploadTask, messageType)
+      if (pausedBeforeStart) {
+        // The uploader installs stop() when upload() is called, so nothing is sent.
+        uploadTask.stop()
+      }
     } else {
       reject(new Error('No Custom uploader'))
     }
@@ -73,6 +90,9 @@ export const customUpload = (
 export const pauseUpload = (attachmentId: string) => {
   if (pendingUploaders[attachmentId]) {
     return pendingUploaders[attachmentId].stop()
+  } else if (notStartedUploads.has(attachmentId)) {
+    notStartedUploads.set(attachmentId, { paused: true })
+    return true
   } else {
     log.info('Unknown uploading task')
     return false
@@ -82,6 +102,9 @@ export const pauseUpload = (attachmentId: string) => {
 export const resumeUpload = (attachmentId: string) => {
   if (pendingUploaders[attachmentId]) {
     return pendingUploaders[attachmentId].resume()
+  } else if (notStartedUploads.has(attachmentId)) {
+    notStartedUploads.set(attachmentId, { paused: false })
+    return true
   } else {
     log.info('Unknown uploading task')
     return false
@@ -89,6 +112,7 @@ export const resumeUpload = (attachmentId: string) => {
 }
 
 export const cancelUpload = (attachmentId: string) => {
+  notStartedUploads.delete(attachmentId)
   const task = pendingUploaders[attachmentId]
   if (task) {
     delete pendingUploaders[attachmentId]

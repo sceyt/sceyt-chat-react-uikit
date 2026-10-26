@@ -365,7 +365,11 @@ const Attachment = ({
       handleStopStartDownloadFile(attachment)
     } else {
       if (attachmentCompilationState[attachment.tid!]) {
-        if (attachmentCompilationState[attachment.tid!] === UPLOAD_STATE.UPLOADING) {
+        // A video being prepared already shows the stop control.
+        if (
+          attachmentCompilationState[attachment.tid!] === UPLOAD_STATE.UPLOADING ||
+          attachmentCompilationState[attachment.tid!] === UPLOAD_STATE.PREPARING
+        ) {
           dispatch(pauseAttachmentUploadingAC(attachment.tid!))
         } else {
           dispatch(resumeAttachmentUploadingAC(attachment.tid!))

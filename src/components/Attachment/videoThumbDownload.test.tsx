@@ -5,6 +5,7 @@ import { attachmentTypes } from '../../helpers/constants'
 import { getAttachmentUrlFromCache, setAttachmentToCache } from '../../helpers/attachmentsCache'
 import { CONNECTION_STATUS } from '../../store/user/constants'
 import { setConnectionStatusAC } from '../../store/user/actions'
+import { pauseAttachmentUploadingAC } from '../../store/message/actions'
 import { createMessageListStore, renderWithSceytProvider } from '../../testUtils/messageListHarness'
 import {
   cancelMediaDownload,
@@ -915,6 +916,28 @@ describe('a failed download is not shown as downloaded', () => {
     expect(screen.queryByLabelText('Download video')).not.toBeInTheDocument()
   })
 
+  it('a retry after a failed video download shows its progress', async () => {
+    mockGetAttachmentUrlFromCache.mockResolvedValueOnce('blob:cached-thumb').mockResolvedValue(false)
+    let reportProgress: (progress: { loaded: number; total: number }) => void = () => undefined
+    download
+      .mockRejectedValueOnce(forbidden())
+      .mockImplementationOnce((_url: string, _download: boolean, onProgress: any) => {
+        reportProgress = onProgress
+        return new Promise(() => undefined)
+      })
+
+    renderAttachment()
+    await flushAttachmentEffects()
+    await flushAttachmentEffects()
+    fireEvent.click(screen.getByLabelText('Download video'))
+    await flushAttachmentEffects()
+    act(() => reportProgress({ loaded: 4, total: 8 }))
+    await flushAttachmentEffects()
+
+    expect(screen.getByTestId('video-download-progress')).toBeInTheDocument()
+    expect(screen.getByTestId('circular-progress')).toHaveAttribute('data-value', '50')
+  })
+
   it('a failed file download stays visible as failed, and retrying it downloads the file', async () => {
     let finishRetry: (result: { Body: Blob }) => void = () => undefined
     download.mockRejectedValueOnce(forbidden()).mockImplementationOnce(
@@ -1077,5 +1100,31 @@ describe('a failed video or image download starts again when the chat reconnects
     await reconnect(store)
 
     expect(download).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('stopping a video while it is prepared', () => {
+  beforeEach(() => {
+    jest.clearAllMocks()
+    resetMediaDownloadCoordinatorForTests()
+    mockGetAttachmentUrlFromCache.mockResolvedValue(false)
+  })
+
+  afterEach(async () => {
+    // Let the render's cache lookups settle, then drop the download they started.
+    await flushAttachmentEffects()
+    resetMediaDownloadCoordinatorForTests()
+  })
+
+  it('the stop control shown while a video is prepared pauses it, not resumes it', async () => {
+    const { store } = renderAttachment({
+      attachmentsUploadingState: { 'video-attachment-tid': 'preparing' }
+    })
+    const dispatch = jest.spyOn(store, 'dispatch')
+    await flushAttachmentEffects()
+
+    fireEvent.click(screen.getByRole('button'))
+
+    expect(dispatch).toHaveBeenCalledWith(pauseAttachmentUploadingAC('video-attachment-tid'))
   })
 })

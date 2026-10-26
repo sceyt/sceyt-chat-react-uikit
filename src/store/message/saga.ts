@@ -191,6 +191,9 @@ import {
   customUpload,
   getCustomUploader,
   getSendAttachmentsAsSeparateMessages,
+  isUploadNotStarted,
+  isUploadPausedBeforeStart,
+  markUploadNotStarted,
   pauseUpload,
   resumeUpload
 } from '../../helpers/customUploader'
@@ -571,11 +574,21 @@ export const handleUploadAttachments = async (attachments: IAttachment[], messag
       }
       const fileType = attachment.url?.type?.split('/')[0]
       if (attachment.type === attachmentTypes.video) {
+        if (!attachment.cachedUrl) {
+          // The stop control shows while the preview uploads; a pause pressed
+          // then is kept and applied when the video upload starts.
+          markUploadNotStarted(attachment.tid!)
+        }
         attachment = await prepareAndUploadVideoPreview(attachment, message.type)
         if (!attachment.cachedUrl) {
           // The preview upload is complete. From this point, progress belongs
           // only to the original video transfer.
-          store.dispatch(updateAttachmentUploadingStateAC(UPLOAD_STATE.UPLOADING, attachment.tid))
+          store.dispatch(
+            updateAttachmentUploadingStateAC(
+              isUploadPausedBeforeStart(attachment.tid!) ? UPLOAD_STATE.PAUSED : UPLOAD_STATE.UPLOADING,
+              attachment.tid
+            )
+          )
         }
       }
       let fileSize = attachment.size
@@ -4509,9 +4522,13 @@ function* resumeAttachmentUploading(action: any) {
     const { attachmentId } = action.payload
     log.info('resume for attachment ... ', attachmentId)
     if (getCustomUploader()) {
+      // Checked first: resuming starts nothing yet, the video's preview is still uploading.
+      const preparing = isUploadNotStarted(attachmentId)
       const isResumed = resumeUpload(attachmentId)
       if (isResumed) {
-        yield put(updateAttachmentUploadingStateAC(UPLOAD_STATE.UPLOADING, attachmentId))
+        yield put(
+          updateAttachmentUploadingStateAC(preparing ? UPLOAD_STATE.PREPARING : UPLOAD_STATE.UPLOADING, attachmentId)
+        )
       }
     }
   } catch (e) {
@@ -5109,6 +5126,8 @@ function* loadMorePollVotes(action: IAction): any {
 }
 
 export const __messageSagaTestables = {
+  pauseAttachmentUploading,
+  resumeAttachmentUploading,
   prefetchCachedChannelsAfterReconnect,
   prefetchInMemoryChannel,
   runBackgroundPrefetch,
