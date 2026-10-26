@@ -736,6 +736,10 @@ const Attachment = ({
 
   const handleResumeOriginalVideoDownload = (event: React.MouseEvent) => {
     event.stopPropagation()
+    restartOriginalVideoDownload()
+  }
+
+  const restartOriginalVideoDownload = () => {
     if (!attachment.url) return
 
     const { originalVideo: originalVideoCacheKey } = getVideoAttachmentCacheKeys(attachment.url, attachment.metadata)
@@ -774,6 +778,10 @@ const Attachment = ({
 
   const handleResumeOriginalImageDownload = (event: Pick<Event, 'stopPropagation'>) => {
     event.stopPropagation()
+    restartOriginalImageDownload()
+  }
+
+  const restartOriginalImageDownload = () => {
     if (!attachment.url) return
 
     const imageDownloadRequest = imageDownloadRequestRef.current + 1
@@ -812,6 +820,23 @@ const Attachment = ({
         log.error('Error restarting image attachment download:', error)
       })
   }
+
+  // A video or image download that failed (e.g. the network went away) starts
+  // again when the chat connects again. One that fails while connected waits for
+  // the user's retry, so a rejection that a retry cannot fix is not repeated.
+  const previousConnectionStatusRef = useRef(connectionStatus)
+  useEffect(() => {
+    const reconnected =
+      connectionStatus === CONNECTION_STATUS.CONNECTED &&
+      previousConnectionStatusRef.current !== CONNECTION_STATUS.CONNECTED
+    previousConnectionStatusRef.current = connectionStatus
+    if (!reconnected) return
+    if (attachment.type === attachmentTypes.video && isSharedOriginalVideoFailed) {
+      restartOriginalVideoDownload()
+    } else if (attachment.type === attachmentTypes.image && sharedOriginalImageDownload.state === 'failed') {
+      restartOriginalImageDownload()
+    }
+  }, [connectionStatus])
 
   const handleCancelOriginalVideoDownload = (event: React.MouseEvent) => {
     event.stopPropagation()

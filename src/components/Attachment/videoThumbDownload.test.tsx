@@ -4,6 +4,7 @@ import Attachment from './index'
 import { attachmentTypes } from '../../helpers/constants'
 import { getAttachmentUrlFromCache, setAttachmentToCache } from '../../helpers/attachmentsCache'
 import { CONNECTION_STATUS } from '../../store/user/constants'
+import { setConnectionStatusAC } from '../../store/user/actions'
 import { createMessageListStore, renderWithSceytProvider } from '../../testUtils/messageListHarness'
 import {
   cancelMediaDownload,
@@ -967,5 +968,114 @@ describe('a failed download is not shown as downloaded', () => {
 
     expect(mockCustomUploader.cancelRequest).toHaveBeenCalledTimes(1)
     expect(screen.queryByLabelText('Download failed, retry')).not.toBeInTheDocument()
+  })
+})
+
+describe('a failed video or image download starts again when the chat reconnects', () => {
+  const imageAttachment = {
+    ...videoAttachment,
+    id: 'reconnect-image-id',
+    tid: 'reconnect-image-tid',
+    type: attachmentTypes.image,
+    url: 'https://cdn/reconnect-image.jpg',
+    attachmentUrl: '',
+    metadata: JSON.stringify({ szw: 1280, szh: 720, tmb: 'a'.repeat(80) })
+  }
+  const networkError = () => new TypeError('Failed to fetch')
+  let download: jest.Mock
+
+  const reconnect = async (store: any) => {
+    act(() => {
+      store.dispatch(setConnectionStatusAC(CONNECTION_STATUS.CONNECTING))
+    })
+    await flushAttachmentEffects()
+    act(() => {
+      store.dispatch(setConnectionStatusAC(CONNECTION_STATUS.CONNECTED))
+    })
+    await flushAttachmentEffects()
+    await flushAttachmentEffects()
+  }
+
+  beforeEach(() => {
+    jest.clearAllMocks()
+    resetMediaDownloadCoordinatorForTests()
+    mockSetAttachmentToCache.mockResolvedValue(undefined)
+    download = jest.fn(() => new Promise(() => undefined))
+    mockCustomUploader = { download, cancelRequest: jest.fn(), upload: jest.fn() }
+  })
+
+  afterEach(() => {
+    mockCustomUploader = undefined
+    mockCompressAndCacheImage = undefined
+  })
+
+  it('a video download that failed on the network starts again after the reconnect', async () => {
+    mockGetAttachmentUrlFromCache.mockResolvedValueOnce('blob:cached-thumb').mockResolvedValue(false)
+    download.mockRejectedValueOnce(networkError())
+
+    const { store } = renderAttachment()
+    await flushAttachmentEffects()
+    await flushAttachmentEffects()
+    expect(download).toHaveBeenCalledTimes(1)
+
+    await reconnect(store)
+
+    expect(download).toHaveBeenCalledTimes(2)
+    expect(download.mock.calls[1]).toEqual([
+      'https://cdn/video.mp4',
+      true,
+      expect.any(Function),
+      undefined,
+      'message-id'
+    ])
+    expect(screen.queryByLabelText('Download video')).not.toBeInTheDocument()
+  })
+
+  it('an image download that failed on the network starts again after the reconnect', async () => {
+    mockGetAttachmentUrlFromCache.mockResolvedValue(false)
+    download.mockRejectedValueOnce(networkError())
+
+    const { store } = renderMediaAttachment(imageAttachment)
+    await flushAttachmentEffects()
+    await flushAttachmentEffects()
+    expect(download).toHaveBeenCalledTimes(1)
+
+    await reconnect(store)
+
+    expect(download).toHaveBeenCalledTimes(2)
+    expect(download.mock.calls[1][0]).toBe('https://cdn/reconnect-image.jpg')
+  })
+
+  it('without a reconnect a failed download waits for the user, so a rejection is not repeated', async () => {
+    mockGetAttachmentUrlFromCache.mockResolvedValueOnce('blob:cached-thumb').mockResolvedValue(false)
+    download.mockRejectedValue(Object.assign(new Error('DOWNLOAD_FORBIDDEN'), { status: 403 }))
+
+    const { store } = renderAttachment()
+    await flushAttachmentEffects()
+    await flushAttachmentEffects()
+    // Another status change that is not a reconnect.
+    act(() => {
+      store.dispatch(setConnectionStatusAC(CONNECTION_STATUS.CONNECTED))
+    })
+    for (let i = 0; i < 5; i += 1) await flushAttachmentEffects()
+
+    expect(download).toHaveBeenCalledTimes(1)
+    expect(screen.getByLabelText('Download video')).toBeInTheDocument()
+  })
+
+  it('a reconnect does not restart a download the user cancelled, or one still running', async () => {
+    mockGetAttachmentUrlFromCache.mockResolvedValueOnce('blob:cached-thumb').mockResolvedValue(false)
+
+    const { store } = renderAttachment()
+    await flushAttachmentEffects()
+    await flushAttachmentEffects()
+    await reconnect(store)
+    expect(download).toHaveBeenCalledTimes(1)
+
+    cancelMediaDownload('original-video:https://cdn/video.mp4')
+    await flushAttachmentEffects()
+    await reconnect(store)
+
+    expect(download).toHaveBeenCalledTimes(1)
   })
 })
