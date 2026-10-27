@@ -1103,7 +1103,7 @@ describe('a failed video or image download starts again when the chat reconnects
   })
 })
 
-describe('stopping a video while it is prepared', () => {
+describe('the upload stop and resume control', () => {
   beforeEach(() => {
     jest.clearAllMocks()
     resetMediaDownloadCoordinatorForTests()
@@ -1126,5 +1126,16 @@ describe('stopping a video while it is prepared', () => {
     fireEvent.click(screen.getByRole('button'))
 
     expect(dispatch).toHaveBeenCalledWith(pauseAttachmentUploadingAC('video-attachment-tid'))
+  })
+
+  it('the upload control is named after what a click does', async () => {
+    const uploading = renderAttachment({ attachmentsUploadingState: { 'video-attachment-tid': 'uploading' } })
+    await flushAttachmentEffects()
+    expect(screen.getByRole('button', { name: 'Stop upload' })).toBeTruthy()
+    uploading.unmount()
+
+    renderAttachment({ attachmentsUploadingState: { 'video-attachment-tid': 'paused' } })
+    await flushAttachmentEffects()
+    expect(screen.getByRole('button', { name: 'Resume upload' })).toBeTruthy()
   })
 })

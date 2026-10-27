@@ -359,6 +359,13 @@ const Attachment = ({
       setDownloadIsCancelled(true)
     }
   }
+  // Named after what a click does (see handlePauseResumeUpload).
+  const pauseResumeUploadLabel = downloadingFile
+    ? 'Cancel file download'
+    : attachmentCompilationState[attachment.tid!] === UPLOAD_STATE.UPLOADING ||
+        attachmentCompilationState[attachment.tid!] === UPLOAD_STATE.PREPARING
+      ? 'Stop upload'
+      : 'Resume upload'
   const handlePauseResumeUpload = (e: Event) => {
     e.stopPropagation()
     if (downloadingFile) {
@@ -1150,7 +1157,7 @@ const Attachment = ({
                     backgroundColor={overlayBackground2}
                   >
                     {isInUploadingState ? (
-                      <CancelResumeWrapper onClick={handlePauseResumeUpload}>
+                      <CancelResumeWrapper onClick={handlePauseResumeUpload} aria-label={pauseResumeUploadLabel}>
                         {attachmentCompilationState[attachment.tid!] === UPLOAD_STATE.UPLOADING ? (
                           <CancelIcon />
                         ) : (
@@ -1298,7 +1305,7 @@ const Attachment = ({
                     backgroundColor={overlayBackground2}
                   >
                     {isInUploadingState ? (
-                      <CancelResumeWrapper onClick={handlePauseResumeUpload}>
+                      <CancelResumeWrapper onClick={handlePauseResumeUpload} aria-label={pauseResumeUploadLabel}>
                         {attachmentCompilationState[attachment.tid!] === UPLOAD_STATE.UPLOADING || isPreparingVideo ? (
                           <CancelIcon />
                         ) : (
@@ -1531,7 +1538,7 @@ const Attachment = ({
                 backgroundColor={overlayBackground2}
               >
                 {(isInUploadingState || downloadingFile) && (
-                  <CancelResumeWrapper onClick={handlePauseResumeUpload}>
+                  <CancelResumeWrapper onClick={handlePauseResumeUpload} aria-label={pauseResumeUploadLabel}>
                     {attachmentCompilationState[attachment.tid!] === UPLOAD_STATE.UPLOADING || downloadingFile ? (
                       <CancelIcon />
                     ) : (
