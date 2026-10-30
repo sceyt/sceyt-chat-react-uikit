@@ -125,7 +125,7 @@ describe('encryptAttachments: uploading', () => {
     expect(rest).toEqual({})
   })
 
-  it('an uploader without supportsEncryption gives no URL before encrypting, so nothing is sent', async () => {
+  it('an uploader without supportsEncryption would store the file unencrypted, so nothing is sent', async () => {
     useUploader()
     markUploadNotStarted('simple')
     const source = file()
@@ -140,11 +140,10 @@ describe('encryptAttachments: uploading', () => {
     expect(isUploadNotStarted('simple')).toBe(false)
   })
 
-  // What an uploader with supportsEncryption does (like Waafi's): it picks the
-  // URL, may resize the file, then prepares it for that URL and stores what
-  // prepareFile returns.
+  // What an uploader with supportsEncryption does (like Waafi's): it may
+  // resize the file, then prepares it and stores what prepareFile returns.
   const storePrepared = async (call: { task: any; args: any[] }, file: Blob, uri: string) => {
-    const prepared = await call.args[1].prepareFile(file, { url: uri })
+    const prepared = await call.args[1].prepareFile(file)
     const stored = await prepared.getAll()
     call.task.success({ uri, blob: file })
     return { prepared, stored }
@@ -163,28 +162,21 @@ describe('encryptAttachments: uploading', () => {
     const { prepared, stored } = await storePrepared(calls[0], resized, 'https://cdn/streaming')
 
     expect(prepared.contentType).toBe('application/octet-stream')
-    expect(await readBlobText(stored)).toBe('enc(key-1@https://cdn/streaming):resized')
+    expect(await readBlobText(stored)).toBe('enc(key-1@id-1):resized')
     const uploaded = await result
     expect(uploaded.uri).toBe('https://cdn/streaming')
     expect(uploaded.blob === resized).toBe(true)
-    expect(uploaded.encryption).toEqual({ v: 1, k: 'key-1' })
+    expect(uploaded.encryption).toEqual({ id: 'id-1', v: 1, k: 'key-1' })
   })
 
-  it('a file stored at another URL than it was prepared for is not sent: it would not open', async () => {
+  it('a prepared file may be stored at any URL: it is bound to its unique id, not to where it is stored', async () => {
     useUploader(true)
-    const result = customUpload({ tid: 'moved', name: 'photo.png', data: file() } as any, () => undefined, 'text')
+    const result = customUpload({ tid: 'anywhere', name: 'photo.png', data: file() } as any, () => undefined, 'text')
 
-    await calls[0].args[1].prepareFile(file(), { url: 'https://cdn/planned' })
-    calls[0].task.success({ uri: 'https://cdn/elsewhere', blob: file() })
+    await calls[0].args[1].prepareFile(file())
+    calls[0].task.success({ uri: 'https://cdn/picked-after-preparing', blob: file() })
 
-    await expect(result).rejects.toThrow('https://cdn/planned')
-  })
-
-  it('a file prepared without its URL cannot be encrypted', async () => {
-    useUploader(true)
-    customUpload({ tid: 'no-url', name: 'photo.png', data: file() } as any, () => undefined, 'text')
-
-    await expect(calls[0].args[1].prepareFile(file())).rejects.toMatchObject({ type: 'InvalidAttachmentEncryption' })
+    expect(await result).toMatchObject({ uri: 'https://cdn/picked-after-preparing', encryption: { id: 'id-1' } })
   })
 
   it('with encryption off, an uploader with supportsEncryption prepares the file the same way, unencrypted', async () => {
@@ -221,7 +213,7 @@ describe('encryptAttachments: uploading', () => {
       'text'
     )
 
-    await calls[0].args[1].prepareFile(file(), { url: 'https://cdn/first' })
+    await calls[0].args[1].prepareFile(file())
     await storePrepared(calls[0], file(), 'https://cdn/second')
 
     expect((await result).encryption).toEqual(expect.objectContaining({ k: 'key-2' }))
@@ -256,7 +248,7 @@ describe('encryptAttachments: uploading', () => {
 })
 
 describe('encryptAttachments: downloading', () => {
-  const encryption = { v: 1, k: 'key-7' }
+  const encryption = { id: 'id-7', v: 1, k: 'key-7' }
   const originalFetch = global.fetch
   const originalCreateObjectURL = URL.createObjectURL
 
@@ -288,7 +280,7 @@ describe('encryptAttachments: downloading', () => {
   })
 
   it('decrypts a { Body } result and keeps its other fields', async () => {
-    const download = jest.fn(async () => ({ Body: fakeEncrypted('key-7', 'picture', 'https://cdn/p'), ETag: 'e1' }))
+    const download = jest.fn(async () => ({ Body: fakeEncrypted('key-7', 'picture'), ETag: 'e1' }))
     setCustomUploader({ upload: jest.fn(), download, cancelRequest: jest.fn() })
 
     const result = await getAttachmentDownloader(encryption, 'image/png')!(
@@ -308,7 +300,7 @@ describe('encryptAttachments: downloading', () => {
   it('decrypts a Blob result', async () => {
     setCustomUploader({
       upload: jest.fn(),
-      download: async () => fakeEncrypted('key-7', 'voice', 'https://cdn/v'),
+      download: async () => fakeEncrypted('key-7', 'voice'),
       cancelRequest: jest.fn()
     })
 
@@ -322,7 +314,7 @@ describe('encryptAttachments: downloading', () => {
     setCustomUploader({ upload: jest.fn(), download: async () => 'https://signed/url', cancelRequest: jest.fn() })
     global.fetch = jest.fn(async () => ({
       ok: true,
-      blob: async () => fakeEncrypted('key-7', 'document', 'https://cdn/d')
+      blob: async () => fakeEncrypted('key-7', 'document')
     })) as any
     let plaintext: Blob | undefined
     URL.createObjectURL = jest.fn((blob: Blob) => {
@@ -343,7 +335,7 @@ describe('encryptAttachments: downloading', () => {
   })
 
   it.each([
-    ['an encrypted', encryption, 'enc(key-7@https://cdn/p):picture', true],
+    ['an encrypted', encryption, 'enc(key-7@id-7):picture', true],
     ['an unencrypted', undefined, 'picture', false]
   ])(
     'an uploader with supportsEncryption is given %s stored file to open itself',
@@ -417,7 +409,7 @@ describe('encryptAttachments: downloading', () => {
   it('a file encrypted with another key is refused', async () => {
     setCustomUploader({
       upload: jest.fn(),
-      download: async () => ({ Body: fakeEncrypted('other-key', 'x', 'https://cdn/p') }),
+      download: async () => ({ Body: fakeEncrypted('other-key', 'x') }),
       cancelRequest: jest.fn()
     })
 
@@ -428,15 +420,20 @@ describe('encryptAttachments: downloading', () => {
     })
   })
 
-  it('a file is opened for the URL it is downloaded from: one encrypted for another URL is refused', async () => {
+  it('a file encrypted with another unique id is refused', async () => {
     setCustomUploader({
       upload: jest.fn(),
-      download: async () => ({ Body: fakeEncrypted('key-7', 'x', 'https://cdn/other') }),
+      download: async () => ({ Body: fakeEncrypted('key-7', 'x') }),
       cancelRequest: jest.fn()
     })
 
     await expect(
-      getAttachmentDownloader(encryption, 'image/png')!('https://cdn/p', true, jest.fn(), 'text')
+      getAttachmentDownloader({ ...encryption, id: 'another-id' }, 'image/png')!(
+        'https://cdn/p',
+        true,
+        jest.fn(),
+        'text'
+      )
     ).rejects.toMatchObject({ type: 'AttachmentDecryptionFailed' })
   })
 })

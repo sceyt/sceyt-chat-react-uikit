@@ -926,12 +926,12 @@ describe('a failed download is not shown as downloaded', () => {
     mockGetAttachmentUrlFromCache.mockImplementation(async (key: string) =>
       key.includes('video-thumb') ? 'blob:cached-thumb' : false
     )
-    download.mockImplementation(async () => ({ Body: fakeEncrypted('another-key', 'movie', 'https://cdn/video.mp4') }))
+    download.mockImplementation(async () => ({ Body: fakeEncrypted('another-key', 'movie') }))
     const encryptedVideo = {
       ...videoAttachment,
       metadata: JSON.stringify({
         ...JSON.parse(videoAttachment.metadata),
-        enc: { v: 1, k: 'key-9' }
+        enc: { id: 'id-9', v: 1, k: 'key-9' }
       })
     }
     const videoDownloads = () => download.mock.calls.filter(([url]) => url === 'https://cdn/video.mp4').length
@@ -1177,7 +1177,7 @@ describe('the upload stop and resume control', () => {
     installFakeFilesClient()
     mockGetAttachmentUrlFromCache.mockResolvedValue(false)
     mockCustomUploader = {
-      download: jest.fn(async () => ({ Body: fakeEncrypted('key-9', 'movie', 'https://cdn/video.mp4') })),
+      download: jest.fn(async () => ({ Body: fakeEncrypted('key-9', 'movie') })),
       cancelRequest: jest.fn(),
       upload: jest.fn()
     }
@@ -1191,7 +1191,7 @@ describe('the upload stop and resume control', () => {
       ...videoAttachment,
       metadata: JSON.stringify({
         ...JSON.parse(videoAttachment.metadata),
-        enc: { v: 1, k: 'key-9' }
+        enc: { id: 'id-9', v: 1, k: 'key-9' }
       })
     }
     try {

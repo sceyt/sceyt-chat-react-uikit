@@ -230,6 +230,9 @@ function onError(error: any) {
 
 let attachmentsUpdate: any = []
 const UNSUPPORTED_PASTED_FILE_MESSAGE = 'This file format is not supported.'
+// JPEG quality of an image sent as media. This is its only encode: uploaders
+// store the file as given.
+const MEDIA_IMAGE_QUALITY = 0.8
 const useComposerLayoutEffect = CAN_USE_DOM ? useLayoutEffect : useEffect
 
 export interface SendMessageProps {
@@ -1501,7 +1504,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
               let preparedFile = file
               let metadata: any
               if (customUploader) {
-                const resizedFile = await resizeImage(file)
+                const resizedFile = await resizeImage(file, undefined, undefined, MEDIA_IMAGE_QUALITY)
                 const patch = {
                   size: isMediaAttachment && resizedFile?.blob ? resizedFile.blob.size : file.size,
                   metadata: { szw: imageWidth, szh: imageHeight, tmb: thumbnail }
@@ -1517,7 +1520,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
                 metadata = patch.metadata
                 handleAttachmentImageForCache({ ...attachment, ...patch })
               } else if (isMediaAttachment && file.type !== 'image/gif') {
-                const resizedFileData = await resizeImage(file)
+                const resizedFileData = await resizeImage(file, undefined, undefined, MEDIA_IMAGE_QUALITY)
                 // canvas.toBlob may return null (for example when memory is constrained).
                 // Keep the original file usable rather than failing the attachment flow.
                 const resizedFile = resizedFileData.blob

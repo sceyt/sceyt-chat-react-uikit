@@ -112,9 +112,7 @@ export const downloadFile = async (
         throw new Error(`Unable to download attachment (${response.status})`)
       }
       const downloaded = await readResponseBlobWithProgress(response, progressCallback, attachment.size || 0)
-      const data = encryption
-        ? await prepareDownloadFile(encryption, type, attachment.url).open(downloaded)
-        : downloaded
+      const data = encryption ? await prepareDownloadFile(encryption, type).open(downloaded) : downloaded
       if (done) {
         done(attachment.id || '')
       }

@@ -12,8 +12,8 @@ import {
   withVideoThumbEncryption
 } from './attachmentEncryption'
 
-const videoKey = { v: 1, k: 'video-key' }
-const previewKey = { v: 1, k: 'preview-key' }
+const videoKey = { id: 'video-id', v: 1, k: 'video-key' }
+const previewKey = { id: 'preview-id', v: 1, k: 'preview-key' }
 
 describe('attachment encryption metadata', () => {
   it('reads the file key from metadata stored as a JSON string', () => {
@@ -24,7 +24,10 @@ describe('attachment encryption metadata', () => {
     ['no metadata', undefined],
     ['metadata without enc', '{"szw":10}'],
     ['metadata that is not JSON', 'not json'],
-    ['only the preview key, before the video is uploaded', JSON.stringify({ enc: { v: 1, thumb: { k: 'a' } } })]
+    [
+      'only the preview key, before the video is uploaded',
+      JSON.stringify({ enc: { v: 1, thumb: { id: 'a', k: 'a' } } })
+    ]
   ])('finds no file key in %s', (_name, metadata) => {
     expect(getAttachmentEncryption(metadata)).toBeUndefined()
   })
@@ -36,7 +39,7 @@ describe('attachment encryption metadata', () => {
     expect(metadata).toEqual({
       szw: 1280,
       video_thumb: 'https://cdn/p.jpg',
-      enc: { ...videoKey, thumb: { k: 'preview-key' } }
+      enc: { ...videoKey, thumb: { id: 'preview-id', k: 'preview-key' } }
     })
     expect(getAttachmentEncryption(metadata)).toEqual(metadata.enc)
     expect(getVideoThumbEncryption(metadata)).toEqual(previewKey)
@@ -44,8 +47,8 @@ describe('attachment encryption metadata', () => {
 
   it('a resent video replaces the preview key of the earlier attempt', () => {
     const first = withVideoThumbEncryption('{}', previewKey)
-    const again = withVideoThumbEncryption(first, { ...previewKey, k: 'new-preview-key' })
-    expect(getVideoThumbEncryption(again)).toEqual({ ...previewKey, k: 'new-preview-key' })
+    const again = withVideoThumbEncryption(first, { id: 'new-preview-id', v: 1, k: 'new-preview-key' })
+    expect(getVideoThumbEncryption(again)).toEqual({ id: 'new-preview-id', v: 1, k: 'new-preview-key' })
   })
 
   it('an unencrypted video has no preview key', () => {
@@ -82,24 +85,20 @@ describe('attachment encryption metadata', () => {
     expect(() => prepareDownloadFile(undefined)).toThrow('client.prepareDownload')
   })
 
-  it('asks the SDK for an upload file encrypted for its URL, and a download file with the key and URL', async () => {
+  it('asks the SDK for an encrypted upload file, and a download file with the unique id and key', async () => {
     const prepareUpload = jest.fn(async () => 'upload-file')
     const prepareDownload = jest.fn(() => 'download-file')
     setClient({ prepareUpload, prepareDownload })
     const blob = new Blob(['x'])
 
     expect(canPrepareAttachmentFiles()).toBe(true)
-    expect(await prepareUploadFile(blob, true, 'https://cdn/x')).toBe('upload-file')
-    expect((prepareUpload.mock.calls[0] as any[])[1]).toEqual({ encrypt: true, url: 'https://cdn/x' })
-    await prepareUploadFile(blob, false, 'https://cdn/x')
+    expect(await prepareUploadFile(blob, true)).toBe('upload-file')
+    expect((prepareUpload.mock.calls[0] as any[])[1]).toEqual({ encrypt: true })
+    await prepareUploadFile(blob, false)
     expect((prepareUpload.mock.calls[1] as any[])[1]).toEqual({ encrypt: false })
-    expect(prepareDownloadFile(videoKey, 'video/mp4', 'https://cdn/v')).toBe('download-file')
-    expect(prepareDownload).toHaveBeenLastCalledWith({
-      metadata: { enc: videoKey },
-      type: 'video/mp4',
-      url: 'https://cdn/v'
-    })
+    expect(prepareDownloadFile(videoKey, 'video/mp4')).toBe('download-file')
+    expect(prepareDownload).toHaveBeenLastCalledWith({ metadata: { enc: videoKey }, type: 'video/mp4' })
     prepareDownloadFile(undefined)
-    expect(prepareDownload).toHaveBeenLastCalledWith({ metadata: {}, type: '', url: undefined })
+    expect(prepareDownload).toHaveBeenLastCalledWith({ metadata: {}, type: '' })
   })
 })

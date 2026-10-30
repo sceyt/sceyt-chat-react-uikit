@@ -1,6 +1,6 @@
 import { runSaga } from 'redux-saga'
 import log from 'loglevel'
-import { setClient } from '../../common/client'
+import { getClient, setClient } from '../../common/client'
 import {
   addMessageToMap,
   clearMessagesMap,
@@ -25,6 +25,7 @@ import {
   deleteMessageAC,
   resendMessageAC,
   sendMessageAC,
+  setUpdateMessageAttachmentAC,
   updateAttachmentUploadingStateAC,
   updateMessageAC
 } from './actions'
@@ -1292,6 +1293,67 @@ describe('attachment upload recovery', () => {
     ])
   })
 
+  it('after an SDK upload, the sender sees the full sent image, not a copy cut to the bubble size', async () => {
+    const currentUser = makeUser({ id: 'current-user' })
+    const channel = makeUploaderChannel('channel-default-image')
+    const image = new File(['full-image-bytes'], 'photo.png', { type: 'image/png' })
+    const pendingMessage = makePendingMessage({
+      channelId: channel.id,
+      tid: 'default-image-message-tid',
+      user: currentUser,
+      attachments: [
+        {
+          tid: 'default-image-attachment-tid',
+          type: attachmentTypes.image,
+          name: 'photo.png',
+          size: image.size,
+          data: image,
+          metadata: '{"szw":1280,"szh":1080}',
+          upload: true
+        } as any
+      ]
+    })
+    setCustomUploader(undefined)
+    setClient({ user: { id: 'current-user' }, Channel: { create: jest.fn() } })
+    // The SDK calls the attachment's completion once the file is stored.
+    channel.sendMessage = jest.fn(async (message: any) => {
+      message.attachments[0].completion({ url: 'https://cdn.example/uploaded-1' }, null)
+      return makeServerResponse('default-image-message-tid', 'default-image-attachment-tid', currentUser)
+    })
+    setActiveChannelId(channel.id)
+    setChannelInMap(channel)
+    addMessageToMap(channel.id, pendingMessage)
+    const originalCreateObjectURL = URL.createObjectURL
+    Object.defineProperty(URL, 'createObjectURL', {
+      configurable: true,
+      value: jest.fn((blob: Blob) => (blob === image ? 'blob:sent-image' : 'blob:another-copy'))
+    })
+    try {
+      await runMessageSaga(__messageSagaTestables.sendMessage, {
+        type: RESEND_MESSAGE,
+        payload: {
+          message: pendingMessage,
+          connectionState: CONNECTION_STATUS.CONNECTED,
+          channelId: channel.id,
+          sendAttachmentsAsSeparateMessage: false
+        }
+      })
+      // The cache update runs after the completion returns.
+      for (let i = 0; i < 20 && !(URL.createObjectURL as jest.Mock).mock.calls.length; i++) {
+        await new Promise((resolve) => setTimeout(resolve, 0))
+      }
+
+      expect(mockStore.dispatch).toHaveBeenCalledWith(
+        setUpdateMessageAttachmentAC('https://cdn.example/uploaded-1', 'blob:sent-image')
+      )
+      expect(mockStore.dispatch).not.toHaveBeenCalledWith(
+        setUpdateMessageAttachmentAC('https://cdn.example/uploaded-1', 'blob:another-copy')
+      )
+    } finally {
+      Object.defineProperty(URL, 'createObjectURL', { configurable: true, value: originalCreateObjectURL })
+    }
+  })
+
   it('uploads the preview with the SDK before sending a default-upload video', async () => {
     const currentUser = makeUser({ id: 'current-user' })
     const channel = makeUploaderChannel('channel-video-preview-required')
@@ -1471,8 +1533,7 @@ describe('attachment upload recovery', () => {
   })
 
   describe('with encryptAttachments', () => {
-    // Like Waafi's uploader: it picks the URL, prepares the file for it, and
-    // stores what prepareFile returns.
+    // Like Waafi's uploader: it prepares the file and stores what prepareFile returns.
     let stored: Blob[]
     let uriFor: (attachment: any) => string
     beforeEach(() => {
@@ -1486,7 +1547,7 @@ describe('attachment upload recovery', () => {
         upload: async (attachment: any, uploadTask: any, _messageType: any, files: any) => {
           uploadCalls.push(attachment)
           const uri = uriFor(attachment)
-          const prepared = await files.prepareFile(attachment.data, { url: uri })
+          const prepared = await files.prepareFile(attachment.data)
           stored.push(await prepared.getAll())
           uploadTask.success({ uri, blob: attachment.data })
         },
@@ -1508,11 +1569,11 @@ describe('attachment upload recovery', () => {
       const [sent] = await handleUploadAttachments([attachment], { type: 'text' } as any, channel)
 
       expect(stored[0].type).toBe('application/octet-stream')
-      expect(await readBlobText(stored[0])).toBe('enc(key-1@https://cdn.example/uploaded-1):file-bytes')
+      expect(await readBlobText(stored[0])).toBe('enc(key-1@id-1):file-bytes')
       expect(JSON.parse(sent.metadata)).toEqual({
         szw: 10,
         szh: 20,
-        enc: { v: 1, k: 'key-1' }
+        enc: { id: 'id-1', v: 1, k: 'key-1' }
       })
       // The size shown and sent is the plaintext's.
       expect((channel as any).__attachmentBuilder.setFileSize).toHaveBeenCalledWith(image.size)
@@ -1547,15 +1608,15 @@ describe('attachment upload recovery', () => {
         Object.defineProperty(URL, 'createObjectURL', { configurable: true, value: originalCreateObjectURL })
       }
 
-      expect(await readBlobText(stored[0])).toBe('enc(key-1@https://cdn.example/clip-preview.jpg):preview-bytes')
-      expect(await readBlobText(stored[1])).toBe('enc(key-2@https://cdn.example/clip.mp4):video-bytes')
+      expect(await readBlobText(stored[0])).toBe('enc(key-1@id-1):preview-bytes')
+      expect(await readBlobText(stored[1])).toBe('enc(key-2@id-2):video-bytes')
       expect(JSON.parse(sent.metadata)).toEqual({
         video_thumb: 'https://cdn.example/clip-preview.jpg',
-        enc: { v: 1, k: 'key-2', thumb: { k: 'key-1' } }
+        enc: { id: 'id-2', v: 1, k: 'key-2', thumb: { id: 'id-1', k: 'key-1' } }
       })
     })
 
-    it('with an uploader that cannot give the URL first, the message fails instead of sending the file unencrypted', async () => {
+    it('with an uploader without supportsEncryption, the message fails instead of sending the file unencrypted', async () => {
       const channel = makeUploaderChannel('channel-encrypted-simple-uploader')
       const image = makeLiveFile()
       setCustomUploader({ upload: jest.fn(), download: jest.fn() })
@@ -1570,22 +1631,40 @@ describe('attachment upload recovery', () => {
       expect(channel.sendMessage).not.toHaveBeenCalled()
     })
 
-    it('without a custom uploader, the message fails instead of sending the file unencrypted', async () => {
+    it('without a custom uploader, the SDK uploads the whole encrypted video and preview, with their keys in the metadata', async () => {
       const currentUser = makeUser({ id: 'current-user' })
       const channel = makeUploaderChannel('channel-encrypted-sdk-upload')
-      const image = makeLiveFile()
+      const video = new File(['video-bytes'], 'clip.mp4', { type: 'video/mp4' })
       const pendingMessage = makePendingMessage({
         channelId: channel.id,
         tid: 'encrypted-sdk-upload-message-tid',
         user: currentUser,
-        attachments: [{ ...makeAttachment('encrypted-sdk-upload-attachment-tid', image), upload: true }]
+        attachments: [
+          {
+            tid: 'encrypted-sdk-upload-attachment-tid',
+            type: attachmentTypes.video,
+            name: 'clip.mp4',
+            size: video.size,
+            data: video,
+            metadata: '{}',
+            upload: true
+          } as any
+        ]
       })
+      const uploadFile = jest.fn().mockResolvedValue('https://cdn.example/sdk-preview.jpg')
+      Object.assign(getClient(), { uploadFile })
       setCustomUploader(undefined)
+      mockGetVideoFirstFrame.mockResolvedValue({ blob: new Blob(['preview-bytes'], { type: 'image/jpeg' }) })
+      channel.sendMessage = jest.fn(() =>
+        Promise.resolve(
+          makeServerResponse('encrypted-sdk-upload-message-tid', 'encrypted-sdk-upload-attachment-tid', currentUser)
+        )
+      )
       setActiveChannelId(channel.id)
       setChannelInMap(channel)
       addMessageToMap(channel.id, pendingMessage)
 
-      const dispatched = await runMessageSaga(__messageSagaTestables.sendMessage, {
+      await runMessageSaga(__messageSagaTestables.sendMessage, {
         type: RESEND_MESSAGE,
         payload: {
           message: pendingMessage,
@@ -1595,13 +1674,21 @@ describe('attachment upload recovery', () => {
         }
       })
 
-      expect(channel.sendMessage).not.toHaveBeenCalled()
-      expect(dispatched).toEqual(
-        expect.arrayContaining([
-          updateAttachmentUploadingStateAC(UPLOAD_STATE.FAIL, 'encrypted-sdk-upload-attachment-tid'),
-          updateMessageAC('encrypted-sdk-upload-message-tid', { state: MESSAGE_STATUS.FAILED })
-        ])
-      )
+      // The preview is made from the plaintext video, then encrypted and uploaded whole.
+      expect(mockGetVideoPreviewFrame).toHaveBeenCalledWith(video)
+      const preview = uploadFile.mock.calls[0][0].data
+      expect(preview.type).toBe('application/octet-stream')
+      expect(await readBlobText(preview)).toBe('enc(key-1@id-1):preview-bytes')
+      // The SDK is given the whole encrypted video, and keeps its progress and completion callbacks.
+      const [sent] = (channel.sendMessage as jest.Mock).mock.calls[0][0].attachments
+      expect(sent).toMatchObject({ upload: true, progress: expect.any(Function), completion: expect.any(Function) })
+      expect(sent.url.type).toBe('application/octet-stream')
+      expect(sent.url.name).toBe('clip.mp4')
+      expect(await readBlobText(sent.url)).toBe('enc(key-2@id-2):video-bytes')
+      expect(JSON.parse(sent.metadata)).toEqual({
+        video_thumb: 'https://cdn.example/sdk-preview.jpg',
+        enc: { id: 'id-2', v: 1, k: 'key-2', thumb: { id: 'id-1', k: 'key-1' } }
+      })
     })
   })
 })

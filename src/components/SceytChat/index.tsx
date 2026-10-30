@@ -233,9 +233,6 @@ const SceytChat = ({
       setCustomUploader(CustomUploader)
     }
     setEncryptAttachments(encryptAttachments)
-    if (encryptAttachments && !CustomUploader) {
-      log.error('encryptAttachments needs a CustomUploader: messages with attachments will not be sent')
-    }
     if (membersDisplayTextByChannelTypesMap) {
       setChannelTypesMemberDisplayTextMap(membersDisplayTextByChannelTypesMap)
     }

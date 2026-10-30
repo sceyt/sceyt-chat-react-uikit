@@ -91,7 +91,7 @@ describe('downloadFile for an encrypted attachment', () => {
     id: 'doc-id',
     url: 'https://cdn/doc',
     name: 'report.pdf',
-    metadata: JSON.stringify({ enc: { v: 1, k: 'key-5' } })
+    metadata: JSON.stringify({ enc: { id: 'id-5', v: 1, k: 'key-5' } })
   } as any
 
   beforeEach(() => {
@@ -104,7 +104,7 @@ describe('downloadFile for an encrypted attachment', () => {
   it('saves the decrypted file from the custom downloader', async () => {
     setCustomUploader({
       upload: jest.fn(),
-      download: async () => ({ Body: fakeEncrypted('key-5', 'pdf-bytes', 'https://cdn/doc') }),
+      download: async () => ({ Body: fakeEncrypted('key-5', 'pdf-bytes') }),
       cancelRequest: jest.fn()
     })
     const done = jest.fn()
@@ -120,9 +120,7 @@ describe('downloadFile for an encrypted attachment', () => {
 
   it('saves the decrypted file from the default downloader', async () => {
     setCustomUploader(undefined)
-    global.fetch = jest
-      .fn()
-      .mockResolvedValue({ ok: true, blob: async () => fakeEncrypted('key-5', 'pdf-bytes', 'https://cdn/doc') })
+    global.fetch = jest.fn().mockResolvedValue({ ok: true, blob: async () => fakeEncrypted('key-5', 'pdf-bytes') })
 
     await downloadFile(attachment, true, jest.fn())
 
@@ -132,7 +130,7 @@ describe('downloadFile for an encrypted attachment', () => {
   it('saves nothing when the file does not decrypt', async () => {
     setCustomUploader({
       upload: jest.fn(),
-      download: async () => ({ Body: fakeEncrypted('another-key', 'pdf-bytes', 'https://cdn/doc') }),
+      download: async () => ({ Body: fakeEncrypted('another-key', 'pdf-bytes') }),
       cancelRequest: jest.fn()
     })
     const done = jest.fn()

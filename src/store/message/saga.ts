@@ -197,7 +197,6 @@ import {
   pauseUpload,
   resumeUpload
 } from '../../helpers/customUploader'
-import { resizeImageWithPica } from '../../helpers/resizeImage'
 import { setAttachmentToCache } from '../../helpers/attachmentsCache'
 import { releaseBlobUrls } from '../../helpers/attachmentBlobUrls'
 import store from '../index'
@@ -221,6 +220,7 @@ import { parseAttachmentMetadata, shouldExtractVideoFirstFrame, withVideoThumb }
 import {
   getEncryptAttachments,
   IAttachmentEncryption,
+  prepareUploadFile,
   withAttachmentEncryption,
   withVideoThumbEncryption
 } from '../../helpers/attachmentEncryption'
@@ -310,6 +310,29 @@ const getAttachmentSourceFile = (attachment: IAttachment): File | null => {
     : new File([source], attachment.name || 'attachment', { type: source.type || 'application/octet-stream' })
 }
 
+// The SDK's own upload sends a file whole, as it is given: with
+// encryptAttachments it is given the whole encrypted file.
+const encryptForSdkUpload = async (file: Blob, name: string) => {
+  const prepared = await prepareUploadFile(file, true)
+  const encrypted = await prepared.getAll()
+  return {
+    file: new File([encrypted], name, { type: prepared.contentType }),
+    encryption: prepared.encryption as IAttachmentEncryption
+  }
+}
+
+/** The attachment for the SDK's own upload, with its file encrypted and its unique id and key in the metadata. */
+const encryptAttachmentForSdkUpload = async (attachment: IAttachment) => {
+  const file =
+    attachment.url instanceof Blob ? attachment.url : attachment.data instanceof Blob ? attachment.data : null
+  if (!file) {
+    throw createAttachmentUnavailableError(`File for tid ${attachment.tid} is unavailable for encryption`)
+  }
+  const name = attachment.name || (file instanceof File ? file.name : '') || 'attachment'
+  const { file: encrypted, encryption } = await encryptForSdkUpload(file, name)
+  return { ...attachment, url: encrypted, metadata: withAttachmentEncryption(attachment.metadata, encryption) }
+}
+
 const prepareAndUploadVideoPreview = async (attachment: IAttachment, messageType: string | null | undefined) => {
   const videoFile =
     attachment.url instanceof Blob ? attachment.url : attachment.data instanceof Blob ? attachment.data : null
@@ -351,7 +374,13 @@ const prepareAndUploadVideoPreview = async (attachment: IAttachment, messageType
     if (typeof client?.uploadFile !== 'function') {
       throw new Error('The SDK uploadFile API is required before sending a video attachment')
     }
-    videoThumb = await client.uploadFile({ data: previewFile, progress: () => undefined })
+    let fileToUpload: File = previewFile
+    if (getEncryptAttachments()) {
+      const encrypted = await encryptForSdkUpload(previewFile, previewName)
+      fileToUpload = encrypted.file
+      videoThumbEncryption = encrypted.encryption
+    }
+    videoThumb = await client.uploadFile({ data: fileToUpload, progress: () => undefined })
   }
 
   if (typeof videoThumb !== 'string' || !videoThumb) {
@@ -1380,35 +1409,27 @@ function* sendMessage(action: IAction): any {
                 const updateImage = async () => {
                   if (!completedAttachment.cachedUrl && fileType === 'image' && completedAttachment.data) {
                     try {
-                      const parsedMetadata = isJSON(completedAttachment.metadata)
-                        ? JSON.parse(completedAttachment.metadata)
-                        : completedAttachment.metadata
-                      const [newWidth, newHeight] = calculateRenderedImageWidth(
-                        parsedMetadata?.szw || 1280,
-                        parsedMetadata?.szh || 1080
-                      )
                       const file =
                         completedAttachment.data instanceof File
                           ? completedAttachment.data
                           : new File([completedAttachment.data], completedAttachment.name || 'image', {
                               type: completedAttachment.data.type
                             })
-                      const { blob: resizedBlob } = await resizeImageWithPica(file, newWidth, newHeight, 1)
-                      if (resizedBlob) {
-                        await setAttachmentToCache(
-                          uriLocal,
-                          new Response(resizedBlob, { headers: { 'Content-Type': resizedBlob.type || file.type } })
-                        )
-                        const resizedUrl = URL.createObjectURL(resizedBlob)
-                        store.dispatch(setUpdateMessageAttachmentAC(uriLocal, resizedUrl))
-                        setAttachmentToCache(
-                          uriLocal + '_original_image_url',
-                          new Response(file, { headers: { 'Content-Type': file.type } })
-                        )
-                        store.dispatch(
-                          setUpdateMessageAttachmentAC(uriLocal + '_original_image_url', URL.createObjectURL(file))
-                        )
-                      }
+                      // The sent file itself, as the custom-uploader path caches it: a
+                      // copy cut to the bubble's CSS size (at most 400 px) looked blurry
+                      // on high-DPI screens and replaced the image after a reload.
+                      await setAttachmentToCache(
+                        uriLocal,
+                        new Response(file, { headers: { 'Content-Type': file.type } })
+                      )
+                      store.dispatch(setUpdateMessageAttachmentAC(uriLocal, URL.createObjectURL(file)))
+                      setAttachmentToCache(
+                        uriLocal + '_original_image_url',
+                        new Response(file, { headers: { 'Content-Type': file.type } })
+                      )
+                      store.dispatch(
+                        setUpdateMessageAttachmentAC(uriLocal + '_original_image_url', URL.createObjectURL(file))
+                      )
                     } catch (err) {
                       log.error('Error caching resized image on upload completion:', err)
                     }
@@ -1659,10 +1680,6 @@ function* sendMessage(action: IAction): any {
               continue
             }
             if (!customUploader) {
-              if (getEncryptAttachments()) {
-                // The SDK uploader would upload the plaintext: fail the message instead.
-                throw new Error('encryptAttachments needs a CustomUploader; the attachment was not sent')
-              }
               for (let attachmentIndex = 0; attachmentIndex < messageAttachment.length; attachmentIndex++) {
                 if (messageAttachment[attachmentIndex].type === attachmentTypes.video) {
                   const preparedVideoAttachment = yield call(
@@ -1681,6 +1698,13 @@ function* sendMessage(action: IAction): any {
                       updateAttachmentUploadingStateAC(UPLOAD_STATE.UPLOADING, messageAttachment[attachmentIndex].tid)
                     )
                   }
+                }
+                // After the video preview, which is made from the plaintext video.
+                if (getEncryptAttachments() && messageAttachment[attachmentIndex].upload) {
+                  messageAttachment[attachmentIndex] = yield call(
+                    encryptAttachmentForSdkUpload,
+                    messageAttachment[attachmentIndex]
+                  )
                 }
               }
             }

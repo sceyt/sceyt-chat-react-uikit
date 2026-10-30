@@ -44,18 +44,14 @@ export interface IUploadTask {
 export interface ICustomUploaderUploadFiles {
   /**
    * Prepares the file to store; call it with the file as it will be stored
-   * (e.g. after resizing an image) and send what it returns: `getPart(n)` as
-   * multipart parts, or `getAll()`, with its `contentType`. It is encrypted
+   * (e.g. after resizing an image) and send what it returns: `getAll()`, or
+   * the byte ranges the upload server gives (`getRange`, or `getPart(n)` for
+   * 5 MiB parts) as multipart parts, with its `contentType`. It is encrypted
    * when `encryptAttachments` is on. The message describes the last file
    * prepared, so prepare once per upload.
-   *
-   * `url` is the URL the file will be stored at, exactly as `success({ uri })`
-   * will give it: pick it before preparing the file. An encrypted file is
-   * bound to it and opens only for it, so the upload fails when `success`
-   * gives another one.
    */
   // eslint-disable-next-line no-unused-vars
-  prepareFile: (file: Blob, options: { url: string }) => Promise<IAttachmentUploadFile>
+  prepareFile: (file: Blob) => Promise<IAttachmentUploadFile>
 }
 
 /** The 6th `download()` argument of a custom uploader that sets `supportsEncryption`. */
@@ -76,9 +72,9 @@ export interface ICustomUploader {
    * `encryptAttachments` is on or not (with a sceyt-chat version that has
    * client.prepareUpload; with an older one these arguments are not passed).
    *
-   * `encryptAttachments` needs it: an encrypted file is bound to its URL, so
-   * the uploader picks the URL before the file is prepared. Without it, an
-   * upload with `encryptAttachments` on fails before anything is sent.
+   * `encryptAttachments` needs it when there is a CustomUploader: the uploader
+   * must store the file prepareFile gives. Without it, an upload with
+   * `encryptAttachments` on fails before anything is sent.
    */
   supportsEncryption?: boolean
   upload: (
@@ -180,8 +176,10 @@ export interface IChatClientProps {
   CustomUploader?: ICustomUploader
   /**
    * Encrypt attachment files before upload and decrypt them after download
-   * (the key is kept in each attachment's metadata). Needs a CustomUploader
-   * with `supportsEncryption` and a sceyt-chat version with client.prepareUpload.
+   * (the unique id and key are kept in each attachment's metadata). Works with
+   * the SDK's own upload, which sends the whole encrypted file, or with a
+   * CustomUploader that sets `supportsEncryption`; needs a sceyt-chat version
+   * with client.prepareUpload.
    */
   encryptAttachments?: boolean
   channelTypeFilter?: string[]

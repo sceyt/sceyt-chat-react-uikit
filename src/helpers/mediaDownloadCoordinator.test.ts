@@ -521,7 +521,7 @@ describe('mediaDownloadCoordinator', () => {
   })
 
   describe('an encrypted attachment', () => {
-    const encryption = { v: 1, k: 'key-3' }
+    const encryption = { id: 'id-3', v: 1, k: 'key-3' }
     const request = {
       key: 'original-image:https://cdn/photo',
       url: 'https://cdn/photo',
@@ -536,7 +536,7 @@ describe('mediaDownloadCoordinator', () => {
     })
 
     it('is decrypted before it is cached and shown', async () => {
-      const download = jest.fn(async () => ({ Body: fakeEncrypted('key-3', 'pixels', 'https://cdn/photo') }))
+      const download = jest.fn(async () => ({ Body: fakeEncrypted('key-3', 'pixels') }))
       setCustomUploader({ download, cancelRequest: jest.fn(), upload: jest.fn() } as any)
 
       const { blob } = await requestMediaDownload(request)
@@ -549,7 +549,7 @@ describe('mediaDownloadCoordinator', () => {
     it('is decrypted when it is downloaded without a custom downloader', async () => {
       global.fetch = jest
         .fn()
-        .mockResolvedValue({ ok: true, blob: async () => fakeEncrypted('key-3', 'pixels', 'https://cdn/photo') }) as any
+        .mockResolvedValue({ ok: true, blob: async () => fakeEncrypted('key-3', 'pixels') }) as any
 
       const { blob } = await requestMediaDownload(request)
 
@@ -559,7 +559,7 @@ describe('mediaDownloadCoordinator', () => {
 
     it('that fails to decrypt is reported as failed, not shown', async () => {
       setCustomUploader({
-        download: async () => ({ Body: fakeEncrypted('another-key', 'pixels', 'https://cdn/photo') }),
+        download: async () => ({ Body: fakeEncrypted('another-key', 'pixels') }),
         cancelRequest: jest.fn(),
         upload: jest.fn()
       } as any)
@@ -570,7 +570,7 @@ describe('mediaDownloadCoordinator', () => {
     })
 
     it('that fails to decrypt is not downloaded again when it is shown again', async () => {
-      const download = jest.fn(async () => ({ Body: fakeEncrypted('another-key', 'pixels', 'https://cdn/photo') }))
+      const download = jest.fn(async () => ({ Body: fakeEncrypted('another-key', 'pixels') }))
       setCustomUploader({ download, cancelRequest: jest.fn(), upload: jest.fn() } as any)
       await expect(requestMediaDownload(request)).rejects.toMatchObject({ type: 'AttachmentDecryptionFailed' })
 
@@ -583,8 +583,8 @@ describe('mediaDownloadCoordinator', () => {
     it('that failed to decrypt is downloaded again when the user retries', async () => {
       const download = jest
         .fn()
-        .mockResolvedValueOnce({ Body: fakeEncrypted('another-key', 'pixels', 'https://cdn/photo') })
-        .mockResolvedValueOnce({ Body: fakeEncrypted('key-3', 'pixels', 'https://cdn/photo') })
+        .mockResolvedValueOnce({ Body: fakeEncrypted('another-key', 'pixels') })
+        .mockResolvedValueOnce({ Body: fakeEncrypted('key-3', 'pixels') })
       setCustomUploader({ download, cancelRequest: jest.fn(), upload: jest.fn() } as any)
       await expect(requestMediaDownload(request)).rejects.toMatchObject({ type: 'AttachmentDecryptionFailed' })
 
@@ -598,12 +598,12 @@ describe('mediaDownloadCoordinator', () => {
     it('that failed to decrypt is downloaded again when its key changes', async () => {
       const download = jest
         .fn()
-        .mockResolvedValueOnce({ Body: fakeEncrypted('another-key', 'pixels', 'https://cdn/photo') })
-        .mockResolvedValueOnce({ Body: fakeEncrypted('key-4', 'pixels', 'https://cdn/photo') })
+        .mockResolvedValueOnce({ Body: fakeEncrypted('another-key', 'pixels') })
+        .mockResolvedValueOnce({ Body: fakeEncrypted('key-4', 'pixels') })
       setCustomUploader({ download, cancelRequest: jest.fn(), upload: jest.fn() } as any)
       await expect(requestMediaDownload(request)).rejects.toMatchObject({ type: 'AttachmentDecryptionFailed' })
 
-      const { blob } = await requestMediaDownload({ ...request, encryption: { ...encryption, k: 'key-4' } })
+      const { blob } = await requestMediaDownload({ ...request, encryption: { ...encryption, id: 'id-4', k: 'key-4' } })
 
       expect(download).toHaveBeenCalledTimes(2)
       expect(await readBlobText(blob)).toBe('pixels')

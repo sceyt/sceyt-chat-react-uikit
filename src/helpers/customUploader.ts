@@ -62,7 +62,7 @@ export const customUpload = (
     const encrypt = getEncryptAttachments()
 
     // `files` is passed when the uploader prepares its file itself; `prepared`
-    // then gives the file it prepared last and the URL it prepared it for.
+    // then gives the file it prepared last.
     const start = (
       uploaded: IAttachment,
       {
@@ -70,7 +70,7 @@ export const customUpload = (
         prepared
       }: {
         files?: ICustomUploaderUploadFiles
-        prepared?: () => { file: IAttachmentUploadFile; url?: string } | undefined
+        prepared?: () => IAttachmentUploadFile | undefined
       } = {}
     ) => {
       const uploadTask: IUploadTask = {
@@ -82,23 +82,13 @@ export const customUpload = (
         },
         success: ({ uri, blob }: { uri: string; blob: Blob }) => {
           delete pendingUploaders[attachment.tid!]
-          const last = prepared?.()
-          const encryption = last?.file.encryption
+          const encryption = prepared?.()?.encryption
           if (encrypt && !encryption) {
             // The uploader stored a file it did not prepare: it may be plaintext,
             // so the message is not sent.
             reject(
               new Error(
                 'The custom uploader stored a file that was not prepared with prepareFile; it may not be encrypted'
-              )
-            )
-            return
-          }
-          if (encryption && uri !== last?.url) {
-            // The file opens only for the URL it was prepared for.
-            reject(
-              new Error(
-                `The custom uploader stored the file at ${uri}, not at ${last?.url}, the URL it was prepared for`
               )
             )
             return
@@ -135,14 +125,13 @@ export const customUpload = (
         )
         return
       }
-      // The uploader picks the URL it stores the file at, then prepares the
-      // file (e.g. after resizing an image) for that URL; the last file
-      // prepared is the one the message describes.
-      let last: { file: IAttachmentUploadFile; url?: string } | undefined
+      // The uploader prepares the file it stores (e.g. after resizing an
+      // image); the last file prepared is the one the message describes.
+      let last: IAttachmentUploadFile | undefined
       const files: ICustomUploaderUploadFiles = {
-        prepareFile: (file: Blob, options?: { url: string }) =>
-          prepareUploadFile(file, encrypt, options?.url).then((uploadFile) => {
-            last = { file: uploadFile, url: options?.url }
+        prepareFile: (file: Blob) =>
+          prepareUploadFile(file, encrypt).then((uploadFile) => {
+            last = uploadFile
             return uploadFile
           })
       }
@@ -150,12 +139,12 @@ export const customUpload = (
     } else if (!encrypt) {
       start(attachment)
     } else {
-      // An encrypted file is bound to the URL it is stored at, so the uploader
-      // must give that URL before the file is encrypted.
+      // An uploader without supportsEncryption would store the file it was
+      // given, unencrypted.
       notStartedUploads.delete(attachment.tid!)
       reject(
         new Error(
-          "Attachment encryption needs a custom uploader with supportsEncryption, which gives the file's URL to prepareFile"
+          'Attachment encryption needs a custom uploader with supportsEncryption, which stores the file prepareFile gives'
         )
       )
     }
@@ -198,7 +187,7 @@ export const getAttachmentDownloader = (
   return (url, asFile, progress, messageType, messageId) => {
     let file: ReturnType<typeof prepareDownloadFile>
     try {
-      file = prepareDownloadFile(encryption, type, url)
+      file = prepareDownloadFile(encryption, type)
     } catch (error) {
       return Promise.reject(error)
     }

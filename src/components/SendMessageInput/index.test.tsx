@@ -21,6 +21,7 @@ import {
 import * as videoContainer from '../../helpers/videoContainer'
 import { releaseAllBlobUrls } from '../../helpers/attachmentBlobUrls'
 import * as imagePreparation from '../../helpers/resizeImage'
+import { setCustomUploader } from '../../helpers/customUploader'
 
 jest.mock('../../helpers/messagesHalper', () => {
   const drafts: Record<string, any> = {}
@@ -317,6 +318,25 @@ describe('file-drop integration: MessageList, Redux and SendMessageInput', () =>
     expect(attachment.data).toBe(file)
     expect(attachment.type).toBe(attachmentTypes.file)
     view.unmount()
+  })
+
+  it.each([
+    ['the SDK upload', undefined],
+    ['a custom uploader', { upload: jest.fn(), download: jest.fn(), cancelRequest: jest.fn() }]
+  ])('a media image sent through %s is encoded once, as JPEG of quality 0.8', async (_name, uploader) => {
+    setCustomUploader(uploader)
+    try {
+      const view = renderFileDropFlow()
+      const file = new File(['photo'], 'photo.jpg', { type: 'image/jpeg' })
+      await view.drop([file], 'media')
+      await view.send()
+
+      expect(imagePreparation.resizeImage).toHaveBeenCalledTimes(1)
+      expect(imagePreparation.resizeImage).toHaveBeenCalledWith(file, undefined, undefined, 0.8)
+      view.unmount()
+    } finally {
+      setCustomUploader(undefined)
+    }
   })
 
   it.each([19, 20, 21, 40])('enforces the 20-file limit for a batch of %s dropped files', async (count) => {

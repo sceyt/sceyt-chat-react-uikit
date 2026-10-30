@@ -196,7 +196,7 @@ const download = async (request: MediaDownloadRequest, job: MediaDownloadJob): P
   }
   const blob = await readResponseBlobWithProgress(response, reportProgress, request.size || 0)
   if (request.encryption) {
-    const plaintext = await prepareDownloadFile(request.encryption, request.contentType, request.url).open(blob)
+    const plaintext = await prepareDownloadFile(request.encryption, request.contentType).open(blob)
     return makeObjectUrl(request, plaintext, job.cacheKeys)
   }
   return makeObjectUrl(request, blob, job.cacheKeys)
