@@ -1,4 +1,4 @@
-import { ICustomUploader, ICustomUploaderUploadFiles, IProgress, IUploadTask } from '../components/ChatContainer'
+import { ICustomUploader, ICustomUploaderUploadHelpers, IProgress, IUploadTask } from '../components/ChatContainer'
 import { IAttachment } from '../types'
 import log from 'loglevel'
 import {
@@ -41,6 +41,11 @@ export const getCustomUploader = () => CustomUploader
 export const getCustomDownloader = (): ICustomUploader['download'] | undefined =>
   CustomUploader && CustomUploader.download
 
+// Whether the uploader prepares the files it stores and opens the ones it
+// downloads (`supportsEncryption` is the old name of `preparesFiles`).
+const uploaderPreparesFiles = () =>
+  !!CustomUploader && !!(CustomUploader.preparesFiles ?? CustomUploader.supportsEncryption)
+
 export interface ICustomUploadResult {
   uri: string
   /** The uploaded file as the user sees it: always the plaintext. */
@@ -61,18 +66,15 @@ export const customUpload = (
   return new Promise((resolve, reject) => {
     const encrypt = getEncryptAttachments()
 
-    // `files` is passed when the uploader prepares its file itself; `prepared`
-    // then gives the file it prepared last.
-    const start = (
-      uploaded: IAttachment,
-      {
-        files,
-        prepared
-      }: {
-        files?: ICustomUploaderUploadFiles
-        prepared?: () => IAttachmentUploadFile | undefined
-      } = {}
-    ) => {
+    // `helpers` is passed when the uploader prepares its file itself;
+    // `getLastPrepared` then gives the file it prepared last.
+    const start = ({
+      helpers,
+      getLastPrepared
+    }: {
+      helpers?: ICustomUploaderUploadHelpers
+      getLastPrepared?: () => IAttachmentUploadFile | undefined
+    } = {}) => {
       const uploadTask: IUploadTask = {
         updateLocalFileLocation: getUpdatedFilePath,
         progress,
@@ -82,7 +84,7 @@ export const customUpload = (
         },
         success: ({ uri, blob }: { uri: string; blob: Blob }) => {
           delete pendingUploaders[attachment.tid!]
-          const encryption = prepared?.()?.encryption
+          const encryption = getLastPrepared?.()?.encryption
           if (encrypt && !encryption) {
             // The uploader stored a file it did not prepare: it may be plaintext,
             // so the message is not sent.
@@ -102,10 +104,10 @@ export const customUpload = (
       pendingUploaders[attachment.tid!] = uploadTask
       const pausedBeforeStart = isUploadPausedBeforeStart(attachment.tid!)
       notStartedUploads.delete(attachment.tid!)
-      if (files) {
-        CustomUploader.upload(uploaded, uploadTask, messageType, files)
+      if (helpers) {
+        CustomUploader.upload(attachment, uploadTask, messageType, helpers)
       } else {
-        CustomUploader.upload(uploaded, uploadTask, messageType)
+        CustomUploader.upload(attachment, uploadTask, messageType)
       }
       if (pausedBeforeStart) {
         // The uploader installs stop() when upload() is called, so nothing is sent.
@@ -115,7 +117,7 @@ export const customUpload = (
 
     if (!CustomUploader) {
       reject(new Error('No Custom uploader'))
-    } else if (CustomUploader.supportsEncryption && (encrypt || canPrepareAttachmentFiles())) {
+    } else if (uploaderPreparesFiles() && (encrypt || canPrepareAttachmentFiles())) {
       if (!canPrepareAttachmentFiles()) {
         // Fails here, before anything is sent.
         reject(
@@ -127,24 +129,24 @@ export const customUpload = (
       }
       // The uploader prepares the file it stores (e.g. after resizing an
       // image); the last file prepared is the one the message describes.
-      let last: IAttachmentUploadFile | undefined
-      const files: ICustomUploaderUploadFiles = {
+      let lastPrepared: IAttachmentUploadFile | undefined
+      const helpers: ICustomUploaderUploadHelpers = {
         prepareFile: (file: Blob) =>
-          prepareUploadFile(file, encrypt).then((uploadFile) => {
-            last = uploadFile
-            return uploadFile
+          prepareUploadFile(file, encrypt).then((prepared) => {
+            lastPrepared = prepared
+            return prepared
           })
       }
-      start(attachment, { files, prepared: () => last })
+      start({ helpers, getLastPrepared: () => lastPrepared })
     } else if (!encrypt) {
-      start(attachment)
+      start()
     } else {
-      // An uploader without supportsEncryption would store the file it was
+      // An uploader without preparesFiles would store the file it was
       // given, unencrypted.
       notStartedUploads.delete(attachment.tid!)
       reject(
         new Error(
-          'Attachment encryption needs a custom uploader with supportsEncryption, which stores the file prepareFile gives'
+          'Attachment encryption needs a custom uploader with preparesFiles, which stores the file prepareFile gives'
         )
       )
     }
@@ -168,7 +170,7 @@ const asBlob = async (body: any): Promise<Blob> => {
  * The custom downloader for one attachment. For an encrypted file
  * (`encryption` from its metadata) it returns the decrypted file, in the same
  * shape the custom downloader returned ({ Body }, a Blob, or a URL string).
- * An uploader with `supportsEncryption` gets the stored file ({ file }) and
+ * An uploader with `preparesFiles` gets the stored file ({ file }) and
  * opens it itself. `type` is the file's real type, e.g. 'video/mp4'.
  * `download` defaults to the CustomUploader's.
  */
@@ -182,8 +184,8 @@ export const getAttachmentDownloader = (
   download: ICustomUploader['download'] | undefined = getCustomDownloader()
 ): ICustomUploader['download'] | undefined => {
   if (!download) return download
-  const opensFiles = !!CustomUploader?.supportsEncryption && canPrepareAttachmentFiles()
-  if (!encryption && !opensFiles) return download
+  const uploaderOpensFiles = uploaderPreparesFiles() && canPrepareAttachmentFiles()
+  if (!encryption && !uploaderOpensFiles) return download
   return (url, asFile, progress, messageType, messageId) => {
     let file: ReturnType<typeof prepareDownloadFile>
     try {
@@ -191,7 +193,7 @@ export const getAttachmentDownloader = (
     } catch (error) {
       return Promise.reject(error)
     }
-    if (opensFiles) {
+    if (uploaderOpensFiles) {
       // The uploader's own request, so its cancelRequest finds it.
       return download(url, asFile, progress, messageType, messageId, { file })
     }

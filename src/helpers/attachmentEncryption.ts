@@ -11,7 +11,7 @@ import { getClient } from '../common/client'
 export interface IAttachmentEncryption {
   /** The file's unique id: the stored file opens only with it. */
   id: string
-  v: number
+  v: 1
   k: string
   /** Unique id and key of the video preview image (`video_thumb`), which is encrypted as its own file. */
   thumb?: { id: string; k: string }

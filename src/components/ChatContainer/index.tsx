@@ -40,8 +40,8 @@ export interface IUploadTask {
   resume: () => void
 }
 
-/** The 4th `upload()` argument of a custom uploader that sets `supportsEncryption`. */
-export interface ICustomUploaderUploadFiles {
+/** The 4th `upload()` argument of a custom uploader that sets `preparesFiles`. */
+export interface ICustomUploaderUploadHelpers {
   /**
    * Prepares the file to store; call it with the file as it will be stored
    * (e.g. after resizing an image) and send what it returns: `getAll()`, or
@@ -54,7 +54,7 @@ export interface ICustomUploaderUploadFiles {
   prepareFile: (file: Blob) => Promise<IAttachmentUploadFile>
 }
 
-/** The 6th `download()` argument of a custom uploader that sets `supportsEncryption`. */
+/** The 6th `download()` argument of a custom uploader that sets `preparesFiles`. */
 export interface ICustomUploaderDownloadFile {
   /**
    * The attachment's stored file: pass the downloaded bytes to `file.open()`
@@ -76,6 +76,8 @@ export interface ICustomUploader {
    * must store the file prepareFile gives. Without it, an upload with
    * `encryptAttachments` on fails before anything is sent.
    */
+  preparesFiles?: boolean
+  /** @deprecated The old name of `preparesFiles`, still read when `preparesFiles` is not set. */
   supportsEncryption?: boolean
   upload: (
     // eslint-disable-next-line no-unused-vars
@@ -85,7 +87,7 @@ export interface ICustomUploader {
     // eslint-disable-next-line no-unused-vars
     messageType: string | null | undefined,
     // eslint-disable-next-line no-unused-vars
-    files?: ICustomUploaderUploadFiles
+    helpers?: ICustomUploaderUploadHelpers
   ) => void
   /**
    * `messageId` is the ID of a message the attachment appears in, supplied by
@@ -178,7 +180,7 @@ export interface IChatClientProps {
    * Encrypt attachment files before upload and decrypt them after download
    * (the unique id and key are kept in each attachment's metadata). Works with
    * the SDK's own upload, which sends the whole encrypted file, or with a
-   * CustomUploader that sets `supportsEncryption`; needs a sceyt-chat version
+   * CustomUploader that sets `preparesFiles`; needs a sceyt-chat version
    * with client.prepareUpload.
    */
   encryptAttachments?: boolean

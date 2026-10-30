@@ -612,11 +612,11 @@ describe('mediaDownloadCoordinator', () => {
     it.each([
       ['that the uikit decrypts', false],
       ['that the uploader opens itself', true]
-    ])('%s is cancelled at the uploader own request', async (_name, supportsEncryption) => {
+    ])('%s is cancelled at the uploader own request', async (_name, preparesFiles) => {
       const uploaderRequest = new Promise(() => undefined)
       const cancelRequest = jest.fn()
       setCustomUploader({
-        supportsEncryption,
+        preparesFiles,
         download: jest.fn(() => uploaderRequest),
         cancelRequest,
         upload: jest.fn()

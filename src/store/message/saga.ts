@@ -652,75 +652,75 @@ export const handleUploadAttachments = async (attachments: IAttachment[], messag
       }
       let fileSize = attachment.size
       let filePath: any
-      let uriLocal
+      let uploadedUri
       const handleUpdateLocalPath = (updatedLink: string) => {
         if (fileType === 'video') {
           filePath = updatedLink
         }
       }
-      let blobLocal: Blob | null = null
+      let uploadedBlob: Blob | null = null
       let encryption: IAttachmentEncryption | undefined
       if (attachment.cachedUrl) {
-        uriLocal = attachment.cachedUrl
+        uploadedUri = attachment.cachedUrl
         const dataSize = attachment.data?.size || 0
         store.dispatch(updateAttachmentUploadingProgressAC(dataSize, dataSize, attachment.tid))
       } else {
         const uploaded = await customUpload(attachment, handleUploadProgress, message.type, handleUpdateLocalPath)
-        uriLocal = uploaded.uri
-        blobLocal = uploaded.blob
+        uploadedUri = uploaded.uri
+        uploadedBlob = uploaded.blob
         encryption = uploaded.encryption
-        if (blobLocal) {
-          fileSize = blobLocal.size
+        if (uploadedBlob) {
+          fileSize = uploadedBlob.size
         } else {
           log.warn('Upload returned null blob for attachment:', attachment.name)
         }
       }
       if (!attachment.cachedUrl && fileType === 'image') {
         try {
-          if (blobLocal && blobLocal.type.startsWith('image/')) {
-            // Use the original file for pica resize — blobLocal is already AWS-resized, re-resizing it degrades quality
+          if (uploadedBlob && uploadedBlob.type.startsWith('image/')) {
+            // The file as the uikit gave it to the uploader (resized when it was added to the message)
             const file =
               attachment.url instanceof File
                 ? attachment.url
                 : new File([attachment.url], attachment.name || 'image', {
-                    type: (attachment.url as File).type || blobLocal.type
+                    type: (attachment.url as File).type || uploadedBlob.type
                   })
 
             // The full-size local source is already available and is what the user
             // saw before reloading the draft. Do not make a second, small WebP copy
             // for the sender's message/list cache: that turned a 1298×1466 image
             // into a 354×400 preview after a reload.
-            await setAttachmentToCache(uriLocal, new Response(file, { headers: { 'Content-Type': file.type } }))
+            await setAttachmentToCache(uploadedUri, new Response(file, { headers: { 'Content-Type': file.type } }))
             filePath = URL.createObjectURL(file)
-            store.dispatch(setUpdateMessageAttachmentAC(uriLocal, filePath))
+            store.dispatch(setUpdateMessageAttachmentAC(uploadedUri, filePath))
             message.attachments[0] = { ...message.attachments[0], attachmentUrl: filePath }
             setAttachmentToCache(
-              uriLocal + `_original_image_url`,
-              new Response(blobLocal, {
+              uploadedUri + `_original_image_url`,
+              new Response(uploadedBlob, {
                 headers: {
-                  'Content-Type': blobLocal.type
+                  'Content-Type': uploadedBlob.type
                 }
               })
             )
-            const originalImageUrl = URL.createObjectURL(blobLocal)
-            store.dispatch(setUpdateMessageAttachmentAC(uriLocal + `_original_image_url`, originalImageUrl))
+            const originalImageUrl = URL.createObjectURL(uploadedBlob)
+            store.dispatch(setUpdateMessageAttachmentAC(uploadedUri + `_original_image_url`, originalImageUrl))
           }
         } catch (error) {
           log.error('Error resizing and caching image during upload:', error)
           // Continue even if caching fails
         }
       } else if (!attachment.cachedUrl && fileType === 'video') {
-        if (blobLocal) {
+        if (uploadedBlob) {
           await setAttachmentToCache(
-            uriLocal + `_original_video_url`,
-            new Response(blobLocal, {
+            uploadedUri + `_original_video_url`,
+            new Response(uploadedBlob, {
               headers: {
-                'Content-Type': blobLocal.type
+                'Content-Type': uploadedBlob.type
               }
             })
           )
-          const originalVideoUrl = URL.createObjectURL(blobLocal)
-          store.dispatch(setUpdateMessageAttachmentAC(uriLocal + `_original_video_url`, originalVideoUrl))
+          const originalVideoUrl = URL.createObjectURL(uploadedBlob)
+          store.dispatch(setUpdateMessageAttachmentAC(uploadedUri + `_original_video_url`, originalVideoUrl))
 
           if (shouldExtractVideoFirstFrame(attachment.metadata)) {
             const parsedMetadata = parseAttachmentMetadata(attachment.metadata)
@@ -728,7 +728,7 @@ export const handleUploadAttachments = async (attachments: IAttachment[], messag
               parsedMetadata.szw || 1280,
               parsedMetadata.szh || 1080
             )
-            const result = await getVideoFirstFrame(blobLocal, newWidth, newHeight)
+            const result = await getVideoFirstFrame(uploadedBlob, newWidth, newHeight)
             if (result) {
               const { frameBlobUrl, blob } = result
               if (frameBlobUrl && blob) {
@@ -737,8 +737,8 @@ export const handleUploadAttachments = async (attachments: IAttachment[], messag
                     'Content-Type': blob.type
                   }
                 })
-                await setAttachmentToCache(uriLocal, response)
-                store.dispatch(setUpdateMessageAttachmentAC(uriLocal, frameBlobUrl))
+                await setAttachmentToCache(uploadedUri, response)
+                store.dispatch(setUpdateMessageAttachmentAC(uploadedUri, frameBlobUrl))
                 message.attachments[0] = { ...message.attachments[0], attachmentUrl: frameBlobUrl }
               }
             }
@@ -757,7 +757,7 @@ export const handleUploadAttachments = async (attachments: IAttachment[], messag
           : JSON.stringify({
               ...parsedAttachmentMeta
             })
-      const attachmentBuilder = channel.createAttachmentBuilder(uriLocal, attachment.type)
+      const attachmentBuilder = channel.createAttachmentBuilder(uploadedUri, attachment.type)
       const attachmentToSend = attachmentBuilder
         .setName(attachment.name)
         .setMetadata(attachmentMeta)
@@ -1399,7 +1399,7 @@ function* sendMessage(action: IAction): any {
                 log.info('fail to upload attachment ... ', error)
                 store.dispatch(updateAttachmentUploadingStateAC(UPLOAD_STATE.FAIL, attachment.tid))
               } else {
-                const uriLocal = updatedAttachment.url
+                const uploadedUri = updatedAttachment.url
                 // Preview preparation updates the attachment builder after this
                 // callback is registered. Use its final metadata so a new
                 // video_thumb prevents a redundant second frame extraction.
@@ -1419,23 +1419,23 @@ function* sendMessage(action: IAction): any {
                       // copy cut to the bubble's CSS size (at most 400 px) looked blurry
                       // on high-DPI screens and replaced the image after a reload.
                       await setAttachmentToCache(
-                        uriLocal,
+                        uploadedUri,
                         new Response(file, { headers: { 'Content-Type': file.type } })
                       )
-                      store.dispatch(setUpdateMessageAttachmentAC(uriLocal, URL.createObjectURL(file)))
+                      store.dispatch(setUpdateMessageAttachmentAC(uploadedUri, URL.createObjectURL(file)))
                       setAttachmentToCache(
-                        uriLocal + '_original_image_url',
+                        uploadedUri + '_original_image_url',
                         new Response(file, { headers: { 'Content-Type': file.type } })
                       )
                       store.dispatch(
-                        setUpdateMessageAttachmentAC(uriLocal + '_original_image_url', URL.createObjectURL(file))
+                        setUpdateMessageAttachmentAC(uploadedUri + '_original_image_url', URL.createObjectURL(file))
                       )
                     } catch (err) {
                       log.error('Error caching resized image on upload completion:', err)
                     }
                   } else if (!completedAttachment.cachedUrl && fileType === 'video' && completedAttachment.data) {
                     try {
-                      const originalVideoCacheKey = `${uriLocal}_original_video_url`
+                      const originalVideoCacheKey = `${uploadedUri}_original_video_url`
                       // Publish the local source before any asynchronous cache
                       // or fallback-thumbnail work. The confirmed sender message
                       // can render before Cache Storage settles; without this
@@ -1464,10 +1464,10 @@ function* sendMessage(action: IAction): any {
                         if (result) {
                           const { frameBlobUrl, blob } = result
                           await setAttachmentToCache(
-                            uriLocal,
+                            uploadedUri,
                             new Response(blob, { headers: { 'Content-Type': blob.type } })
                           )
-                          store.dispatch(setUpdateMessageAttachmentAC(uriLocal, frameBlobUrl))
+                          store.dispatch(setUpdateMessageAttachmentAC(uploadedUri, frameBlobUrl))
                         }
                       }
                     } catch (err) {

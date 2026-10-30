@@ -1504,13 +1504,13 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
               let preparedFile = file
               let metadata: any
               if (customUploader) {
-                const resizedFile = await resizeImage(file, undefined, undefined, MEDIA_IMAGE_QUALITY)
+                const resized = await resizeImage(file, undefined, undefined, MEDIA_IMAGE_QUALITY)
                 const patch = {
-                  size: isMediaAttachment && resizedFile?.blob ? resizedFile.blob.size : file.size,
+                  size: isMediaAttachment && resized?.blob ? resized.blob.size : file.size,
                   metadata: { szw: imageWidth, szh: imageHeight, tmb: thumbnail }
                 }
-                if (isMediaAttachment && resizedFile?.blob) {
-                  preparedFile = new File([resizedFile.blob], resizedFile.file.name, { type: file.type })
+                if (isMediaAttachment && resized?.blob) {
+                  preparedFile = new File([resized.blob], resized.file.name, { type: file.type })
                   patch.size = preparedFile.size
                   updateAttachment({ ...patch, data: preparedFile })
                   setPendingAttachment(tid, { file: preparedFile })

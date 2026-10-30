@@ -1543,11 +1543,11 @@ describe('attachment upload recovery', () => {
       stored = []
       uriFor = () => 'https://cdn.example/uploaded-1'
       setCustomUploader({
-        supportsEncryption: true,
-        upload: async (attachment: any, uploadTask: any, _messageType: any, files: any) => {
+        preparesFiles: true,
+        upload: async (attachment: any, uploadTask: any, _messageType: any, helpers: any) => {
           uploadCalls.push(attachment)
           const uri = uriFor(attachment)
-          const prepared = await files.prepareFile(attachment.data)
+          const prepared = await helpers.prepareFile(attachment.data)
           stored.push(await prepared.getAll())
           uploadTask.success({ uri, blob: attachment.data })
         },
@@ -1616,7 +1616,7 @@ describe('attachment upload recovery', () => {
       })
     })
 
-    it('with an uploader without supportsEncryption, the message fails instead of sending the file unencrypted', async () => {
+    it('with an uploader without preparesFiles, the message fails instead of sending the file unencrypted', async () => {
       const channel = makeUploaderChannel('channel-encrypted-simple-uploader')
       const image = makeLiveFile()
       setCustomUploader({ upload: jest.fn(), download: jest.fn() })
@@ -1627,7 +1627,7 @@ describe('attachment upload recovery', () => {
           { type: 'text' } as any,
           channel
         )
-      ).rejects.toThrow('supportsEncryption')
+      ).rejects.toThrow('preparesFiles')
       expect(channel.sendMessage).not.toHaveBeenCalled()
     })
 

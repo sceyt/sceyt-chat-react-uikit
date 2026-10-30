@@ -90,9 +90,9 @@ describe('encryptAttachments: uploading', () => {
   let calls: { attachment: any; task: any; args: any[] }[]
   const file = () => new File(['hello'], 'photo.png', { type: 'image/png' })
 
-  const useUploader = (supportsEncryption?: boolean) => {
+  const useUploader = (preparesFiles?: boolean) => {
     setCustomUploader({
-      supportsEncryption,
+      preparesFiles,
       upload: (attachment: any, task: any, ...rest: any[]) => {
         calls.push({ attachment, task, args: rest })
         task.stop = () => true
@@ -125,7 +125,7 @@ describe('encryptAttachments: uploading', () => {
     expect(rest).toEqual({})
   })
 
-  it('an uploader without supportsEncryption would store the file unencrypted, so nothing is sent', async () => {
+  it('an uploader without preparesFiles would store the file unencrypted, so nothing is sent', async () => {
     useUploader()
     markUploadNotStarted('simple')
     const source = file()
@@ -135,12 +135,12 @@ describe('encryptAttachments: uploading', () => {
       'text'
     )
 
-    await expect(result).rejects.toThrow('supportsEncryption')
+    await expect(result).rejects.toThrow('preparesFiles')
     expect(calls).toHaveLength(0)
     expect(isUploadNotStarted('simple')).toBe(false)
   })
 
-  // What an uploader with supportsEncryption does (like Waafi's): it may
+  // What an uploader with preparesFiles does (like Waafi's): it may
   // resize the file, then prepares it and stores what prepareFile returns.
   const storePrepared = async (call: { task: any; args: any[] }, file: Blob, uri: string) => {
     const prepared = await call.args[1].prepareFile(file)
@@ -149,7 +149,20 @@ describe('encryptAttachments: uploading', () => {
     return { prepared, stored }
   }
 
-  it('an uploader with supportsEncryption prepares and stores its own file, and its key goes to the message', async () => {
+  it('an uploader that sets the old name supportsEncryption still prepares its own file', async () => {
+    setCustomUploader({
+      supportsEncryption: true,
+      upload: (attachment: any, task: any, ...rest: any[]) => {
+        calls.push({ attachment, task, args: rest })
+      },
+      download: jest.fn()
+    })
+    customUpload({ tid: 'old-name', name: 'photo.png', data: file() } as any, () => undefined, 'text')
+
+    expect(typeof calls[0].args[1]?.prepareFile).toBe('function')
+  })
+
+  it('an uploader with preparesFiles prepares and stores its own file, and its key goes to the message', async () => {
     useUploader(true)
     const source = file()
     const result = customUpload({ tid: 'streaming', name: 'photo.png', data: source } as any, () => undefined, 'text')
@@ -179,7 +192,7 @@ describe('encryptAttachments: uploading', () => {
     expect(await result).toMatchObject({ uri: 'https://cdn/picked-after-preparing', encryption: { id: 'id-1' } })
   })
 
-  it('with encryption off, an uploader with supportsEncryption prepares the file the same way, unencrypted', async () => {
+  it('with encryption off, an uploader with preparesFiles prepares the file the same way, unencrypted', async () => {
     setEncryptAttachments(false)
     useUploader(true)
     const source = file()
@@ -196,7 +209,7 @@ describe('encryptAttachments: uploading', () => {
     expect((await result).encryption).toBeUndefined()
   })
 
-  it('with encryption off and an older SDK, an uploader with supportsEncryption is called as before', async () => {
+  it('with encryption off and an older SDK, an uploader with preparesFiles is called as before', async () => {
     setEncryptAttachments(false)
     setClient({})
     useUploader(true)
@@ -237,7 +250,7 @@ describe('encryptAttachments: uploading', () => {
     await expect(result).rejects.toThrow('not prepared with prepareFile')
   })
 
-  it('an uploader with supportsEncryption and an SDK that cannot prepare files fails before anything is sent', async () => {
+  it('an uploader with preparesFiles and an SDK that cannot prepare files fails before anything is sent', async () => {
     useUploader(true)
     setClient({})
     const result = customUpload({ tid: 'no-prepare', name: 'photo.png', data: file() } as any, () => undefined, 'text')
@@ -267,10 +280,10 @@ describe('encryptAttachments: downloading', () => {
     expect(getAttachmentDownloader(undefined, 'image/png')).toBe(download)
   })
 
-  it('with an older SDK, an unencrypted file uses the downloader of an uploader with supportsEncryption as before', () => {
+  it('with an older SDK, an unencrypted file uses the downloader of an uploader with preparesFiles as before', () => {
     const download = jest.fn()
     setClient({})
-    setCustomUploader({ supportsEncryption: true, upload: jest.fn(), download, cancelRequest: jest.fn() })
+    setCustomUploader({ preparesFiles: true, upload: jest.fn(), download, cancelRequest: jest.fn() })
     expect(getAttachmentDownloader(undefined, 'image/png')).toBe(download)
   })
 
@@ -338,13 +351,13 @@ describe('encryptAttachments: downloading', () => {
     ['an encrypted', encryption, 'enc(key-7@id-7):picture', true],
     ['an unencrypted', undefined, 'picture', false]
   ])(
-    'an uploader with supportsEncryption is given %s stored file to open itself',
+    'an uploader with preparesFiles is given %s stored file to open itself',
     async (_name, enc, storedText, isEncrypted) => {
       // Like Waafi's: it downloads the stored bytes, then returns file.open() of them.
       const download = jest.fn(async (...args: any[]) => ({
         Body: await args[5].file.open(new Blob([storedText], { type: 'application/octet-stream' }))
       }))
-      setCustomUploader({ supportsEncryption: true, upload: jest.fn(), download, cancelRequest: jest.fn() })
+      setCustomUploader({ preparesFiles: true, upload: jest.fn(), download, cancelRequest: jest.fn() })
 
       const result = await getAttachmentDownloader(enc, 'image/png')!('https://cdn/p', true, jest.fn(), 'text', 'm1')
 
@@ -357,10 +370,10 @@ describe('encryptAttachments: downloading', () => {
     }
   )
 
-  it('an uploader with supportsEncryption gets its own request back, so it can cancel it', () => {
+  it('an uploader with preparesFiles gets its own request back, so it can cancel it', () => {
     const request = new Promise(() => undefined)
     const cancelRequest = jest.fn()
-    setCustomUploader({ supportsEncryption: true, upload: jest.fn(), download: () => request, cancelRequest })
+    setCustomUploader({ preparesFiles: true, upload: jest.fn(), download: () => request, cancelRequest })
 
     const returned = getAttachmentDownloader(encryption, 'video/mp4')!('https://cdn/v', true, jest.fn(), 'text', 'm1')
     cancelDownloadRequest(returned)
@@ -392,7 +405,7 @@ describe('encryptAttachments: downloading', () => {
 
   it('metadata that cannot be opened rejects without downloading', async () => {
     const download = jest.fn()
-    setCustomUploader({ supportsEncryption: true, upload: jest.fn(), download, cancelRequest: jest.fn() })
+    setCustomUploader({ preparesFiles: true, upload: jest.fn(), download, cancelRequest: jest.fn() })
     setClient({
       prepareUpload: jest.fn(),
       prepareDownload: () => {
