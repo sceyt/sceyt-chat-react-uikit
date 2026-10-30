@@ -37,7 +37,13 @@ import {
 } from '../../helpers/customUploader'
 import { handleUploadAttachments, __messageSagaTestables, __resetMessageSagaTestState } from './saga'
 import store from '../index'
-import { beginVideoPreparation, completeVideoPreparation } from '../../helpers/attachmentPreparation'
+import {
+  beginVideoPreparation,
+  completeAttachmentPreview,
+  completeVideoPreparation
+} from '../../helpers/attachmentPreparation'
+import { setEncryptAttachments } from '../../helpers/attachmentEncryption'
+import { installFakeFilesClient, readBlobText } from '../../testUtils/fakeAttachmentFiles'
 
 const mockGetVideoFirstFrame = jest.fn()
 const mockGetVideoPreviewFrame = jest.fn()
@@ -637,6 +643,91 @@ describe('attachment upload recovery', () => {
         ]
       })
     )
+
+    resolveSend(makeServerResponse(pendingMessage.tid!, attachmentTid, currentUser))
+    await task.toPromise()
+  })
+
+  it('shows a video row as soon as its preview is ready, while its conversion still runs, and uploads the converted file', async () => {
+    const currentUser = makeUser({ id: 'current-user' })
+    const channel = makeUploaderChannel('channel-video-row-before-conversion')
+    const original = new File(['quicktime-bytes'], 'clip.mov', { type: 'video/quicktime' })
+    const converted = new File(['mp4-bytes'], 'clip.mp4', { type: 'video/mp4' })
+    const attachmentTid = 'video-row-before-conversion-tid'
+    const preview = {
+      metadata: { tmb: 'video-thumb', szw: 1280, szh: 720, dur: 9 },
+      videoPreviewBlob: new Blob(['frame'], { type: 'image/jpeg' })
+    }
+    let resolveSend!: (value: any) => void
+    channel.sendMessage = jest.fn(
+      () =>
+        new Promise((resolve) => {
+          resolveSend = resolve
+        })
+    )
+    const settle = async (until: () => boolean) => {
+      for (let attempt = 0; attempt < 50 && !until(); attempt++) {
+        await new Promise((resolve) => setTimeout(resolve, 0))
+      }
+    }
+    setActiveChannelId(channel.id)
+    setChannelInMap(channel)
+    beginVideoPreparation(attachmentTid, original)
+
+    const task = runSaga(
+      { dispatch: () => undefined, getState: () => mockStoreState },
+      __messageSagaTestables.sendMessage,
+      sendMessageAC(
+        {
+          body: 'video',
+          bodyAttributes: [],
+          attachments: [
+            {
+              tid: attachmentTid,
+              type: attachmentTypes.video,
+              name: original.name,
+              size: original.size,
+              data: original,
+              metadata: '{}',
+              upload: false
+            }
+          ],
+          mentionedUsers: [],
+          type: 'text',
+          metadata: {},
+          parentMessage: null,
+          repliedInThread: false
+        },
+        channel.id,
+        CONNECTION_STATUS.CONNECTED,
+        false
+      )
+    )
+
+    await Promise.resolve()
+    expect(getPendingMessagesFromMap(channel.id)).toHaveLength(0)
+
+    // The frame is ready; the QuickTime-to-MP4 conversion is still running.
+    completeAttachmentPreview(attachmentTid, preview)
+    await settle(() => getPendingMessagesFromMap(channel.id).length > 0)
+
+    const [pendingMessage] = getPendingMessagesFromMap(channel.id)
+    expect(pendingMessage.attachments[0]).toEqual(
+      expect.objectContaining({ tid: attachmentTid, metadata: preview.metadata })
+    )
+    expect(uploadCalls).toHaveLength(0)
+
+    completeVideoPreparation(attachmentTid, { file: converted, ...preview })
+    await settle(() => channel.sendMessage.mock.calls.length > 0)
+
+    // The preview image, then the converted video (not the original .mov).
+    expect(uploadCalls).toHaveLength(2)
+    expect(uploadCalls[1].url === converted).toBe(true)
+    expect(uploadCalls[1].name).toBe('clip.mp4')
+    // The pending row now describes the converted file too.
+    const pendingAttachment = getMessageFromMap(channel.id, pendingMessage.tid!)!.attachments[0]
+    expect(pendingAttachment.name).toBe('clip.mp4')
+    expect(pendingAttachment.data === converted).toBe(true)
 
     resolveSend(makeServerResponse(pendingMessage.tid!, attachmentTid, currentUser))
     await task.toPromise()
@@ -1377,5 +1468,140 @@ describe('attachment upload recovery', () => {
       2
     )
     expect(uploadCalls).toHaveLength(4)
+  })
+
+  describe('with encryptAttachments', () => {
+    // Like Waafi's uploader: it picks the URL, prepares the file for it, and
+    // stores what prepareFile returns.
+    let stored: Blob[]
+    let uriFor: (attachment: any) => string
+    beforeEach(() => {
+      const client = installFakeFilesClient()
+      Object.assign(client, { user: { id: 'current-user' }, Channel: { create: jest.fn() } })
+      setEncryptAttachments(true)
+      stored = []
+      uriFor = () => 'https://cdn.example/uploaded-1'
+      setCustomUploader({
+        supportsEncryption: true,
+        upload: async (attachment: any, uploadTask: any, _messageType: any, files: any) => {
+          uploadCalls.push(attachment)
+          const uri = uriFor(attachment)
+          const prepared = await files.prepareFile(attachment.data, { url: uri })
+          stored.push(await prepared.getAll())
+          uploadTask.success({ uri, blob: attachment.data })
+        },
+        download: jest.fn()
+      })
+    })
+
+    afterEach(() => setEncryptAttachments(false))
+
+    it('uploads the encrypted file and sends its key in the attachment metadata', async () => {
+      const channel = makeUploaderChannel('channel-encrypted-image')
+      const image = makeLiveFile()
+      const attachment = {
+        ...makeAttachment('encrypted-image-tid', image),
+        url: image,
+        metadata: '{"szw":10,"szh":20}'
+      }
+
+      const [sent] = await handleUploadAttachments([attachment], { type: 'text' } as any, channel)
+
+      expect(stored[0].type).toBe('application/octet-stream')
+      expect(await readBlobText(stored[0])).toBe('enc(key-1@https://cdn.example/uploaded-1):file-bytes')
+      expect(JSON.parse(sent.metadata)).toEqual({
+        szw: 10,
+        szh: 20,
+        enc: { v: 1, k: 'key-1' }
+      })
+      // The size shown and sent is the plaintext's.
+      expect((channel as any).__attachmentBuilder.setFileSize).toHaveBeenCalledWith(image.size)
+    })
+
+    it('encrypts a video and its preview image with their own keys', async () => {
+      const channel = makeUploaderChannel('channel-encrypted-video')
+      const video = new File(['video-bytes'], 'clip.mp4', { type: 'video/mp4' })
+      mockGetVideoFirstFrame.mockResolvedValue({ blob: new Blob(['preview-bytes'], { type: 'image/jpeg' }) })
+      uriFor = (uploadedAttachment) =>
+        uploadedAttachment.type === attachmentTypes.image
+          ? 'https://cdn.example/clip-preview.jpg'
+          : 'https://cdn.example/clip.mp4'
+      const attachment = {
+        tid: 'encrypted-video-tid',
+        type: attachmentTypes.video,
+        name: 'clip.mp4',
+        size: video.size,
+        url: video,
+        data: video,
+        metadata: '{}',
+        upload: false
+      } as any
+
+      // The sender keeps the plaintext video to play it without downloading it.
+      const originalCreateObjectURL = URL.createObjectURL
+      Object.defineProperty(URL, 'createObjectURL', { configurable: true, value: jest.fn(() => 'blob:sender-video') })
+      let sent: any
+      try {
+        ;[sent] = await handleUploadAttachments([attachment], { type: 'text' } as any, channel)
+      } finally {
+        Object.defineProperty(URL, 'createObjectURL', { configurable: true, value: originalCreateObjectURL })
+      }
+
+      expect(await readBlobText(stored[0])).toBe('enc(key-1@https://cdn.example/clip-preview.jpg):preview-bytes')
+      expect(await readBlobText(stored[1])).toBe('enc(key-2@https://cdn.example/clip.mp4):video-bytes')
+      expect(JSON.parse(sent.metadata)).toEqual({
+        video_thumb: 'https://cdn.example/clip-preview.jpg',
+        enc: { v: 1, k: 'key-2', thumb: { k: 'key-1' } }
+      })
+    })
+
+    it('with an uploader that cannot give the URL first, the message fails instead of sending the file unencrypted', async () => {
+      const channel = makeUploaderChannel('channel-encrypted-simple-uploader')
+      const image = makeLiveFile()
+      setCustomUploader({ upload: jest.fn(), download: jest.fn() })
+
+      await expect(
+        handleUploadAttachments(
+          [{ ...makeAttachment('encrypted-simple-uploader-tid', image), url: image }],
+          { type: 'text' } as any,
+          channel
+        )
+      ).rejects.toThrow('supportsEncryption')
+      expect(channel.sendMessage).not.toHaveBeenCalled()
+    })
+
+    it('without a custom uploader, the message fails instead of sending the file unencrypted', async () => {
+      const currentUser = makeUser({ id: 'current-user' })
+      const channel = makeUploaderChannel('channel-encrypted-sdk-upload')
+      const image = makeLiveFile()
+      const pendingMessage = makePendingMessage({
+        channelId: channel.id,
+        tid: 'encrypted-sdk-upload-message-tid',
+        user: currentUser,
+        attachments: [{ ...makeAttachment('encrypted-sdk-upload-attachment-tid', image), upload: true }]
+      })
+      setCustomUploader(undefined)
+      setActiveChannelId(channel.id)
+      setChannelInMap(channel)
+      addMessageToMap(channel.id, pendingMessage)
+
+      const dispatched = await runMessageSaga(__messageSagaTestables.sendMessage, {
+        type: RESEND_MESSAGE,
+        payload: {
+          message: pendingMessage,
+          connectionState: CONNECTION_STATUS.CONNECTED,
+          channelId: channel.id,
+          sendAttachmentsAsSeparateMessage: false
+        }
+      })
+
+      expect(channel.sendMessage).not.toHaveBeenCalled()
+      expect(dispatched).toEqual(
+        expect.arrayContaining([
+          updateAttachmentUploadingStateAC(UPLOAD_STATE.FAIL, 'encrypted-sdk-upload-attachment-tid'),
+          updateMessageAC('encrypted-sdk-upload-message-tid', { state: MESSAGE_STATUS.FAILED })
+        ])
+      )
+    })
   })
 })

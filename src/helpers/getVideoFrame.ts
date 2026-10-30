@@ -2,8 +2,8 @@ import { setAttachmentToCache } from './attachmentsCache'
 import { binaryToBase64, calculateSize, resizeImageWithPica } from './resizeImage'
 import { rgbaToThumbHash } from './thumbhash'
 import {
+  canPlayQuickTime,
   inspectVideoBlob,
-  isFirefox,
   isQuickTimeContainer,
   NATIVE_VIDEO_TYPES,
   VideoContainerInfo
@@ -330,12 +330,12 @@ const extractFrameFromBlob = async (
 ): Promise<VideoFirstFrameResult | null> => {
   const { safeBlob, info } = await normalizeVideoBlob(blob)
 
-  // Firefox's mp4 demuxer cannot parse QuickTime-branded containers ('qt  '
+  // Firefox before 157 cannot parse QuickTime-branded containers ('qt  '
   // major brand) regardless of the MIME label — the load silently hangs at
-  // HAVE_NOTHING with no error event. Skip the doomed load attempts (2 × 8s of
-  // waiting) and rewrite the container to standard MP4 instead (stream copy,
-  // no re-encoding).
-  if (isQuickTimeContainer(info) && isFirefox()) {
+  // HAVE_NOTHING with no error event. There, skip the doomed load attempts
+  // (2 × 8s of waiting) and rewrite the container to standard MP4 instead
+  // (stream copy, no re-encoding).
+  if (isQuickTimeContainer(info) && !(await canPlayQuickTime(safeBlob))) {
     if (!allowRemux) {
       return null
     }

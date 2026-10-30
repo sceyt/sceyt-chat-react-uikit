@@ -7,6 +7,7 @@ import {
 } from './mediaDownloadCoordinator'
 import { setCustomUploader } from './customUploader'
 import { getAttachmentUrlFromCache, setAttachmentToCache } from './attachmentsCache'
+import { fakeEncrypted, installFakeFilesClient, readBlobText } from '../testUtils/fakeAttachmentFiles'
 
 jest.mock('./attachmentsCache', () => ({
   getAttachmentUrlFromCache: jest.fn().mockResolvedValue(false),
@@ -517,5 +518,144 @@ describe('mediaDownloadCoordinator', () => {
 
     await expect(request).resolves.toMatchObject({ objectUrl: 'blob:shared-media' })
     expect(getMediaDownloadSnapshot(key)).toMatchObject({ state: 'completed' })
+  })
+
+  describe('an encrypted attachment', () => {
+    const encryption = { v: 1, k: 'key-3' }
+    const request = {
+      key: 'original-image:https://cdn/photo',
+      url: 'https://cdn/photo',
+      cacheKey: 'https://cdn/photo',
+      kind: 'original-image' as const,
+      encryption,
+      contentType: 'image/png'
+    }
+
+    beforeEach(() => {
+      installFakeFilesClient()
+    })
+
+    it('is decrypted before it is cached and shown', async () => {
+      const download = jest.fn(async () => ({ Body: fakeEncrypted('key-3', 'pixels', 'https://cdn/photo') }))
+      setCustomUploader({ download, cancelRequest: jest.fn(), upload: jest.fn() } as any)
+
+      const { blob } = await requestMediaDownload(request)
+
+      expect(blob.type).toBe('image/png')
+      expect(await readBlobText(blob)).toBe('pixels')
+      expect(setAttachmentToCache).toHaveBeenCalledWith('https://cdn/photo', expect.anything())
+    })
+
+    it('is decrypted when it is downloaded without a custom downloader', async () => {
+      global.fetch = jest
+        .fn()
+        .mockResolvedValue({ ok: true, blob: async () => fakeEncrypted('key-3', 'pixels', 'https://cdn/photo') }) as any
+
+      const { blob } = await requestMediaDownload(request)
+
+      expect(global.fetch).toHaveBeenCalledWith('https://cdn/photo', expect.anything())
+      expect(await readBlobText(blob)).toBe('pixels')
+    })
+
+    it('that fails to decrypt is reported as failed, not shown', async () => {
+      setCustomUploader({
+        download: async () => ({ Body: fakeEncrypted('another-key', 'pixels', 'https://cdn/photo') }),
+        cancelRequest: jest.fn(),
+        upload: jest.fn()
+      } as any)
+
+      await expect(requestMediaDownload(request)).rejects.toMatchObject({ type: 'AttachmentDecryptionFailed' })
+      expect(getMediaDownloadSnapshot(request.key)).toMatchObject({ state: 'failed' })
+      expect(setAttachmentToCache).not.toHaveBeenCalled()
+    })
+
+    it('that fails to decrypt is not downloaded again when it is shown again', async () => {
+      const download = jest.fn(async () => ({ Body: fakeEncrypted('another-key', 'pixels', 'https://cdn/photo') }))
+      setCustomUploader({ download, cancelRequest: jest.fn(), upload: jest.fn() } as any)
+      await expect(requestMediaDownload(request)).rejects.toMatchObject({ type: 'AttachmentDecryptionFailed' })
+
+      await expect(requestMediaDownload(request)).rejects.toMatchObject({ type: 'AttachmentDecryptionFailed' })
+
+      expect(download).toHaveBeenCalledTimes(1)
+      expect(getMediaDownloadSnapshot(request.key)).toMatchObject({ state: 'failed' })
+    })
+
+    it('that failed to decrypt is downloaded again when the user retries', async () => {
+      const download = jest
+        .fn()
+        .mockResolvedValueOnce({ Body: fakeEncrypted('another-key', 'pixels', 'https://cdn/photo') })
+        .mockResolvedValueOnce({ Body: fakeEncrypted('key-3', 'pixels', 'https://cdn/photo') })
+      setCustomUploader({ download, cancelRequest: jest.fn(), upload: jest.fn() } as any)
+      await expect(requestMediaDownload(request)).rejects.toMatchObject({ type: 'AttachmentDecryptionFailed' })
+
+      const { blob } = await requestMediaDownload({ ...request, retry: true })
+
+      expect(download).toHaveBeenCalledTimes(2)
+      expect(await readBlobText(blob)).toBe('pixels')
+      expect(getMediaDownloadSnapshot(request.key)).toMatchObject({ state: 'completed' })
+    })
+
+    it('that failed to decrypt is downloaded again when its key changes', async () => {
+      const download = jest
+        .fn()
+        .mockResolvedValueOnce({ Body: fakeEncrypted('another-key', 'pixels', 'https://cdn/photo') })
+        .mockResolvedValueOnce({ Body: fakeEncrypted('key-4', 'pixels', 'https://cdn/photo') })
+      setCustomUploader({ download, cancelRequest: jest.fn(), upload: jest.fn() } as any)
+      await expect(requestMediaDownload(request)).rejects.toMatchObject({ type: 'AttachmentDecryptionFailed' })
+
+      const { blob } = await requestMediaDownload({ ...request, encryption: { ...encryption, k: 'key-4' } })
+
+      expect(download).toHaveBeenCalledTimes(2)
+      expect(await readBlobText(blob)).toBe('pixels')
+    })
+
+    it.each([
+      ['that the uikit decrypts', false],
+      ['that the uploader opens itself', true]
+    ])('%s is cancelled at the uploader own request', async (_name, supportsEncryption) => {
+      const uploaderRequest = new Promise(() => undefined)
+      const cancelRequest = jest.fn()
+      setCustomUploader({
+        supportsEncryption,
+        download: jest.fn(() => uploaderRequest),
+        cancelRequest,
+        upload: jest.fn()
+      } as any)
+      requestMediaDownload(request).catch(() => undefined)
+      await flushCoordinator()
+
+      cancelMediaDownload(request.key)
+
+      // The same promise object: toHaveBeenCalledWith finds any two promises equal.
+      expect(cancelRequest.mock.calls[0][0] === uploaderRequest).toBe(true)
+    })
+  })
+
+  it('a cancelled download that keeps running does not show as loading again', async () => {
+    let reportProgress: (progress: { loaded: number; total: number }) => void = () => undefined
+    setCustomUploader({
+      download: jest.fn((_url, _download, progress) => {
+        reportProgress = progress
+        return new Promise(() => undefined)
+      }),
+      cancelRequest: jest.fn(),
+      upload: jest.fn()
+    } as any)
+    const key = 'original-video:https://cdn/still-running.mp4'
+    requestMediaDownload({
+      key,
+      url: 'https://cdn/still-running.mp4',
+      cacheKey: 'https://cdn/still-running.mp4_original_video_url',
+      kind: 'original-video',
+      size: 1000
+    }).catch(() => undefined)
+    await flushCoordinator()
+    reportProgress({ loaded: 300, total: 1000 })
+    expect(getMediaDownloadSnapshot(key)).toMatchObject({ state: 'loading', loaded: 300 })
+
+    cancelMediaDownload(key)
+    reportProgress({ loaded: 600, total: 1000 })
+
+    expect(getMediaDownloadSnapshot(key)).toMatchObject({ state: 'cancelled' })
   })
 })

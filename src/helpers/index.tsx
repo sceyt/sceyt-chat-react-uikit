@@ -1,7 +1,8 @@
 import { IAttachment, IContact, IUser } from '../types'
 import FileSaver from 'file-saver'
 import moment from 'moment'
-import { getCustomDownloader, getCustomUploader } from './customUploader'
+import { cancelDownloadRequest, getAttachmentDownloader } from './customUploader'
+import { getAttachmentEncryption, getTypeFromFileName, prepareDownloadFile } from './attachmentEncryption'
 import { readResponseBlobWithProgress } from './getVideoFrame'
 import log from 'loglevel'
 
@@ -54,7 +55,10 @@ export const downloadFile = async (
   messageType?: string | null | undefined
 ) => {
   try {
-    const customDownloader = getCustomDownloader()
+    const encryption = getAttachmentEncryption(attachment.metadata)
+    const type = getTypeFromFileName(attachment.name)
+    // Decrypts an encrypted file; the same as the CustomUploader's downloader otherwise.
+    const customDownloader = getAttachmentDownloader(encryption, type)
     let response
     if (customDownloader) {
       const urlPromise = customDownloader(
@@ -107,7 +111,10 @@ export const downloadFile = async (
       if (!response.ok) {
         throw new Error(`Unable to download attachment (${response.status})`)
       }
-      const data = await readResponseBlobWithProgress(response, progressCallback, attachment.size || 0)
+      const downloaded = await readResponseBlobWithProgress(response, progressCallback, attachment.size || 0)
+      const data = encryption
+        ? await prepareDownloadFile(encryption, type, attachment.url).open(downloaded)
+        : downloaded
       if (done) {
         done(attachment.id || '')
       }
@@ -124,10 +131,7 @@ export const downloadFile = async (
 export const cancelDownloadFile = (attachmentId: string) => {
   const promise = filesPromisesOnDownload[attachmentId]
   if (promise) {
-    const customUploader = getCustomUploader()
-    if (customUploader) {
-      customUploader.cancelRequest(promise)
-    }
+    cancelDownloadRequest(promise)
   }
 }
 

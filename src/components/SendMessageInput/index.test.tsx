@@ -13,7 +13,12 @@ import {
   renderWithSceytProvider
 } from '../../testUtils/messageListHarness'
 import { documentDropCases, mediaDropCases } from '../../testUtils/fileDropFixtures'
-import { clearAttachmentPreparation } from '../../helpers/attachmentPreparation'
+import {
+  clearAttachmentPreparation,
+  waitForAttachmentPreparation,
+  waitForAttachmentPreview
+} from '../../helpers/attachmentPreparation'
+import * as videoContainer from '../../helpers/videoContainer'
 import { releaseAllBlobUrls } from '../../helpers/attachmentBlobUrls'
 import * as imagePreparation from '../../helpers/resizeImage'
 
@@ -154,7 +159,10 @@ const renderFileDropFlow = (props = {}) => {
       types: ['Files'],
       items: exposeItems ? files.map((file) => ({ kind: 'file', type: file.type })) : [],
       files,
-      clearData: jest.fn()
+      // As in Firefox: the dropped data is read-only during the drop event.
+      clearData: () => {
+        throw new DOMException('Modifications are not allowed for this document', 'NoModificationAllowedError')
+      }
     }
     const event = (type: string) => {
       const result = new Event(type, { bubbles: true, cancelable: true })
@@ -260,6 +268,28 @@ describe('file-drop integration: MessageList, Redux and SendMessageInput', () =>
       view.unmount()
     }
   )
+
+  it.each(['media', 'file'])('a %s drop only reads the dropped data, which Firefox makes read-only', async (target) => {
+    const errors: string[] = []
+    const onError = (event: ErrorEvent) => {
+      errors.push(event.message)
+      event.preventDefault()
+    }
+    window.addEventListener('error', onError)
+    try {
+      const view = renderFileDropFlow()
+      const file = new File(['photo'], 'photo.jpg', { type: 'image/jpeg' })
+      await view.drop([file], target)
+      await view.send()
+
+      expect(errors).toEqual([])
+      expect(view.outgoing()).toHaveLength(1)
+      expect(view.outgoing()[0].payload.message.attachments[0].data).toBe(file)
+      view.unmount()
+    } finally {
+      window.removeEventListener('error', onError)
+    }
+  })
 
   it.each(mediaDropCases)('sends dropped %s as media with its original file', async (name, mimeType) => {
     const view = renderFileDropFlow()
@@ -556,6 +586,141 @@ describe('SendMessageInput attachment sending', () => {
     expect(sendAction.payload.message.attachments[0].name).toBe('clip.mp4')
     expect(sendAction.payload.message.attachments[0].type).toBe(attachmentTypes.file)
     expect(sendAction.payload.message.attachments[0].data).toBe(video)
+  })
+
+  describe('a QuickTime video being converted to MP4', () => {
+    const MEDIA_ACCEPT = '.jpg,.jpeg,.png,.gif,.mp4,.mov,.avi,.wmv,.flv,.webm,.jfif'
+    const original = () => new File(['quicktime'], 'clip.mov', { type: 'video/quicktime' })
+    const converted = new File(['mp4'], 'clip.mp4', { type: 'video/mp4' })
+
+    const addVideo = async (video: File) => {
+      const { container } = renderWithSceytProvider(
+        <SendMessageInput CustomSendMessageButton={<button data-testid='send-message'>Send</button>} />,
+        {
+          store: createMessageListStore({ ChannelReducer: { activeChannel: makeChannel({ id: 'quicktime-channel' }) } })
+        }
+      )
+      const fileInput = container.querySelector('input[type="file"]') as HTMLInputElement
+      fireEvent.change(fileInput, { target: { files: [video], accept: MEDIA_ACCEPT } })
+      await act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 0))
+      })
+      return require('../../helpers/messagesHalper').setPendingAttachment.mock.calls[0][0] as string
+    }
+
+    afterEach(() => {
+      require('../../helpers/messagesHalper').setPendingAttachment.mock.calls.forEach(([tid]: [string]) =>
+        clearAttachmentPreparation(tid)
+      )
+      inspectVideo?.mockRestore()
+      canPlayQuickTime?.mockRestore()
+    })
+
+    let inspectVideo: jest.SpyInstance | undefined
+    let canPlayQuickTime: jest.SpyInstance | undefined
+    const asQuickTime = (plays: boolean) => {
+      inspectVideo = jest
+        .spyOn(videoContainer, 'inspectVideoBlob')
+        .mockResolvedValue({ mimeType: 'video/mp4', isoBrand: 'qt  ', codecs: [] })
+      canPlayQuickTime = jest.spyOn(videoContainer, 'canPlayQuickTime').mockResolvedValue(plays)
+    }
+
+    it('reports the preview as soon as the frame is ready, without waiting for the conversion', async () => {
+      let finishConversion!: (file: File) => void
+      require('../../helpers/videoConversion').remuxVideoFileForUpload.mockImplementation(
+        () =>
+          new Promise((resolve) => {
+            finishConversion = resolve
+          })
+      )
+      const tid = await addVideo(original())
+
+      let preview: any
+      await act(async () => {
+        preview = await waitForAttachmentPreview(tid, 1000)
+      })
+      expect(JSON.parse(preview.metadata)).toEqual({ tmb: 'data:image/jpeg;base64,thumb', szw: 1280, szh: 720, dur: 3 })
+      // The file to upload is not ready yet.
+      expect((await waitForAttachmentPreparation(tid, 1))?.status).toBe('failed')
+
+      let prepared: any
+      await act(async () => {
+        finishConversion(converted)
+        prepared = await waitForAttachmentPreparation(tid, 1000)
+      })
+      expect(prepared.status).toBe('ready')
+      expect(prepared.file === converted).toBe(true)
+    })
+
+    it('in a Firefox that does not play QuickTime, takes the frame from the converted MP4, not converting it twice', async () => {
+      const remux = require('../../helpers/videoConversion').remuxVideoFileForUpload
+      remux.mockImplementation(() => Promise.resolve(converted))
+      const userAgent = jest
+        .spyOn(window.navigator, 'userAgent', 'get')
+        .mockReturnValue('Mozilla/5.0 (Macintosh; Intel Mac OS X 14.0; rv:131.0) Gecko/20100101 Firefox/131.0')
+      asQuickTime(false)
+      try {
+        const tid = await addVideo(original())
+        await act(async () => {
+          await waitForAttachmentPreparation(tid, 1000)
+        })
+
+        const getFrame = require('../../helpers/getVideoFrame').getFrame
+        expect(getFrame).toHaveBeenCalledTimes(1)
+        expect(getFrame.mock.calls[0][0] === converted).toBe(true)
+        expect(remux).toHaveBeenCalledTimes(1)
+      } finally {
+        userAgent.mockRestore()
+      }
+    })
+
+    it('in a Firefox that plays QuickTime, takes the frame from the original without waiting for the conversion', async () => {
+      require('../../helpers/videoConversion').remuxVideoFileForUpload.mockImplementation(
+        () => new Promise(() => undefined)
+      )
+      asQuickTime(true)
+      const video = original()
+      const tid = await addVideo(video)
+      await act(async () => {
+        await waitForAttachmentPreview(tid, 1000)
+      })
+
+      const getFrame = require('../../helpers/getVideoFrame').getFrame
+      expect(getFrame.mock.calls[0][0] === video).toBe(true)
+      expect(canPlayQuickTime!.mock.calls[0][0] === video).toBe(true)
+    })
+
+    it('a frame that cannot be taken is not tried again from the same file', async () => {
+      const getFrame = require('../../helpers/getVideoFrame').getFrame
+      getFrame.mockRejectedValue(new Error('Failed to extract video frame'))
+      // Not QuickTime: the upload file is the original, so a retry would decode the same bytes again.
+      const video = new File(['mp4'], 'clip.mp4', { type: 'video/mp4' })
+      const tid = await addVideo(video)
+      let prepared: any
+      await act(async () => {
+        prepared = await waitForAttachmentPreparation(tid, 1000)
+      })
+
+      expect(getFrame).toHaveBeenCalledTimes(1)
+      expect(prepared.status).toBe('failed')
+    })
+
+    it('in other browsers, takes the frame from the original file', async () => {
+      require('../../helpers/videoConversion').remuxVideoFileForUpload.mockImplementation(() =>
+        Promise.resolve(converted)
+      )
+      inspectVideo = jest
+        .spyOn(videoContainer, 'inspectVideoBlob')
+        .mockResolvedValue({ mimeType: 'video/mp4', isoBrand: 'qt  ', codecs: [] })
+      const video = original()
+      const tid = await addVideo(video)
+      await act(async () => {
+        await waitForAttachmentPreparation(tid, 1000)
+      })
+
+      const getFrame = require('../../helpers/getVideoFrame').getFrame
+      expect(getFrame.mock.calls[0][0] === video).toBe(true)
+    })
   })
 
   it('creates only one send action when Send is tapped repeatedly while a video is preparing', async () => {

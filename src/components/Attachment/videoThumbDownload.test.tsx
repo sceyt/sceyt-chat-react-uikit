@@ -12,6 +12,7 @@ import {
   requestMediaDownload,
   resetMediaDownloadCoordinatorForTests
 } from '../../helpers/mediaDownloadCoordinator'
+import { fakeEncrypted, installFakeFilesClient, readBlobText } from '../../testUtils/fakeAttachmentFiles'
 
 let mockCustomUploader: any
 let mockCompressAndCacheImage: ((...args: any[]) => Promise<any>) | undefined
@@ -85,7 +86,11 @@ jest.mock('../../helpers/attachmentsCache', () => ({
 
 jest.mock('../../helpers/customUploader', () => ({
   getCustomDownloader: () => mockCustomUploader?.download,
-  getCustomUploader: () => mockCustomUploader
+  // The real one, with the uploader of this test.
+  getAttachmentDownloader: (encryption: any, type: any, download: any = mockCustomUploader?.download) =>
+    jest.requireActual('../../helpers/customUploader').getAttachmentDownloader(encryption, type, download),
+  getCustomUploader: () => mockCustomUploader,
+  cancelDownloadRequest: (request: any) => mockCustomUploader?.cancelRequest(request)
 }))
 
 const mockSaveAs = jest.fn()
@@ -916,6 +921,35 @@ describe('a failed download is not shown as downloaded', () => {
     expect(screen.queryByLabelText('Download video')).not.toBeInTheDocument()
   })
 
+  it('a video that fails to decrypt is not downloaded again when it is shown again, only when the user retries', async () => {
+    installFakeFilesClient()
+    mockGetAttachmentUrlFromCache.mockImplementation(async (key: string) =>
+      key.includes('video-thumb') ? 'blob:cached-thumb' : false
+    )
+    download.mockImplementation(async () => ({ Body: fakeEncrypted('another-key', 'movie', 'https://cdn/video.mp4') }))
+    const encryptedVideo = {
+      ...videoAttachment,
+      metadata: JSON.stringify({
+        ...JSON.parse(videoAttachment.metadata),
+        enc: { v: 1, k: 'key-9' }
+      })
+    }
+    const videoDownloads = () => download.mock.calls.filter(([url]) => url === 'https://cdn/video.mp4').length
+
+    const first = renderAttachment({}, { attachment: encryptedVideo })
+    for (let i = 0; i < 5; i += 1) await flushAttachmentEffects()
+    expect(videoDownloads()).toBe(1)
+    first.unmount()
+
+    renderAttachment({}, { attachment: encryptedVideo })
+    for (let i = 0; i < 5; i += 1) await flushAttachmentEffects()
+    expect(videoDownloads()).toBe(1)
+
+    fireEvent.click(screen.getByLabelText('Download video'))
+    for (let i = 0; i < 5; i += 1) await flushAttachmentEffects()
+    expect(videoDownloads()).toBe(2)
+  })
+
   it('a retry after a failed video download shows its progress', async () => {
     mockGetAttachmentUrlFromCache.mockResolvedValueOnce('blob:cached-thumb').mockResolvedValue(false)
     let reportProgress: (progress: { loaded: number; total: number }) => void = () => undefined
@@ -1137,5 +1171,47 @@ describe('the upload stop and resume control', () => {
     renderAttachment({ attachmentsUploadingState: { 'video-attachment-tid': 'paused' } })
     await flushAttachmentEffects()
     expect(screen.getByRole('button', { name: 'Resume upload' })).toBeTruthy()
+  })
+
+  it('shows an encrypted video only after decrypting it with the key in its metadata', async () => {
+    installFakeFilesClient()
+    mockGetAttachmentUrlFromCache.mockResolvedValue(false)
+    mockCustomUploader = {
+      download: jest.fn(async () => ({ Body: fakeEncrypted('key-9', 'movie', 'https://cdn/video.mp4') })),
+      cancelRequest: jest.fn(),
+      upload: jest.fn()
+    }
+    const shown: Blob[] = []
+    const originalCreateObjectURL = URL.createObjectURL
+    URL.createObjectURL = jest.fn((blob: Blob) => {
+      shown.push(blob)
+      return 'blob:decrypted-video'
+    })
+    const encryptedVideo = {
+      ...videoAttachment,
+      metadata: JSON.stringify({
+        ...JSON.parse(videoAttachment.metadata),
+        enc: { v: 1, k: 'key-9' }
+      })
+    }
+    try {
+      renderAttachment({}, { attachment: encryptedVideo })
+      for (let i = 0; i < 10 && !shown.length; i++) {
+        await flushAttachmentEffects()
+      }
+
+      expect(mockCustomUploader.download).toHaveBeenCalledWith(
+        'https://cdn/video.mp4',
+        true,
+        expect.any(Function),
+        undefined,
+        'message-id'
+      )
+      expect(shown).toHaveLength(1)
+      expect(shown[0].type).toBe('video/mp4')
+      expect(await readBlobText(shown[0])).toBe('movie')
+    } finally {
+      URL.createObjectURL = originalCreateObjectURL
+    }
   })
 })

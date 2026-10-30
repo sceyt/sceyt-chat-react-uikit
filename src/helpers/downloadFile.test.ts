@@ -1,6 +1,7 @@
 import FileSaver from 'file-saver'
-import { downloadFile } from './index'
+import { cancelDownloadFile, downloadFile } from './index'
 import { setCustomUploader } from './customUploader'
+import { fakeEncrypted, installFakeFilesClient, readBlobText } from '../testUtils/fakeAttachmentFiles'
 
 jest.mock('file-saver', () => ({
   __esModule: true,
@@ -82,5 +83,75 @@ describe('downloadFile custom downloader', () => {
       '9223372036854775807'
     )
     expect(mockSaveAs).toHaveBeenCalledWith(expect.any(Blob), 'file.pdf')
+  })
+})
+
+describe('downloadFile for an encrypted attachment', () => {
+  const attachment = {
+    id: 'doc-id',
+    url: 'https://cdn/doc',
+    name: 'report.pdf',
+    metadata: JSON.stringify({ enc: { v: 1, k: 'key-5' } })
+  } as any
+
+  beforeEach(() => {
+    jest.clearAllMocks()
+    installFakeFilesClient()
+  })
+
+  afterEach(() => setCustomUploader(undefined))
+
+  it('saves the decrypted file from the custom downloader', async () => {
+    setCustomUploader({
+      upload: jest.fn(),
+      download: async () => ({ Body: fakeEncrypted('key-5', 'pdf-bytes', 'https://cdn/doc') }),
+      cancelRequest: jest.fn()
+    })
+    const done = jest.fn()
+
+    await downloadFile(attachment, true, done)
+
+    const [saved, name] = mockSaveAs.mock.calls[0]
+    expect(name).toBe('report.pdf')
+    expect(saved.type).toBe('application/pdf')
+    expect(await readBlobText(saved)).toBe('pdf-bytes')
+    expect(done).toHaveBeenCalledWith('doc-id')
+  })
+
+  it('saves the decrypted file from the default downloader', async () => {
+    setCustomUploader(undefined)
+    global.fetch = jest
+      .fn()
+      .mockResolvedValue({ ok: true, blob: async () => fakeEncrypted('key-5', 'pdf-bytes', 'https://cdn/doc') })
+
+    await downloadFile(attachment, true, jest.fn())
+
+    expect(await readBlobText(mockSaveAs.mock.calls[0][0])).toBe('pdf-bytes')
+  })
+
+  it('saves nothing when the file does not decrypt', async () => {
+    setCustomUploader({
+      upload: jest.fn(),
+      download: async () => ({ Body: fakeEncrypted('another-key', 'pdf-bytes', 'https://cdn/doc') }),
+      cancelRequest: jest.fn()
+    })
+    const done = jest.fn()
+
+    await downloadFile(attachment, true, done)
+
+    expect(mockSaveAs).not.toHaveBeenCalled()
+    expect(done).toHaveBeenCalledWith('doc-id', true)
+  })
+
+  it('cancelling the download cancels the uploader own request', () => {
+    const request = new Promise(() => undefined)
+    const cancelRequest = jest.fn()
+    setCustomUploader({ upload: jest.fn(), download: () => request, cancelRequest })
+
+    downloadFile(attachment, true, jest.fn())
+    cancelDownloadFile('doc-id')
+
+    // The same promise object: toHaveBeenCalledWith finds any two promises equal.
+    expect(cancelRequest.mock.calls[0][0] === request).toBe(true)
   })
 })

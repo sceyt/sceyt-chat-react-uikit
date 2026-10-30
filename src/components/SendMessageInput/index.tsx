@@ -96,10 +96,12 @@ import { getReplyLinkPreviewImage, shouldShowLinkPreviewErrorFallback } from '..
 import { getShowOnlyContactUsers } from '../../helpers/contacts'
 import { getFrame, VideoThumbnailFrame } from '../../helpers/getVideoFrame'
 import { remuxVideoFileForUpload } from '../../helpers/videoConversion'
+import { canPlayQuickTime, inspectVideoBlob, isQuickTimeContainer } from '../../helpers/videoContainer'
 import {
   beginAttachmentPreparation,
   clearAttachmentPreparation,
   completeAttachmentPreparation,
+  completeAttachmentPreview,
   failAttachmentPreparation
 } from '../../helpers/attachmentPreparation'
 import { CAN_USE_DOM } from '../../helpers/canUseDOM'
@@ -1547,7 +1549,12 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
             }
           } else if (fileType === 'video') {
             const remuxPromise = remuxVideoFileForUpload(file)
-            let thumbnailSource = file
+            // Firefox before 157 cannot decode a QuickTime (.mov) container: take its frame
+            // from the MP4 the upload remux makes, instead of remuxing the file a second time.
+            let thumbnailSource =
+              isQuickTimeContainer(await inspectVideoBlob(file)) && !(await canPlayQuickTime(file))
+                ? await remuxPromise
+                : file
             let metadata: any
             let frame: VideoThumbnailFrame | undefined
             try {
@@ -1558,7 +1565,9 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
               } catch (error) {
                 // A MOV may play in Safari but not be decodable in Firefox. Retry from
                 // the normalized MP4 rather than sending a video without a thumbnail.
-                thumbnailSource = await remuxPromise
+                const remuxed = await remuxPromise
+                if (remuxed === thumbnailSource) throw error
+                thumbnailSource = remuxed
                 frame = await getFrame(thumbnailSource, 0)
               }
               const { thumb, width, height, duration } = frame
@@ -1568,6 +1577,8 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
               updateAttachment({ metadata, thumbnailState: 'ready' })
               dispatch(setUpdateMessageAttachmentAC(thumb, frame.frameBlobUrl))
               setVideoIsReadyToSend(tid)
+              // The pending row can show now; the upload still waits for the remux below.
+              completeAttachmentPreview(tid, { metadata, videoPreviewBlob: frame.blob })
             } catch (error) {
               log.warn('Unable to generate video thumbnail:', error)
             }

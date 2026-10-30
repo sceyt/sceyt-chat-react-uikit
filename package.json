@@ -68,6 +68,18 @@
       "lcov"
     ],
     "coverageThreshold": {
+      "./src/helpers/attachmentEncryption.ts": {
+        "lines": 100,
+        "branches": 100
+      },
+      "./src/helpers/customUploader.ts": {
+        "lines": 95,
+        "branches": 85
+      },
+      "./src/helpers/mediaDownloadCoordinator.ts": {
+        "lines": 95,
+        "branches": 82
+      },
       "./src/store/message/saga.ts": {
         "lines": 64,
         "branches": 52

@@ -5,6 +5,7 @@ import store from '../../store'
 import SceytChat from '../SceytChat'
 import { IAttachment, IChannel, IContact, ICustomAvatarColors, IMember, IMessage, IUser } from '../../types'
 import { SceytReduxContext } from 'store/context'
+import { IAttachmentDownloadFile, IAttachmentUploadFile } from '../../helpers/attachmentEncryption'
 
 import {
   InviteLinkOptions,
@@ -27,6 +28,11 @@ export interface IUploadTask {
   progress: (progress: IProgress) => void
   // eslint-disable-next-line no-unused-vars
   failure: (error: Error) => void
+  /**
+   * `blob` is the uploaded file as the user's device shows it (e.g. after the
+   * uploader resized an image). With `encryptAttachments` it must be the
+   * plaintext, never the encrypted bytes.
+   */
   // eslint-disable-next-line no-unused-vars
   success: ({ uri, blob }: { uri: string; blob: Blob }) => void
   cancel: () => void
@@ -34,9 +40,57 @@ export interface IUploadTask {
   resume: () => void
 }
 
-export interface ICustomUploader {
+/** The 4th `upload()` argument of a custom uploader that sets `supportsEncryption`. */
+export interface ICustomUploaderUploadFiles {
+  /**
+   * Prepares the file to store; call it with the file as it will be stored
+   * (e.g. after resizing an image) and send what it returns: `getPart(n)` as
+   * multipart parts, or `getAll()`, with its `contentType`. It is encrypted
+   * when `encryptAttachments` is on. The message describes the last file
+   * prepared, so prepare once per upload.
+   *
+   * `url` is the URL the file will be stored at, exactly as `success({ uri })`
+   * will give it: pick it before preparing the file. An encrypted file is
+   * bound to it and opens only for it, so the upload fails when `success`
+   * gives another one.
+   */
   // eslint-disable-next-line no-unused-vars
-  upload: (attachment: IAttachment, uploadTask: IUploadTask, messageType: string | null | undefined) => void
+  prepareFile: (file: Blob, options: { url: string }) => Promise<IAttachmentUploadFile>
+}
+
+/** The 6th `download()` argument of a custom uploader that sets `supportsEncryption`. */
+export interface ICustomUploaderDownloadFile {
+  /**
+   * The attachment's stored file: pass the downloaded bytes to `file.open()`
+   * and return its result, which is the file to show (decrypted when it is
+   * encrypted, with its real type).
+   */
+  file: IAttachmentDownloadFile
+}
+
+export interface ICustomUploader {
+  /**
+   * True: `upload` gets `{ prepareFile }` and sends the file it prepares, and
+   * `download` gets `{ file }` and returns `file.open(downloadedBytes)`. The
+   * SDK does any encryption, so the uploader's code is the same whether
+   * `encryptAttachments` is on or not (with a sceyt-chat version that has
+   * client.prepareUpload; with an older one these arguments are not passed).
+   *
+   * `encryptAttachments` needs it: an encrypted file is bound to its URL, so
+   * the uploader picks the URL before the file is prepared. Without it, an
+   * upload with `encryptAttachments` on fails before anything is sent.
+   */
+  supportsEncryption?: boolean
+  upload: (
+    // eslint-disable-next-line no-unused-vars
+    attachment: IAttachment,
+    // eslint-disable-next-line no-unused-vars
+    uploadTask: IUploadTask,
+    // eslint-disable-next-line no-unused-vars
+    messageType: string | null | undefined,
+    // eslint-disable-next-line no-unused-vars
+    files?: ICustomUploaderUploadFiles
+  ) => void
   /**
    * `messageId` is the ID of a message the attachment appears in, supplied by
    * the client. Treat it as a hint, not proof of access:
@@ -56,7 +110,8 @@ export interface ICustomUploader {
     download: boolean,
     progressCallback: (progress: any) => void,
     messageType: string | null | undefined,
-    messageId?: string | null
+    messageId?: string | null,
+    stored?: ICustomUploaderDownloadFile
   ) => Promise<any>
   // eslint-disable-next-line no-unused-vars
   cancelRequest: (requestPromise: any) => void
@@ -123,6 +178,12 @@ export interface IChatClientProps {
   children?: JSX.Element | JSX.Element[]
   logoSrc?: string
   CustomUploader?: ICustomUploader
+  /**
+   * Encrypt attachment files before upload and decrypt them after download
+   * (the key is kept in each attachment's metadata). Needs a CustomUploader
+   * with `supportsEncryption` and a sceyt-chat version with client.prepareUpload.
+   */
+  encryptAttachments?: boolean
   channelTypeFilter?: string[]
   membersDisplayTextByChannelTypesMap?: {
     [key: string]: string
@@ -172,6 +233,7 @@ const SceytChatContainer = ({
   channelTypeFilter,
   logoSrc,
   CustomUploader,
+  encryptAttachments,
   showNotifications = true,
   hideUserPresence,
   openChatOnUserInteraction,
@@ -244,6 +306,7 @@ const SceytChatContainer = ({
         showOnlyContactUsers={showOnlyContactUsers}
         logoSrc={logoSrc}
         CustomUploader={CustomUploader}
+        encryptAttachments={encryptAttachments}
         handleNewMessages={handleNewMessages}
         sendAttachmentsAsSeparateMessages={sendAttachmentsAsSeparateMessages}
         membersDisplayTextByChannelTypesMap={membersDisplayTextByChannelTypesMap}

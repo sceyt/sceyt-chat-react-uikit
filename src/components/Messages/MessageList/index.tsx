@@ -742,9 +742,10 @@ const MessageList: React.FC<MessagesProps> = ({
     e.preventDefault()
     e.stopPropagation()
     setIsDragging(false)
+    // The dropped data is read-only during a drop (Firefox throws on clearData), and
+    // the browser discards it after the event, so it is only read here.
     if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
       dispatch(setDraggedAttachmentsAC(getDroppedFiles(e), 'file'))
-      e.dataTransfer.clearData()
     }
   }
 
@@ -754,7 +755,6 @@ const MessageList: React.FC<MessagesProps> = ({
     setIsDragging(false)
     if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
       dispatch(setDraggedAttachmentsAC(getDroppedFiles(e), 'media'))
-      e.dataTransfer.clearData()
     }
   }
 

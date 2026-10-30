@@ -34,7 +34,8 @@ import {
 } from '../../helpers'
 import { attachmentTypes, MESSAGE_DELIVERY_STATUS, MESSAGE_STATUS, THEME, UPLOAD_STATE } from '../../helpers/constants'
 import { THEME_COLORS } from '../../UIHelper/constants'
-import { getCustomDownloader, getCustomUploader } from '../../helpers/customUploader'
+import { getAttachmentDownloader, getCustomUploader } from '../../helpers/customUploader'
+import { attachmentDecryption, getAttachmentEncryption, getTypeFromFileName } from '../../helpers/attachmentEncryption'
 import { AttachmentIconCont, UploadProgress, UploadPercent, CancelResumeWrapper } from '../../UIHelper'
 import {
   getAttachmentUrlFromCache,
@@ -197,7 +198,11 @@ const Attachment = ({
   const imageDownloadRequestRef = useRef(0)
   const imageResumeStartedRef = useRef(false)
   const fileNameRef: any = useRef(null)
-  const customDownloader = getCustomDownloader()
+  // Decrypts encrypted files; the same as the CustomUploader's downloader otherwise.
+  const customDownloader = getAttachmentDownloader(
+    getAttachmentEncryption(attachment.metadata),
+    getTypeFromFileName(attachment.name)
+  )
   const previewFileType = isPreview && attachment.data.type.split('/')[0]
   const originalVideoDownloadKey =
     attachment.type === attachmentTypes.video && attachment.url ? `original-video:${attachment.url}` : undefined
@@ -707,7 +712,8 @@ const Attachment = ({
         kind: 'original-video',
         messageType,
         messageId: attachment.messageId,
-        size: Number(attachment.size) || 0
+        size: Number(attachment.size) || 0,
+        ...attachmentDecryption(attachment)
       })
         .then(({ objectUrl }) => {
           if (cancelled || videoDownloadRequest !== videoDownloadRequestRef.current) return
@@ -747,10 +753,10 @@ const Attachment = ({
 
   const handleResumeOriginalVideoDownload = (event: React.MouseEvent) => {
     event.stopPropagation()
-    restartOriginalVideoDownload()
+    restartOriginalVideoDownload(true)
   }
 
-  const restartOriginalVideoDownload = () => {
+  const restartOriginalVideoDownload = (retry?: boolean) => {
     if (!attachment.url) return
 
     const { originalVideo: originalVideoCacheKey } = getVideoAttachmentCacheKeys(attachment.url, attachment.metadata)
@@ -770,7 +776,9 @@ const Attachment = ({
       kind: 'original-video',
       messageType,
       messageId: attachment.messageId,
-      size: Number(attachment.size) || 0
+      size: Number(attachment.size) || 0,
+      ...attachmentDecryption(attachment),
+      retry
     })
       .then(({ objectUrl }) => {
         if (videoDownloadRequest !== videoDownloadRequestRef.current) return
@@ -789,10 +797,10 @@ const Attachment = ({
 
   const handleResumeOriginalImageDownload = (event: Pick<Event, 'stopPropagation'>) => {
     event.stopPropagation()
-    restartOriginalImageDownload()
+    restartOriginalImageDownload(true)
   }
 
-  const restartOriginalImageDownload = () => {
+  const restartOriginalImageDownload = (retry?: boolean) => {
     if (!attachment.url) return
 
     const imageDownloadRequest = imageDownloadRequestRef.current + 1
@@ -809,7 +817,9 @@ const Attachment = ({
       kind: 'original-image',
       messageType,
       messageId: attachment.messageId,
-      size: Number(attachment.size) || 0
+      size: Number(attachment.size) || 0,
+      ...attachmentDecryption(attachment),
+      retry
     })
       .then(async ({ objectUrl }) => {
         if (imageDownloadRequest !== imageDownloadRequestRef.current) return
@@ -898,7 +908,8 @@ const Attachment = ({
                 kind: 'original-image',
                 messageType,
                 messageId: attachment.messageId,
-                size: Number(attachment.size) || 0
+                size: Number(attachment.size) || 0,
+                ...attachmentDecryption(attachment)
               })
                 .then(async ({ objectUrl }) => {
                   if (
@@ -951,7 +962,8 @@ const Attachment = ({
                 kind,
                 messageType,
                 messageId: attachment.messageId,
-                size: Number(attachment.size) || 0
+                size: Number(attachment.size) || 0,
+                ...attachmentDecryption(attachment)
               })
                 .then(({ objectUrl }) => {
                   if (requestAttachmentKey !== currentAttachmentKeyRef.current) return

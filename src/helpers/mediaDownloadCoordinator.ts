@@ -1,4 +1,5 @@
-import { getCustomDownloader, getCustomUploader } from './customUploader'
+import { cancelDownloadRequest, getAttachmentDownloader, getCustomDownloader } from './customUploader'
+import { IAttachmentEncryption, isUnopenableAttachmentError, prepareDownloadFile } from './attachmentEncryption'
 import { readResponseBlobWithProgress } from './getVideoFrame'
 import { getAttachmentURLWithVersion, getAttachmentUrlFromCache, setAttachmentToCache } from './attachmentsCache'
 import { registerBlobUrl } from './attachmentBlobUrls'
@@ -24,6 +25,12 @@ export interface MediaDownloadRequest {
   ) => Promise<any>
   customDownload?: boolean
   skipCacheLookup?: boolean
+  /** The file's `enc` metadata when it is encrypted: the download is decrypted before it is cached or shown. */
+  encryption?: IAttachmentEncryption
+  /** Type of the decrypted file (encrypted objects are stored as application/octet-stream). */
+  contentType?: string
+  /** The user asked to try again: a file that could not be opened before is downloaded again. */
+  retry?: boolean
 }
 
 export interface MediaDownloadSnapshot {
@@ -53,6 +60,10 @@ const jobs = new Map<string, MediaDownloadJob>()
 const snapshots = new Map<string, MediaDownloadSnapshot>()
 const listeners = new Map<string, Set<() => void>>()
 const jobVersions = new Map<string, number>()
+// Files that downloaded but could not be opened (decryption failed): the same
+// bytes and key fail every time, so a remount or reconnect does not download
+// them again. Only a retry the user asks for does.
+const unopenable = new Map<string, { fileKey?: string; error: unknown }>()
 
 const notify = (key: string) => {
   listeners.get(key)?.forEach((listener) => listener())
@@ -122,13 +133,20 @@ const download = async (request: MediaDownloadRequest, job: MediaDownloadJob): P
     // reports the real bytes.
     const rawLoaded = progress?.loaded ?? progress?.uploaded ?? 0
     const rawTotal = progress?.total ?? 0
-    if (rawLoaded <= 1 && rawTotal <= 1) {
+    // A cancelled transfer that is still running (its downloader did not
+    // abort it) must not turn the shared state back to loading.
+    if (job.cancelled || (rawLoaded <= 1 && rawTotal <= 1)) {
       return
     }
     const normalized = normalizeProgress(progress, request.size)
     setJobSnapshot(request.key, job, { state: 'loading', ...normalized })
   }
-  const customDownloader = request.downloader || getCustomDownloader()
+  // An encrypted file comes back from the attachment downloader already decrypted.
+  const customDownloader = getAttachmentDownloader(
+    request.encryption,
+    request.contentType,
+    request.downloader || getCustomDownloader()
+  )
 
   if (customDownloader) {
     // Shared media needs a Blob to cache and to publish one reusable object
@@ -177,6 +195,10 @@ const download = async (request: MediaDownloadRequest, job: MediaDownloadJob): P
     throw new Error(`${label} (${response.status})`)
   }
   const blob = await readResponseBlobWithProgress(response, reportProgress, request.size || 0)
+  if (request.encryption) {
+    const plaintext = await prepareDownloadFile(request.encryption, request.contentType, request.url).open(blob)
+    return makeObjectUrl(request, plaintext, job.cacheKeys)
+  }
   return makeObjectUrl(request, blob, job.cacheKeys)
 }
 
@@ -206,6 +228,15 @@ export const requestMediaDownload = (request: MediaDownloadRequest): Promise<Med
     request.cacheKeys?.forEach((cacheKey) => active.cacheKeys.add(cacheKey))
     return active.promise
   }
+
+  const failure = unopenable.get(request.key)
+  if (failure && failure.fileKey === request.encryption?.k && !request.retry) {
+    if (getMediaDownloadSnapshot(request.key).state !== 'failed') {
+      setSnapshot(request.key, { state: 'failed', loaded: 0, total: 0, progress: 0 })
+    }
+    return Promise.reject(failure.error)
+  }
+  unopenable.delete(request.key)
 
   const job: MediaDownloadJob = {
     version: (jobVersions.get(request.key) || 0) + 1,
@@ -246,6 +277,9 @@ export const requestMediaDownload = (request: MediaDownloadRequest): Promise<Med
       // after its AbortController fires. The local cancellation intent is the
       // authoritative signal, so its UI state must remain cancelled.
       const cancelled = job.cancelled || error?.name === 'AbortError'
+      if (!cancelled && isUnopenableAttachmentError(error)) {
+        unopenable.set(request.key, { fileKey: request.encryption?.k, error })
+      }
       setJobSnapshot(request.key, job, {
         state: cancelled ? 'cancelled' : 'failed',
         loaded: 0,
@@ -278,7 +312,7 @@ export const cancelMediaDownload = (key: string) => {
   jobs.delete(key)
   setSnapshot(key, { state: 'cancelled', loaded: 0, total: 0, progress: 0 })
   if (job.abortController) job.abortController.abort()
-  if (job.customRequest) getCustomUploader()?.cancelRequest(job.customRequest)
+  if (job.customRequest) cancelDownloadRequest(job.customRequest)
 }
 
 export const getMediaDownloadSnapshot = (key?: string): MediaDownloadSnapshot =>
@@ -299,4 +333,5 @@ export const resetMediaDownloadCoordinatorForTests = () => {
   snapshots.clear()
   listeners.clear()
   jobVersions.clear()
+  unopenable.clear()
 }

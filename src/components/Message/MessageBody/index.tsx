@@ -625,7 +625,7 @@ const MessageBody = ({
     // TODO implement remove failed attachment
     // dispatch(removeFailedAttachment(message.tid, attachmentId));
   }
-  if (message.id === '847315742421716992') {
+  if (message.id === '874469181820293120') {
     console.log(message)
   }
 

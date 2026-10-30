@@ -22,7 +22,8 @@ jest.mock('../../hooks', () => {
 let mockCustomDownloader: any
 
 jest.mock('../../helpers/customUploader', () => ({
-  getCustomDownloader: () => mockCustomDownloader
+  getCustomDownloader: () => mockCustomDownloader,
+  getAttachmentDownloader: (_encryption: any, _type: any, download: any) => download
 }))
 
 jest.mock('../../helpers/getVideoFrame', () => ({
@@ -99,7 +100,9 @@ describe('VideoPreview video_thumb rendering', () => {
       'https://cdn/video-thumb.jpg',
       undefined,
       undefined,
-      'message-id'
+      'message-id',
+      // The video's metadata, which holds the preview's key when it is encrypted.
+      expect.stringContaining('"video_thumb":"https://cdn/video-thumb.jpg"')
     )
     expect(mockGetVideoFirstFrame).not.toHaveBeenCalled()
     const pendingPreview = Array.from(container.querySelectorAll('img')).find(
@@ -479,7 +482,8 @@ describe('VideoPreview video_thumb with a custom downloader', () => {
       'https://cdn/video-thumb.jpg',
       mockCustomDownloader,
       undefined,
-      '9223372036854775807'
+      '9223372036854775807',
+      expect.stringContaining('"video_thumb":"https://cdn/video-thumb.jpg"')
     )
   })
 })

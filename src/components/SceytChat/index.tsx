@@ -57,6 +57,7 @@ import {
 } from '../../helpers/notifications'
 import { IChannel, IContactsMap } from '../../types'
 import { setCustomUploader, setSendAttachmentsAsSeparateMessages } from '../../helpers/customUploader'
+import { setEncryptAttachments } from '../../helpers/attachmentEncryption'
 import { IChatClientProps } from '../ChatContainer'
 import { defaultTheme, THEME_COLORS } from '../../UIHelper/constants'
 import { setHideUserPresence } from '../../helpers/userHelper'
@@ -83,6 +84,7 @@ const SceytChat = ({
   showOnlyContactUsers,
   logoSrc,
   CustomUploader,
+  encryptAttachments = false,
   handleNewMessages,
   sendAttachmentsAsSeparateMessages = true,
   membersDisplayTextByChannelTypesMap,
@@ -229,6 +231,10 @@ const SceytChat = ({
   useEffect(() => {
     if (CustomUploader) {
       setCustomUploader(CustomUploader)
+    }
+    setEncryptAttachments(encryptAttachments)
+    if (encryptAttachments && !CustomUploader) {
+      log.error('encryptAttachments needs a CustomUploader: messages with attachments will not be sent')
     }
     if (membersDisplayTextByChannelTypesMap) {
       setChannelTypesMemberDisplayTextMap(membersDisplayTextByChannelTypesMap)

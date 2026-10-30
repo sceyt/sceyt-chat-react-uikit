@@ -212,8 +212,18 @@ import { setConnectionStatus } from 'store/user/reducers'
 import { createAttachmentUnavailableError, isResendableError } from 'helpers/error'
 import { calculateRenderedImageWidth } from 'helpers'
 import { PendingMessageMutation } from './reducers'
-import { clearAttachmentPreparation, waitForAttachmentPreparation } from '../../helpers/attachmentPreparation'
+import {
+  clearAttachmentPreparation,
+  waitForAttachmentPreparation,
+  waitForAttachmentPreview
+} from '../../helpers/attachmentPreparation'
 import { parseAttachmentMetadata, shouldExtractVideoFirstFrame, withVideoThumb } from '../../helpers/videoPreview'
+import {
+  getEncryptAttachments,
+  IAttachmentEncryption,
+  withAttachmentEncryption,
+  withVideoThumbEncryption
+} from '../../helpers/attachmentEncryption'
 
 // Automatic reconnect resends per message tid — a message that keeps failing is
 // dropped from the auto-resend cycle after this many attempts; the manual retry
@@ -273,6 +283,23 @@ const applyPreparedMediaAttachments = async (attachments: IAttachment[], clearPr
   return attachments
 }
 
+// What the pending row needs: each image/video attachment's thumbnail and size
+// metadata. It does not wait for the file to upload (e.g. a QuickTime video still
+// being converted to MP4); applyPreparedMediaAttachments does, before the upload.
+const applyPreparedMediaPreviews = async (attachments: IAttachment[]) => {
+  await Promise.all(
+    attachments.map(async (attachment) => {
+      if (!attachment.tid) return
+      const preview = await waitForAttachmentPreview(attachment.tid, VIDEO_PREPARATION_TIMEOUT_MS)
+      if (preview?.metadata) {
+        attachment.metadata = preview.metadata
+        attachment.videoPreviewBlob = preview.videoPreviewBlob
+      }
+    })
+  )
+  return attachments
+}
+
 const getAttachmentSourceFile = (attachment: IAttachment): File | null => {
   const source =
     attachment.data instanceof Blob ? attachment.data : attachment.url instanceof Blob ? attachment.url : null
@@ -301,6 +328,7 @@ const prepareAndUploadVideoPreview = async (attachment: IAttachment, messageType
   const previewFile = new File([previewImageBlob], previewName, { type: previewImageBlob.type || 'image/jpeg' })
   const customUploader = getCustomUploader()
   let videoThumb: string
+  let videoThumbEncryption: IAttachmentEncryption | undefined
   if (customUploader) {
     // Reuse the application uploader so preview and video follow the same auth,
     // storage, retry, and lifecycle rules. Preview files are temporary backend
@@ -317,6 +345,7 @@ const prepareAndUploadVideoPreview = async (attachment: IAttachment, messageType
     } as IAttachment
     const uploadedPreview = await customUpload(previewAttachment, () => undefined, messageType)
     videoThumb = uploadedPreview.uri
+    videoThumbEncryption = uploadedPreview.encryption
   } else {
     const client = getClient()
     if (typeof client?.uploadFile !== 'function') {
@@ -329,10 +358,11 @@ const prepareAndUploadVideoPreview = async (attachment: IAttachment, messageType
     throw new Error('Video preview upload did not return a URL')
   }
 
+  const metadata = withVideoThumb(attachment.metadata, videoThumb)
   return {
     ...attachment,
     videoPreviewBlob: undefined,
-    metadata: withVideoThumb(attachment.metadata, videoThumb)
+    metadata: videoThumbEncryption ? withVideoThumbEncryption(metadata, videoThumbEncryption) : metadata
   }
 }
 
@@ -600,14 +630,16 @@ export const handleUploadAttachments = async (attachments: IAttachment[], messag
         }
       }
       let blobLocal: Blob | null = null
+      let encryption: IAttachmentEncryption | undefined
       if (attachment.cachedUrl) {
         uriLocal = attachment.cachedUrl
         const dataSize = attachment.data?.size || 0
         store.dispatch(updateAttachmentUploadingProgressAC(dataSize, dataSize, attachment.tid))
       } else {
-        const { uri, blob } = await customUpload(attachment, handleUploadProgress, message.type, handleUpdateLocalPath)
-        uriLocal = uri
-        blobLocal = blob
+        const uploaded = await customUpload(attachment, handleUploadProgress, message.type, handleUpdateLocalPath)
+        uriLocal = uploaded.uri
+        blobLocal = uploaded.blob
+        encryption = uploaded.encryption
         if (blobLocal) {
           fileSize = blobLocal.size
         } else {
@@ -687,11 +719,15 @@ export const handleUploadAttachments = async (attachments: IAttachment[], messag
       store.dispatch(updateAttachmentUploadingStateAC(UPLOAD_STATE.SUCCESS, attachment.tid))
 
       const parsedAttachmentMeta = parseAttachmentMetadata(attachment.metadata)
+      // An encrypted file carries its key in `enc`; a reused (cachedUrl) file
+      // keeps the metadata, and so the key, it was first sent with.
       const attachmentMeta = attachment.cachedUrl
         ? attachment.metadata
-        : JSON.stringify({
-            ...parsedAttachmentMeta
-          })
+        : encryption
+          ? withAttachmentEncryption(attachment.metadata, encryption)
+          : JSON.stringify({
+              ...parsedAttachmentMeta
+            })
       const attachmentBuilder = channel.createAttachmentBuilder(uriLocal, attachment.type)
       const attachmentToSend = attachmentBuilder
         .setName(attachment.name)
@@ -1576,26 +1612,38 @@ function* sendMessage(action: IAction): any {
           }
 
           // Do not insert an optimistic image/video message until its local
-          // preview metadata is ready. The compose input has already cleared,
-          // so this only delays the chat row—not the user's ability to type or
-          // send another message. A failed/timed-out preparation intentionally
-          // falls back to the original file after the bounded wait.
-          yield call(applyPreparedMediaAttachments, messageAttachment, connectionState === CONNECTION_STATUS.CONNECTED)
+          // preview (thumbnail and size metadata) is ready. The compose input has
+          // already cleared, so this only delays the chat row—not the user's
+          // ability to type or send another message. A failed/timed-out preview
+          // shows the row without it after the bounded wait.
+          yield call(applyPreparedMediaPreviews, messageAttachment)
           const pendingMessage = pendingMessages[i]
-          const pendingAttachments = pendingMessage.attachments.map((pendingAttachment: any) => {
-            const preparedAttachment = messageAttachment.find(
-              (attachment: any) => attachment.tid === pendingAttachment.tid
-            )
-            return preparedAttachment
-              ? { ...pendingAttachment, ...preparedAttachment, data: preparedAttachment.data || preparedAttachment.url }
-              : pendingAttachment
-          })
-          pendingMessage.attachments = pendingAttachments
+          const withPreparedAttachments = () =>
+            pendingMessage.attachments.map((pendingAttachment: any) => {
+              const preparedAttachment = messageAttachment.find(
+                (attachment: any) => attachment.tid === pendingAttachment.tid
+              )
+              return preparedAttachment
+                ? {
+                    ...pendingAttachment,
+                    ...preparedAttachment,
+                    data: preparedAttachment.data || preparedAttachment.url
+                  }
+                : pendingAttachment
+            })
+          pendingMessage.attachments = withPreparedAttachments()
 
           if (action.type !== RESEND_MESSAGE) {
             yield call(loadOGMetadataForLinkMessages, [pendingMessage], true)
             yield call(updateMessage, action.type, pendingMessage, channel.id, true, message)
           }
+
+          // The row shows; now wait for the file to upload, which can take longer
+          // (a QuickTime video converted to MP4). A failed/timed-out preparation
+          // falls back to the original file after the bounded wait.
+          yield call(applyPreparedMediaAttachments, messageAttachment, connectionState === CONNECTION_STATUS.CONNECTED)
+          const pendingAttachments = withPreparedAttachments()
+          pendingMessage.attachments = pendingAttachments
 
           if (connectionState === CONNECTION_STATUS.CONNECTED) {
             if (messageToSend.tid && isPendingMessageDeleted(channel.id, messageToSend.tid)) {
@@ -1611,6 +1659,10 @@ function* sendMessage(action: IAction): any {
               continue
             }
             if (!customUploader) {
+              if (getEncryptAttachments()) {
+                // The SDK uploader would upload the plaintext: fail the message instead.
+                throw new Error('encryptAttachments needs a CustomUploader; the attachment was not sent')
+              }
               for (let attachmentIndex = 0; attachmentIndex < messageAttachment.length; attachmentIndex++) {
                 if (messageAttachment[attachmentIndex].type === attachmentTypes.video) {
                   const preparedVideoAttachment = yield call(
