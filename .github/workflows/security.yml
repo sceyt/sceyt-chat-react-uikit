@@ -77,7 +77,7 @@ jobs:
 
       # Scans only the commits in this push / PR. Fails on verified or
       # possibly-valid secrets (API keys, tokens, passwords...).
-      - uses: trufflesecurity/trufflehog@v3.98.1
+      - uses: trufflesecurity/trufflehog@v3.99.7
         with:
           extra_args: --results=verified,unknown
 
