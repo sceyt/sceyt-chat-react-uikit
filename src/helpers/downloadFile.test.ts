@@ -91,7 +91,9 @@ describe('downloadFile for an encrypted attachment', () => {
     id: 'doc-id',
     url: 'https://cdn/doc',
     name: 'report.pdf',
-    metadata: JSON.stringify({ enc: { id: 'id-5', v: 1, k: 'key-5' } })
+    metadata: JSON.stringify({
+      enc: { v: 1, alg: 'tink-aes256-gcm-hkdf-64k+commit-v1', attachmentId: 'id-5', key: 'key-5' }
+    })
   } as any
 
   beforeEach(() => {

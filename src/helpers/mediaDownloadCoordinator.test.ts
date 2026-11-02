@@ -521,7 +521,7 @@ describe('mediaDownloadCoordinator', () => {
   })
 
   describe('an encrypted attachment', () => {
-    const encryption = { id: 'id-3', v: 1, k: 'key-3' }
+    const encryption = { v: 1, alg: 'tink-aes256-gcm-hkdf-64k+commit-v1', attachmentId: 'id-3', key: 'key-3' }
     const request = {
       key: 'original-image:https://cdn/photo',
       url: 'https://cdn/photo',
@@ -603,7 +603,10 @@ describe('mediaDownloadCoordinator', () => {
       setCustomUploader({ download, cancelRequest: jest.fn(), upload: jest.fn() } as any)
       await expect(requestMediaDownload(request)).rejects.toMatchObject({ type: 'AttachmentDecryptionFailed' })
 
-      const { blob } = await requestMediaDownload({ ...request, encryption: { ...encryption, id: 'id-4', k: 'key-4' } })
+      const { blob } = await requestMediaDownload({
+        ...request,
+        encryption: { ...encryption, attachmentId: 'id-4', key: 'key-4' }
+      })
 
       expect(download).toHaveBeenCalledTimes(2)
       expect(await readBlobText(blob)).toBe('pixels')

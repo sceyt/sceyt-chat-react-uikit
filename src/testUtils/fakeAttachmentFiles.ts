@@ -3,9 +3,9 @@ import { IAttachmentDownloadFile, IAttachmentEncryption, IAttachmentUploadFile }
 
 // Stand-ins for the SDK's AttachmentUploadFile and AttachmentDownloadFile. The
 // real ones are tested in sceyt-chat against the format's test vectors; UIKit
-// tests only check that files go through the SDK with the right unique id and
+// tests only check that files go through the SDK with the right attachment id and
 // key. "Encrypting" prefixes the bytes with `enc(<key>@<id>):`, and opening a
-// file with another key or unique id fails. Key `key-n` has unique id `id-n`.
+// file with another key or attachment id fails. Key `key-n` has attachment id `id-n`.
 
 export const readBlobText = (blob: Blob): Promise<string> =>
   new Promise((resolve, reject) => {
@@ -21,7 +21,12 @@ const notUsed = () => {
   throw new Error('not used by the UIKit')
 }
 
-export const fakeEncryption = (key: string): IAttachmentEncryption => ({ id: uniqueIdOf(key), v: 1, k: key })
+export const fakeEncryption = (key: string): IAttachmentEncryption => ({
+  v: 1,
+  alg: 'tink-aes256-gcm-hkdf-64k+commit-v1',
+  attachmentId: uniqueIdOf(key),
+  key
+})
 
 /** The file prepared for upload; encrypted with `key` when there is a key. */
 export const makeFakeUploadFile = (source: Blob, key?: string): IAttachmentUploadFile => ({
@@ -36,7 +41,7 @@ export const makeFakeUploadFile = (source: Blob, key?: string): IAttachmentUploa
   getAll: async () => (key ? new Blob([prefixOf(key), source], { type: 'application/octet-stream' }) : source)
 })
 
-/** The stored file of an attachment; encrypted with `key` and unique id `id` when there is a key. */
+/** The stored file of an attachment; encrypted with `key` and attachment id `id` when there is a key. */
 export const makeFakeDownloadFile = (
   key: string | undefined,
   type: string = '',
@@ -47,14 +52,14 @@ export const makeFakeDownloadFile = (
   open: async (stored: Blob) => {
     if (!key) return type && stored.type !== type ? new Blob([stored], { type }) : stored
     if (!id) {
-      throw Object.assign(new Error('Attachment encryption: the unique id is missing'), {
+      throw Object.assign(new Error('Attachment encryption: the attachment id is missing'), {
         type: 'InvalidAttachmentEncryption'
       })
     }
     const prefix = prefixOf(key, id)
     const text = await readBlobText(stored)
     if (!text.startsWith(prefix)) {
-      throw Object.assign(new Error(`Not encrypted with key ${key} and unique id ${id}`), {
+      throw Object.assign(new Error(`Not encrypted with key ${key} and attachment id ${id}`), {
         type: 'AttachmentDecryptionFailed'
       })
     }
@@ -74,13 +79,13 @@ export const installFakeFilesClient = () => {
       options.encrypt ? makeFakeUploadFile(file, `key-${++created}`) : makeFakeUploadFile(file),
     prepareDownload: ({ metadata, type }: { metadata?: any; type?: string }) => {
       const enc = (typeof metadata === 'string' ? JSON.parse(metadata) : metadata || {}).enc
-      return enc ? makeFakeDownloadFile(enc.k, type, enc.id) : makeFakeDownloadFile(undefined, type)
+      return enc ? makeFakeDownloadFile(enc.key, type, enc.attachmentId) : makeFakeDownloadFile(undefined, type)
     }
   }
   setClient(client)
   return client
 }
 
-/** A Blob encrypted the way the fake file of `key` (unique id `id-n` for `key-n`) encrypts. */
+/** A Blob encrypted the way the fake file of `key` (attachment id `id-n` for `key-n`) encrypts. */
 export const fakeEncrypted = (key: string, text: string) =>
   new Blob([`${prefixOf(key)}${text}`], { type: 'application/octet-stream' })

@@ -931,7 +931,7 @@ describe('a failed download is not shown as downloaded', () => {
       ...videoAttachment,
       metadata: JSON.stringify({
         ...JSON.parse(videoAttachment.metadata),
-        enc: { id: 'id-9', v: 1, k: 'key-9' }
+        enc: { v: 1, alg: 'tink-aes256-gcm-hkdf-64k+commit-v1', attachmentId: 'id-9', key: 'key-9' }
       })
     }
     const videoDownloads = () => download.mock.calls.filter(([url]) => url === 'https://cdn/video.mp4').length
@@ -1191,7 +1191,7 @@ describe('the upload stop and resume control', () => {
       ...videoAttachment,
       metadata: JSON.stringify({
         ...JSON.parse(videoAttachment.metadata),
-        enc: { id: 'id-9', v: 1, k: 'key-9' }
+        enc: { v: 1, alg: 'tink-aes256-gcm-hkdf-64k+commit-v1', attachmentId: 'id-9', key: 'key-9' }
       })
     }
     try {

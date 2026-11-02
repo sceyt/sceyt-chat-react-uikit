@@ -230,7 +230,7 @@ export const requestMediaDownload = (request: MediaDownloadRequest): Promise<Med
   }
 
   const failure = unopenable.get(request.key)
-  if (failure && failure.fileKey === request.encryption?.k && !request.retry) {
+  if (failure && failure.fileKey === request.encryption?.key && !request.retry) {
     if (getMediaDownloadSnapshot(request.key).state !== 'failed') {
       setSnapshot(request.key, { state: 'failed', loaded: 0, total: 0, progress: 0 })
     }
@@ -278,7 +278,7 @@ export const requestMediaDownload = (request: MediaDownloadRequest): Promise<Med
       // authoritative signal, so its UI state must remain cancelled.
       const cancelled = job.cancelled || error?.name === 'AbortError'
       if (!cancelled && isUnopenableAttachmentError(error)) {
-        unopenable.set(request.key, { fileKey: request.encryption?.k, error })
+        unopenable.set(request.key, { fileKey: request.encryption?.key, error })
       }
       setJobSnapshot(request.key, job, {
         state: cancelled ? 'cancelled' : 'failed',

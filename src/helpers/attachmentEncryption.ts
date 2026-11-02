@@ -2,20 +2,37 @@ import { getClient } from '../common/client'
 
 // Attachment encryption (format: sceyt-chat-js-sdk spec/attachment-encryption).
 // The file bytes are encrypted before upload and decrypted after download; the
-// file's unique id and key travel in the attachment's metadata as `enc`. The
+// file's attachment id and key travel in the attachment's metadata as `enc`. The
 // SDK does the work (client.prepareUpload / client.prepareDownload); this file
 // holds the UIKit's side: the option, the metadata, and the types custom
 // uploaders see.
 
-/** The `enc` object in an encrypted attachment's metadata. */
-export interface IAttachmentEncryption {
-  /** The file's unique id: the stored file opens only with it. */
-  id: string
-  v: 1
-  k: string
-  /** Unique id and key of the video preview image (`video_thumb`), which is encrypted as its own file. */
-  thumb?: { id: string; k: string }
+/** Another file of an attachment (a video's preview image), encrypted with its own id and key. */
+export interface IAttachmentRendition {
+  /** "thumbnail" for a video's preview image. */
+  role: string
+  attachmentId: string
+  key: string
 }
+
+/**
+ * The `enc` object in an encrypted attachment's metadata: what opens the file.
+ * The SDK makes `v`, `alg`, `attachmentId` and `key`; the UIKit adds
+ * `renditions`. The file's URL, size, type and name are the attachment's own fields.
+ */
+export interface IAttachmentEncryption {
+  v: 1
+  /** The format: "tink-aes256-gcm-hkdf-64k+commit-v1". */
+  alg: string
+  /** The file's attachment id (16 bytes, base64url): the stored file opens only with it. */
+  attachmentId: string
+  /** The file key (32 bytes, base64url). */
+  key: string
+  /** The video preview image (`video_thumb`) is `role: "thumbnail"`. */
+  renditions?: IAttachmentRendition[]
+}
+
+const THUMBNAIL = 'thumbnail'
 
 /**
  * The SDK's AttachmentUploadFile (sceyt-chat): a file prepared for upload. Send
@@ -94,7 +111,7 @@ export const canPrepareAttachmentFiles = () => {
   return typeof client?.prepareUpload === 'function' && typeof client?.prepareDownload === 'function'
 }
 
-/** Prepares a file for upload; encrypted, with a new unique id and key, when `encrypt` is set. */
+/** Prepares a file for upload; encrypted, with a new attachment id and key, when `encrypt` is set. */
 export const prepareUploadFile = async (file: Blob, encrypt: boolean): Promise<IAttachmentUploadFile> =>
   sdkClient().prepareUpload(file, { encrypt })
 
@@ -123,28 +140,38 @@ const parseMetadata = (metadata: any): Record<string, any> => {
 /** The file's `enc` object, or undefined when the file is not encrypted. */
 export const getAttachmentEncryption = (metadata: any): IAttachmentEncryption | undefined => {
   const enc = parseMetadata(metadata).enc
-  return enc && typeof enc === 'object' && typeof enc.k === 'string' ? enc : undefined
+  return enc && typeof enc === 'object' && typeof enc.key === 'string' ? enc : undefined
 }
 
-/** The `enc` object of the video preview image, or undefined when it is not encrypted. */
+/** What opens the video preview image (its rendition), or undefined when it is not encrypted. */
 export const getVideoThumbEncryption = (metadata: any): IAttachmentEncryption | undefined => {
   const enc = parseMetadata(metadata).enc
-  const thumb = enc && typeof enc === 'object' ? enc.thumb : undefined
-  return thumb && typeof thumb.k === 'string' ? { id: thumb.id, v: enc.v, k: thumb.k } : undefined
+  const renditions = enc && typeof enc === 'object' && Array.isArray(enc.renditions) ? enc.renditions : []
+  const thumb = renditions.find((rendition: any) => rendition && rendition.role === THUMBNAIL)
+  return thumb && typeof thumb.key === 'string'
+    ? { v: enc.v, alg: enc.alg, attachmentId: thumb.attachmentId, key: thumb.key }
+    : undefined
 }
 
-/** Metadata with the file's `enc`, keeping the preview image's key already in it. */
+/** Metadata with the file's `enc`, keeping the renditions already in it. */
 export const withAttachmentEncryption = (metadata: any, encryption: IAttachmentEncryption) => {
   const parsed = parseMetadata(metadata)
-  const thumb = parsed.enc?.thumb
-  return JSON.stringify({ ...parsed, enc: { ...encryption, ...(thumb ? { thumb } : {}) } })
+  const renditions = parsed.enc?.renditions
+  return JSON.stringify({ ...parsed, enc: { ...encryption, ...(renditions ? { renditions } : {}) } })
 }
 
-/** Metadata with the video preview image's unique id and key. The video's own are added once it is uploaded. */
+/**
+ * Metadata with the video preview image as a thumbnail rendition: its
+ * attachment id and key. The video's own `enc` fields are added once it is uploaded.
+ */
 export const withVideoThumbEncryption = (metadata: any, encryption: IAttachmentEncryption) => {
   const parsed = parseMetadata(metadata)
-  const { id, v, k } = encryption
-  return JSON.stringify({ ...parsed, enc: { v, ...parsed.enc, thumb: { id, k } } })
+  const { v, alg, attachmentId, key } = encryption
+  const others = (Array.isArray(parsed.enc?.renditions) ? parsed.enc.renditions : []).filter(
+    (rendition: any) => rendition?.role !== THUMBNAIL
+  )
+  const thumbnail = { role: THUMBNAIL, attachmentId, key }
+  return JSON.stringify({ ...parsed, enc: { v, alg, ...parsed.enc, renditions: [...others, thumbnail] } })
 }
 
 // Encrypted objects are stored as application/octet-stream, so the type of the

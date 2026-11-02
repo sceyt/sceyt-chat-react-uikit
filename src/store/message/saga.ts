@@ -321,7 +321,7 @@ const encryptForSdkUpload = async (file: Blob, name: string) => {
   }
 }
 
-/** The attachment for the SDK's own upload, with its file encrypted and its unique id and key in the metadata. */
+/** The attachment for the SDK's own upload, with its file encrypted and its attachment id and key in the metadata. */
 const encryptAttachmentForSdkUpload = async (attachment: IAttachment) => {
   const file =
     attachment.url instanceof Blob ? attachment.url : attachment.data instanceof Blob ? attachment.data : null

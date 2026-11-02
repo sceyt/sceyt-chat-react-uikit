@@ -179,17 +179,25 @@ describe('encryptAttachments: uploading', () => {
     const uploaded = await result
     expect(uploaded.uri).toBe('https://cdn/streaming')
     expect(uploaded.blob === resized).toBe(true)
-    expect(uploaded.encryption).toEqual({ id: 'id-1', v: 1, k: 'key-1' })
+    expect(uploaded.encryption).toEqual({
+      v: 1,
+      alg: 'tink-aes256-gcm-hkdf-64k+commit-v1',
+      attachmentId: 'id-1',
+      key: 'key-1'
+    })
   })
 
-  it('a prepared file may be stored at any URL: it is bound to its unique id, not to where it is stored', async () => {
+  it('a prepared file may be stored at any URL: it is bound to its attachment id, not to where it is stored', async () => {
     useUploader(true)
     const result = customUpload({ tid: 'anywhere', name: 'photo.png', data: file() } as any, () => undefined, 'text')
 
     await calls[0].args[1].prepareFile(file())
     calls[0].task.success({ uri: 'https://cdn/picked-after-preparing', blob: file() })
 
-    expect(await result).toMatchObject({ uri: 'https://cdn/picked-after-preparing', encryption: { id: 'id-1' } })
+    expect(await result).toMatchObject({
+      uri: 'https://cdn/picked-after-preparing',
+      encryption: { attachmentId: 'id-1' }
+    })
   })
 
   it('with encryption off, an uploader with preparesFiles prepares the file the same way, unencrypted', async () => {
@@ -229,7 +237,7 @@ describe('encryptAttachments: uploading', () => {
     await calls[0].args[1].prepareFile(file())
     await storePrepared(calls[0], file(), 'https://cdn/second')
 
-    expect((await result).encryption).toEqual(expect.objectContaining({ k: 'key-2' }))
+    expect((await result).encryption).toEqual(expect.objectContaining({ key: 'key-2' }))
   })
 
   it('every file is encrypted with its own key', async () => {
@@ -238,7 +246,7 @@ describe('encryptAttachments: uploading', () => {
     const second = customUpload({ tid: 'second', name: 'b.png', data: file() } as any, () => undefined, 'text')
     await Promise.all(calls.map((call, i) => storePrepared(call, file(), `https://cdn/${i}`)))
 
-    expect([(await first).encryption!.k, (await second).encryption!.k].sort()).toEqual(['key-1', 'key-2'])
+    expect([(await first).encryption!.key, (await second).encryption!.key].sort()).toEqual(['key-1', 'key-2'])
   })
 
   it('a file stored without prepareFile is not sent: it may be plaintext', async () => {
@@ -261,7 +269,7 @@ describe('encryptAttachments: uploading', () => {
 })
 
 describe('encryptAttachments: downloading', () => {
-  const encryption = { id: 'id-7', v: 1, k: 'key-7' }
+  const encryption = { v: 1, alg: 'tink-aes256-gcm-hkdf-64k+commit-v1', attachmentId: 'id-7', key: 'key-7' }
   const originalFetch = global.fetch
   const originalCreateObjectURL = URL.createObjectURL
 
@@ -433,7 +441,7 @@ describe('encryptAttachments: downloading', () => {
     })
   })
 
-  it('a file encrypted with another unique id is refused', async () => {
+  it('a file encrypted with another attachment id is refused', async () => {
     setCustomUploader({
       upload: jest.fn(),
       download: async () => ({ Body: fakeEncrypted('key-7', 'x') }),
@@ -441,7 +449,7 @@ describe('encryptAttachments: downloading', () => {
     })
 
     await expect(
-      getAttachmentDownloader({ ...encryption, id: 'another-id' }, 'image/png')!(
+      getAttachmentDownloader({ ...encryption, attachmentId: 'another-id' }, 'image/png')!(
         'https://cdn/p',
         true,
         jest.fn(),

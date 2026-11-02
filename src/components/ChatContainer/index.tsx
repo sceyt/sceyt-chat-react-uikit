@@ -178,7 +178,7 @@ export interface IChatClientProps {
   CustomUploader?: ICustomUploader
   /**
    * Encrypt attachment files before upload and decrypt them after download
-   * (the unique id and key are kept in each attachment's metadata). Works with
+   * (the attachment id and key are kept in each attachment's metadata). Works with
    * the SDK's own upload, which sends the whole encrypted file, or with a
    * CustomUploader that sets `preparesFiles`; needs a sceyt-chat version
    * with client.prepareUpload.

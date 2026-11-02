@@ -1573,7 +1573,7 @@ describe('attachment upload recovery', () => {
       expect(JSON.parse(sent.metadata)).toEqual({
         szw: 10,
         szh: 20,
-        enc: { id: 'id-1', v: 1, k: 'key-1' }
+        enc: { v: 1, alg: 'tink-aes256-gcm-hkdf-64k+commit-v1', attachmentId: 'id-1', key: 'key-1' }
       })
       // The size shown and sent is the plaintext's.
       expect((channel as any).__attachmentBuilder.setFileSize).toHaveBeenCalledWith(image.size)
@@ -1612,7 +1612,13 @@ describe('attachment upload recovery', () => {
       expect(await readBlobText(stored[1])).toBe('enc(key-2@id-2):video-bytes')
       expect(JSON.parse(sent.metadata)).toEqual({
         video_thumb: 'https://cdn.example/clip-preview.jpg',
-        enc: { id: 'id-2', v: 1, k: 'key-2', thumb: { id: 'id-1', k: 'key-1' } }
+        enc: {
+          v: 1,
+          alg: 'tink-aes256-gcm-hkdf-64k+commit-v1',
+          attachmentId: 'id-2',
+          key: 'key-2',
+          renditions: [{ role: 'thumbnail', attachmentId: 'id-1', key: 'key-1' }]
+        }
       })
     })
 
@@ -1687,7 +1693,13 @@ describe('attachment upload recovery', () => {
       expect(await readBlobText(sent.url)).toBe('enc(key-2@id-2):video-bytes')
       expect(JSON.parse(sent.metadata)).toEqual({
         video_thumb: 'https://cdn.example/sdk-preview.jpg',
-        enc: { id: 'id-2', v: 1, k: 'key-2', thumb: { id: 'id-1', k: 'key-1' } }
+        enc: {
+          v: 1,
+          alg: 'tink-aes256-gcm-hkdf-64k+commit-v1',
+          attachmentId: 'id-2',
+          key: 'key-2',
+          renditions: [{ role: 'thumbnail', attachmentId: 'id-1', key: 'key-1' }]
+        }
       })
     })
   })
