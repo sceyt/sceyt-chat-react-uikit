@@ -39,6 +39,8 @@ describe('mediaDownloadCoordinator', () => {
     mockGetAttachmentUrlFromCache.mockResolvedValue(false)
     resetMediaDownloadCoordinatorForTests()
     setCustomUploader(undefined)
+    // Without a custom uploader the SDK downloads (client.download), over the test's fetch.
+    installFakeFilesClient()
     URL.createObjectURL = jest.fn(() => 'blob:shared-media')
   })
 
@@ -600,7 +602,7 @@ describe('mediaDownloadCoordinator', () => {
       expect(setAttachmentToCache).toHaveBeenCalledWith('https://cdn/photo', expect.anything())
     })
 
-    it('is decrypted when it is downloaded without a custom downloader', async () => {
+    it('is decrypted when the SDK downloads it, without a custom downloader', async () => {
       global.fetch = jest
         .fn()
         .mockResolvedValue({ ok: true, blob: async () => fakeEncrypted('key-3', 'pixels') }) as any

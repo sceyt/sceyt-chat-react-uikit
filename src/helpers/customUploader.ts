@@ -2,12 +2,7 @@ import { ICustomUploader, ICustomUploaderDownloadOptions, IProgress, IUploadTask
 import { IAttachment } from '../types'
 import log from 'loglevel'
 import { getClient } from '../common/client'
-import {
-  canPrepareAttachmentFiles,
-  getEncryptAttachments,
-  IAttachmentEncryption,
-  prepareDownloadFile
-} from './attachmentEncryption'
+import { getEncryptAttachments, IAttachmentEncryption, prepareDownloadFile } from './attachmentEncryption'
 
 let CustomUploader: ICustomUploader
 let sendAttachmentsAsSeparateMessages: boolean = false
@@ -68,16 +63,12 @@ export const customUpload = (
       reject(new Error('No Custom uploader'))
       return
     }
-    if (encrypt && !(uploaderPreparesFiles() && canPrepareAttachmentFiles())) {
+    if (encrypt && !uploaderPreparesFiles()) {
       // Fails here, before anything is sent: an uploader without preparesFiles
       // would store the file it was given, unencrypted.
       notStartedUploads.delete(attachment.tid!)
       reject(
-        new Error(
-          uploaderPreparesFiles()
-            ? 'Attachment encryption needs a sceyt-chat version with client.prepareUpload and client.prepareDownload'
-            : 'Attachment encryption needs a custom uploader with preparesFiles, which stores the file encrypted'
-        )
+        new Error('Attachment encryption needs a custom uploader with preparesFiles, which stores the file encrypted')
       )
       return
     }
@@ -118,9 +109,6 @@ export const customUpload = (
   })
 }
 
-/** Whether the SDK can upload one file, encrypted or not (client.upload). */
-export const canUploadWithSdk = () => typeof getClient()?.upload === 'function'
-
 /**
  * Uploads one attachment's file with the SDK (client.upload), encrypted when
  * `encryptAttachments` is on; the uikit uploads each attachment of a message
@@ -141,7 +129,7 @@ export const sdkUpload = (
     notStartedUploads.delete(tid)
     const file: Blob | null =
       attachment.url instanceof Blob ? attachment.url : attachment.data instanceof Blob ? attachment.data : null
-    if (!canUploadWithSdk()) {
+    if (typeof getClient()?.upload !== 'function') {
       reject(new Error('Uploading an attachment needs a sceyt-chat version with client.upload'))
       return
     }
@@ -205,13 +193,6 @@ export const sdkUpload = (
     if (!pausedBeforeStart) send()
   })
 
-/**
- * Whether the uikit uploads each attachment itself, with the custom uploader
- * or the SDK's client.upload, and sends the message with the file URLs. With
- * an older SDK and no custom uploader, the SDK uploads them in sendMessage.
- */
-export const uikitUploadsFiles = () => !!CustomUploader || canUploadWithSdk()
-
 /** Uploads one attachment: with the custom uploader when there is one, else with the SDK. */
 export const uploadAttachmentFile = (
   attachment: IAttachment,
@@ -244,8 +225,7 @@ const asBlob = async (body: any): Promise<Blob> => {
  * custom downloader returned ({ Body }, a Blob, or a URL string). An uploader
  * with `preparesFiles` also gets `encryption` and opens the file itself.
  * `type` is the file's real type, e.g. 'video/mp4'. `download` defaults to the
- * CustomUploader's; without one, the SDK downloads the file (client.download)
- * when it can, else there is no downloader.
+ * CustomUploader's; without one, the SDK downloads the file (client.download).
  */
 export type AttachmentDownloader = (
   // eslint-disable-next-line no-unused-vars
@@ -264,15 +244,15 @@ const uploaderRequests = new WeakMap<Promise<any>, Promise<any>>()
 // A request of the SDK's downloader, to what cancels it.
 const sdkRequests = new WeakMap<Promise<any>, AbortController>()
 
-/** Whether the SDK can download and open one file (client.download). */
-export const canDownloadWithSdk = () => typeof getClient()?.download === 'function'
-
 // Downloads with the SDK (client.download), which opens the file (decrypted
 // with `encryption`) and resumes a lost connection; gives { Body } like a
 // custom downloader.
 const sdkDownloader =
   (encryption: IAttachmentEncryption | undefined, type: string): AttachmentDownloader =>
   (url, _asFile, progress) => {
+    if (typeof getClient()?.download !== 'function') {
+      return Promise.reject(new Error('Downloading an attachment needs a sceyt-chat version with client.download'))
+    }
     const controller = new AbortController()
     const request = getClient()
       .download(url, {
@@ -292,9 +272,9 @@ export const getAttachmentDownloader = (
   encryption?: IAttachmentEncryption,
   type: string = '',
   download: ICustomUploader['download'] | undefined = getCustomDownloader()
-): AttachmentDownloader | undefined => {
-  if (!download) return canDownloadWithSdk() ? sdkDownloader(encryption, type) : undefined
-  if (uploaderPreparesFiles() && canPrepareAttachmentFiles()) {
+): AttachmentDownloader => {
+  if (!download) return sdkDownloader(encryption, type)
+  if (uploaderPreparesFiles()) {
     // The uploader opens the file itself; its own request, so its cancelRequest finds it.
     return (url, asFile, progress, messageType) => {
       try {

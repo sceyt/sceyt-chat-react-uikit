@@ -1,7 +1,6 @@
 import { setClient } from '../common/client'
 import {
   attachmentDecryption,
-  canPrepareAttachmentFiles,
   getAttachmentEncryption,
   getTypeFromFileName,
   getVideoThumbEncryption,
@@ -88,7 +87,6 @@ describe('attachment encryption metadata', () => {
 
   it('with an SDK that cannot prepare files, preparing one fails with a clear error', async () => {
     setClient({})
-    expect(canPrepareAttachmentFiles()).toBe(false)
     expect(() => prepareDownloadFile(videoKey, 'video/mp4')).toThrow('client.prepareDownload')
     expect(() => prepareDownloadFile(undefined)).toThrow('client.prepareDownload')
   })
@@ -97,7 +95,6 @@ describe('attachment encryption metadata', () => {
     const prepareDownload = jest.fn(() => 'download-file')
     setClient({ prepareUpload: jest.fn(), prepareDownload })
 
-    expect(canPrepareAttachmentFiles()).toBe(true)
     expect(prepareDownloadFile(videoKey, 'video/mp4')).toBe('download-file')
     expect(prepareDownload).toHaveBeenLastCalledWith({ metadata: { enc: videoKey }, type: 'video/mp4' })
     prepareDownloadFile(undefined)

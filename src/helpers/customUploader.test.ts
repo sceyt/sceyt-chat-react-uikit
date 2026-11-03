@@ -242,15 +242,6 @@ describe('encryptAttachments: uploading', () => {
 
     await expect(result).rejects.toThrow('without reporting its encryption')
   })
-
-  it('an uploader with preparesFiles and an SDK that cannot prepare files fails before anything is sent', async () => {
-    useUploader(true)
-    setClient({})
-    const result = customUpload({ tid: 'no-prepare', name: 'photo.png', data: file() } as any, () => undefined, 'text')
-
-    await expect(result).rejects.toThrow('client.prepareUpload')
-    expect(calls).toHaveLength(0)
-  })
 })
 
 describe('encryptAttachments: downloading', () => {
@@ -307,21 +298,6 @@ describe('encryptAttachments: downloading', () => {
     const args: any[] = download.mock.calls[0]
     expect(args[0] === video).toBe(true)
     expect(args[4]).toEqual({ kind: 'thumbnail', url: 'https://cdn/clip-preview.jpg', type: 'image/jpeg' })
-  })
-
-  it('with an older SDK, an uploader with preparesFiles gets no encryption: the uikit does not open files', () => {
-    const download = jest.fn(() => new Promise(() => undefined))
-    setClient({})
-    setCustomUploader({ preparesFiles: true, upload: jest.fn(), download, cancelRequest: jest.fn() })
-
-    getAttachmentDownloader(photo, 'file', undefined, 'image/png')!('https://cdn/p', true, jest.fn(), 'text')
-
-    expect((download.mock.calls[0] as any[])[4]).toEqual({ kind: 'file', url: 'https://cdn/p', type: 'image/png' })
-  })
-
-  it('without a custom uploader there is no downloader', () => {
-    setCustomUploader(undefined)
-    expect(getAttachmentDownloader(photo, 'file', encryption, 'image/png')).toBeUndefined()
   })
 
   it('decrypts a { Body } result and keeps its other fields', async () => {
@@ -595,10 +571,12 @@ describe('the SDK downloads when there is no custom uploader (client.download)',
     setCustomUploader(undefined)
   })
 
-  it('with an SDK that has no client.download there is no downloader', () => {
+  it('with an SDK that has no client.download, downloading fails with a clear error', async () => {
     setClient({})
 
-    expect(getAttachmentDownloader(photo, 'file', encryption, 'image/png')).toBeUndefined()
+    await expect(
+      getAttachmentDownloader(photo, 'file', encryption, 'image/png')('https://cdn/p', true, jest.fn())
+    ).rejects.toThrow('a sceyt-chat version with client.download')
   })
 })
 

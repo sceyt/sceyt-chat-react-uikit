@@ -54,7 +54,7 @@ import AudioPlayer from '../AudioPlayer'
 import log from 'loglevel'
 import { isJSON } from 'helpers/message'
 import { updateMessageAsOpenedAC } from 'store/channel/actions'
-import { compressAndCacheImage, getVideoFirstFrame, readResponseBlobWithProgress } from 'helpers/getVideoFrame'
+import { compressAndCacheImage, getVideoFirstFrame } from 'helpers/getVideoFrame'
 import { ensurePlayableVideoBlob } from 'helpers/videoConversion'
 import { getVideoAttachmentCacheKeys, getVideoThumb, shouldExtractVideoFirstFrame } from 'helpers/videoPreview'
 import { cancelMediaDownload, requestMediaDownload } from '../../helpers/mediaDownloadCoordinator'
@@ -198,8 +198,8 @@ const Attachment = ({
   const imageDownloadRequestRef = useRef(0)
   const imageResumeStartedRef = useRef(false)
   const fileNameRef: any = useRef(null)
-  // Decrypts encrypted files; the same as the CustomUploader's downloader otherwise.
-  const customDownloader = getAttachmentDownloader(
+  // The CustomUploader's downloader, or the SDK's (client.download); decrypts encrypted files.
+  const downloader = getAttachmentDownloader(
     attachment,
     'file',
     getAttachmentEncryption(attachment.metadata),
@@ -335,32 +335,13 @@ const Attachment = ({
     markPreferredSourceLoaded
   } = useProgressiveMediaSource(preferredImageSource, fallbackImageSource)
 
-  const downloadImage = (url: string) => {
-    const image = new Image(renderWidth / 2, renderHeight / 2)
-    image.src = url
-    image.width = renderWidth / 2
-    image.height = renderHeight / 2
-    image.onload = () => {
-      setAttachmentUrl(url)
-      setDownloadingFile(false)
-    }
-    image.onerror = () => {
-      log.error('Error on download image', url)
-      setDownloadingFile(false)
-    }
-  }
-
   const handlePauseResumeDownload = (e: Event) => {
     e.stopPropagation()
     if (downloadIsCancelled) {
       setDownloadIsCancelled(false)
-      if (customDownloader) {
-        // Resume through the shared full download. Asking the custom downloader
-        // for a bare URL would load the image without its authorization headers.
-        handleResumeOriginalImageDownload(e)
-      } else {
-        downloadImage(attachment.url)
-      }
+      // Resume through the shared full download. Asking the custom downloader
+      // for a bare URL would load the image without its authorization headers.
+      handleResumeOriginalImageDownload(e)
     } else {
       setAttachmentUrl('')
       setDownloadIsCancelled(true)
@@ -457,164 +438,83 @@ const Attachment = ({
   }
 
   const handleDownloadFile = async () => {
-    if (customDownloader) {
-      if (!attachment.attachmentUrl) {
-        setDownloadingFile(true)
+    if (!attachment.attachmentUrl) {
+      setDownloadingFile(true)
+    }
+    const urlPromise = downloader(
+      attachment.url,
+      true,
+      (progress) => {
+        const loadedRes = progress.loaded && progress.loaded / progress.total
+        const uploadPercent = loadedRes && loadedRes * 100
+        setSizeProgress({ loaded: progress.loaded || 0, total: progress.total || 0 })
+        setProgress(uploadPercent)
+      },
+      messageType
+    )
+    setDownloadFilePromise(attachment.id!, urlPromise)
+    const result = await urlPromise
+    // In Firefox, QuickTime .mov blobs must be remuxed to standard MP4 before
+    // they can be played or have frames extracted; other browsers (and
+    // non-QuickTime files) get the blob back unchanged.
+    const body = attachment.type === attachmentTypes.video ? await ensurePlayableVideoBlob(result.Body) : result.Body
+    const url = URL.createObjectURL(body)
+    setSizeProgress(undefined)
+    let downloadingUrl = url
+    if (attachment.type === attachmentTypes.image) {
+      const compressedUrl = await compressAndCacheImage(url, attachment.url, renderWidth, renderHeight)
+      if (compressedUrl) {
+        registerBlobUrl(getAttachmentURLWithVersion(attachment.url), compressedUrl)
+        downloadingUrl = compressedUrl
       }
-      const urlPromise = customDownloader(
-        attachment.url,
-        true,
-        (progress) => {
-          const loadedRes = progress.loaded && progress.loaded / progress.total
-          const uploadPercent = loadedRes && loadedRes * 100
-          setSizeProgress({ loaded: progress.loaded || 0, total: progress.total || 0 })
-          setProgress(uploadPercent)
-        },
-        messageType
+      setAttachmentToCache(
+        attachment.url + '_original_image_url',
+        new Response(result.Body, {
+          headers: { 'Content-Type': 'image/jpeg' }
+        })
       )
-      setDownloadFilePromise(attachment.id!, urlPromise)
-      const result = await urlPromise
-      // In Firefox, QuickTime .mov blobs must be remuxed to standard MP4 before
-      // they can be played or have frames extracted; other browsers (and
-      // non-QuickTime files) get the blob back unchanged.
-      const body = attachment.type === attachmentTypes.video ? await ensurePlayableVideoBlob(result.Body) : result.Body
-      const url = URL.createObjectURL(body)
-      setSizeProgress(undefined)
-      let downloadingUrl = url
-      if (attachment.type === attachmentTypes.image) {
-        const compressedUrl = await compressAndCacheImage(url, attachment.url, renderWidth, renderHeight)
-        if (compressedUrl) {
-          registerBlobUrl(getAttachmentURLWithVersion(attachment.url), compressedUrl)
-          downloadingUrl = compressedUrl
+      dispatch(setUpdateMessageAttachmentAC(attachment.url + '_original_image_url', url))
+    } else {
+      if (attachment.type === attachmentTypes.video) {
+        if (shouldExtractVideoFirstFrame(attachment.metadata)) {
+          // Pass the raw Blob (result.Body), not the object URL string.
+          // getVideoFirstFrame needs the actual Blob so it can inspect and
+          // correct a bad/unsupported MIME type (e.g. "video/quicktime;
+          // charset=utf-8" from S3) before creating its own internal object
+          // URL. Once an object URL string is created from a mistyped blob,
+          // Firefox has already locked in the bad type and there's no way
+          // to fix it from the string alone.
+          const frameResult = await getVideoFirstFrame(body, renderWidth, renderHeight)
+          if (frameResult) {
+            const { frameBlobUrl, blob } = frameResult
+            const response = new Response(blob, {
+              headers: { 'Content-Type': 'image/jpeg' }
+            })
+            const key = attachment.url
+            await setAttachmentToCache(key, response)
+            dispatch(setUpdateMessageAttachmentAC(key, frameBlobUrl))
+          }
         }
         setAttachmentToCache(
-          attachment.url + '_original_image_url',
-          new Response(result.Body, {
-            headers: { 'Content-Type': 'image/jpeg' }
+          attachment.url + `_original_video_url`,
+          new Response(body, {
+            headers: { 'Content-Type': body.type || 'application/octet-stream' }
           })
         )
-        dispatch(setUpdateMessageAttachmentAC(attachment.url + '_original_image_url', url))
+        dispatch(setUpdateMessageAttachmentAC(attachment.url + `_original_video_url`, url))
       } else {
-        if (attachment.type === attachmentTypes.video) {
-          if (shouldExtractVideoFirstFrame(attachment.metadata)) {
-            // Pass the raw Blob (result.Body), not the object URL string.
-            // getVideoFirstFrame needs the actual Blob so it can inspect and
-            // correct a bad/unsupported MIME type (e.g. "video/quicktime;
-            // charset=utf-8" from S3) before creating its own internal object
-            // URL. Once an object URL string is created from a mistyped blob,
-            // Firefox has already locked in the bad type and there's no way
-            // to fix it from the string alone.
-            const frameResult = await getVideoFirstFrame(body, renderWidth, renderHeight)
-            if (frameResult) {
-              const { frameBlobUrl, blob } = frameResult
-              const response = new Response(blob, {
-                headers: { 'Content-Type': 'image/jpeg' }
-              })
-              const key = attachment.url
-              await setAttachmentToCache(key, response)
-              dispatch(setUpdateMessageAttachmentAC(key, frameBlobUrl))
-            }
-          }
-          setAttachmentToCache(
-            attachment.url + `_original_video_url`,
-            new Response(body, {
-              headers: { 'Content-Type': body.type || 'application/octet-stream' }
-            })
-          )
-          dispatch(setUpdateMessageAttachmentAC(attachment.url + `_original_video_url`, url))
-        } else {
-          setAttachmentToCache(
-            attachment.url,
-            new Response(result.Body, {
-              headers: { 'Content-Type': attachment.type || 'application/octet-stream' }
-            })
-          )
-          dispatch(setUpdateMessageAttachmentAC(attachment.url, url))
-        }
-      }
-      setIsCached(true)
-      setDownloadingFile(false)
-      setAttachmentUrl(downloadingUrl)
-    } else {
-      setDownloadingFile(true)
-      let downloadingUrl = attachment.url
-      if (attachment.type === attachmentTypes.image) {
-        try {
-          const compressedUrl = await compressAndCacheImage(
-            attachment.url,
-            attachment.url,
-            renderWidth,
-            renderHeight,
-            undefined,
-            ({ loaded, total }) => {
-              setSizeProgress({ loaded, total })
-              setProgress(Math.max(3, Math.min(100, (loaded / total) * 100)))
-            },
-            attachment.size
-          )
-          if (compressedUrl) {
-            registerBlobUrl(getAttachmentURLWithVersion(attachment.url), compressedUrl)
-            downloadingUrl = compressedUrl
-          }
-          setIsCached(true)
-          setAttachmentUrl(downloadingUrl)
-        } finally {
-          setDownloadingFile(false)
-        }
-      } else {
-        fetch(attachment.url)
-          .then(async (response) => {
-            if (!response.ok) {
-              throw new Error(`Unable to download attachment (${response.status})`)
-            }
-            const rawBlob = await readResponseBlobWithProgress(
-              response,
-              ({ loaded, total }) => {
-                setSizeProgress({ loaded, total })
-                setProgress(Math.max(3, Math.min(100, (loaded / total) * 100)))
-              },
-              attachment.size
-            )
-            // Remux QuickTime blobs for Firefox (no-op elsewhere) — see above.
-            const blob = attachment.type === attachmentTypes.video ? await ensurePlayableVideoBlob(rawBlob) : rawBlob
-            const blobUrl = URL.createObjectURL(blob)
-            if (attachment.type === attachmentTypes.video) {
-              if (shouldExtractVideoFirstFrame(attachment.metadata)) {
-                // Same fix here: pass the raw blob, not blobUrl, so
-                // getVideoFirstFrame can correct the MIME type if needed.
-                const frameResult = await getVideoFirstFrame(blob, renderWidth, renderHeight)
-                if (frameResult) {
-                  const { frameBlobUrl, blob: frameBlob } = frameResult
-                  await setAttachmentToCache(
-                    attachment.url,
-                    new Response(frameBlob, { headers: { 'Content-Type': 'image/jpeg' } })
-                  )
-                  dispatch(setUpdateMessageAttachmentAC(attachment.url, frameBlobUrl))
-                }
-              }
-              setAttachmentToCache(
-                attachment.url + '_original_video_url',
-                new Response(blob, { headers: { 'Content-Type': blob.type || 'video/mp4' } })
-              )
-              dispatch(setUpdateMessageAttachmentAC(attachment.url + '_original_video_url', blobUrl))
-            } else {
-              setAttachmentToCache(
-                attachment.url,
-                new Response(blob, { headers: { 'Content-Type': blob.type || 'application/octet-stream' } })
-              )
-              registerBlobUrl(getAttachmentURLWithVersion(attachment.url), blobUrl)
-            }
-            setAttachmentUrl(blobUrl)
-            setIsCached(true)
+        setAttachmentToCache(
+          attachment.url,
+          new Response(result.Body, {
+            headers: { 'Content-Type': attachment.type || 'application/octet-stream' }
           })
-          .catch((error) => {
-            log.error('Error fetching attachment:', error)
-          })
-          .finally(() => {
-            setDownloadingFile(false)
-          })
+        )
+        dispatch(setUpdateMessageAttachmentAC(attachment.url, url))
       }
     }
+    setIsCached(true)
+    setDownloadingFile(false)
+    setAttachmentUrl(downloadingUrl)
   }
 
   useEffect(() => {
@@ -894,8 +794,6 @@ const Attachment = ({
           if (imageDownloadRequest !== imageDownloadRequestRef.current) return
           if (attachment.type === attachmentTypes.image && !isPreview) {
             if (cachedUrl) {
-              // @ts-ignore
-              // downloadImage(cachedUrl)
               setAttachmentUrl(cachedUrl)
               dispatch(setUpdateMessageAttachmentAC(attachment.url, cachedUrl))
               setIsCached(true)
@@ -982,37 +880,33 @@ const Attachment = ({
         })
         .catch((e: any) => {
           log.info('error on get attachment url from cache. .. ', e)
-          if (customDownloader) {
-            setDownloadingFile(true)
-            customDownloader(
-              attachment.url,
-              true,
-              (progress) => {
-                const loadedRes = progress.loaded && progress.loaded / progress.total
-                const uploadPercent = loadedRes && loadedRes * 100
-                setSizeProgress({ loaded: progress.loaded || 0, total: progress.total || 0 })
-                setProgress(uploadPercent)
-              },
-              messageType
-            ).then(async (url) => {
-              let downloadingUrl = url
-              if (attachment.type === attachmentTypes.image) {
-                const compressedUrl = await compressAndCacheImage(url, attachment.url, renderWidth, renderHeight)
-                if (compressedUrl) {
-                  registerBlobUrl(getAttachmentURLWithVersion(attachment.url), compressedUrl)
-                  downloadingUrl = compressedUrl
-                }
-              } else {
-                const response = await fetch(url)
-                setAttachmentToCache(attachment.url, response)
+          setDownloadingFile(true)
+          downloader(
+            attachment.url,
+            true,
+            (progress) => {
+              const loadedRes = progress.loaded && progress.loaded / progress.total
+              const uploadPercent = loadedRes && loadedRes * 100
+              setSizeProgress({ loaded: progress.loaded || 0, total: progress.total || 0 })
+              setProgress(uploadPercent)
+            },
+            messageType
+          ).then(async (url) => {
+            let downloadingUrl = url
+            if (attachment.type === attachmentTypes.image) {
+              const compressedUrl = await compressAndCacheImage(url, attachment.url, renderWidth, renderHeight)
+              if (compressedUrl) {
+                registerBlobUrl(getAttachmentURLWithVersion(attachment.url), compressedUrl)
+                downloadingUrl = compressedUrl
               }
-              setAttachmentUrl(downloadingUrl)
-              dispatch(setUpdateMessageAttachmentAC(attachment.url, attachment.url))
-              setDownloadingFile(false)
-            })
-          } else {
-            setAttachmentUrl(attachment.url)
-          }
+            } else {
+              const response = await fetch(url)
+              setAttachmentToCache(attachment.url, response)
+            }
+            setAttachmentUrl(downloadingUrl)
+            dispatch(setUpdateMessageAttachmentAC(attachment.url, attachment.url))
+            setDownloadingFile(false)
+          })
         })
     }
   }, [imageDownloadRetry, isSharedOriginalImageCancelled])

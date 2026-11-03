@@ -21,7 +21,7 @@ import {
 import * as videoContainer from '../../helpers/videoContainer'
 import { releaseAllBlobUrls } from '../../helpers/attachmentBlobUrls'
 import * as imagePreparation from '../../helpers/resizeImage'
-import { setCustomUploader } from '../../helpers/customUploader'
+import { setCustomUploader, setSendAttachmentsAsSeparateMessages } from '../../helpers/customUploader'
 
 jest.mock('../../helpers/messagesHalper', () => {
   const drafts: Record<string, any> = {}
@@ -91,7 +91,15 @@ jest.mock('../Attachment', () => ({
   AttachmentFile: () => null,
   AttachmentImg: () => null
 }))
-jest.mock('../AudioRecord', () => ({ __esModule: true, default: () => null }))
+// Keeps the props of the voice recorder, so a test can send a recording through it.
+let mockAudioRecordProps: any
+jest.mock('../AudioRecord', () => ({
+  __esModule: true,
+  default: (props: any) => {
+    mockAudioRecordProps = props
+    return null
+  }
+}))
 jest.mock('../../common/dropdown', () => ({ __esModule: true, default: () => null }))
 jest.mock('../../common/popups/delete', () => ({ __esModule: true, default: () => null }))
 jest.mock('../../common/popups/forwardMessage', () => ({ __esModule: true, default: () => null }))
@@ -571,6 +579,44 @@ describe('SendMessageInput attachment sending', () => {
       frameBlobUrl: 'blob:video-thumb',
       blob: new Blob(['thumb'], { type: 'image/jpeg' })
     })
+  })
+
+  it('a voice message is sent as a new message, with the separate-messages setting as it is', async () => {
+    const channel = makeChannel({ id: 'voice-channel' })
+    const store = createMessageListStore({ ChannelReducer: { activeChannel: channel } })
+    const dispatchedActions: any[] = []
+    const dispatch = store.dispatch.bind(store)
+    jest.spyOn(store, 'dispatch').mockImplementation((action: any) => {
+      dispatchedActions.push(action)
+      return dispatch(action)
+    })
+    setSendAttachmentsAsSeparateMessages(false)
+    renderWithSceytProvider(<SendMessageInput />, { store })
+    const recording = new File(['voice'], 'voice.mp3', { type: 'audio/mpeg' })
+
+    act(() => {
+      mockAudioRecordProps.sendRecordedFile(
+        { file: recording, objectUrl: 'blob:voice', thumb: [0, 1], dur: 2 },
+        channel.id
+      )
+    })
+
+    // The recording is read (FileReader) before the message is sent.
+    for (
+      let attempt = 0;
+      attempt < 20 && !dispatchedActions.some((action) => action.type === SEND_MESSAGE);
+      attempt++
+    ) {
+      await act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 0))
+      })
+    }
+    const sendAction = dispatchedActions.find((action) => action.type === SEND_MESSAGE)
+    expect(sendAction.payload).toMatchObject({ channelId: channel.id, sendAttachmentsAsSeparateMessage: false })
+    expect(sendAction.payload.isResend).toBeUndefined()
+    expect(sendAction.payload.message.attachments).toEqual([
+      expect.objectContaining({ type: attachmentTypes.voice, data: recording })
+    ])
   })
 
   it('keeps a video selected through the File picker as a file attachment', async () => {

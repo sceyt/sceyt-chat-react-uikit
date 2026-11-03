@@ -194,7 +194,6 @@ import {
   markUploadNotStarted,
   pauseUpload,
   resumeUpload,
-  uikitUploadsFiles,
   uploadAttachmentFile
 } from '../../helpers/customUploader'
 import { setAttachmentToCache } from '../../helpers/attachmentsCache'
@@ -218,7 +217,6 @@ import {
 } from '../../helpers/attachmentPreparation'
 import { parseAttachmentMetadata, shouldExtractVideoFirstFrame, withVideoThumb } from '../../helpers/videoPreview'
 import {
-  getEncryptAttachments,
   IAttachmentEncryption,
   withAttachmentEncryption,
   withVideoThumbEncryption
@@ -339,33 +337,25 @@ const prepareAndUploadVideoPreview = async (attachment: IAttachment, messageType
 
   const previewName = `${attachment.name?.replace(/\.[^.]+$/, '') || 'video'}-preview.jpg`
   const previewFile = new File([previewImageBlob], previewName, { type: previewImageBlob.type || 'image/jpeg' })
-  let videoThumb: string
-  let videoThumbEncryption: IAttachmentEncryption | undefined
-  if (uikitUploadsFiles()) {
-    // Reuse the attachment uploader (the application's, or the SDK's client.upload)
-    // so preview and video follow the same auth, storage, retry, and lifecycle
-    // rules. Preview files are temporary backend objects and must expire if no
-    // sent message references their returned URL.
-    const previewAttachment = {
-      tid: `${attachment.tid || 'video'}-preview-${Date.now()}`,
-      name: previewName,
-      type: attachmentTypes.image,
-      size: previewFile.size,
-      url: previewFile,
-      data: previewFile,
-      metadata: '{}',
-      upload: false
-    } as IAttachment
-    const uploadedPreview = await uploadAttachmentFile(previewAttachment, () => undefined, messageType)
-    videoThumb = uploadedPreview.uri
-    videoThumbEncryption = uploadedPreview.encryption
-  } else {
-    const client = getClient()
-    if (typeof client?.uploadFile !== 'function') {
-      throw new Error('The SDK uploadFile API is required before sending a video attachment')
-    }
-    videoThumb = await client.uploadFile({ data: previewFile, progress: () => undefined })
-  }
+  // Reuse the attachment uploader (the application's, or the SDK's client.upload)
+  // so preview and video follow the same auth, storage, retry, and lifecycle
+  // rules. Preview files are temporary backend objects and must expire if no
+  // sent message references their returned URL.
+  const previewAttachment = {
+    tid: `${attachment.tid || 'video'}-preview-${Date.now()}`,
+    name: previewName,
+    type: attachmentTypes.image,
+    size: previewFile.size,
+    url: previewFile,
+    data: previewFile,
+    metadata: '{}',
+    upload: false
+  } as IAttachment
+  const { uri: videoThumb, encryption: videoThumbEncryption } = await uploadAttachmentFile(
+    previewAttachment,
+    () => undefined,
+    messageType
+  )
 
   if (typeof videoThumb !== 'string' || !videoThumb) {
     throw new Error('Video preview upload did not return a URL')
@@ -1319,9 +1309,8 @@ function* sendMessage(action: IAction): any {
     yield put(addChannelAC(JSON.parse(JSON.stringify(channel))))
     const mentionedUserIds = message.mentionedUsers ? message.mentionedUsers.map((member: any) => member.id) : []
     // let attachmentsToSend: IAttachment[] = []
-    // The uikit uploads each attachment and sends the message with the URLs;
-    // with an older SDK and no custom uploader, sendMessage uploads them.
-    const uploadsFiles = uikitUploadsFiles()
+    // The uikit uploads each attachment (with the custom uploader or the SDK's
+    // client.upload) and sends the message with the file URLs.
 
     if (message.attachments && message.attachments.length) {
       let linkAttachment = null
@@ -1360,133 +1349,18 @@ function* sendMessage(action: IAction): any {
           const messageAttachment = attachmentBuilder
             .setName(attachment.name)
             .setMetadata(attachment.metadata)
-            .setUpload(uploadsFiles ? false : attachment.upload)
+            .setUpload(false)
             .setFileSize(attachment.size)
             .create()
 
-          if (!uploadsFiles) {
-            const handleUpdateUploadProgress = (percent: number) => {
-              store.dispatch(
-                updateAttachmentUploadingProgressAC(attachment.size * (percent / 100), attachment.size, attachment.tid)
-              )
-            }
-            // Render a spinner as soon as Send is pressed, but do not expose
-            // byte progress until the preview URL is ready and the real video
-            // upload starts.
-            if (attachment.upload) {
-              store.dispatch(
-                updateAttachmentUploadingStateAC(
-                  attachment.type === attachmentTypes.video ? UPLOAD_STATE.PREPARING : UPLOAD_STATE.UPLOADING,
-                  attachment.tid
-                )
-              )
-            }
-            messageAttachment.progress = (progressPercent: any) => {
-              handleUpdateUploadProgress(progressPercent)
-              // attachmentsListeners.progress(progressPercent, attachment.tid);
-            }
-            messageAttachment.completion = (updatedAttachment: any, error: any) => {
-              if (error) {
-                log.info('fail to upload attachment ... ', error)
-                store.dispatch(updateAttachmentUploadingStateAC(UPLOAD_STATE.FAIL, attachment.tid))
-              } else {
-                const uploadedUri = updatedAttachment.url
-                // Preview preparation updates the attachment builder after this
-                // callback is registered. Use its final metadata so a new
-                // video_thumb prevents a redundant second frame extraction.
-                const completedAttachment = { ...attachment, ...messageAttachment }
-                const fileType = completedAttachment.data?.type?.split('/')[0]
-
-                const updateImage = async () => {
-                  if (!completedAttachment.cachedUrl && fileType === 'image' && completedAttachment.data) {
-                    try {
-                      const file =
-                        completedAttachment.data instanceof File
-                          ? completedAttachment.data
-                          : new File([completedAttachment.data], completedAttachment.name || 'image', {
-                              type: completedAttachment.data.type
-                            })
-                      // The sent file itself, as the custom-uploader path caches it: a
-                      // copy cut to the bubble's CSS size (at most 400 px) looked blurry
-                      // on high-DPI screens and replaced the image after a reload.
-                      await setAttachmentToCache(
-                        uploadedUri,
-                        new Response(file, { headers: { 'Content-Type': file.type } })
-                      )
-                      store.dispatch(setUpdateMessageAttachmentAC(uploadedUri, URL.createObjectURL(file)))
-                      setAttachmentToCache(
-                        uploadedUri + '_original_image_url',
-                        new Response(file, { headers: { 'Content-Type': file.type } })
-                      )
-                      store.dispatch(
-                        setUpdateMessageAttachmentAC(uploadedUri + '_original_image_url', URL.createObjectURL(file))
-                      )
-                    } catch (err) {
-                      log.error('Error caching resized image on upload completion:', err)
-                    }
-                  } else if (!completedAttachment.cachedUrl && fileType === 'video' && completedAttachment.data) {
-                    try {
-                      const originalVideoCacheKey = `${uploadedUri}_original_video_url`
-                      // Publish the local source before any asynchronous cache
-                      // or fallback-thumbnail work. The confirmed sender message
-                      // can render before Cache Storage settles; without this
-                      // object URL it mistakes its own newly uploaded video for
-                      // a remote uncached attachment and downloads it again.
-                      const originalVideoUrl = URL.createObjectURL(completedAttachment.data)
-                      store.dispatch(setUpdateMessageAttachmentAC(originalVideoCacheKey, originalVideoUrl))
-                      await setAttachmentToCache(
-                        originalVideoCacheKey,
-                        new Response(completedAttachment.data, {
-                          headers: { 'Content-Type': completedAttachment.data.type || 'video/mp4' }
-                        })
-                      )
-
-                      // New videos already have video_thumb. Older/legacy
-                      // videos keep the first-frame fallback for compatibility.
-                      if (shouldExtractVideoFirstFrame(completedAttachment.metadata)) {
-                        const parsedMetadata = isJSON(completedAttachment.metadata)
-                          ? JSON.parse(completedAttachment.metadata)
-                          : completedAttachment.metadata
-                        const [newWidth, newHeight] = calculateRenderedImageWidth(
-                          parsedMetadata?.szw || 1280,
-                          parsedMetadata?.szh || 1080
-                        )
-                        const result = await getVideoFirstFrame(completedAttachment.data, newWidth, newHeight)
-                        if (result) {
-                          const { frameBlobUrl, blob } = result
-                          await setAttachmentToCache(
-                            uploadedUri,
-                            new Response(blob, { headers: { 'Content-Type': blob.type } })
-                          )
-                          store.dispatch(setUpdateMessageAttachmentAC(uploadedUri, frameBlobUrl))
-                        }
-                      }
-                    } catch (err) {
-                      log.error('Error caching video frame on upload completion:', err)
-                    }
-                  }
-                }
-                updateImage()
-
-                store.dispatch(removeAttachmentProgressAC(attachment.tid))
-                deletePendingAttachment(attachment.tid)
-                releaseBlobUrls([`compose_${attachment.tid}`])
-                store.dispatch(updateAttachmentUploadingStateAC(UPLOAD_STATE.SUCCESS, attachment.tid))
-              }
-            }
-          } else if (uploadsFiles && attachment) {
-            attachment = {
-              ...attachment,
-              url: attachment.data
-            }
+          attachment = {
+            ...attachment,
+            url: attachment.data
           }
 
           // not for SDK, for displaying attachments and their progress
           messageAttachment.tid = attachment.tid
-
-          if (uploadsFiles) {
-            messageAttachment.url = attachment.data
-          }
+          messageAttachment.url = attachment.data
 
           if (sendAttachmentsAsSeparateMessage) {
             const messageBuilder = channel.createMessageBuilder()
@@ -1540,7 +1414,7 @@ function* sendMessage(action: IAction): any {
           } else {
             attachmentsToSend.push(messageAttachment)
           }
-          if (!messageAttachment.cachedUrl && uploadsFiles) {
+          if (!messageAttachment.cachedUrl) {
             yield put(
               updateAttachmentUploadingStateAC(
                 messageAttachment.type === attachmentTypes.video ? UPLOAD_STATE.PREPARING : UPLOAD_STATE.UPLOADING,
@@ -1677,43 +1551,13 @@ function* sendMessage(action: IAction): any {
             if (messageToSend.tid && isPendingMessageDeleted(channel.id, messageToSend.tid)) {
               continue
             }
-            if (!uploadsFiles) {
-              if (getEncryptAttachments() && messageAttachment.some((attachment: IAttachment) => attachment.upload)) {
-                // Only an SDK with client.upload encrypts the files it uploads:
-                // the message fails before anything is sent.
-                throw new Error('Attachment encryption needs a sceyt-chat version with client.upload')
-              }
-              for (let attachmentIndex = 0; attachmentIndex < messageAttachment.length; attachmentIndex++) {
-                if (messageAttachment[attachmentIndex].type === attachmentTypes.video) {
-                  const preparedVideoAttachment = yield call(
-                    prepareAndUploadVideoPreview,
-                    messageAttachment[attachmentIndex],
-                    message.type
-                  )
-                  // Keep the SDK-managed progress/completion callbacks that were
-                  // assigned to the default-upload attachment builder.
-                  messageAttachment[attachmentIndex] = {
-                    ...messageAttachment[attachmentIndex],
-                    ...preparedVideoAttachment
-                  }
-                  if (messageAttachment[attachmentIndex].upload) {
-                    yield put(
-                      updateAttachmentUploadingStateAC(UPLOAD_STATE.UPLOADING, messageAttachment[attachmentIndex].tid)
-                    )
-                  }
-                }
-              }
-            }
             // Preparation and custom uploading are asynchronous. A delete can
             // happen while either is in progress, so do not fall through to
             // `channel.sendMessage` after either operation completes.
             if (messageToSend.tid && isPendingMessageDeleted(channel.id, messageToSend.tid)) {
               continue
             }
-            let attachmentsToSend = messageAttachment
-            if (uploadsFiles) {
-              attachmentsToSend = yield call(handleUploadAttachments, messageAttachment || [], messageCopy, channel)
-            }
+            const attachmentsToSend = yield call(handleUploadAttachments, messageAttachment || [], messageCopy, channel)
             if (messageToSend.tid && isPendingMessageDeleted(channel.id, messageToSend.tid)) {
               continue
             }
@@ -1747,20 +1591,18 @@ function* sendMessage(action: IAction): any {
             if (messageToSend.tid) {
               autoResendAttempts.delete(messageToSend.tid)
             }
-            if (uploadsFiles) {
-              for (let k = 0; k < messageAttachment.length; k++) {
-                messageResponse.attachments[k] = {
-                  ...messageResponse.attachments[k],
-                  user: JSON.parse(JSON.stringify(messageResponse.user)),
-                  tid: messageAttachment[k].tid as string
-                }
-                yield put(removeAttachmentProgressAC(messageAttachment[k].tid))
-                yield put(removeAttachmentUploadingStateAC(messageAttachment[k].tid as string))
-                deletePendingAttachment(messageAttachment[k].tid!)
-                // The compose preview URL is superseded by the upload-time
-                // display URL once the message is confirmed.
-                releaseBlobUrls([`compose_${messageAttachment[k].tid}`])
+            for (let k = 0; k < messageAttachment.length; k++) {
+              messageResponse.attachments[k] = {
+                ...messageResponse.attachments[k],
+                user: JSON.parse(JSON.stringify(messageResponse.user)),
+                tid: messageAttachment[k].tid as string
               }
+              yield put(removeAttachmentProgressAC(messageAttachment[k].tid))
+              yield put(removeAttachmentUploadingStateAC(messageAttachment[k].tid as string))
+              deletePendingAttachment(messageAttachment[k].tid!)
+              // The compose preview URL is superseded by the upload-time
+              // display URL once the message is confirmed.
+              releaseBlobUrls([`compose_${messageAttachment[k].tid}`])
             }
             let attachmentsToUpdate = []
             if (messageResponse.attachments && messageResponse.attachments.length > 0) {
@@ -4575,11 +4417,9 @@ function* refreshActiveMediaAttachmentsAfterReconnect(action: IAction): any {
 function* pauseAttachmentUploading(action: any) {
   try {
     const { attachmentId } = action.payload
-    if (uikitUploadsFiles()) {
-      const isPaused = pauseUpload(attachmentId)
-      if (isPaused) {
-        yield put(updateAttachmentUploadingStateAC(UPLOAD_STATE.PAUSED, attachmentId))
-      }
+    const isPaused = pauseUpload(attachmentId)
+    if (isPaused) {
+      yield put(updateAttachmentUploadingStateAC(UPLOAD_STATE.PAUSED, attachmentId))
     }
   } catch (e) {
     log.error('error in pause attachment uploading', e)
@@ -4593,15 +4433,13 @@ function* resumeAttachmentUploading(action: any) {
   try {
     const { attachmentId } = action.payload
     log.info('resume for attachment ... ', attachmentId)
-    if (uikitUploadsFiles()) {
-      // Checked first: resuming starts nothing yet, the video's preview is still uploading.
-      const preparing = isUploadNotStarted(attachmentId)
-      const isResumed = resumeUpload(attachmentId)
-      if (isResumed) {
-        yield put(
-          updateAttachmentUploadingStateAC(preparing ? UPLOAD_STATE.PREPARING : UPLOAD_STATE.UPLOADING, attachmentId)
-        )
-      }
+    // Checked first: resuming starts nothing yet, the video's preview is still uploading.
+    const preparing = isUploadNotStarted(attachmentId)
+    const isResumed = resumeUpload(attachmentId)
+    if (isResumed) {
+      yield put(
+        updateAttachmentUploadingStateAC(preparing ? UPLOAD_STATE.PREPARING : UPLOAD_STATE.UPLOADING, attachmentId)
+      )
     }
   } catch (e) {
     log.error('error in resume attachment uploading', e)

@@ -1,5 +1,6 @@
 import { setClient } from '../common/client'
 import { IAttachmentDownloadFile, IAttachmentEncryption } from '../helpers/attachmentEncryption'
+import { readResponseBlobWithProgress } from '../helpers/getVideoFrame'
 
 // Stand-ins for the SDK's AttachmentUploadFile and AttachmentDownloadFile. The
 // real ones are tested in sceyt-chat against the format's test vectors; UIKit
@@ -71,16 +72,50 @@ export const makeFakeDownloadFile = (
   openRange: notUsed
 })
 
+const fakePrepareDownload = ({ metadata, type }: { metadata?: any; type?: string }) => {
+  const enc = (typeof metadata === 'string' ? JSON.parse(metadata) : metadata || {}).enc
+  return enc ? makeFakeDownloadFile(enc.key, type, enc.attachmentId) : makeFakeDownloadFile(undefined, type)
+}
+
+/**
+ * client.download as the SDK does it, over the test's fetch (without resuming a
+ * lost connection): one request for `url`, then the file opened (decrypted with
+ * the `enc` in `metadata`) with its real type.
+ */
+export const fakeSdkDownload = async (
+  url: string,
+  {
+    metadata,
+    type,
+    progress,
+    signal
+  }: {
+    metadata?: any
+    type?: string
+    // eslint-disable-next-line no-unused-vars
+    progress?: (loaded: number, total?: number) => void
+    signal?: AbortSignal
+  } = {}
+): Promise<Blob> => {
+  const response = await fetch(url, { signal })
+  if (!response.ok) {
+    throw Object.assign(new Error(`The file could not be downloaded (${response.status})`), {
+      code: response.status,
+      type: 'DownloadFailed'
+    })
+  }
+  const stored = await readResponseBlobWithProgress(response, ({ loaded, total }) => progress?.(loaded, total))
+  return fakePrepareDownload({ metadata, type }).open(stored)
+}
+
 /** Installs a chat client whose files are fake ones; keys are numbered key-1, key-2, … */
 export const installFakeFilesClient = () => {
   let created = 0
   const client = {
     prepareUpload: async (file: Blob, options: { encrypt?: boolean } = {}) =>
       options.encrypt ? makeFakeUploadFile(file, `key-${++created}`) : makeFakeUploadFile(file),
-    prepareDownload: ({ metadata, type }: { metadata?: any; type?: string }) => {
-      const enc = (typeof metadata === 'string' ? JSON.parse(metadata) : metadata || {}).enc
-      return enc ? makeFakeDownloadFile(enc.key, type, enc.attachmentId) : makeFakeDownloadFile(undefined, type)
-    }
+    prepareDownload: fakePrepareDownload,
+    download: fakeSdkDownload
   }
   setClient(client)
   return client

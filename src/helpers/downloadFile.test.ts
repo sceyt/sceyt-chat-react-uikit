@@ -10,10 +10,11 @@ jest.mock('file-saver', () => ({
 
 const mockSaveAs = FileSaver.saveAs as jest.Mock
 
-describe('downloadFile default downloader', () => {
+describe('downloadFile without a custom uploader: the SDK downloads (client.download)', () => {
   beforeEach(() => {
     jest.clearAllMocks()
     setCustomUploader(undefined)
+    installFakeFilesClient()
   })
 
   it('reports incremental progress for a full video download before saving it', async () => {
@@ -118,7 +119,7 @@ describe('downloadFile for an encrypted attachment', () => {
     expect(done).toHaveBeenCalledWith('doc-id')
   })
 
-  it('saves the decrypted file from the default downloader', async () => {
+  it('saves the decrypted file the SDK downloaded', async () => {
     setCustomUploader(undefined)
     global.fetch = jest.fn().mockResolvedValue({ ok: true, blob: async () => fakeEncrypted('key-5', 'pdf-bytes') })
 

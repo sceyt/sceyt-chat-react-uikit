@@ -1,7 +1,7 @@
 import { cancelDownloadRequest, getAttachmentDownloader, getCustomDownloader } from './customUploader'
 import { ICustomUploader } from '../components/ChatContainer'
 import { IAttachment } from '../types'
-import { IAttachmentEncryption, isUnopenableAttachmentError, prepareDownloadFile } from './attachmentEncryption'
+import { IAttachmentEncryption, isUnopenableAttachmentError } from './attachmentEncryption'
 import { readResponseBlobWithProgress } from './getVideoFrame'
 import { getAttachmentURLWithVersion, getAttachmentUrlFromCache, setAttachmentToCache } from './attachmentsCache'
 import { registerBlobUrl } from './attachmentBlobUrls'
@@ -138,8 +138,9 @@ const download = async (request: MediaDownloadRequest, job: MediaDownloadJob): P
     const normalized = normalizeProgress(progress, request.size)
     setJobSnapshot(request.key, job, { state: 'loading', ...normalized })
   }
-  // An encrypted file comes back from the attachment downloader already decrypted.
-  const customDownloader = getAttachmentDownloader(
+  // The CustomUploader's downloader, or the SDK's (client.download); an
+  // encrypted file comes back from it already decrypted.
+  const downloader = getAttachmentDownloader(
     request.attachment,
     request.kind === 'video-thumbnail' ? 'thumbnail' : 'file',
     request.encryption,
@@ -147,51 +148,36 @@ const download = async (request: MediaDownloadRequest, job: MediaDownloadJob): P
     request.downloader || getCustomDownloader()
   )
 
-  if (customDownloader) {
-    // Shared media needs a Blob to cache and to publish one reusable object
-    // URL. Custom uploader implementations (including AWS-based uploaders)
-    // use `download: true` for that full-download path; `false` only returns
-    // a short-lived URL which the coordinator would have to fetch again.
-    const requestBlob = request.customDownload ?? true
-    const customRequest = customDownloader(request.url, requestBlob, reportProgress, request.messageType)
-    job.customRequest = customRequest
-    const result = await customRequest
-    const body = result?.Body || result
-    if (body instanceof Blob) {
-      reportProgress({ loaded: body.size, total: body.size })
-      return makeObjectUrl(request, body, job.cacheKeys)
-    }
-    if (body instanceof ArrayBuffer || ArrayBuffer.isView(body)) {
-      const blob = new Blob([body], { type: 'application/octet-stream' })
-      reportProgress({ loaded: blob.size, total: blob.size })
-      return makeObjectUrl(request, blob, job.cacheKeys)
-    }
-    if (typeof body !== 'string') {
-      throw new Error('Media downloader returned an unsupported result')
-    }
-
-    // Some custom downloaders return a local/remote URL rather than a Blob.
-    // Fetch it once here so all subscribers still share the same blob result.
-    job.abortController = new AbortController()
-    const response = await fetch(body, { signal: job.abortController.signal })
-    if (!response.ok) {
-      throw new Error(`Unable to read downloaded media (${response.status})`)
-    }
-    const blob = await readResponseBlobWithProgress(response, reportProgress, request.size || 0)
+  // Shared media needs a Blob to cache and to publish one reusable object
+  // URL. Custom uploader implementations (including AWS-based uploaders)
+  // use `download: true` for that full-download path; `false` only returns
+  // a short-lived URL which the coordinator would have to fetch again.
+  const requestBlob = request.customDownload ?? true
+  const customRequest = downloader(request.url, requestBlob, reportProgress, request.messageType)
+  job.customRequest = customRequest
+  const result = await customRequest
+  const body = result?.Body || result
+  if (body instanceof Blob) {
+    reportProgress({ loaded: body.size, total: body.size })
+    return makeObjectUrl(request, body, job.cacheKeys)
+  }
+  if (body instanceof ArrayBuffer || ArrayBuffer.isView(body)) {
+    const blob = new Blob([body], { type: 'application/octet-stream' })
+    reportProgress({ loaded: blob.size, total: blob.size })
     return makeObjectUrl(request, blob, job.cacheKeys)
   }
+  if (typeof body !== 'string') {
+    throw new Error('Media downloader returned an unsupported result')
+  }
 
+  // Some custom downloaders return a local/remote URL rather than a Blob.
+  // Fetch it once here so all subscribers still share the same blob result.
   job.abortController = new AbortController()
-  const response = await fetch(request.url, { signal: job.abortController.signal })
+  const response = await fetch(body, { signal: job.abortController.signal })
   if (!response.ok) {
-    const label = request.kind === 'video-thumbnail' ? 'Unable to download video preview' : 'Unable to download media'
-    throw new Error(`${label} (${response.status})`)
+    throw new Error(`Unable to read downloaded media (${response.status})`)
   }
   const blob = await readResponseBlobWithProgress(response, reportProgress, request.size || 0)
-  if (request.encryption) {
-    const plaintext = await prepareDownloadFile(request.encryption, request.contentType).open(blob)
-    return makeObjectUrl(request, plaintext, job.cacheKeys)
-  }
   return makeObjectUrl(request, blob, job.cacheKeys)
 }
 

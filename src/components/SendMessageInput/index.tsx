@@ -1463,7 +1463,8 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
       // a persisted File as a Blob, and the explicit name lets hydration rebuild a
       // real File without changing the image bytes.
       name: file.name,
-      upload: !customUploader,
+      // The uikit uploads the file (custom uploader or client.upload), not sendMessage.
+      upload: false,
       type,
       tid,
       size: file.size,
@@ -1682,7 +1683,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
               name: `${uuidv4()}.mp3`,
               data: recordedFile.file,
               tid,
-              upload: true,
+              upload: false,
               size: recordedFile.file.size,
               attachmentUrl: recordedFile.objectUrl,
               metadata: JSON.stringify({ tmb: recordedFile.thumb, dur: recordedFile.dur }),
@@ -1694,7 +1695,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
           parentMessage: messageForReply || null
         }
         const sendAttachmentsAsSeparateMessage = getSendAttachmentsAsSeparateMessages()
-        dispatch(sendMessageAC(messageToSend, id, connectionStatus, connectionStatus, sendAttachmentsAsSeparateMessage))
+        dispatch(sendMessageAC(messageToSend, id, connectionStatus, sendAttachmentsAsSeparateMessage))
       }
 
       reader.onerror = (e: any) => {

@@ -77,12 +77,6 @@ const sdkClient = () => {
   return client
 }
 
-/** Whether the chat client can prepare upload and download files (a sceyt-chat with prepareUpload). */
-export const canPrepareAttachmentFiles = () => {
-  const client = getClient()
-  return typeof client?.prepareUpload === 'function' && typeof client?.prepareDownload === 'function'
-}
-
 /** The download file of an attachment with this `enc` (none: not encrypted). Throws if `enc` is not valid. */
 export const prepareDownloadFile = (
   encryption: IAttachmentEncryption | undefined,

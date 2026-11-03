@@ -102,7 +102,11 @@ jest.mock('../../helpers/customUploader', () => ({
       .requireActual('../../helpers/customUploader')
       .getAttachmentDownloader(attachment, kind, encryption, type, download),
   getCustomUploader: () => mockCustomUploader,
-  cancelDownloadRequest: (request: any) => mockCustomUploader?.cancelRequest(request)
+  // Without a custom uploader, the SDK's download is cancelled (its request aborted).
+  cancelDownloadRequest: (request: any) =>
+    mockCustomUploader
+      ? mockCustomUploader.cancelRequest(request)
+      : jest.requireActual('../../helpers/customUploader').cancelDownloadRequest(request)
 }))
 
 const mockSaveAs = jest.fn()
@@ -178,6 +182,8 @@ describe('video attachment preview and download states', () => {
     resetMediaDownloadCoordinatorForTests()
     mockCustomUploader = undefined
     mockSetAttachmentToCache.mockResolvedValue(undefined)
+    // Without a custom uploader the SDK downloads (client.download), over the test's fetch.
+    installFakeFilesClient()
   })
 
   afterEach(() => {
@@ -1152,7 +1158,7 @@ describe('the upload stop and resume control', () => {
     const dispatch = jest.spyOn(store, 'dispatch')
     await flushAttachmentEffects()
 
-    fireEvent.click(screen.getByRole('button'))
+    fireEvent.click(screen.getByRole('button', { name: 'Stop upload' }))
 
     expect(dispatch).toHaveBeenCalledWith(pauseAttachmentUploadingAC('video-attachment-tid'))
   })

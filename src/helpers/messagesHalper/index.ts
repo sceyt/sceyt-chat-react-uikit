@@ -1,7 +1,7 @@
 import { IAttachment, IMarker, IMessage, IPollVote, IReaction } from '../../types'
 import { checkArraysEqual } from '../index'
 import { attachmentTypes, MESSAGE_DELIVERY_STATUS, MESSAGE_STATUS } from '../constants'
-import { cancelUpload, uikitUploadsFiles } from '../customUploader'
+import { cancelUpload } from '../customUploader'
 import { releaseBlobUrls } from '../attachmentBlobUrls'
 import { clearVideoPreparation } from '../attachmentPreparation'
 import { handleVoteDetails } from '../message'
@@ -1497,11 +1497,8 @@ export const deletePendingMessage = (channelId: string, message: IMessage) => {
     markPendingMessageDeleted(channelId, messageTid)
   }
   if (message.attachments && message.attachments.length) {
-    const uploadsFiles = uikitUploadsFiles()
     message.attachments.forEach((att: IAttachment) => {
-      if (uploadsFiles) {
-        cancelUpload(att.tid!)
-      }
+      cancelUpload(att.tid!)
       deletePendingAttachment(att.tid!)
       clearVideoPreparation(att.tid!)
       releaseBlobUrls([`compose_${att.tid}`])

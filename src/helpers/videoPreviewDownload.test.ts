@@ -1,6 +1,7 @@
 import { getAttachmentUrlFromCache, setAttachmentToCache } from './attachmentsCache'
 import { registerBlobUrl } from './attachmentBlobUrls'
 import { downloadVideoThumb } from './videoPreview'
+import { installFakeFilesClient } from '../testUtils/fakeAttachmentFiles'
 
 jest.mock('./attachmentsCache', () => ({
   getAttachmentUrlFromCache: jest.fn(),
@@ -19,6 +20,8 @@ describe('downloadVideoThumb', () => {
   beforeEach(() => {
     jest.resetAllMocks()
     mockGetAttachmentUrlFromCache.mockResolvedValueOnce(false).mockResolvedValueOnce('blob:preview')
+    // Without a custom downloader the SDK downloads (client.download), over the test's fetch.
+    installFakeFilesClient()
   })
 
   it('uses the custom attachment downloader and caches its preview blob', async () => {
@@ -44,7 +47,7 @@ describe('downloadVideoThumb', () => {
     expect(mockSetAttachmentToCache).toHaveBeenCalledWith('https://cdn/preview.jpg', expect.any(Response))
   })
 
-  it('uses a normal attachment fetch when no custom downloader is configured', async () => {
+  it('is downloaded by the SDK when no custom downloader is configured', async () => {
     const preview = new Blob(['preview'], { type: 'image/jpeg' })
     const fetchMock = jest
       .spyOn(global, 'fetch' as any)
@@ -59,12 +62,13 @@ describe('downloadVideoThumb', () => {
     fetchMock.mockRestore()
   })
 
-  it('does not cache an inaccessible default thumbnail URL', async () => {
+  it('does not cache a thumbnail the SDK could not download', async () => {
     const fetchMock = jest.spyOn(global, 'fetch' as any).mockResolvedValue({ ok: false, status: 403 } as any)
 
-    await expect(downloadVideoThumb('https://cdn/denied.jpg', video)).rejects.toThrow(
-      'Unable to download video preview (403)'
-    )
+    await expect(downloadVideoThumb('https://cdn/denied.jpg', video)).rejects.toMatchObject({
+      code: 403,
+      type: 'DownloadFailed'
+    })
 
     expect(mockSetAttachmentToCache).not.toHaveBeenCalled()
     fetchMock.mockRestore()
