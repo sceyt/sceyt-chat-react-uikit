@@ -6,7 +6,6 @@ import {
   getTypeFromFileName,
   getVideoThumbEncryption,
   prepareDownloadFile,
-  prepareUploadFile,
   videoThumbDecryption,
   withAttachmentEncryption,
   withVideoThumbEncryption
@@ -90,21 +89,15 @@ describe('attachment encryption metadata', () => {
   it('with an SDK that cannot prepare files, preparing one fails with a clear error', async () => {
     setClient({})
     expect(canPrepareAttachmentFiles()).toBe(false)
-    await expect(prepareUploadFile(new Blob(['x']), true)).rejects.toThrow('client.prepareUpload')
+    expect(() => prepareDownloadFile(videoKey, 'video/mp4')).toThrow('client.prepareDownload')
     expect(() => prepareDownloadFile(undefined)).toThrow('client.prepareDownload')
   })
 
-  it('asks the SDK for an encrypted upload file, and a download file with the attachment id and key', async () => {
-    const prepareUpload = jest.fn(async () => 'upload-file')
+  it('asks the SDK for a download file with the attachment id and key', () => {
     const prepareDownload = jest.fn(() => 'download-file')
-    setClient({ prepareUpload, prepareDownload })
-    const blob = new Blob(['x'])
+    setClient({ prepareUpload: jest.fn(), prepareDownload })
 
     expect(canPrepareAttachmentFiles()).toBe(true)
-    expect(await prepareUploadFile(blob, true)).toBe('upload-file')
-    expect((prepareUpload.mock.calls[0] as any[])[1]).toEqual({ encrypt: true })
-    await prepareUploadFile(blob, false)
-    expect((prepareUpload.mock.calls[1] as any[])[1]).toEqual({ encrypt: false })
     expect(prepareDownloadFile(videoKey, 'video/mp4')).toBe('download-file')
     expect(prepareDownload).toHaveBeenLastCalledWith({ metadata: { enc: videoKey }, type: 'video/mp4' })
     prepareDownloadFile(undefined)

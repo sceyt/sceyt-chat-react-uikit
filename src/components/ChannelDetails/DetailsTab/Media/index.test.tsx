@@ -74,7 +74,7 @@ describe('Media details tab', () => {
         url: 'https://cdn.example/video.mp4',
         cacheKey: 'https://cdn.example/video.mp4_original_video_url',
         kind: 'original-video',
-        messageId: 'message-id',
+        attachment: expect.objectContaining({ messageId: 'message-id' }),
         size: 1024
       })
     )

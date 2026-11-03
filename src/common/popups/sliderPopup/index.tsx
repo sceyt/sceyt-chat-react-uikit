@@ -464,12 +464,12 @@ const SliderPopup: React.FC<IProps> = ({
                 )
               }
               requestMediaDownload({
+                attachment: currentFile,
                 key: `${kind}:${currentFileUrl}`,
                 url: currentFileUrl,
                 cacheKey: attachmentKey,
                 kind,
                 messageType,
-                messageId: currentFile?.messageId,
                 size: Number(currentFileSize) || 0,
                 ...attachmentDecryption(currentFile)
               })

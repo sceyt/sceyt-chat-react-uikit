@@ -96,13 +96,15 @@ describe('VideoPreview video_thumb rendering', () => {
 
     await flushPreviewEffects()
 
+    // The video attachment: its message id, and its metadata, which holds the preview's key when it is encrypted.
     expect(mockDownloadVideoThumb).toHaveBeenCalledWith(
       'https://cdn/video-thumb.jpg',
+      expect.objectContaining({
+        messageId: 'message-id',
+        metadata: expect.stringContaining('"video_thumb":"https://cdn/video-thumb.jpg"')
+      }),
       undefined,
-      undefined,
-      'message-id',
-      // The video's metadata, which holds the preview's key when it is encrypted.
-      expect.stringContaining('"video_thumb":"https://cdn/video-thumb.jpg"')
+      undefined
     )
     expect(mockGetVideoFirstFrame).not.toHaveBeenCalled()
     const pendingPreview = Array.from(container.querySelectorAll('img')).find(
@@ -480,10 +482,12 @@ describe('VideoPreview video_thumb with a custom downloader', () => {
     expect(mockDownloadVideoThumb).toHaveBeenCalledTimes(1)
     expect(mockDownloadVideoThumb).toHaveBeenCalledWith(
       'https://cdn/video-thumb.jpg',
+      expect.objectContaining({
+        messageId: '9223372036854775807',
+        metadata: expect.stringContaining('"video_thumb":"https://cdn/video-thumb.jpg"')
+      }),
       mockCustomDownloader,
-      undefined,
-      '9223372036854775807',
-      expect.stringContaining('"video_thumb":"https://cdn/video-thumb.jpg"')
+      undefined
     )
   })
 })

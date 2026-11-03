@@ -38,11 +38,11 @@ const startMediaVideoDownload = (file: IAttachment) => {
 
   const { originalVideo } = getVideoAttachmentCacheKeys(file.url, file.metadata)
   return requestMediaDownload({
+    attachment: file,
     key: `original-video:${file.url}`,
     url: file.url,
     cacheKey: originalVideo,
     kind: 'original-video',
-    messageId: file.messageId,
     size: Number(file.size) || 0,
     ...attachmentDecryption(file)
   })

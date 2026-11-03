@@ -110,12 +110,12 @@ const VoiceItem = ({
           return undefined
         }
         return requestMediaDownload({
+          attachment: file,
           key: `voice:${file.url}`,
           url: file.url,
           cacheKey: file.url,
           kind: 'voice',
           messageType,
-          messageId: file.messageId,
           size: Number(file.size) || 0,
           ...attachmentDecryption(file)
         })

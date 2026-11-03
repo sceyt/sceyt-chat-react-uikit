@@ -12,6 +12,8 @@ jest.mock('./attachmentBlobUrls', () => ({ registerBlobUrl: jest.fn() }))
 const mockGetAttachmentUrlFromCache = getAttachmentUrlFromCache as jest.Mock
 const mockSetAttachmentToCache = setAttachmentToCache as jest.Mock
 const mockRegisterBlobUrl = registerBlobUrl as jest.Mock
+// The video the preview belongs to: the custom downloader gets it whole.
+const video = { url: 'https://cdn/clip.mp4', messageId: 'message-id', metadata: '{}' } as any
 
 describe('downloadVideoThumb', () => {
   beforeEach(() => {
@@ -23,11 +25,13 @@ describe('downloadVideoThumb', () => {
     const preview = new Blob(['preview'], { type: 'image/jpeg' })
     const downloader = jest.fn().mockResolvedValue({ Body: preview })
 
-    await expect(downloadVideoThumb('https://cdn/preview.jpg', downloader, 'text', 'message-id')).resolves.toBe(
-      'blob:preview'
-    )
+    await expect(downloadVideoThumb('https://cdn/preview.jpg', video, downloader, 'text')).resolves.toBe('blob:preview')
 
-    expect(downloader).toHaveBeenCalledWith('https://cdn/preview.jpg', true, expect.any(Function), 'text', 'message-id')
+    expect(downloader).toHaveBeenCalledWith(video, true, expect.any(Function), 'text', {
+      kind: 'thumbnail',
+      url: 'https://cdn/preview.jpg',
+      type: 'image/jpeg'
+    })
     expect(mockSetAttachmentToCache).toHaveBeenCalledWith('https://cdn/preview.jpg', expect.any(Response))
   })
 
@@ -35,7 +39,7 @@ describe('downloadVideoThumb', () => {
     const preview = new Blob(['preview'], { type: 'image/jpeg' })
     const downloader = jest.fn().mockResolvedValue(preview)
 
-    await expect(downloadVideoThumb('https://cdn/preview.jpg', downloader)).resolves.toBe('blob:preview')
+    await expect(downloadVideoThumb('https://cdn/preview.jpg', video, downloader)).resolves.toBe('blob:preview')
 
     expect(mockSetAttachmentToCache).toHaveBeenCalledWith('https://cdn/preview.jpg', expect.any(Response))
   })
@@ -46,7 +50,7 @@ describe('downloadVideoThumb', () => {
       .spyOn(global, 'fetch' as any)
       .mockResolvedValue({ ok: true, blob: async () => preview } as any)
 
-    await expect(downloadVideoThumb('https://cdn/preview.jpg')).resolves.toBe('blob:preview')
+    await expect(downloadVideoThumb('https://cdn/preview.jpg', video)).resolves.toBe('blob:preview')
 
     expect(fetchMock).toHaveBeenCalledWith(
       'https://cdn/preview.jpg',
@@ -58,7 +62,9 @@ describe('downloadVideoThumb', () => {
   it('does not cache an inaccessible default thumbnail URL', async () => {
     const fetchMock = jest.spyOn(global, 'fetch' as any).mockResolvedValue({ ok: false, status: 403 } as any)
 
-    await expect(downloadVideoThumb('https://cdn/denied.jpg')).rejects.toThrow('Unable to download video preview (403)')
+    await expect(downloadVideoThumb('https://cdn/denied.jpg', video)).rejects.toThrow(
+      'Unable to download video preview (403)'
+    )
 
     expect(mockSetAttachmentToCache).not.toHaveBeenCalled()
     fetchMock.mockRestore()
@@ -68,7 +74,9 @@ describe('downloadVideoThumb', () => {
     const fetchMock = jest.spyOn(global, 'fetch' as any)
     const downloader = jest.fn().mockRejectedValue(new Error('preview download failed'))
 
-    await expect(downloadVideoThumb('https://cdn/preview.jpg', downloader)).rejects.toThrow('preview download failed')
+    await expect(downloadVideoThumb('https://cdn/preview.jpg', video, downloader)).rejects.toThrow(
+      'preview download failed'
+    )
 
     expect(fetchMock).not.toHaveBeenCalled()
     fetchMock.mockRestore()
@@ -78,7 +86,7 @@ describe('downloadVideoThumb', () => {
     mockGetAttachmentUrlFromCache.mockReset().mockResolvedValue('blob:cached-preview')
     const downloader = jest.fn()
 
-    await expect(downloadVideoThumb('https://cdn/preview.jpg', downloader)).resolves.toBe('blob:cached-preview')
+    await expect(downloadVideoThumb('https://cdn/preview.jpg', video, downloader)).resolves.toBe('blob:cached-preview')
 
     expect(downloader).not.toHaveBeenCalled()
     expect(mockSetAttachmentToCache).not.toHaveBeenCalled()
@@ -93,7 +101,7 @@ describe('downloadVideoThumb', () => {
     })
     const downloader = jest.fn().mockResolvedValue({ Body: new Blob(['preview']) })
 
-    await expect(downloadVideoThumb('https://cdn/preview.jpg', downloader)).resolves.toBe('blob:local-preview')
+    await expect(downloadVideoThumb('https://cdn/preview.jpg', video, downloader)).resolves.toBe('blob:local-preview')
 
     expect(mockRegisterBlobUrl).toHaveBeenCalledWith('https://cdn/preview.jpg_1_0_2', 'blob:local-preview')
     Object.defineProperty(URL, 'createObjectURL', { configurable: true, value: originalCreateObjectURL })
@@ -109,7 +117,7 @@ describe('downloadVideoThumb', () => {
     })
 
     await expect(
-      downloadVideoThumb('https://cdn/preview.jpg', jest.fn().mockResolvedValue({ Body: new Blob(['preview']) }))
+      downloadVideoThumb('https://cdn/preview.jpg', video, jest.fn().mockResolvedValue({ Body: new Blob(['preview']) }))
     ).resolves.toBe('blob:uncached-preview')
 
     expect(mockRegisterBlobUrl).toHaveBeenCalledWith('https://cdn/preview.jpg_1_0_2', 'blob:uncached-preview')

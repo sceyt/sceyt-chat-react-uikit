@@ -58,7 +58,7 @@ export const downloadFile = async (
     const encryption = getAttachmentEncryption(attachment.metadata)
     const type = getTypeFromFileName(attachment.name)
     // Decrypts an encrypted file; the same as the CustomUploader's downloader otherwise.
-    const customDownloader = getAttachmentDownloader(encryption, type)
+    const customDownloader = getAttachmentDownloader(attachment, 'file', encryption, type)
     let response
     if (customDownloader) {
       const urlPromise = customDownloader(
@@ -69,8 +69,7 @@ export const downloadFile = async (
             progressCallback(progress)
           }
         },
-        messageType,
-        attachment.messageId
+        messageType
       )
       filesPromisesOnDownload[attachment.id!] = urlPromise
       const result = await urlPromise

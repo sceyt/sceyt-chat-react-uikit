@@ -5,7 +5,7 @@ import store from '../../store'
 import SceytChat from '../SceytChat'
 import { IAttachment, IChannel, IContact, ICustomAvatarColors, IMember, IMessage, IUser } from '../../types'
 import { SceytReduxContext } from 'store/context'
-import { IAttachmentDownloadFile, IAttachmentUploadFile } from '../../helpers/attachmentEncryption'
+import { IAttachmentEncryption } from '../../helpers/attachmentEncryption'
 
 import {
   InviteLinkOptions,
@@ -23,62 +23,69 @@ export interface IProgress {
 
 export interface IUploadTask {
   // eslint-disable-next-line no-unused-vars
-  updateLocalFileLocation?: (newPath: String) => void
+  updateLocalFileLocation?: (newPath: string) => void
   // eslint-disable-next-line no-unused-vars
   progress: (progress: IProgress) => void
   // eslint-disable-next-line no-unused-vars
   failure: (error: Error) => void
   /**
    * `blob` is the uploaded file as the user's device shows it (e.g. after the
-   * uploader resized an image). With `encryptAttachments` it must be the
-   * plaintext, never the encrypted bytes.
+   * uploader resized an image), or null when the uploader gave it with
+   * `updateLocalFileLocation`. With `encryptAttachments` it must be the
+   * plaintext, never the encrypted bytes. `encryption` is the `encryption` of
+   * the file the uploader prepared and stored (client.prepareUpload): required
+   * when the upload was asked to `encrypt`, or the message is not sent.
    */
   // eslint-disable-next-line no-unused-vars
-  success: ({ uri, blob }: { uri: string; blob: Blob }) => void
+  success: ({ uri, blob, encryption }: { uri: string; blob: Blob | null; encryption?: IAttachmentEncryption }) => void
   cancel: () => void
   stop: () => void
   resume: () => void
 }
 
-/** The 4th `upload()` argument of a custom uploader that sets `preparesFiles`. */
-export interface ICustomUploaderUploadHelpers {
+/** The 4th `upload()` argument. */
+export interface ICustomUploaderUploadOptions {
   /**
-   * Prepares the file to store; call it with the file as it will be stored
-   * (e.g. after resizing an image) and send what it returns: `getAll()`, or
-   * the byte ranges the upload server gives (`getRange`, or `getPart(n)` for
-   * 5 MiB parts) as multipart parts, with its `contentType`. It is encrypted
-   * when `encryptAttachments` is on. The message describes the last file
-   * prepared, so prepare once per upload.
+   * `encryptAttachments` is on: store the file encrypted. Prepare the file as it
+   * will be stored (e.g. after resizing an image) with the chat client's
+   * `prepareUpload(file, { encrypt: true })`, send its `getAll()` or the byte
+   * ranges the upload server gives (`getRange`, or `getPart(n)` for 5 MiB parts)
+   * with its `contentType`, and pass its `encryption` to `success()`.
    */
-  // eslint-disable-next-line no-unused-vars
-  prepareFile: (file: Blob) => Promise<IAttachmentUploadFile>
+  encrypt: boolean
 }
 
-/** The 6th `download()` argument of a custom uploader that sets `preparesFiles`. */
-export interface ICustomUploaderDownloadFile {
+/** The 6th `download()` argument: which file of the attachment to download, and how to open it. */
+export interface ICustomUploaderDownloadOptions {
+  /** `file`: the attachment's own file; `thumbnail`: the preview image of a video attachment. */
+  kind: 'file' | 'thumbnail'
+  /** The URL to download: the attachment's `url`, or for a thumbnail its `video_thumb`. */
+  url: string
   /**
-   * The attachment's stored file: pass the downloaded bytes to `file.open()`
-   * and return its result, which is the file to show (decrypted when it is
-   * encrypted, with its real type).
+   * For an uploader with `preparesFiles`, when the file is encrypted: its `enc`
+   * (a thumbnail's own key, from the attachment's `enc.renditions`). Open the
+   * downloaded bytes with the chat client's
+   * `prepareDownload({ metadata: { enc: encryption }, type })` and return the
+   * file it gives (decrypted, with its real type).
    */
-  file: IAttachmentDownloadFile
+  encryption?: IAttachmentEncryption
+  /** The file's real type, or '' when unknown. */
+  type: string
 }
 
 export interface ICustomUploader {
   /**
-   * True: `upload` gets `{ prepareFile }` and sends the file it prepares, and
-   * `download` gets `{ file }` and returns `file.open(downloadedBytes)`. The
-   * SDK does any encryption, so the uploader's code is the same whether
-   * `encryptAttachments` is on or not (with a sceyt-chat version that has
-   * client.prepareUpload; with an older one these arguments are not passed).
+   * True: the uploader prepares and opens files with the chat client
+   * (`prepareUpload` / `prepareDownload`, which do any encryption): `upload`
+   * stores the file encrypted when its options say `encrypt` and reports the
+   * file's `encryption`, and `download` gets `{ encryption, type }` and returns
+   * the opened file.
    *
-   * `encryptAttachments` needs it when there is a CustomUploader: the uploader
-   * must store the file prepareFile gives. Without it, an upload with
-   * `encryptAttachments` on fails before anything is sent.
+   * `encryptAttachments` needs it when there is a CustomUploader. Without it,
+   * an upload with `encryptAttachments` on fails before anything is sent, and
+   * `download` returns the stored bytes, which the UIKit opens.
    */
   preparesFiles?: boolean
-  /** @deprecated The old name of `preparesFiles`, still read when `preparesFiles` is not set. */
-  supportsEncryption?: boolean
   upload: (
     // eslint-disable-next-line no-unused-vars
     attachment: IAttachment,
@@ -87,29 +94,29 @@ export interface ICustomUploader {
     // eslint-disable-next-line no-unused-vars
     messageType: string | null | undefined,
     // eslint-disable-next-line no-unused-vars
-    helpers?: ICustomUploaderUploadHelpers
+    options: ICustomUploaderUploadOptions
   ) => void
   /**
-   * `messageId` is the ID of a message the attachment appears in, supplied by
-   * the client. Treat it as a hint, not proof of access:
+   * Downloads a file of `attachment`: the one `options` names (`options.url`).
+   * `attachment.messageId` is the ID of a message the attachment appears in,
+   * supplied by the client. Treat it as a hint, not proof of access:
    * - Media previews (images, videos, voice, video thumbnails) are shared and
-   *   cached by `uri`. When several messages use the same file (e.g. forwards),
+   *   cached by URL. When several messages use the same file (e.g. forwards),
    *   only the first request's ID is sent, and its failure is shared too.
    * - A file already in the browser's attachment cache is served without
    *   calling `download`; that cache is per origin, not per user.
    * - It may be empty (`''`) or missing for messages that are not confirmed yet.
    * The backend must verify that the caller can read the message and that
-   * `uri` legitimately belongs to it (e.g. traced to its original upload),
+   * `options.url` legitimately belongs to it (e.g. traced to its original upload),
    * before serving the file.
    */
   // eslint-disable-next-line no-unused-vars
   download: (
-    uri: string,
+    attachment: IAttachment,
     download: boolean,
     progressCallback: (progress: any) => void,
     messageType: string | null | undefined,
-    messageId?: string | null,
-    stored?: ICustomUploaderDownloadFile
+    options: ICustomUploaderDownloadOptions
   ) => Promise<any>
   // eslint-disable-next-line no-unused-vars
   cancelRequest: (requestPromise: any) => void

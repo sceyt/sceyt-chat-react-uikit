@@ -53,7 +53,7 @@ describe('VoiceItem', () => {
         url: 'https://cdn/voice.mp3',
         kind: 'voice',
         messageType: 'text',
-        messageId: 'message-id'
+        attachment: expect.objectContaining({ messageId: 'message-id' })
       })
     )
   })

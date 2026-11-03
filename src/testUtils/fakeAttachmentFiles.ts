@@ -1,5 +1,5 @@
 import { setClient } from '../common/client'
-import { IAttachmentDownloadFile, IAttachmentEncryption, IAttachmentUploadFile } from '../helpers/attachmentEncryption'
+import { IAttachmentDownloadFile, IAttachmentEncryption } from '../helpers/attachmentEncryption'
 
 // Stand-ins for the SDK's AttachmentUploadFile and AttachmentDownloadFile. The
 // real ones are tested in sceyt-chat against the format's test vectors; UIKit
@@ -28,8 +28,8 @@ export const fakeEncryption = (key: string): IAttachmentEncryption => ({
   key
 })
 
-/** The file prepared for upload; encrypted with `key` when there is a key. */
-export const makeFakeUploadFile = (source: Blob, key?: string): IAttachmentUploadFile => ({
+/** The file client.prepareUpload gives; encrypted with `key` when there is a key. */
+export const makeFakeUploadFile = (source: Blob, key?: string) => ({
   source,
   size: key ? source.size + prefixOf(key).length : source.size,
   contentType: key ? 'application/octet-stream' : source.type,

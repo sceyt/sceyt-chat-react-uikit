@@ -129,7 +129,7 @@ const VideoPreview = memo(
           ? getAttachmentUrlFromCache(videoThumb)
               .catch(() => false)
               .then((cachedUrl) => (typeof cachedUrl === 'string' ? cachedUrl : undefined))
-          : downloadVideoThumb(videoThumb, customDownloader, messageType, file.messageId, file.metadata)
+          : downloadVideoThumb(videoThumb, file, customDownloader, messageType)
 
       let cancelled = false
       previewRequest

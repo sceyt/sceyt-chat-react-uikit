@@ -1,4 +1,6 @@
 import { cancelDownloadRequest, getAttachmentDownloader, getCustomDownloader } from './customUploader'
+import { ICustomUploader } from '../components/ChatContainer'
+import { IAttachment } from '../types'
 import { IAttachmentEncryption, isUnopenableAttachmentError, prepareDownloadFile } from './attachmentEncryption'
 import { readResponseBlobWithProgress } from './getVideoFrame'
 import { getAttachmentURLWithVersion, getAttachmentUrlFromCache, setAttachmentToCache } from './attachmentsCache'
@@ -9,20 +11,15 @@ export type MediaDownloadKind = 'original-image' | 'original-video' | 'video-thu
 
 export interface MediaDownloadRequest {
   key: string
+  /** The attachment the file belongs to: the custom downloader gets it. */
+  attachment: IAttachment
   url: string
   cacheKey: string
   cacheKeys?: string[]
   kind: MediaDownloadKind
   messageType?: string | null
-  messageId?: string | null
   size?: number
-  downloader?: (
-    url: string,
-    download: boolean,
-    progress: (progress: any) => void,
-    messageType?: string | null,
-    messageId?: string | null
-  ) => Promise<any>
+  downloader?: ICustomUploader['download']
   customDownload?: boolean
   skipCacheLookup?: boolean
   /** The file's `enc` metadata when it is encrypted: the download is decrypted before it is cached or shown. */
@@ -143,6 +140,8 @@ const download = async (request: MediaDownloadRequest, job: MediaDownloadJob): P
   }
   // An encrypted file comes back from the attachment downloader already decrypted.
   const customDownloader = getAttachmentDownloader(
+    request.attachment,
+    request.kind === 'video-thumbnail' ? 'thumbnail' : 'file',
     request.encryption,
     request.contentType,
     request.downloader || getCustomDownloader()
@@ -154,13 +153,7 @@ const download = async (request: MediaDownloadRequest, job: MediaDownloadJob): P
     // use `download: true` for that full-download path; `false` only returns
     // a short-lived URL which the coordinator would have to fetch again.
     const requestBlob = request.customDownload ?? true
-    const customRequest = customDownloader(
-      request.url,
-      requestBlob,
-      reportProgress,
-      request.messageType,
-      request.messageId
-    )
+    const customRequest = customDownloader(request.url, requestBlob, reportProgress, request.messageType)
     job.customRequest = customRequest
     const result = await customRequest
     const body = result?.Body || result

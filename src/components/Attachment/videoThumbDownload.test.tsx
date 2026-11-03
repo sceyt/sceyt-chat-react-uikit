@@ -15,6 +15,10 @@ import {
 import { fakeEncrypted, installFakeFilesClient, readBlobText } from '../../testUtils/fakeAttachmentFiles'
 
 let mockCustomUploader: any
+// What a custom downloader was asked for, as plain values: the attachment
+// holds a File, and a failing diff of a File runs the test worker out of memory.
+const asked = (call: any[]) => [call[0]?.messageId, call[1], call[3], call[4]?.kind, call[4]?.url]
+const askedFor = (url: string, kind = 'file') => ['message-id', true, undefined, kind, url]
 let mockCompressAndCacheImage: ((...args: any[]) => Promise<any>) | undefined
 
 jest.mock('../../helpers/getVideoFrame', () => {
@@ -87,8 +91,16 @@ jest.mock('../../helpers/attachmentsCache', () => ({
 jest.mock('../../helpers/customUploader', () => ({
   getCustomDownloader: () => mockCustomUploader?.download,
   // The real one, with the uploader of this test.
-  getAttachmentDownloader: (encryption: any, type: any, download: any = mockCustomUploader?.download) =>
-    jest.requireActual('../../helpers/customUploader').getAttachmentDownloader(encryption, type, download),
+  getAttachmentDownloader: (
+    attachment: any,
+    kind: any,
+    encryption: any,
+    type: any,
+    download: any = mockCustomUploader?.download
+  ) =>
+    jest
+      .requireActual('../../helpers/customUploader')
+      .getAttachmentDownloader(attachment, kind, encryption, type, download),
   getCustomUploader: () => mockCustomUploader,
   cancelDownloadRequest: (request: any) => mockCustomUploader?.cancelRequest(request)
 }))
@@ -792,7 +804,7 @@ describe('custom downloader receives the message ID', () => {
     renderMediaAttachment(imageAttachment)
     await flushAttachmentEffects()
 
-    expect(download).toHaveBeenCalledWith('https://cdn/image.jpg', true, expect.any(Function), undefined, 'message-id')
+    expect(download.mock.calls.map(asked)).toContainEqual(askedFor('https://cdn/image.jpg'))
   })
 
   it('original video', async () => {
@@ -801,7 +813,7 @@ describe('custom downloader receives the message ID', () => {
     renderAttachment()
     await flushAttachmentEffects()
 
-    expect(download).toHaveBeenCalledWith('https://cdn/video.mp4', true, expect.any(Function), undefined, 'message-id')
+    expect(download.mock.calls.map(asked)).toContainEqual(askedFor('https://cdn/video.mp4'))
   })
 
   it('voice message', async () => {
@@ -810,7 +822,7 @@ describe('custom downloader receives the message ID', () => {
     renderMediaAttachment({ ...imageAttachment, type: attachmentTypes.voice, url: 'https://cdn/voice.mp3' })
     await flushAttachmentEffects()
 
-    expect(download).toHaveBeenCalledWith('https://cdn/voice.mp3', true, expect.any(Function), undefined, 'message-id')
+    expect(download.mock.calls.map(asked)).toContainEqual(askedFor('https://cdn/voice.mp3'))
   })
 
   it('retrying a cancelled image download sends the message ID', async () => {
@@ -825,7 +837,7 @@ describe('custom downloader receives the message ID', () => {
 
     expect(download).toHaveBeenCalledTimes(2)
     download.mock.calls.forEach((call: any[]) => {
-      expect(call).toEqual(['https://cdn/image.jpg', true, expect.any(Function), undefined, 'message-id'])
+      expect(asked(call)).toEqual(askedFor('https://cdn/image.jpg'))
     })
   })
 
@@ -851,13 +863,7 @@ describe('custom downloader receives the message ID', () => {
       await flushAttachmentEffects()
 
       expect(download).toHaveBeenCalledTimes(3)
-      expect(download.mock.calls[2]).toEqual([
-        'https://cdn/image.jpg',
-        true,
-        expect.any(Function),
-        undefined,
-        'message-id'
-      ])
+      expect(asked(download.mock.calls[2])).toEqual(askedFor('https://cdn/image.jpg'))
     } finally {
       mockCompressAndCacheImage = undefined
       URL.createObjectURL = originalCreateObjectURL
@@ -870,7 +876,7 @@ describe('custom downloader receives the message ID', () => {
     renderMediaAttachment(imageAttachment)
     await flushAttachmentEffects()
 
-    expect(download).toHaveBeenCalledWith('https://cdn/image.jpg', true, expect.any(Function), undefined, 'message-id')
+    expect(download.mock.calls.map(asked)).toContainEqual(askedFor('https://cdn/image.jpg'))
   })
 })
 
@@ -911,13 +917,7 @@ describe('a failed download is not shown as downloaded', () => {
     await flushAttachmentEffects()
 
     expect(download).toHaveBeenCalledTimes(2)
-    expect(download.mock.calls[1]).toEqual([
-      'https://cdn/video.mp4',
-      true,
-      expect.any(Function),
-      undefined,
-      'message-id'
-    ])
+    expect(asked(download.mock.calls[1])).toEqual(askedFor('https://cdn/video.mp4'))
     expect(screen.queryByLabelText('Download video')).not.toBeInTheDocument()
   })
 
@@ -934,7 +934,8 @@ describe('a failed download is not shown as downloaded', () => {
         enc: { v: 1, alg: 'tink-aes256-gcm-hkdf-64k+commit-v1', attachmentId: 'id-9', key: 'key-9' }
       })
     }
-    const videoDownloads = () => download.mock.calls.filter(([url]) => url === 'https://cdn/video.mp4').length
+    const videoDownloads = () =>
+      download.mock.calls.filter((call: any[]) => call[4]?.url === 'https://cdn/video.mp4').length
 
     const first = renderAttachment({}, { attachment: encryptedVideo })
     for (let i = 0; i < 5; i += 1) await flushAttachmentEffects()
@@ -1078,13 +1079,7 @@ describe('a failed video or image download starts again when the chat reconnects
     await reconnect(store)
 
     expect(download).toHaveBeenCalledTimes(2)
-    expect(download.mock.calls[1]).toEqual([
-      'https://cdn/video.mp4',
-      true,
-      expect.any(Function),
-      undefined,
-      'message-id'
-    ])
+    expect(asked(download.mock.calls[1])).toEqual(askedFor('https://cdn/video.mp4'))
     expect(screen.queryByLabelText('Download video')).not.toBeInTheDocument()
   })
 
@@ -1100,7 +1095,7 @@ describe('a failed video or image download starts again when the chat reconnects
     await reconnect(store)
 
     expect(download).toHaveBeenCalledTimes(2)
-    expect(download.mock.calls[1][0]).toBe('https://cdn/reconnect-image.jpg')
+    expect(download.mock.calls[1][4].url).toBe('https://cdn/reconnect-image.jpg')
   })
 
   it('without a reconnect a failed download waits for the user, so a rejection is not repeated', async () => {
@@ -1200,13 +1195,7 @@ describe('the upload stop and resume control', () => {
         await flushAttachmentEffects()
       }
 
-      expect(mockCustomUploader.download).toHaveBeenCalledWith(
-        'https://cdn/video.mp4',
-        true,
-        expect.any(Function),
-        undefined,
-        'message-id'
-      )
+      expect(mockCustomUploader.download.mock.calls.map(asked)).toContainEqual(askedFor('https://cdn/video.mp4'))
       expect(shown).toHaveLength(1)
       expect(shown[0].type).toBe('video/mp4')
       expect(await readBlobText(shown[0])).toBe('movie')

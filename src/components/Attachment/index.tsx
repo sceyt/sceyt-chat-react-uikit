@@ -200,6 +200,8 @@ const Attachment = ({
   const fileNameRef: any = useRef(null)
   // Decrypts encrypted files; the same as the CustomUploader's downloader otherwise.
   const customDownloader = getAttachmentDownloader(
+    attachment,
+    'file',
     getAttachmentEncryption(attachment.metadata),
     getTypeFromFileName(attachment.name)
   )
@@ -468,8 +470,7 @@ const Attachment = ({
           setSizeProgress({ loaded: progress.loaded || 0, total: progress.total || 0 })
           setProgress(uploadPercent)
         },
-        messageType,
-        attachment.messageId
+        messageType
       )
       setDownloadFilePromise(attachment.id!, urlPromise)
       const result = await urlPromise
@@ -706,12 +707,12 @@ const Attachment = ({
       setIsCached(false)
       originalVideoDownloadStartedRef.current = true
       requestMediaDownload({
+        attachment,
         key: `original-video:${attachment.url}`,
         url: attachment.url,
         cacheKey: originalVideoCacheKey,
         kind: 'original-video',
         messageType,
-        messageId: attachment.messageId,
         size: Number(attachment.size) || 0,
         ...attachmentDecryption(attachment)
       })
@@ -770,12 +771,12 @@ const Attachment = ({
     // attachment (chat list, Media tab, and slider) to the loading snapshot.
     originalVideoDownloadStartedRef.current = true
     requestMediaDownload({
+      attachment,
       key: `original-video:${attachment.url}`,
       url: attachment.url,
       cacheKey: originalVideoCacheKey,
       kind: 'original-video',
       messageType,
-      messageId: attachment.messageId,
       size: Number(attachment.size) || 0,
       ...attachmentDecryption(attachment),
       retry
@@ -810,13 +811,13 @@ const Attachment = ({
     setIsOriginalImageRestarting(true)
     setImageDownloadRetry((retry) => retry + 1)
     requestMediaDownload({
+      attachment,
       key: `original-image:${attachment.url}`,
       url: attachment.url,
       cacheKey: attachment.url,
       cacheKeys: [attachment.url + '_original_image_url'],
       kind: 'original-image',
       messageType,
-      messageId: attachment.messageId,
       size: Number(attachment.size) || 0,
       ...attachmentDecryption(attachment),
       retry
@@ -901,13 +902,13 @@ const Attachment = ({
             } else {
               setIsCached(false)
               requestMediaDownload({
+                attachment,
                 key: `original-image:${attachment.url}`,
                 url: attachment.url,
                 cacheKey: attachment.url,
                 cacheKeys: [attachment.url + '_original_image_url'],
                 kind: 'original-image',
                 messageType,
-                messageId: attachment.messageId,
                 size: Number(attachment.size) || 0,
                 ...attachmentDecryption(attachment)
               })
@@ -956,12 +957,12 @@ const Attachment = ({
               setIsCached(false)
               const kind = attachment.type === attachmentTypes.voice ? 'voice' : 'file'
               requestMediaDownload({
+                attachment,
                 key: `${kind}:${attachment.url}`,
                 url: attachment.url,
                 cacheKey: attachment.url,
                 kind,
                 messageType,
-                messageId: attachment.messageId,
                 size: Number(attachment.size) || 0,
                 ...attachmentDecryption(attachment)
               })
@@ -992,8 +993,7 @@ const Attachment = ({
                 setSizeProgress({ loaded: progress.loaded || 0, total: progress.total || 0 })
                 setProgress(uploadPercent)
               },
-              messageType,
-              attachment.messageId
+              messageType
             ).then(async (url) => {
               let downloadingUrl = url
               if (attachment.type === attachmentTypes.image) {

@@ -3,9 +3,9 @@ import { getClient } from '../common/client'
 // Attachment encryption (format: sceyt-chat-js-sdk spec/attachment-encryption).
 // The file bytes are encrypted before upload and decrypted after download; the
 // file's attachment id and key travel in the attachment's metadata as `enc`. The
-// SDK does the work (client.prepareUpload / client.prepareDownload); this file
-// holds the UIKit's side: the option, the metadata, and the types custom
-// uploaders see.
+// SDK does the work (client.upload, or client.prepareUpload in a custom
+// uploader; client.prepareDownload); this file holds the UIKit's side: the
+// option, the metadata, and opening downloaded files.
 
 /** Another file of an attachment (a video's preview image), encrypted with its own id and key. */
 export interface IAttachmentRendition {
@@ -33,34 +33,6 @@ export interface IAttachmentEncryption {
 }
 
 const THUMBNAIL = 'thumbnail'
-
-/**
- * The SDK's AttachmentUploadFile (sceyt-chat): a file prepared for upload. Send
- * `getAll()` in one request, or the parts of a multipart upload (in any order,
- * several at once), stored as `contentType`. Part n is the stored bytes
- * `(n − 1) × partSize` up to `n × partSize`; `getRange` gives any other cut.
- * The bytes come encrypted when the file is, so the uploader's code is the same
- * either way.
- */
-export interface IAttachmentUploadFile {
-  /** The file it was prepared from. */
-  readonly source: Blob
-  /** Bytes that will be stored (the encrypted size when encrypted). */
-  readonly size: number
-  /** Type to store the file with (application/octet-stream when encrypted). */
-  readonly contentType: string
-  /** Stored bytes per part (5 MiB); the last part is smaller. */
-  readonly partSize: number
-  readonly partCount: number
-  /** The file's `enc` metadata, when it is encrypted. */
-  readonly encryption?: IAttachmentEncryption
-  // eslint-disable-next-line no-unused-vars
-  getPart: (partNumber: number) => Promise<Uint8Array>
-  /** The stored bytes from `start` up to (not including) `end`, e.g. a part as the upload server cuts it. */
-  // eslint-disable-next-line no-unused-vars
-  getRange: (start: number, end: number) => Promise<Uint8Array>
-  getAll: () => Promise<Blob>
-}
 
 /**
  * The SDK's AttachmentDownloadFile (sceyt-chat): an attachment's stored file.
@@ -110,10 +82,6 @@ export const canPrepareAttachmentFiles = () => {
   const client = getClient()
   return typeof client?.prepareUpload === 'function' && typeof client?.prepareDownload === 'function'
 }
-
-/** Prepares a file for upload; encrypted, with a new attachment id and key, when `encrypt` is set. */
-export const prepareUploadFile = async (file: Blob, encrypt: boolean): Promise<IAttachmentUploadFile> =>
-  sdkClient().prepareUpload(file, { encrypt })
 
 /** The download file of an attachment with this `enc` (none: not encrypted). Throws if `enc` is not valid. */
 export const prepareDownloadFile = (

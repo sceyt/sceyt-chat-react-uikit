@@ -1,4 +1,14 @@
-import SceytChat, { SceytChatUIKitTheme, ThemeMode } from './ChatContainer'
+import SceytChat, {
+  SceytChatUIKitTheme,
+  ThemeMode,
+  ICustomUploader,
+  ICustomUploaderDownloadOptions,
+  ICustomUploaderUploadOptions,
+  IProgress,
+  IUploadTask
+} from './ChatContainer'
+import { IAttachment } from '../types'
+import { IAttachmentEncryption, IAttachmentRendition } from '../helpers/attachmentEncryption'
 import ChannelList from './ChannelList'
 import Channel from './Channel'
 import Chat from './Chat'
@@ -66,7 +76,16 @@ export {
   IForwardMessageNote,
   IForwardPreviewMessage,
   CustomLoadErrorStateComponent,
-  ILoadErrorStateProps
+  ILoadErrorStateProps,
+  // A custom uploader (the `customUploader` prop) and what it is given.
+  ICustomUploader,
+  ICustomUploaderDownloadOptions,
+  ICustomUploaderUploadOptions,
+  IProgress,
+  IUploadTask,
+  IAttachment,
+  IAttachmentEncryption,
+  IAttachmentRendition
 }
 
 declare global {

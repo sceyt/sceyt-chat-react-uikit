@@ -158,7 +158,11 @@ describe('SliderPopup cached media', () => {
     await flushEffects()
 
     expect(mockRequestMediaDownload).toHaveBeenCalledWith(
-      expect.objectContaining({ url: selectedVideo.url, kind: 'original-video', messageId: 'message-1' })
+      expect.objectContaining({
+        url: selectedVideo.url,
+        kind: 'original-video',
+        attachment: expect.objectContaining({ messageId: 'message-1' })
+      })
     )
   })
 

@@ -93,41 +93,67 @@ describe('mediaDownloadCoordinator', () => {
     const download = jest.fn().mockResolvedValue({ Body: new Blob(['image'], { type: 'image/jpeg' }) })
     setCustomUploader({ download, cancelRequest: jest.fn(), upload: jest.fn() } as any)
 
+    const attachment = { url: 'https://cdn/image.jpg', name: 'image.jpg' } as any
+
     await requestMediaDownload({
       key: 'original-image:https://cdn/image.jpg',
+      attachment,
       url: 'https://cdn/image.jpg',
       cacheKey: 'https://cdn/image.jpg',
       kind: 'original-image'
     })
 
-    expect(download).toHaveBeenCalledWith('https://cdn/image.jpg', true, expect.any(Function), undefined, undefined)
+    expect(download).toHaveBeenCalledWith(attachment, true, expect.any(Function), undefined, {
+      kind: 'file',
+      url: 'https://cdn/image.jpg',
+      type: ''
+    })
   })
 
-  it('passes the message id of the attachment to a custom downloader', async () => {
+  it('gives a custom downloader the attachment, which carries its message id', async () => {
     const download = jest.fn().mockResolvedValue({ Body: new Blob(['image'], { type: 'image/jpeg' }) })
     setCustomUploader({ download, cancelRequest: jest.fn(), upload: jest.fn() } as any)
+    const attachment = { url: 'https://cdn/image.jpg', messageId: '9223372036854775807' } as any
 
     await requestMediaDownload({
       key: 'original-image:https://cdn/image.jpg',
+      attachment,
       url: 'https://cdn/image.jpg',
       cacheKey: 'https://cdn/image.jpg',
       kind: 'original-image',
-      messageType: 'text',
-      messageId: '9223372036854775807'
+      messageType: 'text'
     })
 
-    expect(download).toHaveBeenCalledWith(
-      'https://cdn/image.jpg',
-      true,
-      expect.any(Function),
-      'text',
-      '9223372036854775807'
-    )
+    expect(download.mock.calls[0][0].messageId).toBe('9223372036854775807')
+    expect(download.mock.calls[0][3]).toBe('text')
+  })
+
+  it('asks a custom downloader for a video preview as the thumbnail of its video', async () => {
+    const download = jest.fn().mockResolvedValue({ Body: new Blob(['preview'], { type: 'image/jpeg' }) })
+    setCustomUploader({ download, cancelRequest: jest.fn(), upload: jest.fn() } as any)
+    const video = { url: 'https://cdn/clip.mp4', messageId: '9223372036854775807' } as any
+
+    await requestMediaDownload({
+      key: 'video-thumbnail:https://cdn/clip-preview.jpg',
+      attachment: video,
+      url: 'https://cdn/clip-preview.jpg',
+      cacheKey: 'https://cdn/clip-preview.jpg',
+      kind: 'video-thumbnail',
+      contentType: 'image/jpeg'
+    })
+
+    expect(download.mock.calls[0][0] === video).toBe(true)
+    expect(download.mock.calls[0][4]).toEqual({
+      kind: 'thumbnail',
+      url: 'https://cdn/clip-preview.jpg',
+      type: 'image/jpeg'
+    })
   })
 
   it('shares one download between two messages using the same file, sent with the first message ID', async () => {
     const download = jest.fn().mockResolvedValue({ Body: new Blob(['image'], { type: 'image/jpeg' }) })
     setCustomUploader({ download, cancelRequest: jest.fn(), upload: jest.fn() } as any)
+    const attachment = { url: 'https://cdn/shared.jpg' } as any
     const request = {
       key: 'original-image:https://cdn/shared.jpg',
       url: 'https://cdn/shared.jpg',
@@ -136,13 +162,13 @@ describe('mediaDownloadCoordinator', () => {
     }
 
     await Promise.all([
-      requestMediaDownload({ ...request, messageId: '9223372036854775807' }),
-      requestMediaDownload({ ...request, messageId: '9223372036854775808' })
+      requestMediaDownload({ ...request, attachment: { ...attachment, messageId: '9223372036854775807' } }),
+      requestMediaDownload({ ...request, attachment: { ...attachment, messageId: '9223372036854775808' } })
     ])
 
     // Forwarded messages point at the same file; the backend authorizes either ID.
     expect(download).toHaveBeenCalledTimes(1)
-    expect(download.mock.calls[0][4]).toBe('9223372036854775807')
+    expect(download.mock.calls[0][0].messageId).toBe('9223372036854775807')
   })
 
   it('reuses a completed browser-cache blob without invoking the downloader', async () => {
