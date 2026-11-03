@@ -508,6 +508,100 @@ describe('encryptAttachments: downloading', () => {
   })
 })
 
+describe('the SDK downloads when there is no custom uploader (client.download)', () => {
+  const encryption = { v: 1, alg: 'tink-aes256-gcm-hkdf-64k+commit-v1', attachmentId: 'id-7', key: 'key-7' }
+  const photo = { id: 'a1', messageId: 'm1', url: 'https://cdn/p', name: 'photo.png', metadata: '{}' } as any
+  let downloads: { url: string; options: any }[]
+  let answer: () => Promise<Blob>
+
+  beforeEach(() => {
+    downloads = []
+    answer = async () => new Blob(['picture'], { type: 'image/png' })
+    setCustomUploader(undefined)
+    setClient({
+      download: (url: string, options: any) => {
+        downloads.push({ url, options })
+        return answer()
+      }
+    })
+  })
+  afterEach(() => setClient({}))
+
+  it('downloads an encrypted file with its key and type, and gives it back as { Body }', async () => {
+    const result = await getAttachmentDownloader(photo, 'file', encryption, 'image/png')!(
+      'https://cdn/p',
+      true,
+      jest.fn()
+    )
+
+    expect(downloads).toHaveLength(1)
+    expect(downloads[0].url).toBe('https://cdn/p')
+    expect(downloads[0].options).toMatchObject({ metadata: { enc: encryption }, type: 'image/png' })
+    // The SDK opened it: the uikit does not decrypt it again.
+    expect(await readBlobText(result.Body)).toBe('picture')
+    expect(result.ContentType).toBe('image/png')
+  })
+
+  it('downloads a file that is not encrypted the same way', async () => {
+    await getAttachmentDownloader(photo, 'file', undefined, 'image/png')!('https://cdn/p', true, jest.fn())
+
+    expect(downloads[0].options.metadata).toEqual({})
+  })
+
+  it('downloads a video preview from its own URL with its own key', async () => {
+    const thumbKey = { ...encryption, attachmentId: 'thumb-id', key: 'thumb-key' }
+
+    await getAttachmentDownloader(photo, 'thumbnail', thumbKey, 'image/jpeg')!(
+      'https://cdn/p-preview.jpg',
+      true,
+      jest.fn()
+    )
+
+    expect(downloads[0].url).toBe('https://cdn/p-preview.jpg')
+    expect(downloads[0].options).toMatchObject({ metadata: { enc: thumbKey }, type: 'image/jpeg' })
+  })
+
+  it('reports progress as { loaded, total }, total 0 when the server does not say', async () => {
+    const progress = jest.fn()
+    answer = async () => {
+      downloads[0].options.progress(10, 40)
+      downloads[0].options.progress(20, undefined)
+      return new Blob(['x'])
+    }
+
+    await getAttachmentDownloader(photo, 'file', undefined, '')!('https://cdn/p', true, progress)
+
+    expect(progress.mock.calls).toEqual([[{ loaded: 10, total: 40 }], [{ loaded: 20, total: 0 }]])
+  })
+
+  it('cancelling the request aborts the SDK download', () => {
+    answer = () => new Promise(() => undefined)
+
+    cancelDownloadRequest(
+      getAttachmentDownloader(photo, 'file', encryption, 'image/png')!('https://cdn/p', true, jest.fn())
+    )
+
+    expect(downloads[0].options.signal.aborted).toBe(true)
+  })
+
+  it('a custom uploader downloads instead of the SDK', () => {
+    const download = jest.fn(() => new Promise(() => undefined))
+    setCustomUploader({ upload: jest.fn(), download, cancelRequest: jest.fn() })
+
+    getAttachmentDownloader(photo, 'file', undefined, 'image/png')!('https://cdn/p', true, jest.fn())
+
+    expect(download).toHaveBeenCalledTimes(1)
+    expect(downloads).toEqual([])
+    setCustomUploader(undefined)
+  })
+
+  it('with an SDK that has no client.download there is no downloader', () => {
+    setClient({})
+
+    expect(getAttachmentDownloader(photo, 'file', encryption, 'image/png')).toBeUndefined()
+  })
+})
+
 describe('sdkUpload: one attachment uploaded with client.upload', () => {
   interface ISdkUpload {
     file: Blob

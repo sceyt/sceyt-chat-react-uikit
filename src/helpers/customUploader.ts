@@ -244,7 +244,8 @@ const asBlob = async (body: any): Promise<Blob> => {
  * custom downloader returned ({ Body }, a Blob, or a URL string). An uploader
  * with `preparesFiles` also gets `encryption` and opens the file itself.
  * `type` is the file's real type, e.g. 'video/mp4'. `download` defaults to the
- * CustomUploader's.
+ * CustomUploader's; without one, the SDK downloads the file (client.download)
+ * when it can, else there is no downloader.
  */
 export type AttachmentDownloader = (
   // eslint-disable-next-line no-unused-vars
@@ -260,6 +261,30 @@ export type AttachmentDownloader = (
 // A request the attachment downloader returned, to the uploader's own request
 // inside it: the uploader's cancelRequest only knows its own.
 const uploaderRequests = new WeakMap<Promise<any>, Promise<any>>()
+// A request of the SDK's downloader, to what cancels it.
+const sdkRequests = new WeakMap<Promise<any>, AbortController>()
+
+/** Whether the SDK can download and open one file (client.download). */
+export const canDownloadWithSdk = () => typeof getClient()?.download === 'function'
+
+// Downloads with the SDK (client.download), which opens the file (decrypted
+// with `encryption`) and resumes a lost connection; gives { Body } like a
+// custom downloader.
+const sdkDownloader =
+  (encryption: IAttachmentEncryption | undefined, type: string): AttachmentDownloader =>
+  (url, _asFile, progress) => {
+    const controller = new AbortController()
+    const request = getClient()
+      .download(url, {
+        metadata: encryption ? { enc: encryption } : {},
+        type,
+        signal: controller.signal,
+        progress: (loaded: number, total?: number) => progress({ loaded, total: total || 0 })
+      })
+      .then((Body: Blob) => ({ Body, ContentType: Body.type }))
+    sdkRequests.set(request, controller)
+    return request
+  }
 
 export const getAttachmentDownloader = (
   attachment: IAttachment,
@@ -268,7 +293,7 @@ export const getAttachmentDownloader = (
   type: string = '',
   download: ICustomUploader['download'] | undefined = getCustomDownloader()
 ): AttachmentDownloader | undefined => {
-  if (!download) return undefined
+  if (!download) return canDownloadWithSdk() ? sdkDownloader(encryption, type) : undefined
   if (uploaderPreparesFiles() && canPrepareAttachmentFiles()) {
     // The uploader opens the file itself; its own request, so its cancelRequest finds it.
     return (url, asFile, progress, messageType) => {
@@ -305,6 +330,11 @@ export const getAttachmentDownloader = (
 
 /** Cancels a request returned by a downloader from getAttachmentDownloader. */
 export const cancelDownloadRequest = (request: Promise<any>) => {
+  const sdkRequest = sdkRequests.get(request)
+  if (sdkRequest) {
+    sdkRequest.abort()
+    return
+  }
   CustomUploader?.cancelRequest(uploaderRequests.get(request) || request)
 }
 

@@ -6,6 +6,7 @@ import {
   subscribeToMediaDownload
 } from './mediaDownloadCoordinator'
 import { setCustomUploader } from './customUploader'
+import { setClient } from '../common/client'
 import { getAttachmentUrlFromCache, setAttachmentToCache } from './attachmentsCache'
 import { fakeEncrypted, installFakeFilesClient, readBlobText } from '../testUtils/fakeAttachmentFiles'
 
@@ -87,6 +88,33 @@ describe('mediaDownloadCoordinator', () => {
       state: 'completed',
       progress: 100
     })
+  })
+
+  it('without a custom uploader, the SDK downloads and opens the file, and it is cached and shown once', async () => {
+    const download = jest.fn(async () => new Blob(['opened video'], { type: 'video/mp4' }))
+    setClient({ download })
+    global.fetch = jest.fn() as any
+    const encryption = { v: 1 as const, alg: 'tink-aes256-gcm-hkdf-64k+commit-v1', attachmentId: 'id-3', key: 'key-3' }
+    try {
+      const { blob } = await requestMediaDownload({
+        key: 'original-video:https://cdn/clip.mp4',
+        attachment: { url: 'https://cdn/clip.mp4' } as any,
+        url: 'https://cdn/clip.mp4',
+        cacheKey: 'https://cdn/clip.mp4_original_video_url',
+        kind: 'original-video',
+        encryption,
+        contentType: 'video/mp4'
+      })
+
+      expect(download).toHaveBeenCalledTimes(1)
+      expect((download.mock.calls[0] as any[])[1]).toMatchObject({ metadata: { enc: encryption }, type: 'video/mp4' })
+      // Opened by the SDK only: not downloaded with a plain request, nor decrypted again.
+      expect(global.fetch).not.toHaveBeenCalled()
+      expect(await readBlobText(blob)).toBe('opened video')
+      expect(setAttachmentToCache).toHaveBeenCalledWith('https://cdn/clip.mp4_original_video_url', expect.any(Response))
+    } finally {
+      setClient({})
+    }
   })
 
   it('asks a custom downloader for a Blob by default', async () => {
