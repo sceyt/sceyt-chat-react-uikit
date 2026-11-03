@@ -299,6 +299,20 @@ const applyPreparedMediaPreviews = async (attachments: IAttachment[]) => {
   return attachments
 }
 
+// A pending message's attachments with what preparation added to the ones being
+// sent (thumbnail, size metadata, a converted file).
+const withPreparedAttachments = (pendingMessage: IMessage, prepared: IAttachment[]) =>
+  pendingMessage.attachments.map((pendingAttachment) => {
+    const preparedAttachment = prepared.find((attachment) => attachment.tid === pendingAttachment.tid)
+    return preparedAttachment
+      ? {
+          ...pendingAttachment,
+          ...preparedAttachment,
+          data: preparedAttachment.data || preparedAttachment.url
+        }
+      : pendingAttachment
+  })
+
 const getAttachmentSourceFile = (attachment: IAttachment): File | null => {
   const source =
     attachment.data instanceof Blob ? attachment.data : attachment.url instanceof Blob ? attachment.url : null
@@ -1591,6 +1605,35 @@ function* sendMessage(action: IAction): any {
         }
       }
 
+      // Show every message's row first. Each one waits only for its own preview,
+      // not for the messages before it to upload and send (attachments sent as
+      // separate messages would otherwise appear one at a time).
+      const showErrors: unknown[] = []
+      for (let i = 0; i < messagesToSend.length; i++) {
+        const messageToSend = messagesToSend[i]
+        if (messageToSend.tid && isPendingMessageDeleted(channel.id, messageToSend.tid)) {
+          continue
+        }
+        try {
+          // Do not insert an optimistic image/video message until its local
+          // preview (thumbnail and size metadata) is ready. The compose input has
+          // already cleared, so this only delays the chat row—not the user's
+          // ability to type or send another message. A failed/timed-out preview
+          // shows the row without it after the bounded wait.
+          yield call(applyPreparedMediaPreviews, messageToSend.attachments)
+          const pendingMessage = pendingMessages[i]
+          pendingMessage.attachments = withPreparedAttachments(pendingMessage, messageToSend.attachments)
+
+          if (action.type !== RESEND_MESSAGE) {
+            yield call(loadOGMetadataForLinkMessages, [pendingMessage], true)
+            yield call(updateMessage, action.type, pendingMessage, channel.id, true, message)
+          }
+        } catch (e) {
+          // Fails the message below, as an error while sending it does.
+          showErrors[i] = e
+        }
+      }
+
       for (let i = 0; i < messagesToSend.length; i++) {
         const messageAttachment = messagesToSend[i].attachments
         let messageToSend = messagesToSend[i]
@@ -1609,38 +1652,16 @@ function* sendMessage(action: IAction): any {
             continue
           }
 
-          // Do not insert an optimistic image/video message until its local
-          // preview (thumbnail and size metadata) is ready. The compose input has
-          // already cleared, so this only delays the chat row—not the user's
-          // ability to type or send another message. A failed/timed-out preview
-          // shows the row without it after the bounded wait.
-          yield call(applyPreparedMediaPreviews, messageAttachment)
-          const pendingMessage = pendingMessages[i]
-          const withPreparedAttachments = () =>
-            pendingMessage.attachments.map((pendingAttachment: any) => {
-              const preparedAttachment = messageAttachment.find(
-                (attachment: any) => attachment.tid === pendingAttachment.tid
-              )
-              return preparedAttachment
-                ? {
-                    ...pendingAttachment,
-                    ...preparedAttachment,
-                    data: preparedAttachment.data || preparedAttachment.url
-                  }
-                : pendingAttachment
-            })
-          pendingMessage.attachments = withPreparedAttachments()
-
-          if (action.type !== RESEND_MESSAGE) {
-            yield call(loadOGMetadataForLinkMessages, [pendingMessage], true)
-            yield call(updateMessage, action.type, pendingMessage, channel.id, true, message)
+          if (showErrors[i]) {
+            throw showErrors[i]
           }
+          const pendingMessage = pendingMessages[i]
 
           // The row shows; now wait for the file to upload, which can take longer
           // (a QuickTime video converted to MP4). A failed/timed-out preparation
           // falls back to the original file after the bounded wait.
           yield call(applyPreparedMediaAttachments, messageAttachment, connectionState === CONNECTION_STATUS.CONNECTED)
-          const pendingAttachments = withPreparedAttachments()
+          const pendingAttachments = withPreparedAttachments(pendingMessage, messageAttachment)
           pendingMessage.attachments = pendingAttachments
 
           if (connectionState === CONNECTION_STATUS.CONNECTED) {

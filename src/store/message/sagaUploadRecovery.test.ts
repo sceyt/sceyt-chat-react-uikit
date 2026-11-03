@@ -650,6 +650,78 @@ describe('attachment upload recovery', () => {
     await task.toPromise()
   })
 
+  it('attachments sent as separate messages all show while the first one still uploads, and are sent in order', async () => {
+    const currentUser = makeUser({ id: 'current-user' })
+    const channel = makeUploaderChannel('channel-separate-rows')
+    const messageBuilder: any = channel.createMessageBuilder()
+    messageBuilder.create
+      .mockImplementationOnce(() => makePendingMessage({ channelId: channel.id, tid: 'separate-msg-1' }))
+      .mockImplementationOnce(() => makePendingMessage({ channelId: channel.id, tid: 'separate-msg-2' }))
+    const uploads: any[] = []
+    uploadBehavior = (_attachment, uploadTask) => uploads.push(uploadTask)
+    channel.sendMessage = jest.fn((sent: any) =>
+      Promise.resolve({
+        ...makeServerResponse(sent.tid, sent.attachments[0].tid, currentUser),
+        id: `srv-${sent.tid}`
+      })
+    )
+    setActiveChannelId(channel.id)
+    setChannelInMap(channel)
+    const file = (tid: string, name: string) => ({
+      tid,
+      type: attachmentTypes.file,
+      name,
+      size: 3,
+      data: new File(['abc'], name, { type: 'application/pdf' }),
+      metadata: '{}',
+      upload: false
+    })
+    const settle = async (done: () => boolean) => {
+      for (let attempt = 0; attempt < 200 && !done(); attempt++) {
+        await Promise.resolve()
+      }
+    }
+
+    const task = runSaga(
+      { dispatch: () => undefined, getState: () => mockStoreState },
+      __messageSagaTestables.sendMessage,
+      sendMessageAC(
+        {
+          body: 'two files',
+          bodyAttributes: [],
+          attachments: [file('separate-file-1', 'first.pdf'), file('separate-file-2', 'second.pdf')],
+          mentionedUsers: [],
+          type: 'text',
+          metadata: {},
+          parentMessage: null,
+          repliedInThread: false
+        },
+        channel.id,
+        CONNECTION_STATUS.CONNECTED,
+        true
+      )
+    )
+
+    await settle(() => uploads.length > 0)
+    expect(uploads).toHaveLength(1)
+    expect(getPendingMessagesFromMap(channel.id).map((pending) => pending.tid)).toEqual([
+      'separate-msg-1',
+      'separate-msg-2'
+    ])
+    expect(channel.sendMessage).not.toHaveBeenCalled()
+
+    uploads[0].success({ uri: 'https://cdn.example/first.pdf', blob: null })
+    await settle(() => uploads.length > 1)
+    uploads[1].success({ uri: 'https://cdn.example/second.pdf', blob: null })
+    await task.toPromise()
+
+    expect((channel.sendMessage as jest.Mock).mock.calls.map(([sent]) => sent.tid)).toEqual([
+      'separate-msg-1',
+      'separate-msg-2'
+    ])
+    expect(getPendingMessagesFromMap(channel.id)).toHaveLength(0)
+  })
+
   it('shows a video row as soon as its preview is ready, while its conversion still runs, and uploads the converted file', async () => {
     const currentUser = makeUser({ id: 'current-user' })
     const channel = makeUploaderChannel('channel-video-row-before-conversion')
