@@ -211,6 +211,31 @@ describe('SceytChat file transfer settings', () => {
     await unmountChat(view.unmount)
   })
 
+  it('a change of fileTransfer after the chat is shown is applied, and removing it goes back to the defaults', async () => {
+    const appTransport = { upload: jest.fn(), download: jest.fn(), cancelRequest: jest.fn() }
+    const chatClient = client()
+    const store = createMessageListStore()
+    const view = renderWithSceytProvider(<SceytChat client={chatClient} fileTransfer={{ transport }} />, { store })
+    await flushPromises()
+    expect(getTransport()).toBe(transport)
+    expect(getEncryptAttachments()).toBe(false)
+
+    view.rerender(
+      <SceytChat client={chatClient} fileTransfer={{ transport: appTransport, encryption, encryptUploads: true }} />
+    )
+    await flushPromises()
+    expect(getTransport()).toBe(appTransport)
+    expect(getFileEncryption()).toBe(encryption)
+    expect(getEncryptAttachments()).toBe(true)
+
+    view.rerender(<SceytChat client={chatClient} />)
+    await flushPromises()
+    expect(getTransport()).toBe(defaultFileTransferTransport)
+    expect(getFileEncryption()).toBe(fileEncryption)
+    expect(getEncryptAttachments()).toBe(false)
+    await unmountChat(view.unmount)
+  })
+
   it('CustomUploader and encryptAttachments still work, and fileTransfer takes their place when both are set', async () => {
     const appTransport = { upload: jest.fn(), download: jest.fn(), cancelRequest: jest.fn() }
     const first = await renderWith({ CustomUploader: transport, encryptAttachments: true })

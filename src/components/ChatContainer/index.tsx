@@ -35,6 +35,8 @@ export interface IUploadTask {
    * plaintext, never the encrypted bytes. `encryption` is the `encryptionInfo`
    * of the file the uploader encrypted and stored (`options.fileEncryption`):
    * required when the upload was asked to `encrypt`, or the message is not sent.
+   * An `encryption` that `options.fileEncryption` did not make for this upload
+   * (made up, or of a file sent before) is refused too.
    */
   // eslint-disable-next-line no-unused-vars
   success: ({ uri, blob, encryption }: { uri: string; blob: Blob | null; encryption?: IAttachmentEncryption }) => void

@@ -12,7 +12,8 @@ import {
   pauseUpload,
   resumeUpload,
   sdkUpload,
-  setCustomUploader
+  setCustomUploader,
+  uploadFileEncryption
 } from './customUploader'
 import { fileEncryption, setEncryptAttachments, setFileEncryption } from './attachmentEncryption'
 import { getClient, setClient } from '../common/client'
@@ -121,7 +122,7 @@ describe('encryptAttachments: uploading', () => {
     expect(calls).toHaveLength(1)
     // Files are compared by identity: a failing diff of a File crashes the jest worker.
     expect(calls[0].attachment.data === source).toBe(true)
-    expect(calls[0].args).toEqual(['text', { encrypt: false, fileEncryption }])
+    expect(calls[0].args).toEqual(['text', { encrypt: false, fileEncryption: uploadFileEncryption }])
     calls[0].task.success({ uri: 'https://cdn/plain', blob: source })
     const { uri, blob, ...rest } = await result
     expect(uri).toBe('https://cdn/plain')
@@ -175,7 +176,7 @@ describe('encryptAttachments: uploading', () => {
     // It starts at once, with the plaintext file to resize.
     expect(calls).toHaveLength(1)
     expect(calls[0].attachment.data === source).toBe(true)
-    expect(calls[0].args).toEqual(['text', { encrypt: true, fileEncryption }])
+    expect(calls[0].args).toEqual(['text', { encrypt: true, fileEncryption: uploadFileEncryption }])
     const resized = new Blob(['resized'], { type: 'image/png' })
     const { prepared, stored } = await storePrepared(calls[0], resized, 'https://cdn/streaming')
 
@@ -218,10 +219,29 @@ describe('encryptAttachments: uploading', () => {
       'text'
     )
 
-    const encryption = { v: 1, alg: 'tink-aes256-gcm-hkdf-64k+commit-v1', attachmentId: 'id-9', key: 'key-9' }
-    calls[0].task.success({ uri: 'https://cdn/encrypted-anyway', blob: file(), encryption })
+    const session = await calls[0].args[1].fileEncryption.prepareEncryption(file())
+    calls[0].task.success({ uri: 'https://cdn/encrypted-anyway', blob: file(), encryption: session.encryptionInfo })
 
-    expect((await result).encryption).toEqual(encryption)
+    expect((await result).encryption).toEqual(session.encryptionInfo)
+  })
+
+  it('an encryption the given fileEncryption did not make (made up, or of another file sent before) is not sent', async () => {
+    useUploader(true)
+    const madeUp = customUpload({ tid: 'made-up', name: 'a.png', data: file() } as any, () => undefined, 'text')
+    calls[0].task.success({
+      uri: 'https://cdn/made-up',
+      blob: file(),
+      encryption: { v: 1, alg: 'tink-aes256-gcm-hkdf-64k+commit-v1', attachmentId: 'id-9', key: 'key-9' }
+    })
+    await expect(madeUp).rejects.toThrow('did not make')
+
+    // A key already sent with another file is not taken again.
+    const first = customUpload({ tid: 'first-key', name: 'b.png', data: file() } as any, () => undefined, 'text')
+    const { prepared } = await storePrepared(calls[1], file(), 'https://cdn/first-key')
+    await first
+    const reused = customUpload({ tid: 'reused-key', name: 'c.png', data: file() } as any, () => undefined, 'text')
+    calls[2].task.success({ uri: 'https://cdn/reused-key', blob: file(), encryption: (prepared as any).encryptionInfo })
+    await expect(reused).rejects.toThrow('did not make')
   })
 
   it('with encryption off and an older SDK, an uploader with preparesFiles uploads as usual', async () => {
@@ -230,7 +250,7 @@ describe('encryptAttachments: uploading', () => {
     useUploader(true)
     customUpload({ tid: 'old-sdk', name: 'photo.png', data: file() } as any, () => undefined, 'text')
 
-    expect(calls[0].args).toEqual(['text', { encrypt: false, fileEncryption }])
+    expect(calls[0].args).toEqual(['text', { encrypt: false, fileEncryption: uploadFileEncryption }])
   })
 
   it('every file is encrypted with its own key', async () => {
@@ -657,6 +677,20 @@ describe('the default transport downloads when the app has none (client.download
 
 describe('getTransport: the transport files go through', () => {
   afterEach(() => setCustomUploader(undefined))
+
+  it('a download is cancelled through the transport it went through, even after the app changed the transport', () => {
+    const first = { upload: jest.fn(), download: jest.fn(() => new Promise(() => undefined)), cancelRequest: jest.fn() }
+    const second = { upload: jest.fn(), download: jest.fn(), cancelRequest: jest.fn() }
+    const photo = { id: 'a1', messageId: 'm1', url: 'https://cdn/p', name: 'photo.png', metadata: '{}' } as any
+    setCustomUploader(first)
+    const request = getAttachmentDownloader(photo, 'file', undefined, 'image/png')!('https://cdn/p', true, jest.fn())
+
+    setCustomUploader(second)
+    cancelDownloadRequest(request)
+
+    expect(first.cancelRequest).toHaveBeenCalledWith(request)
+    expect(second.cancelRequest).not.toHaveBeenCalled()
+  })
 
   it("is the default one (the chat client's) when the app has none", () => {
     setCustomUploader(undefined)

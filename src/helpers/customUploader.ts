@@ -8,6 +8,7 @@ import {
   getEncryptAttachments,
   getFileEncryption,
   IAttachmentEncryption,
+  IFileEncryption,
   prepareDownloadFile
 } from './attachmentEncryption'
 
@@ -57,6 +58,26 @@ export const isConnectionLost = () => {
   if (typeof navigator !== 'undefined' && navigator.onLine === false) return true
   const connectionState = getClient()?.connectionState
   return !!connectionState && connectionState !== CONNECTION_STATUS.CONNECTED
+}
+
+// The attachment ids the encryption made for uploads, until their upload succeeds
+// (the oldest go first past the limit): a transport can report only an encryption
+// made by the fileEncryption it was given, so a made-up or reused key is not sent.
+const madeAttachmentIds = new Set<string>()
+const MAX_MADE_ATTACHMENT_IDS = 1000
+
+/** The configured encryption as transports get it for uploads: it remembers the attachment ids it makes. */
+export const uploadFileEncryption: IFileEncryption = {
+  prepareEncryption: async (file) => {
+    const session = await getFileEncryption().prepareEncryption(file)
+    madeAttachmentIds.add(session.encryptionInfo.attachmentId)
+    if (madeAttachmentIds.size > MAX_MADE_ATTACHMENT_IDS) {
+      madeAttachmentIds.delete(madeAttachmentIds.values().next().value as string)
+    }
+    return session
+  },
+  prepareDecryption: (encryptedFile, encryptionInfo, type) =>
+    getFileEncryption().prepareDecryption(encryptedFile, encryptionInfo, type)
 }
 
 export interface ICustomUploadResult {
@@ -109,6 +130,17 @@ const uploadWith = (
           )
           return
         }
+        if (encryption && !madeAttachmentIds.has(encryption.attachmentId)) {
+          // Not made by the fileEncryption it was given: the file may not open with it.
+          reject(
+            new Error(
+              'The uploader reported an encryption that options.fileEncryption did not make; ' +
+                'report the encryptionInfo of the session it stored the file with'
+            )
+          )
+          return
+        }
+        if (encryption) madeAttachmentIds.delete(encryption.attachmentId)
         resolve({ uri, blob, ...(encryption ? { encryption } : {}) })
       },
       cancel: () => {},
@@ -118,7 +150,7 @@ const uploadWith = (
     pendingUploaders[attachment.tid!] = uploadTask
     const pausedBeforeStart = isUploadPausedBeforeStart(attachment.tid!)
     // The default transport sees a pause pressed before the start, and sends nothing until resume.
-    transport.upload(attachment, uploadTask, messageType, { encrypt, fileEncryption: getFileEncryption() })
+    transport.upload(attachment, uploadTask, messageType, { encrypt, fileEncryption: uploadFileEncryption })
     notStartedUploads.delete(attachment.tid!)
     if (pausedBeforeStart) {
       // The uploader installs stop() when upload() is called, so nothing is sent.
@@ -330,6 +362,9 @@ export type AttachmentDownloader = (
 // A request the attachment downloader returned, to the transport's own request
 // inside it: the transport's cancelRequest only knows its own.
 const uploaderRequests = new WeakMap<Promise<any>, Promise<any>>()
+// A request the attachment downloader returned, to the transport it went through
+// (the app may change the transport while it runs).
+const requestTransports = new WeakMap<Promise<any>, ICustomUploader>()
 
 // Fails before anything is downloaded when the chat client cannot open this
 // encrypted file's metadata (the default encryption); the app's encryption
@@ -346,6 +381,22 @@ export const getAttachmentDownloader = (
   download?: ICustomUploader['download']
 ): AttachmentDownloader => {
   const transport = getTransport()
+  const downloader = downloaderThrough(transport, attachment, kind, encryption, type, download)
+  return (url, asFile, progress, messageType) => {
+    const request = downloader(url, asFile, progress, messageType)
+    requestTransports.set(request, transport)
+    return request
+  }
+}
+
+const downloaderThrough = (
+  transport: ICustomUploader,
+  attachment: IAttachment,
+  kind: ICustomUploaderDownloadOptions['kind'],
+  encryption: IAttachmentEncryption | undefined,
+  type: string,
+  download: ICustomUploader['download'] | undefined
+): AttachmentDownloader => {
   const fileDownload = download || transport.download
   if (fileDownload === transport.download && transport.preparesFiles) {
     // The transport opens the file itself; its own request, so its cancelRequest finds it.
@@ -389,7 +440,8 @@ export const getAttachmentDownloader = (
 
 /** Cancels a request returned by a downloader from getAttachmentDownloader. */
 export const cancelDownloadRequest = (request: Promise<any>) => {
-  getTransport().cancelRequest(uploaderRequests.get(request) || request)
+  const transport = requestTransports.get(request) || getTransport()
+  transport.cancelRequest(uploaderRequests.get(request) || request)
 }
 
 export const pauseUpload = (attachmentId: string) => {

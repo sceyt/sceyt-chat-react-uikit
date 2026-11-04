@@ -901,6 +901,107 @@ describe('attachment upload recovery', () => {
       expect(getPendingMessagesFromMap(channel.id)).toHaveLength(0)
     })
 
+    const tooLarge = () => Object.assign(new Error('The file is too large'), { type: 'TooLargeRequest' })
+
+    it('a message that can never be sent (too large) does not hold back the ones after it', async () => {
+      const { channel, uploads } = setupPendingFiles('channel-resend-too-large')
+      uploadBehavior = (attachment, uploadTask) => {
+        uploads.push({ tid: attachment.tid, task: uploadTask })
+        if (attachment.tid === 'channel-resend-too-large-file-1') uploadTask.failure(tooLarge())
+        else uploadTask.success({ uri: `https://cdn.example/${attachment.tid}`, blob: null })
+      }
+
+      await resendPending().toPromise()
+
+      expect(uploads.map((upload) => upload.tid)).toEqual([
+        'channel-resend-too-large-file-1',
+        'channel-resend-too-large-file-2'
+      ])
+      expect((channel.sendMessage as jest.Mock).mock.calls.map(([sent]) => sent.tid)).toEqual([
+        'channel-resend-too-large-msg-2'
+      ])
+      // Not sent again on the next reconnect: it is no longer pending.
+      expect(getPendingMessagesFromMap(channel.id)).toHaveLength(0)
+    })
+
+    it('a lost connection in one chat does not hold back the messages of another', async () => {
+      const first = setupPendingFiles('channel-resend-chat-a')
+      const second = setupPendingFiles('channel-resend-chat-b')
+      const uploaded: string[] = []
+      uploadBehavior = (attachment, uploadTask) => {
+        uploaded.push(attachment.tid)
+        if (attachment.tid === 'channel-resend-chat-a-file-1') uploadTask.failure(networkingError())
+        else uploadTask.success({ uri: `https://cdn.example/${attachment.tid}`, blob: null })
+      }
+
+      await resendPending().toPromise()
+
+      expect(uploaded).not.toContain('channel-resend-chat-a-file-2')
+      expect(first.channel.sendMessage).not.toHaveBeenCalled()
+      expect(getPendingMessagesFromMap(first.channel.id).map((message) => message.tid)).toEqual([
+        'channel-resend-chat-a-msg-1',
+        'channel-resend-chat-a-msg-2'
+      ])
+      expect((second.channel.sendMessage as jest.Mock).mock.calls.map(([sent]) => sent.tid)).toEqual([
+        'channel-resend-chat-b-msg-1',
+        'channel-resend-chat-b-msg-2'
+      ])
+      expect(getPendingMessagesFromMap(second.channel.id)).toHaveLength(0)
+    })
+
+    it('a message deleted while it is sent again does not hold back the ones after it', async () => {
+      const { channel, pending, uploads } = setupPendingFiles('channel-resend-deleted')
+      uploadBehavior = (attachment, uploadTask) => {
+        uploads.push({ tid: attachment.tid, task: uploadTask })
+        if (attachment.tid === 'channel-resend-deleted-file-1') {
+          uploadTask.cancel = () => uploadTask.failure(new Error('Upload cancelled by user'))
+        } else {
+          uploadTask.success({ uri: `https://cdn.example/${attachment.tid}`, blob: null })
+        }
+      }
+      const run = resendPending()
+      await settle(() => uploads.length > 0)
+
+      deletePendingMessage(channel.id, pending[0])
+      await run.toPromise()
+
+      expect(uploads.map((upload) => upload.tid)).toEqual([
+        'channel-resend-deleted-file-1',
+        'channel-resend-deleted-file-2'
+      ])
+      expect((channel.sendMessage as jest.Mock).mock.calls.map(([sent]) => sent.tid)).toEqual([
+        'channel-resend-deleted-msg-2'
+      ])
+      expect(getPendingMessagesFromMap(channel.id)).toHaveLength(0)
+    })
+
+    it('a message that keeps failing holds back the ones after it until its attempts run out; then they are sent', async () => {
+      const { channel, uploads } = setupPendingFiles('channel-resend-out-of-attempts')
+      uploadBehavior = (attachment, uploadTask) => {
+        uploads.push({ tid: attachment.tid, task: uploadTask })
+        if (attachment.tid === 'channel-resend-out-of-attempts-file-1') uploadTask.failure(networkingError())
+        else uploadTask.success({ uri: `https://cdn.example/${attachment.tid}`, blob: null })
+      }
+
+      // Five reconnects (the attempt budget): each tries the first message only.
+      for (let round = 0; round < 5; round++) {
+        await resendPending().toPromise()
+      }
+      expect(uploads.map((upload) => upload.tid)).toEqual(Array(5).fill('channel-resend-out-of-attempts-file-1'))
+      expect(channel.sendMessage).not.toHaveBeenCalled()
+
+      // It is not tried again; the next one is sent, and the first stays failed for a manual retry.
+      await resendPending().toPromise()
+      expect(uploads).toHaveLength(6)
+      expect(uploads[5].tid).toBe('channel-resend-out-of-attempts-file-2')
+      expect((channel.sendMessage as jest.Mock).mock.calls.map(([sent]) => sent.tid)).toEqual([
+        'channel-resend-out-of-attempts-msg-2'
+      ])
+      expect(getPendingMessagesFromMap(channel.id).map((message) => message.tid)).toEqual([
+        'channel-resend-out-of-attempts-msg-1'
+      ])
+    })
+
     it('a message sent meanwhile (by another send) is not sent again, nor shown as failed', async () => {
       const { channel, uploads } = setupPendingFiles('channel-resend-sent-meanwhile')
       // A second file to upload (were message 2 sent again) is stored at once.
@@ -989,6 +1090,67 @@ describe('attachment upload recovery', () => {
       'wait-msg-1',
       'wait-msg-2'
     ])
+    expect(getPendingMessagesFromMap(channel.id)).toHaveLength(0)
+  })
+
+  it('a message that can never be sent (too large) does not make the next ones of its send wait: they go at once', async () => {
+    const currentUser = makeUser({ id: 'current-user' })
+    const channel = makeUploaderChannel('channel-too-large-no-wait')
+    const messageBuilder: any = channel.createMessageBuilder()
+    messageBuilder.create
+      .mockImplementationOnce(() => makePendingMessage({ channelId: channel.id, tid: 'too-large-msg-1' }))
+      .mockImplementationOnce(() => makePendingMessage({ channelId: channel.id, tid: 'too-large-msg-2' }))
+    const uploads: string[] = []
+    // The first file is refused by the server; the second goes through.
+    uploadBehavior = (attachment, uploadTask) => {
+      uploads.push(attachment.tid)
+      if (uploads.length === 1) {
+        uploadTask.failure(Object.assign(new Error('The file is too large'), { type: 'TooLargeRequest' }))
+      } else {
+        uploadTask.success({ uri: `https://cdn.example/${attachment.tid}`, blob: null })
+      }
+    }
+    channel.sendMessage = jest.fn((sent: any) =>
+      Promise.resolve({ ...makeServerResponse(sent.tid, sent.attachments[0].tid, currentUser), id: `srv-${sent.tid}` })
+    )
+    setActiveChannelId(channel.id)
+    setChannelInMap(channel)
+    const file = (tid: string, name: string) => ({
+      tid: trackedTid(tid),
+      type: attachmentTypes.file,
+      name,
+      size: 3,
+      data: new File(['abc'], name, { type: 'application/pdf' }),
+      metadata: '{}',
+      upload: false
+    })
+
+    await runSaga(
+      { dispatch: () => undefined, getState: () => mockStoreState },
+      __messageSagaTestables.sendMessage,
+      sendMessageAC(
+        {
+          body: 'two files',
+          bodyAttributes: [],
+          attachments: [file('too-large-file-1', 'huge.pdf'), file('too-large-file-2', 'small.pdf')],
+          mentionedUsers: [],
+          type: 'text',
+          metadata: {},
+          parentMessage: null,
+          repliedInThread: false
+        },
+        channel.id,
+        CONNECTION_STATUS.CONNECTED,
+        true
+      )
+    ).toPromise()
+    for (let attempt = 0; attempt < 100; attempt++) {
+      await Promise.resolve()
+    }
+
+    // Sent in the same send, and nothing is sent again afterwards.
+    expect(uploads).toEqual(['too-large-file-1', 'too-large-file-2'])
+    expect((channel.sendMessage as jest.Mock).mock.calls.map(([sent]) => sent.tid)).toEqual(['too-large-msg-2'])
     expect(getPendingMessagesFromMap(channel.id)).toHaveLength(0)
   })
 
@@ -1769,8 +1931,8 @@ describe('attachment upload recovery', () => {
   })
 
   describe('with encryptAttachments', () => {
-    // Like Waafi's uploader: it prepares the file with the chat client, stores
-    // it and reports its encryption.
+    // Like Waafi's uploader: it encrypts the file with the fileEncryption it is
+    // given, stores it and reports its encryption.
     let stored: Blob[]
     let uriFor: (attachment: any) => string
     beforeEach(() => {
@@ -1784,9 +1946,9 @@ describe('attachment upload recovery', () => {
         upload: async (attachment: any, uploadTask: any, _messageType: any, options: any) => {
           uploadCalls.push(attachment)
           const uri = uriFor(attachment)
-          const prepared = await getClient().prepareUpload(attachment.data, { encrypt: options.encrypt })
-          stored.push(await prepared.getAll())
-          uploadTask.success({ uri, blob: attachment.data, encryption: prepared.encryption })
+          const prepared = await options.fileEncryption.prepareEncryption(attachment.data)
+          stored.push(await prepared.readAll())
+          uploadTask.success({ uri, blob: attachment.data, encryption: prepared.encryptionInfo })
         },
         download: jest.fn()
       })

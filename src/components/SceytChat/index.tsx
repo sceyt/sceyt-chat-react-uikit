@@ -229,12 +229,19 @@ const SceytChat = ({
     }
   }
 
+  // fileTransfer takes the place of CustomUploader and encryptAttachments; without a
+  // transport, the default one (the chat client's) is used. A change applies to the
+  // transfers that start after it.
+  const transport = fileTransfer?.transport || CustomUploader
+  const encryptUploads = fileTransfer?.encryptUploads ?? encryptAttachments
+  const encryption = fileTransfer?.encryption
   useEffect(() => {
-    // fileTransfer takes the place of CustomUploader and encryptAttachments; without a
-    // transport, the default one (the chat client's) is used.
-    setCustomUploader(fileTransfer?.transport || CustomUploader)
-    setEncryptAttachments(fileTransfer?.encryptUploads ?? encryptAttachments)
-    setFileEncryption(fileTransfer?.encryption)
+    setCustomUploader(transport)
+    setEncryptAttachments(encryptUploads)
+    setFileEncryption(encryption)
+  }, [transport, encryptUploads, encryption])
+
+  useEffect(() => {
     if (membersDisplayTextByChannelTypesMap) {
       setChannelTypesMemberDisplayTextMap(membersDisplayTextByChannelTypesMap)
     }
