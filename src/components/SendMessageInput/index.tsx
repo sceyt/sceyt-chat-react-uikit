@@ -3532,7 +3532,6 @@ const LinkPreviewTitle = styled.div<{ color: string }>`
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-family: Inter;
   font-weight: 500;
   font-size: 13px;
   line-height: 16px;

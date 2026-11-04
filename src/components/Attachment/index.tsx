@@ -172,11 +172,17 @@ const Attachment = ({
   const currentAttachmentKeyRef = useRef(attachmentKey)
   currentAttachmentKeyRef.current = attachmentKey
   const [failTimeout, setFailTimeout]: any = useState()
-  const [progress, setProgress] = useState(3)
-  const [sizeProgress, setSizeProgress] = useState<{ loaded: number; total: number } | undefined>({
-    loaded: 0,
-    total: attachment?.size || 0
-  })
+  // The upload progress stored for this attachment: kept (and never going back)
+  // across a failed send and the next one, so the message shows it from its first render.
+  const storedUploadProgress = attachmentsUploadProgress[attachment.tid || attachment.id || '']
+  const [progress, setProgress] = useState(
+    storedUploadProgress?.progress && storedUploadProgress.progress * 100 > 3 ? storedUploadProgress.progress * 100 : 3
+  )
+  const [sizeProgress, setSizeProgress] = useState<{ loaded: number; total: number } | undefined>(
+    storedUploadProgress
+      ? { loaded: storedUploadProgress.uploaded || 0, total: storedUploadProgress.total || 0 }
+      : { loaded: 0, total: attachment?.size || 0 }
+  )
   const [isCached, setIsCached] = useState(true)
   // const [linkTitle, setLinkTitle] = useState('')
   // const [linkDescription, setLinkDescription] = useState('')
@@ -249,6 +255,8 @@ const Attachment = ({
       attachmentCompilationState[attachment.tid!] === UPLOAD_STATE.UPLOADING ||
       attachmentCompilationState[attachment.tid!] === UPLOAD_STATE.PAUSED)
   const isPreparingVideo = attachmentCompilationState[attachment.tid!] === UPLOAD_STATE.PREPARING
+  // A video prepared for its first send has no progress yet; one sent again keeps what was uploaded.
+  const hidesVideoProgress = isPreparingVideo && !storedUploadProgress
   const isSharedOriginalVideoDownloading = sharedOriginalVideoDownload.state === 'loading'
   const isSharedOriginalVideoCancelled = sharedOriginalVideoDownload.state === 'cancelled'
   // A failed download offers the same Download control as a cancelled one, so
@@ -1234,7 +1242,7 @@ const Attachment = ({
                           <CircularProgressbar
                             minValue={0}
                             maxValue={100}
-                            value={isPreparingVideo ? 3 : videoProgress}
+                            value={hidesVideoProgress ? 3 : videoProgress}
                             backgroundPadding={3}
                             background={true}
                             text=''
@@ -1255,7 +1263,7 @@ const Attachment = ({
                         </ProgressWrapper>
                         {videoSizeProgress && !isRepliedMessage && (
                           <SizeProgress color={textOnPrimary}>
-                            {bytesToSize(isPreparingVideo ? 0 : videoSizeProgress.loaded, 1)} /{' '}
+                            {bytesToSize(hidesVideoProgress ? 0 : videoSizeProgress.loaded, 1)} /{' '}
                             {bytesToSize(videoSizeProgress.total, 1)}
                           </SizeProgress>
                         )}

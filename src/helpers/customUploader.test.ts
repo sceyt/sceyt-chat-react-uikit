@@ -620,6 +620,52 @@ describe('sdkUpload: one attachment uploaded with client.upload', () => {
   }
   const flush = () => new Promise((resolve) => setTimeout(resolve, 0))
 
+  it('shows no progress reported while the browser is offline, nor holds it', async () => {
+    const progress = jest.fn()
+    const onLine = jest.spyOn(window.navigator, 'onLine', 'get')
+    try {
+      sdkUpload(attachment('offline-progress-tid'), progress)
+      onLine.mockReturnValue(true)
+      uploads[0].options.progress(2, 10)
+      // The network went off: the browser reports bytes it put into a lost connection.
+      onLine.mockReturnValue(false)
+      uploads[0].options.progress(10, 10)
+      onLine.mockReturnValue(true)
+      uploads[0].options.progress(3, 10)
+
+      expect(progress.mock.calls).toEqual([[{ loaded: 2, total: 10 }], [{ loaded: 3, total: 10 }]])
+    } finally {
+      onLine.mockRestore()
+    }
+  })
+
+  it('shows no progress reported while the chat is not connected (online, but every packet lost), nor holds it', async () => {
+    const progress = jest.fn()
+    sdkUpload(attachment('disconnected-progress-tid'), progress)
+    Object.assign(getClient(), { connectionState: 'Connected' })
+    uploads[0].options.progress(2, 10)
+    // The browser stays online; the chat connection timed out.
+    Object.assign(getClient(), { connectionState: 'Connecting' })
+    uploads[0].options.progress(10, 10)
+    Object.assign(getClient(), { connectionState: 'Connected' })
+    uploads[0].options.progress(3, 10)
+
+    expect(progress.mock.calls).toEqual([[{ loaded: 2, total: 10 }], [{ loaded: 3, total: 10 }]])
+  })
+
+  it('shows no progress the browser reports for a request that already failed', async () => {
+    const progress = jest.fn()
+    const result = sdkUpload(attachment('late-progress-tid'), progress)
+    uploads[0].options.progress(2, 10)
+    uploads[0].fail(new TypeError('Network Error'))
+    await expect(result).rejects.toThrow('Network Error')
+
+    // The lost request's last bytes are reported after it failed.
+    uploads[0].options.progress(4, 10)
+
+    expect(progress.mock.calls).toEqual([[{ loaded: 2, total: 10 }]])
+  })
+
   it('uploads the file and gives back its URL and the file as the user sees it', async () => {
     const file = fileOf('hello')
 

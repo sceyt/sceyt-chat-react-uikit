@@ -189,6 +189,7 @@ import { navigateToLatest } from '../../helpers/messageListNavigator'
 import { CONNECTION_STATUS } from '../user/constants'
 import {
   getSendAttachmentsAsSeparateMessages,
+  isConnectionLost,
   isUploadNotStarted,
   isUploadPausedBeforeStart,
   markUploadNotStarted,
@@ -228,6 +229,11 @@ import {
 const MAX_AUTO_RESEND_ATTEMPTS = 5
 const autoResendAttempts = new Map<string, number>()
 const autoResendsInFlight = new Set<string>()
+// Messages a running sendMessage still uploads or sends, by `${channelId}:${tid}`.
+// A reconnect resend leaves them to it: their uploads go on once the network is
+// back, and sending them again would upload their files a second time.
+const messagesBeingSent = new Set<string>()
+const beingSentKey = (channelId: string, tid: string) => `${channelId}:${tid}`
 const loadMoreMessagesInFlight = new Set<string>()
 const prefetchInFlight = new Set<string>()
 const queuedPrefetchRequests = new Map<string, { fromMessageId: string; pages: number }>()
@@ -321,13 +327,9 @@ const getAttachmentSourceFile = (attachment: IAttachment): File | null => {
     : new File([source], attachment.name || 'attachment', { type: source.type || 'application/octet-stream' })
 }
 
-const prepareAndUploadVideoPreview = async (attachment: IAttachment, messageType: string | null | undefined) => {
-  const videoFile =
-    attachment.url instanceof Blob ? attachment.url : attachment.data instanceof Blob ? attachment.data : null
-  if (!videoFile) {
-    throw createAttachmentUnavailableError(`Video file for tid ${attachment.tid} is unavailable for preview generation`)
-  }
-
+// Uploads the preview image of a video (its first frame, or the one made when it
+// was added) and returns its URL and encryption.
+const uploadVideoPreview = async (attachment: IAttachment, videoFile: Blob, messageType: string | null | undefined) => {
   const previewBlob = attachment.videoPreviewBlob instanceof Blob ? attachment.videoPreviewBlob : undefined
   const frame = previewBlob ? undefined : await getVideoPreviewFrame(videoFile)
   const previewImageBlob = previewBlob || frame?.blob
@@ -351,21 +353,35 @@ const prepareAndUploadVideoPreview = async (attachment: IAttachment, messageType
     metadata: '{}',
     upload: false
   } as IAttachment
-  const { uri: videoThumb, encryption: videoThumbEncryption } = await uploadAttachmentFile(
-    previewAttachment,
-    () => undefined,
-    messageType
-  )
-
-  if (typeof videoThumb !== 'string' || !videoThumb) {
+  const { uri, encryption } = await uploadAttachmentFile(previewAttachment, () => undefined, messageType)
+  if (typeof uri !== 'string' || !uri) {
     throw new Error('Video preview upload did not return a URL')
   }
+  return { url: uri, encryption }
+}
 
-  const metadata = withVideoThumb(attachment.metadata, videoThumb)
+const prepareAndUploadVideoPreview = async (attachment: IAttachment, messageType: string | null | undefined) => {
+  const videoFile =
+    attachment.url instanceof Blob ? attachment.url : attachment.data instanceof Blob ? attachment.data : null
+  if (!videoFile) {
+    throw createAttachmentUnavailableError(`Video file for tid ${attachment.tid} is unavailable for preview generation`)
+  }
+
+  // A preview an earlier send of this message uploaded (its video upload then
+  // failed, e.g. the network went off) goes with the video again.
+  let preview = attachment.tid ? getPendingAttachment(attachment.tid)?.videoPreview : undefined
+  if (!preview) {
+    preview = await uploadVideoPreview(attachment, videoFile, messageType)
+    if (attachment.tid) {
+      setPendingAttachment(attachment.tid, { videoPreview: preview })
+    }
+  }
+
+  const metadata = withVideoThumb(attachment.metadata, preview.url)
   return {
     ...attachment,
     videoPreviewBlob: undefined,
-    metadata: videoThumbEncryption ? withVideoThumbEncryption(metadata, videoThumbEncryption) : metadata
+    metadata: preview.encryption ? withVideoThumbEncryption(metadata, preview.encryption) : metadata
   }
 }
 
@@ -590,6 +606,8 @@ export const handleUploadAttachments = async (attachments: IAttachment[], messag
   return await Promise.all(
     attachments.map(async (attachment) => {
       const handleUploadProgress = ({ loaded, total }: IProgress) => {
+        // Bytes the browser reports while the connection is lost went into it.
+        if (isConnectionLost()) return
         store.dispatch(updateAttachmentUploadingProgressAC(loaded, total, attachment.tid))
       }
       const shouldRecoverVideoSource = attachment.type === attachmentTypes.video && !(attachment.url instanceof Blob)
@@ -1282,6 +1300,7 @@ function* sendMessage(action: IAction): any {
   const { payload } = action
   const { message, connectionState, channelId, sendAttachmentsAsSeparateMessage } = payload
   const pendingMessages: IMessage[] = []
+  const beingSent: string[] = []
   try {
     let channel: IChannel = yield call(getChannelFromMap, channelId)
     if (!channel) {
@@ -1479,6 +1498,13 @@ function* sendMessage(action: IAction): any {
         }
       }
 
+      messagesToSend.forEach((messageToSend) => {
+        if (!messageToSend.tid) return
+        const key = beingSentKey(channel.id, messageToSend.tid)
+        messagesBeingSent.add(key)
+        beingSent.push(key)
+      })
+
       // Show every message's row first. Each one waits only for its own preview,
       // not for the messages before it to upload and send (attachments sent as
       // separate messages would otherwise appear one at a time).
@@ -1508,6 +1534,11 @@ function* sendMessage(action: IAction): any {
         }
       }
 
+      // Set when a message fails on an error worth trying again (a lost connection):
+      // the next ones are not tried now. They fail with it, and the pending run
+      // sends them after it, in order (trying them now would upload them while it
+      // is sent again, and send them before it).
+      let waitsForFailed: unknown = null
       for (let i = 0; i < messagesToSend.length; i++) {
         const messageAttachment = messagesToSend[i].attachments
         let messageToSend = messagesToSend[i]
@@ -1526,6 +1557,9 @@ function* sendMessage(action: IAction): any {
             continue
           }
 
+          if (waitsForFailed) {
+            throw waitsForFailed
+          }
           if (showErrors[i]) {
             throw showErrors[i]
           }
@@ -1705,6 +1739,9 @@ function* sendMessage(action: IAction): any {
             continue
           }
           const isErrorResendable = isResendableError(e?.type)
+          if (isErrorResendable) {
+            waitsForFailed = waitsForFailed || e
+          }
           if (channel?.id && messageToSend?.tid) {
             log.error('Error on uploading attachment', messageToSend.tid, e)
             if (messageToSend.attachments?.length) {
@@ -1720,12 +1757,30 @@ function* sendMessage(action: IAction): any {
               isErrorResendable
             )
           }
+        } finally {
+          // Sent, failed or deleted: a reconnect resend may take it from here.
+          const sentTid = messagesToSend[i].tid
+          if (sentTid) {
+            messagesBeingSent.delete(beingSentKey(channel.id, sentTid))
+          }
         }
+      }
+      if (
+        waitsForFailed &&
+        action.type !== RESEND_MESSAGE &&
+        connectionState === CONNECTION_STATUS.CONNECTED &&
+        store.getState().UserReducer.connectionStatus === CONNECTION_STATUS.CONNECTED
+      ) {
+        // Lost while being sent, and the connection is already back (a reconnect
+        // sends them otherwise): the failed message and the ones that waited go now, in order.
+        yield spawn(sendPendingMessages, CONNECTION_STATUS.CONNECTED)
       }
     }
   } catch (e) {
     log.error('error on send message ... ', e)
     // yield put(setErrorNotification(`${e.message} ${e.code}`));
+  } finally {
+    beingSent.forEach((key) => messagesBeingSent.delete(key))
   }
 }
 
@@ -2244,15 +2299,47 @@ function* editMessage(action: IAction): any {
   }
 }
 
-const sendPendingMessages = function* (connectionState: string) {
+// The run of sendPendingMessages going on, if any. The reconnect and each chat
+// that loads start one; a second one at the same time would send the next
+// message while the first still uploads (they then arrive out of order), and
+// send again a message the other one sent meanwhile. A call while a run goes
+// on asks it to go round once more instead.
+let pendingMessagesRun: { again: boolean; connectionState: string } | null = null
+
+const sendPendingMessages = function* (connectionState: string): any {
+  if (pendingMessagesRun) {
+    pendingMessagesRun.again = true
+    pendingMessagesRun.connectionState = connectionState
+    return
+  }
+  const run = { again: true, connectionState }
+  pendingMessagesRun = run
+  try {
+    while (run.again) {
+      run.again = false
+      yield call(sendPendingMessagesInOrder, run.connectionState)
+    }
+  } finally {
+    pendingMessagesRun = null
+  }
+}
+
+// Sends each pending message again, one at a time, in the order they were written.
+const sendPendingMessagesInOrder = function* (connectionState: string) {
   const pendingMessagesMap = getAllPendingFromMap()
   for (const channelId in pendingMessagesMap) {
-    for (const msg of pendingMessagesMap[channelId]) {
+    for (const listed of pendingMessagesMap[channelId]) {
+      // The list was made when the run started: a message sent (or deleted) since is left out.
+      const msg = getPendingMessagesFromMap(channelId).find((pending) => pending.tid === listed.tid)
+      if (!msg) {
+        continue
+      }
       const attachments = msg?.attachments?.filter((att: IAttachment) => att?.type !== attachmentTypes.link)
       const resendKey = msg?.tid || msg?.id
       const resendInFlightKey = resendKey ? `${channelId}:${resendKey}` : null
       if (resendKey) {
-        if (autoResendsInFlight.has(resendInFlightKey!)) {
+        // Still being sent (or resent): sending it again would upload its files twice.
+        if (autoResendsInFlight.has(resendInFlightKey!) || messagesBeingSent.has(resendInFlightKey!)) {
           continue
         }
         const attempts = autoResendAttempts.get(resendKey) || 0
@@ -2293,6 +2380,12 @@ const sendPendingMessages = function* (connectionState: string) {
         if (resendInFlightKey) {
           autoResendsInFlight.delete(resendInFlightKey)
         }
+      }
+      // Still pending: it failed again on a lost connection (a message that cannot be sent
+      // is no longer pending). The later messages of this chat wait, or they would arrive
+      // before it; the next round (the reconnect) starts again from this one.
+      if (getPendingMessagesFromMap(channelId).some((pending) => pending.tid === msg.tid)) {
+        break
       }
     }
   }
@@ -5078,6 +5171,8 @@ export const __resetMessageSagaTestState = () => {
   prefetchCancelVersions.clear()
   autoResendAttempts.clear()
   autoResendsInFlight.clear()
+  messagesBeingSent.clear()
+  pendingMessagesRun = null
   activeChannelLoadsInFlight = 0
   activeDisplayedCacheKey = null
   activeDisplayedAttachmentScope = null

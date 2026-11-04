@@ -2,6 +2,7 @@ import { ICustomUploader, ICustomUploaderDownloadOptions, IProgress, IUploadTask
 import { IAttachment } from '../types'
 import log from 'loglevel'
 import { getClient } from '../common/client'
+import { CONNECTION_STATUS } from '../store/user/constants'
 import { getEncryptAttachments, IAttachmentEncryption, prepareDownloadFile } from './attachmentEncryption'
 
 let CustomUploader: ICustomUploader
@@ -39,6 +40,18 @@ export const getCustomDownloader = (): ICustomUploader['download'] | undefined =
 // Whether the uploader prepares the files it stores and opens the ones it
 // downloads, with the chat client.
 const uploaderPreparesFiles = () => !!CustomUploader && !!CustomUploader.preparesFiles
+
+/**
+ * Whether the connection is lost: the browser is offline, or the chat client is
+ * not connected (the network may be up but lose every packet). Upload progress
+ * reported then is not shown: the browser still puts the rest of a request into
+ * the lost connection and counts those bytes as sent (the bar would run to the end).
+ */
+export const isConnectionLost = () => {
+  if (typeof navigator !== 'undefined' && navigator.onLine === false) return true
+  const connectionState = getClient()?.connectionState
+  return !!connectionState && connectionState !== CONNECTION_STATUS.CONNECTED
+}
 
 export interface ICustomUploadResult {
   uri: string
@@ -148,15 +161,20 @@ export const sdkUpload = (
     const send = () => {
       const current = new AbortController()
       request = current
+      // The browser may still report progress for a request that failed (the bytes it had sent): not shown.
+      let settled = false
       getClient()
         .upload(file, {
           encrypt: getEncryptAttachments(),
           signal: current.signal,
           progress: (loaded: number, total: number) => {
-            if (current.signal.aborted || loaded < shownLoaded) return
+            if (settled || current.signal.aborted || loaded < shownLoaded || isConnectionLost()) return
             shownLoaded = loaded
             progress({ loaded, total })
           }
+        })
+        .finally(() => {
+          settled = true
         })
         .then(
           ({ url, encryption }: { url: string; encryption?: IAttachmentEncryption }) => {

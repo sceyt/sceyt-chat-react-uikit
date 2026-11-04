@@ -1,4 +1,7 @@
 import React from 'react'
+import { renderToString } from 'react-dom/server'
+import { Provider } from 'react-redux'
+import { SceytReduxContext } from '../../store/context'
 import { act, fireEvent, screen } from '@testing-library/react'
 import Attachment from './index'
 import { attachmentTypes } from '../../helpers/constants'
@@ -1161,6 +1164,49 @@ describe('the upload stop and resume control', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Stop upload' }))
 
     expect(dispatch).toHaveBeenCalledWith(pauseAttachmentUploadingAC('video-attachment-tid'))
+  })
+
+  describe('the upload progress of a video sent again (after a lost connection)', () => {
+    // The first render, before any effect runs: what the message shows the moment it is drawn.
+    const firstRender = (messageState: Record<string, any>) =>
+      renderToString(
+        <Provider
+          context={SceytReduxContext}
+          store={createMessageListStore({
+            UserReducer: { connectionStatus: CONNECTION_STATUS.CONNECTED },
+            MessageReducer: messageState
+          })}
+        >
+          <Attachment attachment={videoAttachment as any} backgroundColor='#ffffff' videoAttachmentMaxWidth={420} />
+        </Provider>
+      )
+    const stored = { 'video-attachment-tid': { uploaded: 4_000_000, total: 10_000_000, progress: 0.4 } }
+
+    it('shows what was uploaded, not 0, when the message is drawn again', () => {
+      const html = firstRender({
+        attachmentsUploadingState: { 'video-attachment-tid': 'uploading' },
+        attachmentsUploadingProgress: stored
+      })
+
+      expect(html).toContain('4 MB')
+      expect(html).not.toContain('0 Bytes')
+    })
+
+    it('shows what was uploaded, not 0, while the video is prepared again', () => {
+      const html = firstRender({
+        attachmentsUploadingState: { 'video-attachment-tid': 'preparing' },
+        attachmentsUploadingProgress: stored
+      })
+
+      expect(html).toContain('4 MB')
+      expect(html).not.toContain('0 Bytes')
+    })
+
+    it('a video prepared for the first time shows no progress yet', () => {
+      const html = firstRender({ attachmentsUploadingState: { 'video-attachment-tid': 'preparing' } })
+
+      expect(html).toContain('0 Bytes')
+    })
   })
 
   it('the upload control is named after what a click does', async () => {

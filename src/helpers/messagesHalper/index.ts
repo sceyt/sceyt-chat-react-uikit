@@ -2,6 +2,7 @@ import { IAttachment, IMarker, IMessage, IPollVote, IReaction } from '../../type
 import { checkArraysEqual } from '../index'
 import { attachmentTypes, MESSAGE_DELIVERY_STATUS, MESSAGE_STATUS } from '../constants'
 import { cancelUpload } from '../customUploader'
+import { IAttachmentEncryption } from '../attachmentEncryption'
 import { releaseBlobUrls } from '../attachmentBlobUrls'
 import { clearVideoPreparation } from '../attachmentPreparation'
 import { handleVoteDetails } from '../message'
@@ -327,6 +328,9 @@ type PendingAttachment = {
   file?: File
   messageTid?: string
   channelId?: string
+  // A video's preview image, once uploaded: a later send of the message (after its
+  // video upload failed) uses it instead of uploading another one.
+  videoPreview?: { url: string; encryption?: IAttachmentEncryption }
 }
 
 const pendingAttachments: { [key: string]: PendingAttachment } = {}

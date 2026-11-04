@@ -9,7 +9,8 @@ import {
   getPendingAttachment,
   getMessageFromMap,
   getPendingMessagesFromMap,
-  setPendingAttachment
+  setPendingAttachment,
+  updateMessageOnMap
 } from '../../helpers/messagesHalper'
 import { destroyChannelsMap, setActiveChannelId, setChannelInMap } from '../../helpers/channelHalper'
 import { CONNECTION_STATUS } from '../user/constants'
@@ -25,6 +26,7 @@ import {
   deleteMessageAC,
   resendMessageAC,
   sendMessageAC,
+  updateAttachmentUploadingProgressAC,
   updateAttachmentUploadingStateAC,
   updateMessageAC
 } from './actions'
@@ -222,6 +224,11 @@ describe('attachment upload recovery', () => {
   const trackPendingAttachment = (tid: string, data: { file?: File }) => {
     usedAttachmentTids.push(tid)
     setPendingAttachment(tid, data)
+  }
+  // An attachment tid whose pending entry (the sending code may add one) is cleared after the test.
+  const trackedTid = (tid: string) => {
+    usedAttachmentTids.push(tid)
+    return tid
   }
 
   beforeEach(() => {
@@ -717,6 +724,350 @@ describe('attachment upload recovery', () => {
     expect((channel.sendMessage as jest.Mock).mock.calls.map(([sent]) => sent.tid)).toEqual([
       'separate-msg-1',
       'separate-msg-2'
+    ])
+    expect(getPendingMessagesFromMap(channel.id)).toHaveLength(0)
+  })
+
+  it('shows no upload progress reported while the browser is offline (bytes that went into a lost connection)', async () => {
+    const channel = makeUploaderChannel('channel-offline-progress')
+    const file = new File(['abc'], 'report.pdf', { type: 'application/pdf' })
+    const attachment = {
+      ...makeAttachment(trackedTid('offline-progress-tid'), file),
+      url: file,
+      type: attachmentTypes.file
+    }
+    let task: any
+    uploadBehavior = (_attachment, uploadTask) => (task = uploadTask)
+    const onLine = jest.spyOn(window.navigator, 'onLine', 'get')
+    try {
+      const upload = handleUploadAttachments([attachment], { type: 'text' } as any, channel)
+      await Promise.resolve()
+      await Promise.resolve()
+      onLine.mockReturnValue(true)
+      task.progress({ loaded: 1, total: 10 })
+      onLine.mockReturnValue(false)
+      task.progress({ loaded: 10, total: 10 })
+      onLine.mockReturnValue(true)
+      task.progress({ loaded: 2, total: 10 })
+      task.success({ uri: 'https://cdn.example/report.pdf', blob: null })
+      await upload
+
+      expect(
+        mockStore.dispatch.mock.calls
+          .map(([action]) => action)
+          .filter((action) => action.type === updateAttachmentUploadingProgressAC(0, 0, '').type)
+          .map((action) => action.payload.uploaded)
+      ).toEqual([1, 2])
+    } finally {
+      onLine.mockRestore()
+    }
+  })
+
+  it('shows no upload progress reported while the chat is not connected (online, but every packet lost)', async () => {
+    const channel = makeUploaderChannel('channel-disconnected-progress')
+    const file = new File(['abc'], 'report.pdf', { type: 'application/pdf' })
+    const attachment = {
+      ...makeAttachment(trackedTid('disconnected-progress-tid'), file),
+      url: file,
+      type: attachmentTypes.file
+    }
+    let task: any
+    uploadBehavior = (_attachment, uploadTask) => (task = uploadTask)
+    const upload = handleUploadAttachments([attachment], { type: 'text' } as any, channel)
+    await Promise.resolve()
+    await Promise.resolve()
+    Object.assign(getClient(), { connectionState: CONNECTION_STATUS.CONNECTED })
+    task.progress({ loaded: 1, total: 10 })
+    // The browser stays online; the chat connection timed out.
+    Object.assign(getClient(), { connectionState: CONNECTION_STATUS.CONNECTING })
+    task.progress({ loaded: 10, total: 10 })
+    Object.assign(getClient(), { connectionState: CONNECTION_STATUS.CONNECTED })
+    task.progress({ loaded: 2, total: 10 })
+    task.success({ uri: 'https://cdn.example/report.pdf', blob: null })
+    await upload
+
+    expect(
+      mockStore.dispatch.mock.calls
+        .map(([action]) => action)
+        .filter((action) => action.type === updateAttachmentUploadingProgressAC(0, 0, '').type)
+        .map((action) => action.payload.uploaded)
+    ).toEqual([1, 2])
+  })
+
+  describe('pending messages sent again (after a lost connection)', () => {
+    // Two failed messages of a chat, each with a file, waiting to be sent again.
+    const setupPendingFiles = (channelId: string) => {
+      const currentUser = makeUser({ id: 'current-user' })
+      const channel = makeUploaderChannel(channelId)
+      const pending = [1, 2].map((n) => {
+        const file = new File([`file-${n}`], `file-${n}.pdf`, { type: 'application/pdf' })
+        trackPendingAttachment(`${channelId}-file-${n}`, { file })
+        const message = makePendingMessage({
+          channelId,
+          tid: `${channelId}-msg-${n}`,
+          user: currentUser,
+          state: MESSAGE_STATUS.FAILED,
+          attachments: [
+            { ...makeAttachment(`${channelId}-file-${n}`, file), type: attachmentTypes.file, name: file.name }
+          ]
+        })
+        addMessageToMap(channelId, message)
+        return message
+      })
+      const uploads: { tid: string; task: any }[] = []
+      uploadBehavior = (attachment, uploadTask) => uploads.push({ tid: attachment.tid, task: uploadTask })
+      channel.sendMessage = jest.fn((sent: any) =>
+        Promise.resolve({
+          ...makeServerResponse(sent.tid, sent.attachments[0].tid, currentUser),
+          id: `srv-${sent.tid}`
+        })
+      )
+      setActiveChannelId(channelId)
+      setChannelInMap(channel)
+      return { channel, pending, uploads }
+    }
+    const resendPending = () =>
+      runSaga(
+        { dispatch: () => undefined, getState: () => mockStoreState },
+        __messageSagaTestables.sendPendingMessages,
+        CONNECTION_STATUS.CONNECTED
+      )
+    const settle = async (done: () => boolean = () => false) => {
+      for (let attempt = 0; attempt < 200 && !done(); attempt++) {
+        await Promise.resolve()
+      }
+    }
+
+    it('are sent one at a time, in order, even when two resends start at once (reconnect, and the chat loading)', async () => {
+      const { channel, uploads } = setupPendingFiles('channel-resend-in-order')
+
+      const first = resendPending()
+      const second = resendPending()
+      await settle()
+      // Only the first message's file uploads.
+      expect(uploads.map((upload) => upload.tid)).toEqual(['channel-resend-in-order-file-1'])
+
+      uploads[0].task.success({ uri: 'https://cdn.example/file-1.pdf', blob: null })
+      await settle(() => uploads.length > 1)
+      expect(uploads.map((upload) => upload.tid)).toEqual([
+        'channel-resend-in-order-file-1',
+        'channel-resend-in-order-file-2'
+      ])
+      uploads[1].task.success({ uri: 'https://cdn.example/file-2.pdf', blob: null })
+      await first.toPromise()
+      await second.toPromise()
+
+      expect((channel.sendMessage as jest.Mock).mock.calls.map(([sent]) => sent.tid)).toEqual([
+        'channel-resend-in-order-msg-1',
+        'channel-resend-in-order-msg-2'
+      ])
+      expect(getPendingMessagesFromMap(channel.id)).toHaveLength(0)
+    })
+
+    it('when one fails again, the ones after it wait: the next round sends them after it, in order', async () => {
+      const { channel, uploads } = setupPendingFiles('channel-resend-fails-again')
+      // Were the second message tried, its small file would go through (the network came back meanwhile).
+      uploadBehavior = (attachment, uploadTask) => {
+        uploads.push({ tid: attachment.tid, task: uploadTask })
+        if (attachment.tid === 'channel-resend-fails-again-file-2') {
+          uploadTask.success({ uri: 'https://cdn.example/file-2.pdf', blob: null })
+        }
+      }
+      const run = resendPending()
+      await settle(() => uploads.length > 0)
+      // The connection is lost again while the first message's file uploads.
+      uploads[0].task.failure(networkingError())
+      await run.toPromise()
+
+      // The second message was not tried meanwhile (it would be sent before the first).
+      expect(uploads.map((upload) => upload.tid)).toEqual(['channel-resend-fails-again-file-1'])
+      expect(channel.sendMessage).not.toHaveBeenCalled()
+      expect(getPendingMessagesFromMap(channel.id).map((message) => message.tid)).toEqual([
+        'channel-resend-fails-again-msg-1',
+        'channel-resend-fails-again-msg-2'
+      ])
+
+      // The connection is back: the next round sends both, in order.
+      uploadBehavior = (attachment, uploadTask) => {
+        uploads.push({ tid: attachment.tid, task: uploadTask })
+        uploadTask.success({ uri: `https://cdn.example/${attachment.tid}`, blob: null })
+      }
+      await resendPending().toPromise()
+
+      expect((channel.sendMessage as jest.Mock).mock.calls.map(([sent]) => sent.tid)).toEqual([
+        'channel-resend-fails-again-msg-1',
+        'channel-resend-fails-again-msg-2'
+      ])
+      expect(getPendingMessagesFromMap(channel.id)).toHaveLength(0)
+    })
+
+    it('a message sent meanwhile (by another send) is not sent again, nor shown as failed', async () => {
+      const { channel, uploads } = setupPendingFiles('channel-resend-sent-meanwhile')
+      // A second file to upload (were message 2 sent again) is stored at once.
+      uploadBehavior = (attachment, uploadTask) => {
+        uploads.push({ tid: attachment.tid, task: uploadTask })
+        if (attachment.tid === 'channel-resend-sent-meanwhile-file-2') {
+          uploadTask.success({ uri: 'https://cdn.example/file-2.pdf', blob: null })
+        }
+      }
+      const run = resendPending()
+      await settle(() => uploads.length > 0)
+
+      // Message 2 is sent by another send while the first message uploads.
+      updateMessageOnMap(channel.id, {
+        messageId: 'channel-resend-sent-meanwhile-msg-2',
+        params: { id: 'srv-msg-2', state: MESSAGE_STATUS.UNMODIFIED }
+      })
+      // The first message's upload is lost again.
+      uploads[0].task.failure(networkingError())
+      await run.toPromise()
+
+      expect(uploads.map((upload) => upload.tid)).toEqual(['channel-resend-sent-meanwhile-file-1'])
+      expect(channel.sendMessage).not.toHaveBeenCalled()
+      expect(
+        getMessageFromMap(channel.id, 'srv-msg-2') ||
+          getMessageFromMap(channel.id, 'channel-resend-sent-meanwhile-msg-2')
+      ).toEqual(expect.objectContaining({ id: 'srv-msg-2', state: MESSAGE_STATUS.UNMODIFIED }))
+    })
+  })
+
+  it('when a lost connection fails a message, the next ones wait for it: they are sent after it, in order', async () => {
+    const currentUser = makeUser({ id: 'current-user' })
+    const channel = makeUploaderChannel('channel-wait-for-failed')
+    const messageBuilder: any = channel.createMessageBuilder()
+    messageBuilder.create
+      .mockImplementationOnce(() => makePendingMessage({ channelId: channel.id, tid: 'wait-msg-1' }))
+      .mockImplementationOnce(() => makePendingMessage({ channelId: channel.id, tid: 'wait-msg-2' }))
+    const uploads: string[] = []
+    // The first upload is cut by a lost connection; every later one goes through.
+    uploadBehavior = (attachment, uploadTask) => {
+      uploads.push(attachment.tid)
+      if (uploads.length === 1) uploadTask.failure(networkingError())
+      else uploadTask.success({ uri: `https://cdn.example/${attachment.tid}`, blob: null })
+    }
+    channel.sendMessage = jest.fn((sent: any) =>
+      Promise.resolve({ ...makeServerResponse(sent.tid, sent.attachments[0].tid, currentUser), id: `srv-${sent.tid}` })
+    )
+    setActiveChannelId(channel.id)
+    setChannelInMap(channel)
+    const file = (tid: string, name: string) => ({
+      tid: trackedTid(tid),
+      type: attachmentTypes.file,
+      name,
+      size: 3,
+      data: new File(['abc'], name, { type: 'application/pdf' }),
+      metadata: '{}',
+      upload: false
+    })
+
+    await runSaga(
+      { dispatch: () => undefined, getState: () => mockStoreState },
+      __messageSagaTestables.sendMessage,
+      sendMessageAC(
+        {
+          body: 'two files',
+          bodyAttributes: [],
+          attachments: [file('wait-file-1', 'first.pdf'), file('wait-file-2', 'second.pdf')],
+          mentionedUsers: [],
+          type: 'text',
+          metadata: {},
+          parentMessage: null,
+          repliedInThread: false
+        },
+        channel.id,
+        CONNECTION_STATUS.CONNECTED,
+        true
+      )
+    ).toPromise()
+    // The connection is back: the waiting messages are sent again, one at a time, in order.
+    for (let attempt = 0; attempt < 400 && getPendingMessagesFromMap(channel.id).length > 0; attempt++) {
+      await Promise.resolve()
+    }
+
+    expect(uploads).toEqual(['wait-file-1', 'wait-file-1', 'wait-file-2'])
+    expect((channel.sendMessage as jest.Mock).mock.calls.map(([sent]) => sent.tid)).toEqual([
+      'wait-msg-1',
+      'wait-msg-2'
+    ])
+    expect(getPendingMessagesFromMap(channel.id)).toHaveLength(0)
+  })
+
+  it('a reconnect while messages are still uploading leaves them to that send: each file is uploaded and sent once', async () => {
+    const currentUser = makeUser({ id: 'current-user' })
+    const channel = makeUploaderChannel('channel-reconnect-while-uploading')
+    const messageBuilder: any = channel.createMessageBuilder()
+    messageBuilder.create
+      .mockImplementationOnce(() => makePendingMessage({ channelId: channel.id, tid: 'uploading-msg-1' }))
+      .mockImplementationOnce(() => makePendingMessage({ channelId: channel.id, tid: 'uploading-msg-2' }))
+    const uploads: any[] = []
+    uploadBehavior = (_attachment, uploadTask) => uploads.push(uploadTask)
+    channel.sendMessage = jest.fn((sent: any) =>
+      Promise.resolve({
+        ...makeServerResponse(sent.tid, sent.attachments[0].tid, currentUser),
+        id: `srv-${sent.tid}`
+      })
+    )
+    setActiveChannelId(channel.id)
+    setChannelInMap(channel)
+    const file = (tid: string, name: string) => ({
+      tid,
+      type: attachmentTypes.file,
+      name,
+      size: 3,
+      data: new File(['abc'], name, { type: 'application/pdf' }),
+      metadata: '{}',
+      upload: false
+    })
+    const settle = async (done: () => boolean = () => false) => {
+      for (let attempt = 0; attempt < 200 && !done(); attempt++) {
+        await Promise.resolve()
+      }
+    }
+    const send = runSaga(
+      { dispatch: () => undefined, getState: () => mockStoreState },
+      __messageSagaTestables.sendMessage,
+      sendMessageAC(
+        {
+          body: 'two files',
+          bodyAttributes: [],
+          attachments: [file('uploading-file-1', 'first.pdf'), file('uploading-file-2', 'second.pdf')],
+          mentionedUsers: [],
+          type: 'text',
+          metadata: {},
+          parentMessage: null,
+          repliedInThread: false
+        },
+        channel.id,
+        CONNECTION_STATUS.CONNECTED,
+        true
+      )
+    )
+    await settle(() => uploads.length > 0)
+
+    // The connection drops and comes back while the first file uploads (its uploader goes on by itself).
+    mockStoreState.UserReducer.waitToSendPendingMessages = true
+    try {
+      const reconnect = runSaga(
+        { dispatch: () => undefined, getState: () => mockStoreState },
+        __messageSagaTestables.resumePendingMessagesAfterReconnect,
+        { payload: { status: CONNECTION_STATUS.CONNECTED } }
+      )
+      await settle()
+      expect(uploads).toHaveLength(1)
+
+      uploads[0].success({ uri: 'https://cdn.example/first.pdf', blob: null })
+      await settle(() => uploads.length > 1)
+      uploads[1].success({ uri: 'https://cdn.example/second.pdf', blob: null })
+      await send.toPromise()
+      await reconnect.toPromise()
+    } finally {
+      mockStoreState.UserReducer.waitToSendPendingMessages = false
+    }
+
+    expect(uploads).toHaveLength(2)
+    expect((channel.sendMessage as jest.Mock).mock.calls.map(([sent]) => sent.tid)).toEqual([
+      'uploading-msg-1',
+      'uploading-msg-2'
     ])
     expect(getPendingMessagesFromMap(channel.id)).toHaveLength(0)
   })
@@ -1365,11 +1716,11 @@ describe('attachment upload recovery', () => {
     ])
   })
 
-  it('re-runs preview and video upload after a retryable video upload failure', async () => {
+  it('after a retryable video upload failure, the video is uploaded again with the preview already uploaded', async () => {
     const channel = makeUploaderChannel('channel-video-preview-retry')
     const video = new File(['video-bytes'], 'clip.mp4', { type: 'video/mp4' })
     const attachment = {
-      tid: 'video-preview-retry-attachment-tid',
+      tid: trackedTid('video-preview-retry-attachment-tid'),
       type: attachmentTypes.video,
       name: 'clip.mp4',
       size: video.size,
@@ -1405,12 +1756,16 @@ describe('attachment upload recovery', () => {
     )
 
     failVideoUpload = false
-    await handleUploadAttachments([attachment], { type: 'text' } as any, channel)
+    const [sent] = await handleUploadAttachments([attachment], { type: 'text' } as any, channel)
 
-    expect(uploadCalls.filter((uploadedAttachment) => uploadedAttachment.type === attachmentTypes.image)).toHaveLength(
-      2
-    )
-    expect(uploadCalls).toHaveLength(4)
+    // The preview the first send stored goes with the video: it is not made or uploaded again.
+    expect(uploadCalls.map((uploadedAttachment) => uploadedAttachment.type)).toEqual([
+      attachmentTypes.image,
+      attachmentTypes.video,
+      attachmentTypes.video
+    ])
+    expect(mockGetVideoPreviewFrame).toHaveBeenCalledTimes(1)
+    expect(JSON.parse(sent.metadata)).toMatchObject({ video_thumb: 'https://cdn.example/clip-preview.jpg' })
   })
 
   describe('with encryptAttachments', () => {
