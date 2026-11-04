@@ -2,7 +2,10 @@ import {
   cancelDownloadRequest,
   cancelUpload,
   customUpload,
+  defaultFileTransferTransport,
   getAttachmentDownloader,
+  getCustomUploader,
+  getTransport,
   isUploadNotStarted,
   isUploadPausedBeforeStart,
   markUploadNotStarted,
@@ -11,7 +14,7 @@ import {
   sdkUpload,
   setCustomUploader
 } from './customUploader'
-import { setEncryptAttachments } from './attachmentEncryption'
+import { fileEncryption, setEncryptAttachments, setFileEncryption } from './attachmentEncryption'
 import { getClient, setClient } from '../common/client'
 import { fakeEncrypted, installFakeFilesClient, readBlobText } from '../testUtils/fakeAttachmentFiles'
 
@@ -118,7 +121,7 @@ describe('encryptAttachments: uploading', () => {
     expect(calls).toHaveLength(1)
     // Files are compared by identity: a failing diff of a File crashes the jest worker.
     expect(calls[0].attachment.data === source).toBe(true)
-    expect(calls[0].args).toEqual(['text', { encrypt: false }])
+    expect(calls[0].args).toEqual(['text', { encrypt: false, fileEncryption }])
     calls[0].task.success({ uri: 'https://cdn/plain', blob: source })
     const { uri, blob, ...rest } = await result
     expect(uri).toBe('https://cdn/plain')
@@ -150,12 +153,17 @@ describe('encryptAttachments: uploading', () => {
   })
 
   // What an uploader with preparesFiles does (like Waafi's): it may resize the
-  // file, prepares it with the chat client as its options say, stores it and
-  // reports the prepared file's encryption.
+  // file, encrypts it with the fileEncryption its options give when they say
+  // `encrypt`, stores it and reports its encryptionInfo.
   const storePrepared = async (call: { task: any; args: any[] }, file: Blob, uri: string) => {
-    const prepared = await getClient().prepareUpload(file, { encrypt: call.args[1].encrypt })
-    const stored = await prepared.getAll()
-    call.task.success({ uri, blob: file, encryption: prepared.encryption })
+    const { encrypt, fileEncryption: encryption } = call.args[1]
+    if (!encrypt) {
+      call.task.success({ uri, blob: file })
+      return { prepared: { contentType: file.type }, stored: file }
+    }
+    const prepared = await encryption.prepareEncryption(file)
+    const stored = await prepared.readAll()
+    call.task.success({ uri, blob: file, encryption: prepared.encryptionInfo })
     return { prepared, stored }
   }
 
@@ -167,7 +175,7 @@ describe('encryptAttachments: uploading', () => {
     // It starts at once, with the plaintext file to resize.
     expect(calls).toHaveLength(1)
     expect(calls[0].attachment.data === source).toBe(true)
-    expect(calls[0].args).toEqual(['text', { encrypt: true }])
+    expect(calls[0].args).toEqual(['text', { encrypt: true, fileEncryption }])
     const resized = new Blob(['resized'], { type: 'image/png' })
     const { prepared, stored } = await storePrepared(calls[0], resized, 'https://cdn/streaming')
 
@@ -222,7 +230,7 @@ describe('encryptAttachments: uploading', () => {
     useUploader(true)
     customUpload({ tid: 'old-sdk', name: 'photo.png', data: file() } as any, () => undefined, 'text')
 
-    expect(calls[0].args).toEqual(['text', { encrypt: false }])
+    expect(calls[0].args).toEqual(['text', { encrypt: false, fileEncryption }])
   })
 
   it('every file is encrypted with its own key', async () => {
@@ -280,7 +288,7 @@ describe('encryptAttachments: downloading', () => {
       true,
       expect.any(Function),
       'text',
-      { kind: 'file', url: 'https://cdn/p', type: 'image/png' }
+      { kind: 'file', url: 'https://cdn/p', type: 'image/png', fileEncryption }
     ])
   })
 
@@ -297,7 +305,12 @@ describe('encryptAttachments: downloading', () => {
 
     const args: any[] = download.mock.calls[0]
     expect(args[0] === video).toBe(true)
-    expect(args[4]).toEqual({ kind: 'thumbnail', url: 'https://cdn/clip-preview.jpg', type: 'image/jpeg' })
+    expect(args[4]).toEqual({
+      kind: 'thumbnail',
+      url: 'https://cdn/clip-preview.jpg',
+      type: 'image/jpeg',
+      fileEncryption
+    })
   })
 
   it('decrypts a { Body } result and keeps its other fields', async () => {
@@ -314,7 +327,8 @@ describe('encryptAttachments: downloading', () => {
     expect(download).toHaveBeenCalledWith(photo, true, expect.any(Function), 'text', {
       kind: 'file',
       url: 'https://cdn/p',
-      type: 'image/png'
+      type: 'image/png',
+      fileEncryption
     })
     expect(result.ETag).toBe('e1')
     expect(result.Body.type).toBe('image/png')
@@ -387,7 +401,13 @@ describe('encryptAttachments: downloading', () => {
       const args: any[] = download.mock.calls[0]
       expect(args[0] === photo).toBe(true)
       expect(args.slice(1, 4)).toEqual([true, expect.any(Function), 'text'])
-      expect(args[4]).toEqual({ kind: 'file', url: 'https://cdn/p', encryption: enc, type: 'image/png' })
+      expect(args[4]).toEqual({
+        kind: 'file',
+        url: 'https://cdn/p',
+        encryption: enc,
+        type: 'image/png',
+        fileEncryption
+      })
       expect(result.Body.type).toBe('image/png')
       expect(await readBlobText(result.Body)).toBe('picture')
     }
@@ -484,26 +504,29 @@ describe('encryptAttachments: downloading', () => {
   })
 })
 
-describe('the SDK downloads when there is no custom uploader (client.download)', () => {
-  const encryption = { v: 1, alg: 'tink-aes256-gcm-hkdf-64k+commit-v1', attachmentId: 'id-7', key: 'key-7' }
+describe('the default transport downloads when the app has none (client.download)', () => {
+  const encryption = { v: 1 as const, alg: 'tink-aes256-gcm-hkdf-64k+commit-v1', attachmentId: 'id-7', key: 'key-7' }
   const photo = { id: 'a1', messageId: 'm1', url: 'https://cdn/p', name: 'photo.png', metadata: '{}' } as any
   let downloads: { url: string; options: any }[]
   let answer: () => Promise<Blob>
 
   beforeEach(() => {
     downloads = []
-    answer = async () => new Blob(['picture'], { type: 'image/png' })
+    answer = async () => fakeEncrypted('key-7', 'picture')
     setCustomUploader(undefined)
+    const files = installFakeFilesClient()
+    // As the SDK does: the answer, opened with the `enc` in `metadata` (none: as it is), with the type.
     setClient({
-      download: (url: string, options: any) => {
+      ...files,
+      download: async (url: string, options: any) => {
         downloads.push({ url, options })
-        return answer()
+        return files.prepareDownload({ metadata: options.metadata, type: options.type }).open(await answer())
       }
     })
   })
   afterEach(() => setClient({}))
 
-  it('downloads an encrypted file with its key and type, and gives it back as { Body }', async () => {
+  it('with the default encryption, the client downloads an encrypted file and opens it: { Body } with its real type', async () => {
     const result = await getAttachmentDownloader(photo, 'file', encryption, 'image/png')!(
       'https://cdn/p',
       true,
@@ -512,22 +535,30 @@ describe('the SDK downloads when there is no custom uploader (client.download)',
 
     expect(downloads).toHaveLength(1)
     expect(downloads[0].url).toBe('https://cdn/p')
+    // The client opens it as it downloads it (it resumes a lost connection from the last whole segment).
     expect(downloads[0].options).toMatchObject({ metadata: { enc: encryption }, type: 'image/png' })
-    // The SDK opened it: the uikit does not decrypt it again.
     expect(await readBlobText(result.Body)).toBe('picture')
     expect(result.ContentType).toBe('image/png')
   })
 
-  it('downloads a file that is not encrypted the same way', async () => {
-    await getAttachmentDownloader(photo, 'file', undefined, 'image/png')!('https://cdn/p', true, jest.fn())
+  it('downloads a file that is not encrypted with its real type, and decrypts nothing', async () => {
+    answer = async () => new Blob(['picture'], { type: 'image/png' })
 
-    expect(downloads[0].options.metadata).toEqual({})
+    const result = await getAttachmentDownloader(photo, 'file', undefined, 'image/png')!(
+      'https://cdn/p',
+      true,
+      jest.fn()
+    )
+
+    expect(downloads[0].options).toMatchObject({ metadata: {}, type: 'image/png' })
+    expect(await readBlobText(result.Body)).toBe('picture')
   })
 
-  it('downloads a video preview from its own URL with its own key', async () => {
-    const thumbKey = { ...encryption, attachmentId: 'thumb-id', key: 'thumb-key' }
+  it('downloads a video preview from its own URL and opens it with its own key', async () => {
+    const thumbKey = { ...encryption, attachmentId: 'id-8', key: 'key-8' }
+    answer = async () => fakeEncrypted('key-8', 'preview')
 
-    await getAttachmentDownloader(photo, 'thumbnail', thumbKey, 'image/jpeg')!(
+    const result = await getAttachmentDownloader(photo, 'thumbnail', thumbKey, 'image/jpeg')!(
       'https://cdn/p-preview.jpg',
       true,
       jest.fn()
@@ -535,6 +566,16 @@ describe('the SDK downloads when there is no custom uploader (client.download)',
 
     expect(downloads[0].url).toBe('https://cdn/p-preview.jpg')
     expect(downloads[0].options).toMatchObject({ metadata: { enc: thumbKey }, type: 'image/jpeg' })
+    expect(await readBlobText(result.Body)).toBe('preview')
+    expect(result.Body.type).toBe('image/jpeg')
+  })
+
+  it('does not open a file encrypted with another key', async () => {
+    answer = async () => fakeEncrypted('key-9', 'picture')
+
+    await expect(
+      getAttachmentDownloader(photo, 'file', encryption, 'image/png')!('https://cdn/p', true, jest.fn())
+    ).rejects.toMatchObject({ type: 'AttachmentDecryptionFailed' })
   })
 
   it('reports progress as { loaded, total }, total 0 when the server does not say', async () => {
@@ -550,7 +591,7 @@ describe('the SDK downloads when there is no custom uploader (client.download)',
     expect(progress.mock.calls).toEqual([[{ loaded: 10, total: 40 }], [{ loaded: 20, total: 0 }]])
   })
 
-  it('cancelling the request aborts the SDK download', () => {
+  it('cancelling the request aborts the download', () => {
     answer = () => new Promise(() => undefined)
 
     cancelDownloadRequest(
@@ -560,7 +601,7 @@ describe('the SDK downloads when there is no custom uploader (client.download)',
     expect(downloads[0].options.signal.aborted).toBe(true)
   })
 
-  it('a custom uploader downloads instead of the SDK', () => {
+  it("the app's transport downloads instead of the default one", () => {
     const download = jest.fn(() => new Promise(() => undefined))
     setCustomUploader({ upload: jest.fn(), download, cancelRequest: jest.fn() })
 
@@ -571,12 +612,68 @@ describe('the SDK downloads when there is no custom uploader (client.download)',
     setCustomUploader(undefined)
   })
 
+  it("with the app's encryption, the client gives the stored bytes and the app's encryption opens them", async () => {
+    const opened = new Blob(['opened by the app'], { type: 'image/png' })
+    const prepareDecryption = jest.fn(async () => ({ readAll: async () => opened }))
+    setFileEncryption({ prepareEncryption: jest.fn(), prepareDecryption })
+
+    try {
+      const result = await getAttachmentDownloader(photo, 'file', encryption, 'image/png')!(
+        'https://cdn/p',
+        true,
+        jest.fn()
+      )
+
+      expect(downloads[0].options).toMatchObject({ metadata: {}, type: '' })
+      expect(prepareDecryption).toHaveBeenCalledWith(expect.any(Blob), encryption, 'image/png')
+      expect(await readBlobText((prepareDecryption.mock.calls[0] as any[])[0])).toBe('enc(key-7@id-7):picture')
+      expect(result.Body === opened).toBe(true)
+    } finally {
+      setFileEncryption(undefined)
+    }
+  })
+
   it('with an SDK that has no client.download, downloading fails with a clear error', async () => {
-    setClient({})
+    setClient({ ...getClient(), download: undefined })
 
     await expect(
       getAttachmentDownloader(photo, 'file', encryption, 'image/png')('https://cdn/p', true, jest.fn())
     ).rejects.toThrow('a sceyt-chat version with client.download')
+  })
+
+  it('with an older SDK without client.prepareDownload, an unencrypted file still downloads', async () => {
+    answer = async () => new Blob(['picture'], { type: 'image/png' })
+    setClient({ download: getClient().download })
+
+    const result = await getAttachmentDownloader(photo, 'file', undefined, 'image/png')!(
+      'https://cdn/p',
+      true,
+      jest.fn()
+    )
+
+    expect(await readBlobText(result.Body)).toBe('picture')
+  })
+})
+
+describe('getTransport: the transport files go through', () => {
+  afterEach(() => setCustomUploader(undefined))
+
+  it("is the default one (the chat client's) when the app has none", () => {
+    setCustomUploader(undefined)
+
+    expect(getTransport()).toBe(defaultFileTransferTransport)
+    expect(getCustomUploader()).toBeUndefined()
+  })
+
+  it("is the app's own when it has one", () => {
+    const transport = { upload: jest.fn(), download: jest.fn(), cancelRequest: jest.fn() }
+    setCustomUploader(transport)
+
+    expect(getTransport()).toBe(transport)
+  })
+
+  it('the default transport encrypts and opens files itself, with the fileEncryption it is given', () => {
+    expect(defaultFileTransferTransport.preparesFiles).toBe(true)
   })
 })
 
@@ -680,18 +777,63 @@ describe('sdkUpload: one attachment uploaded with client.upload', () => {
     expect(uploaded.blob === file).toBe(true)
   })
 
-  it('with encryptAttachments, asks the SDK to encrypt and gives back the encryption for the metadata', async () => {
+  it('with encryptAttachments, sends the file encrypted by the configured encryption and gives back its encryption', async () => {
     setEncryptAttachments(true)
     const file = fileOf('secret')
-    const encryption = { v: 1, alg: 'x', attachmentId: 'id', key: 'k' }
+    const encryption = { v: 1 as const, alg: 'x', attachmentId: 'id-1', key: 'key-1' }
+    const prepareEncryption = jest.fn(async () => ({
+      plaintextSize: 6,
+      ciphertextSize: 16,
+      contentType: 'application/octet-stream',
+      encryptionInfo: encryption,
+      read: jest.fn(),
+      readAll: async () => new Blob(['encrypted-secret'])
+    }))
+    setFileEncryption({ prepareEncryption, prepareDecryption: jest.fn() })
 
-    const uploading = sdkUpload(attachment('sdk-2', file), () => undefined)
-    expect(uploads[0].options.encrypt).toBe(true)
-    uploads[0].finish({ url: 'https://cdn.example/2', size: 6, encryption })
+    try {
+      const uploading = sdkUpload(attachment('sdk-2', file), () => undefined)
+      await flush()
+      expect(prepareEncryption.mock.calls[0][0] === file).toBe(true)
+      // The stored bytes go as they are: the client does not encrypt them again.
+      expect(uploads[0].options.encrypt).toBe(false)
+      expect(await readBlobText(uploads[0].file)).toBe('encrypted-secret')
+      expect(uploads[0].file.type).toBe('application/octet-stream')
+      uploads[0].finish({ url: 'https://cdn.example/2', size: 16 })
 
-    const uploaded = await uploading
-    expect(uploaded.blob === file).toBe(true)
-    expect(uploaded.encryption).toEqual(encryption)
+      const uploaded = await uploading
+      expect(uploaded.blob === file).toBe(true)
+      expect(uploaded.encryption).toEqual(encryption)
+    } finally {
+      setFileEncryption(undefined)
+    }
+  })
+
+  it('an encrypted file sent again after a stop keeps its key: it is encrypted once', async () => {
+    setEncryptAttachments(true)
+    installFakeFilesClient()
+    const prepareUpload = jest.spyOn(getClient(), 'prepareUpload')
+    setClient({
+      ...getClient(),
+      upload: (file: Blob, options: any) =>
+        new Promise((resolve, reject) => {
+          uploads.push({ file, options, finish: resolve, fail: reject })
+          options.signal.addEventListener('abort', () =>
+            reject(Object.assign(new Error('cancelled'), { name: 'AbortError' }))
+          )
+        })
+    })
+
+    const uploading = sdkUpload(attachment('sdk-2b', fileOf('secret')), () => undefined)
+    await flush()
+    pauseUpload('sdk-2b')
+    resumeUpload('sdk-2b')
+    await flush()
+    uploads[1].finish({ url: 'https://cdn.example/2b', size: 22 })
+
+    expect(prepareUpload).toHaveBeenCalledTimes(1)
+    expect(await readBlobText(uploads[1].file)).toBe(await readBlobText(uploads[0].file))
+    expect((await uploading).encryption!.key).toBe('key-1')
   })
 
   it('each attachment is its own upload: stopping one leaves the others going', async () => {

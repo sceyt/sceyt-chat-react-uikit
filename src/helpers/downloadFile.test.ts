@@ -1,4 +1,5 @@
 import FileSaver from 'file-saver'
+import { fileEncryption } from './attachmentEncryption'
 import { cancelDownloadFile, downloadFile } from './index'
 import { setCustomUploader } from './customUploader'
 import { fakeEncrypted, installFakeFilesClient, readBlobText } from '../testUtils/fakeAttachmentFiles'
@@ -79,7 +80,8 @@ describe('downloadFile custom downloader', () => {
     expect(download).toHaveBeenCalledWith(attachment, true, expect.any(Function), 'text', {
       kind: 'file',
       url: 'https://cdn/file.pdf',
-      type: 'application/pdf'
+      type: 'application/pdf',
+      fileEncryption
     })
     expect(mockSaveAs).toHaveBeenCalledWith(expect.any(Blob), 'file.pdf')
   })

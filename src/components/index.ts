@@ -4,11 +4,21 @@ import SceytChat, {
   ICustomUploader,
   ICustomUploaderDownloadOptions,
   ICustomUploaderUploadOptions,
+  IFileTransfer,
   IProgress,
   IUploadTask
 } from './ChatContainer'
 import { IAttachment } from '../types'
-import { IAttachmentEncryption, IAttachmentRendition } from '../helpers/attachmentEncryption'
+import { defaultFileTransferTransport } from '../helpers/customUploader'
+import {
+  fileEncryption as chatSdkFileEncryption,
+  IAttachmentEncryption,
+  IAttachmentRendition,
+  IFileDecryptionSession,
+  IFileEncryption,
+  IFileEncryptionInfo,
+  IFileEncryptionSession
+} from '../helpers/attachmentEncryption'
 import ChannelList from './ChannelList'
 import Channel from './Channel'
 import Chat from './Chat'
@@ -85,7 +95,16 @@ export {
   IUploadTask,
   IAttachment,
   IAttachmentEncryption,
-  IAttachmentRendition
+  IAttachmentRendition,
+  // File transfer (the `fileTransfer` prop) and its defaults, to wrap or delegate to.
+  IFileTransfer,
+  defaultFileTransferTransport,
+  chatSdkFileEncryption,
+  // Attachment encryption a custom uploader gets as `options.fileEncryption`.
+  IFileEncryption,
+  IFileEncryptionSession,
+  IFileDecryptionSession,
+  IFileEncryptionInfo
 }
 
 declare global {

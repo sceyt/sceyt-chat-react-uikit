@@ -29,6 +29,14 @@ export const fakeEncryption = (key: string): IAttachmentEncryption => ({
   key
 })
 
+const readBytes = (blob: Blob): Promise<Uint8Array> =>
+  new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => resolve(new Uint8Array(reader.result as ArrayBuffer))
+    reader.onerror = () => reject(reader.error)
+    reader.readAsArrayBuffer(blob)
+  })
+
 /** The file client.prepareUpload gives; encrypted with `key` when there is a key. */
 export const makeFakeUploadFile = (source: Blob, key?: string) => ({
   source,
@@ -38,7 +46,9 @@ export const makeFakeUploadFile = (source: Blob, key?: string) => ({
   partCount: Math.max(1, Math.ceil(source.size / (5 * 1024 * 1024))),
   encryption: key ? fakeEncryption(key) : undefined,
   getPart: notUsed,
-  getRange: notUsed,
+  // The stored bytes from `start` up to `end`, as the SDK reads a range.
+  getRange: (start: number, end: number) =>
+    readBytes((key ? new Blob([prefixOf(key), source]) : source).slice(start, end)),
   getAll: async () => (key ? new Blob([prefixOf(key), source], { type: 'application/octet-stream' }) : source)
 })
 

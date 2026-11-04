@@ -3,9 +3,16 @@ import { IAttachment } from '../types'
 import log from 'loglevel'
 import { getClient } from '../common/client'
 import { CONNECTION_STATUS } from '../store/user/constants'
-import { getEncryptAttachments, IAttachmentEncryption, prepareDownloadFile } from './attachmentEncryption'
+import {
+  fileEncryption,
+  getEncryptAttachments,
+  getFileEncryption,
+  IAttachmentEncryption,
+  prepareDownloadFile
+} from './attachmentEncryption'
 
-let CustomUploader: ICustomUploader
+// The app's transport (`fileTransfer.transport`, or the CustomUploader prop), if it has one.
+let CustomUploader: ICustomUploader | undefined
 let sendAttachmentsAsSeparateMessages: boolean = false
 
 // The stop, resume and cancel controls of each running upload, by attachment tid.
@@ -22,7 +29,8 @@ export const isUploadNotStarted = (attachmentId: string) => notStartedUploads.ha
 
 export const isUploadPausedBeforeStart = (attachmentId: string) => !!notStartedUploads.get(attachmentId)?.paused
 
-export const setCustomUploader = (uploader: any) => {
+/** The app's transport; undefined goes back to the default one (the chat client's). */
+export const setCustomUploader = (uploader: ICustomUploader | undefined) => {
   CustomUploader = uploader
 }
 
@@ -32,14 +40,12 @@ export const setSendAttachmentsAsSeparateMessages = (asSeparate: boolean) => {
 
 export const getSendAttachmentsAsSeparateMessages = () => sendAttachmentsAsSeparateMessages
 
+/** The app's own transport, or undefined when it uses the default one. */
 export const getCustomUploader = () => CustomUploader
 
+/** The app's own transport's download, or undefined when it uses the default one. */
 export const getCustomDownloader = (): ICustomUploader['download'] | undefined =>
   CustomUploader && CustomUploader.download
-
-// Whether the uploader prepares the files it stores and opens the ones it
-// downloads, with the chat client.
-const uploaderPreparesFiles = () => !!CustomUploader && !!CustomUploader.preparesFiles
 
 /**
  * Whether the connection is lost: the browser is offline, or the chat client is
@@ -61,7 +67,9 @@ export interface ICustomUploadResult {
   encryption?: IAttachmentEncryption
 }
 
-export const customUpload = (
+// Uploads one attachment's file with `transport`.
+const uploadWith = (
+  transport: ICustomUploader,
   attachment: IAttachment,
   // eslint-disable-next-line no-unused-vars
   progress: ({ loaded, total }: IProgress) => void,
@@ -72,11 +80,7 @@ export const customUpload = (
 ): Promise<ICustomUploadResult> => {
   return new Promise((resolve, reject) => {
     const encrypt = getEncryptAttachments()
-    if (!CustomUploader) {
-      reject(new Error('No Custom uploader'))
-      return
-    }
-    if (encrypt && !uploaderPreparesFiles()) {
+    if (encrypt && !transport.preparesFiles) {
       // Fails here, before anything is sent: an uploader without preparesFiles
       // would store the file it was given, unencrypted.
       notStartedUploads.delete(attachment.tid!)
@@ -100,7 +104,7 @@ export const customUpload = (
           reject(
             new Error(
               'The custom uploader stored a file without reporting its encryption; ' +
-                'prepare it with client.prepareUpload(file, { encrypt: true })'
+                'encrypt it with options.fileEncryption.prepareEncryption(file)'
             )
           )
           return
@@ -113,8 +117,9 @@ export const customUpload = (
     }
     pendingUploaders[attachment.tid!] = uploadTask
     const pausedBeforeStart = isUploadPausedBeforeStart(attachment.tid!)
+    // The default transport sees a pause pressed before the start, and sends nothing until resume.
+    transport.upload(attachment, uploadTask, messageType, { encrypt, fileEncryption: getFileEncryption() })
     notStartedUploads.delete(attachment.tid!)
-    CustomUploader.upload(attachment, uploadTask, messageType, { encrypt })
     if (pausedBeforeStart) {
       // The uploader installs stop() when upload() is called, so nothing is sent.
       uploadTask.stop()
@@ -122,96 +127,163 @@ export const customUpload = (
   })
 }
 
-/**
- * Uploads one attachment's file with the SDK (client.upload), encrypted when
- * `encryptAttachments` is on; the uikit uploads each attachment of a message
- * this way. Stop, resume and cancel work as for a custom uploader: stop()
- * aborts the request and resume() sends the file again from the start (the
- * SDK sends it whole), so the progress then waits until it passes what it
- * showed. A cancelled upload never settles, as with a custom uploader: its
- * message is gone.
- */
-export const sdkUpload = (
+/** Uploads one attachment's file with the app's own transport. */
+export const customUpload = (
   attachment: IAttachment,
   // eslint-disable-next-line no-unused-vars
-  progress: (progress: IProgress) => void
+  progress: ({ loaded, total }: IProgress) => void,
+  // eslint-disable-next-line no-unused-vars
+  messageType: string | null | undefined,
+  // eslint-disable-next-line no-unused-vars
+  getUpdatedFilePath?: (newPath: string) => void
 ): Promise<ICustomUploadResult> =>
-  new Promise((resolve, reject) => {
-    const tid = attachment.tid!
-    const pausedBeforeStart = isUploadPausedBeforeStart(tid)
-    notStartedUploads.delete(tid)
+  CustomUploader
+    ? uploadWith(CustomUploader, attachment, progress, messageType, getUpdatedFilePath)
+    : Promise.reject(new Error('No Custom uploader'))
+
+// The default transport's downloads, to what cancels each.
+const defaultRequests = new WeakMap<Promise<any>, AbortController>()
+
+const abortError = () => Object.assign(new Error('The upload was stopped'), { name: 'AbortError' })
+
+/**
+ * The default transport: files go to the chat server with the chat client, one
+ * request per file (client.upload / client.download). Encryption is the
+ * configured one (`options.fileEncryption`); with the default one, the chat
+ * client decrypts a file as it downloads it. stop() aborts the request and
+ * resume() sends the file again from the start (the server has no multipart
+ * upload; an encrypted file is encrypted once, so it is sent again with the
+ * same key), so the progress then waits until it passes what it showed. A
+ * cancelled upload never settles: its message is gone.
+ */
+export const defaultFileTransferTransport: ICustomUploader = {
+  preparesFiles: true,
+  upload: (attachment, uploadTask, _messageType, { encrypt, fileEncryption: encryption }) => {
     const file: Blob | null =
       attachment.url instanceof Blob ? attachment.url : attachment.data instanceof Blob ? attachment.data : null
     if (typeof getClient()?.upload !== 'function') {
-      reject(new Error('Uploading an attachment needs a sceyt-chat version with client.upload'))
+      uploadTask.failure(new Error('Uploading an attachment needs a sceyt-chat version with client.upload'))
       return
     }
     if (!file) {
-      reject(new Error(`File for tid ${tid} is unavailable for upload`))
+      uploadTask.failure(new Error(`File for tid ${attachment.tid} is unavailable for upload`))
       return
     }
+    const name = (file as File).name || attachment.name || 'file'
+    // What is stored: the file itself, or the file encrypted (once, for every attempt).
+    // The file encrypted, once for every attempt: sent again with the same key.
+    let encrypted: Promise<{ body: Blob; encryption: IAttachmentEncryption }> | undefined
+    const encryptedFile = () =>
+      (encrypted =
+        encrypted ||
+        encryption.prepareEncryption(file).then(async (session) => ({
+          body: new File([await session.readAll()], name, { type: session.contentType }),
+          encryption: session.encryptionInfo
+        })))
 
     let request: AbortController | undefined
     let cancelled = false
     let shownLoaded = 0
-    const finish = () => {
-      delete pendingUploaders[tid]
-      request = undefined
-    }
     const send = () => {
       const current = new AbortController()
       request = current
       // The browser may still report progress for a request that failed (the bytes it had sent): not shown.
       let settled = false
-      getClient()
-        .upload(file, {
-          encrypt: getEncryptAttachments(),
-          signal: current.signal,
-          progress: (loaded: number, total: number) => {
-            if (settled || current.signal.aborted || loaded < shownLoaded || isConnectionLost()) return
-            shownLoaded = loaded
-            progress({ loaded, total })
-          }
-        })
+      // The stored bytes go as they are: the client does not encrypt them again.
+      const store = (body: Blob, storedEncryption?: IAttachmentEncryption) =>
+        getClient()
+          .upload(body, {
+            encrypt: false,
+            signal: current.signal,
+            progress: (loaded: number, total: number) => {
+              if (settled || current.signal.aborted || loaded < shownLoaded || isConnectionLost()) return
+              shownLoaded = loaded
+              uploadTask.progress({ loaded, total })
+            }
+          })
+          .then(({ url }: { url: string }) => ({ url, encryption: storedEncryption }))
+      const sent: Promise<{ url: string; encryption?: IAttachmentEncryption }> = encrypt
+        ? encryptedFile().then(({ body, encryption: bodyEncryption }) => {
+            if (current.signal.aborted) throw abortError()
+            return store(body, bodyEncryption)
+          })
+        : store(file)
+      sent
         .finally(() => {
           settled = true
         })
         .then(
-          ({ url, encryption }: { url: string; encryption?: IAttachmentEncryption }) => {
+          ({ url, encryption: storedEncryption }) => {
             // Stored, even when stop() came as it finished.
             if (cancelled) return
-            finish()
-            resolve({ uri: url, blob: file, ...(encryption ? { encryption } : {}) })
+            request = undefined
+            uploadTask.success({ uri: url, blob: file, ...(storedEncryption ? { encryption: storedEncryption } : {}) })
           },
           (error: Error) => {
             // Aborted by stop() or cancel(), not a failure.
             if (current.signal.aborted) return
-            finish()
-            reject(error)
+            request = undefined
+            uploadTask.failure(error)
           }
         )
     }
 
-    pendingUploaders[tid] = {
-      stop: () => {
-        request?.abort()
-        request = undefined
-        return true
-      },
-      resume: () => {
-        if (!request) send()
-        return true
-      },
-      cancel: () => {
-        cancelled = true
-        request?.abort()
-        request = undefined
-      }
+    uploadTask.stop = () => {
+      request?.abort()
+      request = undefined
+      return true
     }
-    if (!pausedBeforeStart) send()
-  })
+    uploadTask.resume = () => {
+      if (!request && !cancelled) send()
+      return true
+    }
+    uploadTask.cancel = () => {
+      cancelled = true
+      request?.abort()
+      request = undefined
+    }
+    if (!isUploadPausedBeforeStart(attachment.tid!)) send()
+  },
+  download: (_attachment, _asFile, progress, _messageType, { url, encryption, type, fileEncryption: decryption }) => {
+    if (typeof getClient()?.download !== 'function') {
+      return Promise.reject(new Error('Downloading an attachment needs a sceyt-chat version with client.download'))
+    }
+    const controller = new AbortController()
+    // With its own encryption the chat client opens the file as it downloads it
+    // (after a lost connection it goes on from the last whole segment, and keeps
+    // only the plaintext). With the app's, it gives the stored bytes, which that opens.
+    const clientOpens = !encryption || decryption === fileEncryption
+    const request = getClient()
+      .download(url, {
+        metadata: encryption && clientOpens ? { enc: encryption } : {},
+        type: clientOpens ? type : '',
+        signal: controller.signal,
+        progress: (loaded: number, total?: number) => progress({ loaded, total: total || 0 })
+      })
+      .then(async (downloaded: Blob) => {
+        const Body =
+          encryption && !clientOpens
+            ? await (await decryption.prepareDecryption(downloaded, encryption, type)).readAll()
+            : downloaded
+        return { Body, ContentType: Body.type }
+      })
+    defaultRequests.set(request, controller)
+    return request
+  },
+  cancelRequest: (request) => defaultRequests.get(request)?.abort()
+}
 
-/** Uploads one attachment: with the custom uploader when there is one, else with the SDK. */
+/** The transport files go through: the app's own, or the default one (the chat client's). */
+export const getTransport = (): ICustomUploader => CustomUploader || defaultFileTransferTransport
+
+/** Uploads one attachment's file with the default transport (the chat client's). */
+export const sdkUpload = (
+  attachment: IAttachment,
+  // eslint-disable-next-line no-unused-vars
+  progress: (progress: IProgress) => void
+): Promise<ICustomUploadResult> => uploadWith(defaultFileTransferTransport, attachment, progress, undefined)
+
+/** Uploads one attachment's file with the transport: the app's own, or the default one. */
 export const uploadAttachmentFile = (
   attachment: IAttachment,
   // eslint-disable-next-line no-unused-vars
@@ -219,8 +291,7 @@ export const uploadAttachmentFile = (
   messageType: string | null | undefined,
   // eslint-disable-next-line no-unused-vars
   getUpdatedFilePath?: (newPath: string) => void
-): Promise<ICustomUploadResult> =>
-  CustomUploader ? customUpload(attachment, progress, messageType, getUpdatedFilePath) : sdkUpload(attachment, progress)
+): Promise<ICustomUploadResult> => uploadWith(getTransport(), attachment, progress, messageType, getUpdatedFilePath)
 
 const asBlob = async (body: any): Promise<Blob> => {
   if (body instanceof Blob) return body
@@ -236,14 +307,14 @@ const asBlob = async (body: any): Promise<Blob> => {
 }
 
 /**
- * The custom downloader of one file of an attachment, called with the URL to
- * download. It calls the uploader's `download` with the attachment and
- * `{ kind, url, type }`. For an encrypted file (`encryption`: its `enc`, or a
- * thumbnail's own key) it returns the decrypted file, in the same shape the
- * custom downloader returned ({ Body }, a Blob, or a URL string). An uploader
- * with `preparesFiles` also gets `encryption` and opens the file itself.
- * `type` is the file's real type, e.g. 'video/mp4'. `download` defaults to the
- * CustomUploader's; without one, the SDK downloads the file (client.download).
+ * The downloader of one file of an attachment, called with the URL to
+ * download. It calls the transport's `download` with the attachment and
+ * `{ kind, url, type, fileEncryption }`. For an encrypted file (`encryption`:
+ * its `enc`, or a thumbnail's own key) it returns the decrypted file, in the
+ * same shape the download returned ({ Body }, a Blob, or a URL string). A
+ * transport with `preparesFiles` also gets `encryption` and opens the file
+ * itself. `type` is the file's real type, e.g. 'video/mp4'. `download` defaults
+ * to the transport's: the app's own, or the default one (client.download).
  */
 export type AttachmentDownloader = (
   // eslint-disable-next-line no-unused-vars
@@ -256,68 +327,58 @@ export type AttachmentDownloader = (
   messageType?: string | null
 ) => Promise<any>
 
-// A request the attachment downloader returned, to the uploader's own request
-// inside it: the uploader's cancelRequest only knows its own.
+// A request the attachment downloader returned, to the transport's own request
+// inside it: the transport's cancelRequest only knows its own.
 const uploaderRequests = new WeakMap<Promise<any>, Promise<any>>()
-// A request of the SDK's downloader, to what cancels it.
-const sdkRequests = new WeakMap<Promise<any>, AbortController>()
 
-// Downloads with the SDK (client.download), which opens the file (decrypted
-// with `encryption`) and resumes a lost connection; gives { Body } like a
-// custom downloader.
-const sdkDownloader =
-  (encryption: IAttachmentEncryption | undefined, type: string): AttachmentDownloader =>
-  (url, _asFile, progress) => {
-    if (typeof getClient()?.download !== 'function') {
-      return Promise.reject(new Error('Downloading an attachment needs a sceyt-chat version with client.download'))
-    }
-    const controller = new AbortController()
-    const request = getClient()
-      .download(url, {
-        metadata: encryption ? { enc: encryption } : {},
-        type,
-        signal: controller.signal,
-        progress: (loaded: number, total?: number) => progress({ loaded, total: total || 0 })
-      })
-      .then((Body: Blob) => ({ Body, ContentType: Body.type }))
-    sdkRequests.set(request, controller)
-    return request
-  }
+// Fails before anything is downloaded when the chat client cannot open this
+// encrypted file's metadata (the default encryption); the app's encryption
+// checks it as it opens the file. An unencrypted file needs no check.
+const checkOpenable = (encryption: IAttachmentEncryption | undefined, type: string) => {
+  if (encryption && getFileEncryption() === fileEncryption) prepareDownloadFile(encryption, type)
+}
 
 export const getAttachmentDownloader = (
   attachment: IAttachment,
   kind: ICustomUploaderDownloadOptions['kind'],
   encryption?: IAttachmentEncryption,
   type: string = '',
-  download: ICustomUploader['download'] | undefined = getCustomDownloader()
+  download?: ICustomUploader['download']
 ): AttachmentDownloader => {
-  if (!download) return sdkDownloader(encryption, type)
-  if (uploaderPreparesFiles()) {
-    // The uploader opens the file itself; its own request, so its cancelRequest finds it.
+  const transport = getTransport()
+  const fileDownload = download || transport.download
+  if (fileDownload === transport.download && transport.preparesFiles) {
+    // The transport opens the file itself; its own request, so its cancelRequest finds it.
     return (url, asFile, progress, messageType) => {
       try {
         // Metadata that cannot be opened fails before anything is downloaded.
-        prepareDownloadFile(encryption, type)
+        checkOpenable(encryption, type)
       } catch (error) {
         return Promise.reject(error)
       }
-      return download(attachment, asFile, progress, messageType, { kind, url, encryption, type })
+      return fileDownload(attachment, asFile, progress, messageType, {
+        kind,
+        url,
+        encryption,
+        type,
+        fileEncryption: getFileEncryption()
+      })
     }
   }
   const requestOf: AttachmentDownloader = (url, asFile, progress, messageType) =>
-    download(attachment, asFile, progress, messageType, { kind, url, type })
+    fileDownload(attachment, asFile, progress, messageType, { kind, url, type, fileEncryption: getFileEncryption() })
   if (!encryption) return requestOf
   return (url, asFile, progress, messageType) => {
-    let file: ReturnType<typeof prepareDownloadFile>
     try {
-      file = prepareDownloadFile(encryption, type)
+      checkOpenable(encryption, type)
     } catch (error) {
       return Promise.reject(error)
     }
     const request = requestOf(url, asFile, progress, messageType)
     const opened = request.then(async (result: any) => {
       const hasBody = result && typeof result === 'object' && 'Body' in result
-      const plaintext = await file.open(await asBlob(hasBody ? result.Body : result))
+      const stored = await asBlob(hasBody ? result.Body : result)
+      const plaintext = await (await getFileEncryption().prepareDecryption(stored, encryption, type)).readAll()
       if (hasBody) return { ...result, Body: plaintext }
       return typeof result === 'string' ? URL.createObjectURL(plaintext) : plaintext
     })
@@ -328,12 +389,7 @@ export const getAttachmentDownloader = (
 
 /** Cancels a request returned by a downloader from getAttachmentDownloader. */
 export const cancelDownloadRequest = (request: Promise<any>) => {
-  const sdkRequest = sdkRequests.get(request)
-  if (sdkRequest) {
-    sdkRequest.abort()
-    return
-  }
-  CustomUploader?.cancelRequest(uploaderRequests.get(request) || request)
+  getTransport().cancelRequest(uploaderRequests.get(request) || request)
 }
 
 export const pauseUpload = (attachmentId: string) => {

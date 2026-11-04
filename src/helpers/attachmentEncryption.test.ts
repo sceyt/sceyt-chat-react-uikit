@@ -1,6 +1,7 @@
 import { setClient } from '../common/client'
 import {
   attachmentDecryption,
+  fileEncryption,
   getAttachmentEncryption,
   getTypeFromFileName,
   getVideoThumbEncryption,
@@ -9,6 +10,7 @@ import {
   withAttachmentEncryption,
   withVideoThumbEncryption
 } from './attachmentEncryption'
+import { fakeEncrypted, installFakeFilesClient, readBlobText } from '../testUtils/fakeAttachmentFiles'
 
 const ALG = 'tink-aes256-gcm-hkdf-64k+commit-v1'
 const videoKey = { v: 1 as const, alg: ALG, attachmentId: 'video-id', key: 'video-key' }
@@ -99,5 +101,121 @@ describe('attachment encryption metadata', () => {
     expect(prepareDownload).toHaveBeenLastCalledWith({ metadata: { enc: videoKey }, type: 'video/mp4' })
     prepareDownloadFile(undefined)
     expect(prepareDownload).toHaveBeenLastCalledWith({ metadata: {}, type: '' })
+  })
+})
+
+describe('fileEncryption: what a custom uploader encrypts and opens files with', () => {
+  const photo = () => new File(['a picture'], 'photo.png', { type: 'image/png' })
+  // The test files are ASCII text.
+  const text = (bytes: Uint8Array) => String.fromCharCode(...Array.from(bytes))
+
+  beforeEach(() => {
+    installFakeFilesClient()
+  })
+
+  it('encrypts a file with a new key and attachment id each time, and describes what it stores', async () => {
+    const first = await fileEncryption.prepareEncryption(photo())
+    const second = await fileEncryption.prepareEncryption(photo())
+
+    expect(first.encryptionInfo).toEqual({ v: 1, alg: ALG, attachmentId: 'id-1', key: 'key-1' })
+    expect(second.encryptionInfo.key).toBe('key-2')
+    expect(first.plaintextSize).toBe('a picture'.length)
+    expect(first.ciphertextSize).toBe('enc(key-1@id-1):a picture'.length)
+    expect(first.contentType).toBe('application/octet-stream')
+  })
+
+  it('reads exactly the stored bytes asked for; parts read in any order make the whole stored file', async () => {
+    const session = await fileEncryption.prepareEncryption(photo())
+    const whole = await readBlobText(await session.readAll())
+
+    const parts = await Promise.all([
+      session.read(10, 10),
+      session.read(0, 10),
+      session.read(20, session.ciphertextSize - 20)
+    ])
+
+    expect(parts.map((part) => part.length)).toEqual([10, 10, session.ciphertextSize - 20])
+    expect(text(parts[1]) + text(parts[0]) + text(parts[2])).toBe(whole)
+  })
+
+  it('gives the same bytes for the same range again, so a failed part is sent as it was', async () => {
+    const session = await fileEncryption.prepareEncryption(photo())
+
+    expect(text(await session.read(3, 12))).toBe(text(await session.read(3, 12)))
+  })
+
+  it('reads nothing at the end of the file', async () => {
+    const session = await fileEncryption.prepareEncryption(photo())
+
+    expect(await session.read(session.ciphertextSize, 0)).toHaveLength(0)
+  })
+
+  it.each([
+    ['a negative offset', -1, 1],
+    ['a negative length', 0, -1],
+    ['past the end', 1, Number.MAX_SAFE_INTEGER],
+    ['a fractional offset', 0.5, 1]
+  ])('refuses a range with %s', async (_case, offset, length) => {
+    const session = await fileEncryption.prepareEncryption(photo())
+
+    await expect(session.read(offset, length)).rejects.toThrow(RangeError)
+  })
+
+  it('fails when the chat client does not encrypt the file (an older sceyt-chat)', async () => {
+    setClient({
+      prepareUpload: async (file: Blob) => ({ size: file.size, contentType: file.type }),
+      prepareDownload: jest.fn()
+    })
+
+    await expect(fileEncryption.prepareEncryption(photo())).rejects.toThrow('without encrypting it')
+  })
+
+  it('fails with a clear error when the chat client cannot prepare files', async () => {
+    setClient({})
+
+    await expect(fileEncryption.prepareEncryption(photo())).rejects.toThrow('client.prepareUpload')
+  })
+
+  it('opens a downloaded encrypted file with its encryption info: decrypted, with its real type', async () => {
+    const session = await fileEncryption.prepareDecryption(
+      fakeEncrypted('key-7', 'a picture'),
+      {
+        v: 1,
+        alg: ALG,
+        attachmentId: 'id-7',
+        key: 'key-7'
+      },
+      'image/png'
+    )
+    const opened = await session.readAll()
+
+    expect(opened.type).toBe('image/png')
+    expect(await readBlobText(opened)).toBe('a picture')
+  })
+
+  it('opens what it encrypted', async () => {
+    const encrypted = await fileEncryption.prepareEncryption(photo())
+    const opened = await (
+      await fileEncryption.prepareDecryption(await encrypted.readAll(), encrypted.encryptionInfo, 'image/png')
+    ).readAll()
+
+    expect(await readBlobText(opened)).toBe('a picture')
+  })
+
+  it('does not open a file encrypted with another key', async () => {
+    const session = await fileEncryption.prepareDecryption(fakeEncrypted('key-7', 'a picture'), {
+      v: 1,
+      alg: ALG,
+      attachmentId: 'id-8',
+      key: 'key-8'
+    })
+
+    await expect(session.readAll()).rejects.toMatchObject({ type: 'AttachmentDecryptionFailed' })
+  })
+
+  it('needs the encryption info to open a file: without it, nothing is opened as plaintext', async () => {
+    await expect(fileEncryption.prepareDecryption(fakeEncrypted('key-7', 'x'), undefined as any)).rejects.toThrow(
+      'needs its encryption info'
+    )
   })
 })

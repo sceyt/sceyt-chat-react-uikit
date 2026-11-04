@@ -1,4 +1,5 @@
 import { getAttachmentUrlFromCache, setAttachmentToCache } from './attachmentsCache'
+import { fileEncryption } from './attachmentEncryption'
 import { registerBlobUrl } from './attachmentBlobUrls'
 import { downloadVideoThumb } from './videoPreview'
 import { installFakeFilesClient } from '../testUtils/fakeAttachmentFiles'
@@ -33,7 +34,8 @@ describe('downloadVideoThumb', () => {
     expect(downloader).toHaveBeenCalledWith(video, true, expect.any(Function), 'text', {
       kind: 'thumbnail',
       url: 'https://cdn/preview.jpg',
-      type: 'image/jpeg'
+      type: 'image/jpeg',
+      fileEncryption
     })
     expect(mockSetAttachmentToCache).toHaveBeenCalledWith('https://cdn/preview.jpg', expect.any(Response))
   })

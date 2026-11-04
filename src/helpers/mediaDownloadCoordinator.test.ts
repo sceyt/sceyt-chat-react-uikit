@@ -5,6 +5,7 @@ import {
   resetMediaDownloadCoordinatorForTests,
   subscribeToMediaDownload
 } from './mediaDownloadCoordinator'
+import { fileEncryption } from './attachmentEncryption'
 import { setCustomUploader } from './customUploader'
 import { setClient } from '../common/client'
 import { getAttachmentUrlFromCache, setAttachmentToCache } from './attachmentsCache'
@@ -92,9 +93,9 @@ describe('mediaDownloadCoordinator', () => {
     })
   })
 
-  it('without a custom uploader, the SDK downloads and opens the file, and it is cached and shown once', async () => {
+  it('without a custom uploader, the default transport downloads and opens the file, and it is cached and shown once', async () => {
     const download = jest.fn(async () => new Blob(['opened video'], { type: 'video/mp4' }))
-    setClient({ download })
+    setClient({ ...installFakeFilesClient(), download })
     global.fetch = jest.fn() as any
     const encryption = { v: 1 as const, alg: 'tink-aes256-gcm-hkdf-64k+commit-v1', attachmentId: 'id-3', key: 'key-3' }
     try {
@@ -109,10 +110,12 @@ describe('mediaDownloadCoordinator', () => {
       })
 
       expect(download).toHaveBeenCalledTimes(1)
+      // With the default encryption the client opens it as it downloads it.
       expect((download.mock.calls[0] as any[])[1]).toMatchObject({ metadata: { enc: encryption }, type: 'video/mp4' })
-      // Opened by the SDK only: not downloaded with a plain request, nor decrypted again.
+      // Opened by the client only: not downloaded again with a plain request, nor decrypted again.
       expect(global.fetch).not.toHaveBeenCalled()
       expect(await readBlobText(blob)).toBe('opened video')
+      expect(blob.type).toBe('video/mp4')
       expect(setAttachmentToCache).toHaveBeenCalledWith('https://cdn/clip.mp4_original_video_url', expect.any(Response))
     } finally {
       setClient({})
@@ -136,7 +139,8 @@ describe('mediaDownloadCoordinator', () => {
     expect(download).toHaveBeenCalledWith(attachment, true, expect.any(Function), undefined, {
       kind: 'file',
       url: 'https://cdn/image.jpg',
-      type: ''
+      type: '',
+      fileEncryption
     })
   })
 
@@ -176,7 +180,8 @@ describe('mediaDownloadCoordinator', () => {
     expect(download.mock.calls[0][4]).toEqual({
       kind: 'thumbnail',
       url: 'https://cdn/clip-preview.jpg',
-      type: 'image/jpeg'
+      type: 'image/jpeg',
+      fileEncryption
     })
   })
 

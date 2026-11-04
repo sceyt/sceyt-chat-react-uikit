@@ -1936,13 +1936,12 @@ describe('attachment upload recovery', () => {
     beforeEach(() => {
       sdkUploads = []
       uploadFile = jest.fn()
-      uploadAnswer = async (file, options) => ({
-        url: `https://cdn.example/${file.name}`,
-        size: file.size,
-        ...(options.encrypt ? { encryption: encryptionFor(sdkUploads.length) } : {})
-      })
+      uploadAnswer = async (file) => ({ url: `https://cdn.example/${file.name}`, size: file.size })
       setCustomUploader(undefined)
+      // The default transport: the chat client stores the bytes it is given, encrypted
+      // before by the default encryption (its prepareUpload; keys are key-1, key-2, …).
       setClient({
+        ...installFakeFilesClient(),
         user: { id: 'current-user' },
         Channel: { create: jest.fn() },
         uploadFile,
@@ -2018,7 +2017,7 @@ describe('attachment upload recovery', () => {
       expect(sent[0].completion).toBeUndefined()
     })
 
-    it('with encryptAttachments, each file is encrypted by the SDK and its own key goes in its metadata', async () => {
+    it('with encryptAttachments, each file is encrypted before it is sent and its own key goes in its metadata', async () => {
       setEncryptAttachments(true)
       const channel = makeUploaderChannel('channel-sdk-upload-encrypted')
       const first = new File(['first'], 'first.pdf', { type: 'application/pdf' })
@@ -2031,10 +2030,13 @@ describe('attachment upload recovery', () => {
 
       await sendPending(channel, pendingWith(channel, 'sdk-encrypted', [first, second]))
 
-      expect(sdkUploads.every(({ options }) => options.encrypt === true)).toBe(true)
-      // The SDK is given the file as the user picked it; it encrypts it.
+      // The client is given the stored bytes, encrypted with each file's own key, with the file's name.
+      expect(sdkUploads.every(({ options }) => options.encrypt === false)).toBe(true)
       expect(sdkUploads.map(({ file }) => file.name)).toEqual(['first.pdf', 'second.pdf'])
-      expect(sdkUploads.every(({ file }, i) => file === [first, second][i])).toBe(true)
+      expect(await Promise.all(sdkUploads.map(({ file }) => readBlobText(file)))).toEqual([
+        'enc(key-1@id-1):first',
+        'enc(key-2@id-2):second'
+      ])
       const sent = (channel.sendMessage as jest.Mock).mock.calls[0][0].attachments
       expect(sent.map((attachment: any) => JSON.parse(attachment.metadata).enc.attachmentId).sort()).toEqual([
         'id-1',
@@ -2060,7 +2062,9 @@ describe('attachment upload recovery', () => {
 
       // The test's attachment builder keeps no name, so the preview is "video-preview.jpg".
       expect(sdkUploads.map(({ file }) => file.name)).toEqual(['video-preview.jpg', 'clip.mp4'])
-      expect(sdkUploads[0].file.type).toBe('image/jpeg')
+      // Both are stored encrypted, the preview with its own key.
+      expect(sdkUploads.map(({ file }) => file.type)).toEqual(['application/octet-stream', 'application/octet-stream'])
+      expect(await readBlobText(sdkUploads[0].file)).toBe('enc(key-1@id-1):preview-bytes')
       expect(uploadFile).not.toHaveBeenCalled()
       const [sent] = (channel.sendMessage as jest.Mock).mock.calls[0][0].attachments
       expect(sent).toMatchObject({ url: 'https://cdn.example/clip.mp4', upload: false })

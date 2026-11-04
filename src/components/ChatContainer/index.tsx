@@ -5,7 +5,7 @@ import store from '../../store'
 import SceytChat from '../SceytChat'
 import { IAttachment, IChannel, IContact, ICustomAvatarColors, IMember, IMessage, IUser } from '../../types'
 import { SceytReduxContext } from 'store/context'
-import { IAttachmentEncryption } from '../../helpers/attachmentEncryption'
+import { IAttachmentEncryption, IFileEncryption } from '../../helpers/attachmentEncryption'
 
 import {
   InviteLinkOptions,
@@ -32,9 +32,9 @@ export interface IUploadTask {
    * `blob` is the uploaded file as the user's device shows it (e.g. after the
    * uploader resized an image), or null when the uploader gave it with
    * `updateLocalFileLocation`. With `encryptAttachments` it must be the
-   * plaintext, never the encrypted bytes. `encryption` is the `encryption` of
-   * the file the uploader prepared and stored (client.prepareUpload): required
-   * when the upload was asked to `encrypt`, or the message is not sent.
+   * plaintext, never the encrypted bytes. `encryption` is the `encryptionInfo`
+   * of the file the uploader encrypted and stored (`options.fileEncryption`):
+   * required when the upload was asked to `encrypt`, or the message is not sent.
    */
   // eslint-disable-next-line no-unused-vars
   success: ({ uri, blob, encryption }: { uri: string; blob: Blob | null; encryption?: IAttachmentEncryption }) => void
@@ -46,13 +46,15 @@ export interface IUploadTask {
 /** The 4th `upload()` argument. */
 export interface ICustomUploaderUploadOptions {
   /**
-   * `encryptAttachments` is on: store the file encrypted. Prepare the file as it
-   * will be stored (e.g. after resizing an image) with the chat client's
-   * `prepareUpload(file, { encrypt: true })`, send its `getAll()` or the byte
-   * ranges the upload server gives (`getRange`, or `getPart(n)` for 5 MiB parts)
-   * with its `contentType`, and pass its `encryption` to `success()`.
+   * `encryptAttachments` is on: store the file encrypted. Encrypt the file as it
+   * will be stored (e.g. after resizing an image) with
+   * `fileEncryption.prepareEncryption(file)`, send its `readAll()` or the byte
+   * ranges of its parts (`read(offset, length)`, planned from `ciphertextSize`)
+   * with its `contentType`, and pass its `encryptionInfo` to `success()`.
    */
   encrypt: boolean
+  /** Encrypts files to upload (when `encrypt`) and opens downloaded ones, with the chat client. */
+  fileEncryption: IFileEncryption
 }
 
 /** The 6th `download()` argument: which file of the attachment to download, and how to open it. */
@@ -64,22 +66,22 @@ export interface ICustomUploaderDownloadOptions {
   /**
    * For an uploader with `preparesFiles`, when the file is encrypted: its `enc`
    * (a thumbnail's own key, from the attachment's `enc.renditions`). Open the
-   * downloaded bytes with the chat client's
-   * `prepareDownload({ metadata: { enc: encryption }, type })` and return the
-   * file it gives (decrypted, with its real type).
+   * downloaded bytes with `fileEncryption.prepareDecryption(bytes, encryption, type)`
+   * and return its `readAll()` (decrypted and verified, with its real type).
    */
   encryption?: IAttachmentEncryption
   /** The file's real type, or '' when unknown. */
   type: string
+  /** Opens encrypted files, with the chat client. */
+  fileEncryption: IFileEncryption
 }
 
 export interface ICustomUploader {
   /**
-   * True: the uploader prepares and opens files with the chat client
-   * (`prepareUpload` / `prepareDownload`, which do any encryption): `upload`
-   * stores the file encrypted when its options say `encrypt` and reports the
-   * file's `encryption`, and `download` gets `{ encryption, type }` and returns
-   * the opened file.
+   * True: the uploader encrypts and opens files itself, with the
+   * `fileEncryption` its options give: `upload` stores the file encrypted when
+   * its options say `encrypt` and reports the file's `encryption`, and
+   * `download` gets `{ encryption, type }` and returns the opened file.
    *
    * `encryptAttachments` needs it when there is a CustomUploader. Without it,
    * an upload with `encryptAttachments` on fails before anything is sent, and
@@ -167,6 +169,22 @@ export interface SceytChatUIKitTheme {
 
 export type ThemeMode = 'light' | 'dark' | string
 
+/**
+ * How attachment files are uploaded, downloaded and encrypted (the
+ * `fileTransfer` prop). Every field is optional and falls back to its default.
+ */
+export interface IFileTransfer {
+  /** Encrypt new uploads (default false). Encrypted downloads follow the attachment metadata. */
+  encryptUploads?: boolean
+  /** Encrypts and decrypts files; default: the chat client's (sceyt-chat). */
+  encryption?: IFileEncryption
+  /**
+   * Uploads and downloads files; default: the chat client's, one request per
+   * file to the chat server (`defaultFileTransferTransport`).
+   */
+  transport?: ICustomUploader
+}
+
 export interface IChatClientProps {
   client: any
   theme?: SceytChatUIKitTheme
@@ -182,12 +200,19 @@ export interface IChatClientProps {
   showNotifications?: boolean
   children?: JSX.Element | JSX.Element[]
   logoSrc?: string
+  /** File transfer settings; they take the place of `CustomUploader` and `encryptAttachments` when set. */
+  fileTransfer?: IFileTransfer
+  /**
+   * @deprecated Use `fileTransfer={{ transport }}`; this prop goes in the next major version.
+   * The app's transport; `fileTransfer.transport` takes its place when set.
+   */
   CustomUploader?: ICustomUploader
   /**
-   * Encrypt attachment files before upload and decrypt them after download
-   * (the attachment id and key are kept in each attachment's metadata). Works with
-   * the SDK's own upload, which sends the whole encrypted file, or with a
-   * CustomUploader that sets `preparesFiles`; needs a sceyt-chat version
+   * @deprecated Use `fileTransfer={{ encryptUploads }}`; this prop goes in the next major version.
+   * Encrypt attachment files before upload (the attachment id and key are kept in
+   * each attachment's metadata); `fileTransfer.encryptUploads` takes its place when set.
+   * Works with the default transport, or with a transport that sets `preparesFiles`
+   * (it encrypts with the `fileEncryption` it is given); needs a sceyt-chat version
    * with client.prepareUpload.
    */
   encryptAttachments?: boolean
@@ -239,6 +264,7 @@ const SceytChatContainer = ({
   defaultRolesByChannelTypesMap,
   channelTypeFilter,
   logoSrc,
+  fileTransfer,
   CustomUploader,
   encryptAttachments,
   showNotifications = true,
@@ -312,6 +338,7 @@ const SceytChatContainer = ({
         children={children}
         showOnlyContactUsers={showOnlyContactUsers}
         logoSrc={logoSrc}
+        fileTransfer={fileTransfer}
         CustomUploader={CustomUploader}
         encryptAttachments={encryptAttachments}
         handleNewMessages={handleNewMessages}
