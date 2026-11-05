@@ -6,14 +6,11 @@ import { APPLY_PRESENCE_USERS, presenceRegistry } from '../../helpers/presence/r
 import { resetUpdatedUserMapAC } from '../../store/user/actions'
 import { CONNECTION_STATUS } from '../../store/user/constants'
 import { IUser } from '../../types'
-import { defaultFileTransferTransport, getTransport, setCustomUploader } from '../../helpers/customUploader'
-import {
-  fileEncryption,
-  getEncryptAttachments,
-  getFileEncryption,
-  setEncryptAttachments,
-  setFileEncryption
-} from '../../helpers/attachmentEncryption'
+import { fileTransfer as uikitFileTransfer } from '../../fileTransfer/sceytChatUIKitFileTransfer'
+import { DefaultFileTransferTransport } from '../../fileTransfer/defaults/defaultFileTransferTransport'
+import { ChatSdkFileEncryption } from '../../fileTransfer/encryption/chatSdkFileEncryption'
+import { FileTransferTransport } from '../../fileTransfer/types'
+import { FileEncryption } from '../../fileTransfer/encryption/types'
 
 jest.mock('../../helpers/messagesIdb', () => ({
   initMessagesIdbForUser: () => Promise.resolve(),
@@ -168,8 +165,13 @@ describe('SceytChat presence lifecycle', () => {
 })
 
 describe('SceytChat file transfer settings', () => {
-  const transport = { upload: jest.fn(), download: jest.fn(), cancelRequest: jest.fn() }
-  const encryption = { prepareEncryption: jest.fn(), prepareDecryption: jest.fn() }
+  const makeTransport = (): FileTransferTransport => ({ upload: jest.fn(), download: jest.fn(), cancel: jest.fn() })
+  const transport = makeTransport()
+  const encryption: FileEncryption = {
+    prepareEncryption: jest.fn(),
+    restoreEncryption: jest.fn(),
+    prepareDecryption: jest.fn()
+  }
   const client = () =>
     makeClient(
       'user-1',
@@ -184,72 +186,59 @@ describe('SceytChat file transfer settings', () => {
     return view
   }
 
+  const expectDefaults = () => {
+    expect(uikitFileTransfer.transport).toBeInstanceOf(DefaultFileTransferTransport)
+    expect(uikitFileTransfer.hasCustomTransport).toBe(false)
+    expect(uikitFileTransfer.encryption).toBeInstanceOf(ChatSdkFileEncryption)
+    expect(uikitFileTransfer.encryptUploads).toBe(false)
+  }
+
   afterEach(async () => {
-    setCustomUploader(undefined)
-    setEncryptAttachments(false)
-    setFileEncryption(undefined)
+    uikitFileTransfer.configure()
     presenceRegistry.dispose()
   })
 
   it('fileTransfer sets the transport, the encryption and whether uploads are encrypted', async () => {
     const view = await renderWith({ fileTransfer: { transport, encryption, encryptUploads: true } })
 
-    expect(getTransport()).toBe(transport)
-    expect(getFileEncryption()).toBe(encryption)
-    expect(getEncryptAttachments()).toBe(true)
+    expect(uikitFileTransfer.transport).toBe(transport)
+    expect(uikitFileTransfer.hasCustomTransport).toBe(true)
+    expect(uikitFileTransfer.encryption).toBe(encryption)
+    expect(uikitFileTransfer.encryptUploads).toBe(true)
     await unmountChat(view.unmount)
   })
 
   it('without fileTransfer, the defaults are used: the chat client transfers and encrypts, uploads are not encrypted', async () => {
-    setCustomUploader(transport)
-    setFileEncryption(encryption)
+    uikitFileTransfer.transport = transport
+    uikitFileTransfer.encryption = encryption
+    uikitFileTransfer.encryptUploads = true
     const view = await renderWith({})
 
-    expect(getTransport()).toBe(defaultFileTransferTransport)
-    expect(getFileEncryption()).toBe(fileEncryption)
-    expect(getEncryptAttachments()).toBe(false)
+    expectDefaults()
     await unmountChat(view.unmount)
   })
 
   it('a change of fileTransfer after the chat is shown is applied, and removing it goes back to the defaults', async () => {
-    const appTransport = { upload: jest.fn(), download: jest.fn(), cancelRequest: jest.fn() }
+    const appTransport = makeTransport()
     const chatClient = client()
     const store = createMessageListStore()
     const view = renderWithSceytProvider(<SceytChat client={chatClient} fileTransfer={{ transport }} />, { store })
     await flushPromises()
-    expect(getTransport()).toBe(transport)
-    expect(getEncryptAttachments()).toBe(false)
+    expect(uikitFileTransfer.transport).toBe(transport)
+    expect(uikitFileTransfer.encryption).toBeInstanceOf(ChatSdkFileEncryption)
+    expect(uikitFileTransfer.encryptUploads).toBe(false)
 
     view.rerender(
       <SceytChat client={chatClient} fileTransfer={{ transport: appTransport, encryption, encryptUploads: true }} />
     )
     await flushPromises()
-    expect(getTransport()).toBe(appTransport)
-    expect(getFileEncryption()).toBe(encryption)
-    expect(getEncryptAttachments()).toBe(true)
+    expect(uikitFileTransfer.transport).toBe(appTransport)
+    expect(uikitFileTransfer.encryption).toBe(encryption)
+    expect(uikitFileTransfer.encryptUploads).toBe(true)
 
     view.rerender(<SceytChat client={chatClient} />)
     await flushPromises()
-    expect(getTransport()).toBe(defaultFileTransferTransport)
-    expect(getFileEncryption()).toBe(fileEncryption)
-    expect(getEncryptAttachments()).toBe(false)
+    expectDefaults()
     await unmountChat(view.unmount)
-  })
-
-  it('CustomUploader and encryptAttachments still work, and fileTransfer takes their place when both are set', async () => {
-    const appTransport = { upload: jest.fn(), download: jest.fn(), cancelRequest: jest.fn() }
-    const first = await renderWith({ CustomUploader: transport, encryptAttachments: true })
-    expect(getTransport()).toBe(transport)
-    expect(getEncryptAttachments()).toBe(true)
-    await unmountChat(first.unmount)
-
-    const second = await renderWith({
-      CustomUploader: transport,
-      encryptAttachments: true,
-      fileTransfer: { transport: appTransport, encryptUploads: false }
-    })
-    expect(getTransport()).toBe(appTransport)
-    expect(getEncryptAttachments()).toBe(false)
-    await unmountChat(second.unmount)
   })
 })

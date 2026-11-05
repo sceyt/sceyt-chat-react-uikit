@@ -6,6 +6,8 @@ import { getVideoFirstFrame } from '../../helpers/getVideoFrame'
 import { downloadVideoThumb } from '../../helpers/videoPreview'
 import { getAttachmentUrlFromCache } from '../../helpers/attachmentsCache'
 import { createMessageListStore, renderWithSceytProvider } from '../../testUtils/messageListHarness'
+import { fileTransfer } from '../../fileTransfer/sceytChatUIKitFileTransfer'
+import { FileTransferResult, FileTransferTransport } from '../../fileTransfer/types'
 
 jest.mock('../../hooks', () => {
   const { THEME_COLORS } = require('../../UIHelper/constants')
@@ -18,13 +20,6 @@ jest.mock('../../hooks', () => {
     })
   }
 })
-
-let mockCustomDownloader: any
-
-jest.mock('../../helpers/customUploader', () => ({
-  getCustomDownloader: () => mockCustomDownloader,
-  getAttachmentDownloader: (_encryption: any, _type: any, download: any) => download
-}))
 
 jest.mock('../../helpers/getVideoFrame', () => ({
   getVideoFirstFrame: jest.fn()
@@ -103,7 +98,6 @@ describe('VideoPreview video_thumb rendering', () => {
         messageId: 'message-id',
         metadata: expect.stringContaining('"video_thumb":"https://cdn/video-thumb.jpg"')
       }),
-      undefined,
       undefined
     )
     expect(mockGetVideoFirstFrame).not.toHaveBeenCalled()
@@ -419,7 +413,7 @@ describe('VideoPreview video_thumb rendering', () => {
   })
 })
 
-describe('VideoPreview video_thumb with a custom downloader', () => {
+describe('VideoPreview video_thumb with a custom transport', () => {
   // A forwarded video is rendered before the send is confirmed: the SDK gives
   // the pending attachment an empty message ID.
   const pendingFile = {
@@ -447,12 +441,17 @@ describe('VideoPreview video_thumb with a custom downloader', () => {
 
   beforeEach(() => {
     jest.clearAllMocks()
-    mockCustomDownloader = jest.fn()
+    const transport: FileTransferTransport = {
+      upload: async () => FileTransferResult.failure(new Error('not used')),
+      download: async () => FileTransferResult.failure(new Error('not used')),
+      cancel: () => undefined
+    }
+    fileTransfer.transport = transport
     mockGetAttachmentUrlFromCache.mockResolvedValue(false)
   })
 
   afterEach(() => {
-    mockCustomDownloader = undefined
+    fileTransfer.configure()
   })
 
   it('shows a cached preview of a pending forwarded video', async () => {
@@ -486,7 +485,6 @@ describe('VideoPreview video_thumb with a custom downloader', () => {
         messageId: '9223372036854775807',
         metadata: expect.stringContaining('"video_thumb":"https://cdn/video-thumb.jpg"')
       }),
-      mockCustomDownloader,
       undefined
     )
   })

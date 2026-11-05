@@ -74,7 +74,8 @@ import { THEME_COLORS } from '../../UIHelper/constants'
 import { createImageThumbnail, resizeImage } from '../../helpers/resizeImage'
 import { detectBrowser, detectOS } from '../../helpers'
 import { IMember, IMessage, IUser } from '../../types'
-import { getCustomUploader, getSendAttachmentsAsSeparateMessages } from '../../helpers/customUploader'
+import { getSendAttachmentsAsSeparateMessages } from '../../helpers/sendAttachments'
+import { fileTransfer } from '../../fileTransfer/sceytChatUIKitFileTransfer'
 import {
   checkDraftMessagesIsEmpty,
   areDraftMessagesHydrated,
@@ -1432,7 +1433,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
   }
 
   const handleAddAttachment = async (file: File, isMediaAttachment: boolean) => {
-    const customUploader = getCustomUploader()
+    const customUploader = fileTransfer.hasCustomTransport
     const fileType = file.type.split('/')[0]
     const tid = uuidv4()
 

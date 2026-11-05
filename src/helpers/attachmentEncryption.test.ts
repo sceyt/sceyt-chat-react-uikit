@@ -1,221 +1,83 @@
-import { setClient } from '../common/client'
 import {
   attachmentDecryption,
-  fileEncryption,
   getAttachmentEncryption,
   getTypeFromFileName,
   getVideoThumbEncryption,
-  prepareDownloadFile,
+  isUnopenableAttachmentError,
   videoThumbDecryption,
-  withAttachmentEncryption,
-  withVideoThumbEncryption
+  withAttachmentEncryption
 } from './attachmentEncryption'
-import { fakeEncrypted, installFakeFilesClient, readBlobText } from '../testUtils/fakeAttachmentFiles'
-
-const ALG = 'tink-aes256-gcm-hkdf-64k+commit-v1'
-const videoKey = { v: 1 as const, alg: ALG, attachmentId: 'video-id', key: 'video-key' }
-const previewKey = { v: 1 as const, alg: ALG, attachmentId: 'preview-id', key: 'preview-key' }
+import { fakeEncryption, fakeEncryptionInfo } from '../testUtils/fakeAttachmentFiles'
 
 describe('attachment encryption metadata', () => {
   it('reads the file key from metadata stored as a JSON string', () => {
-    expect(getAttachmentEncryption(JSON.stringify({ szw: 10, enc: videoKey }))).toEqual(videoKey)
+    const metadata = JSON.stringify({ szw: 10, enc: fakeEncryption('key-1') })
+
+    expect(getAttachmentEncryption(metadata)).toEqual(fakeEncryptionInfo('key-1'))
+    expect(getAttachmentEncryption({ enc: fakeEncryption('key-1') })).toEqual(fakeEncryptionInfo('key-1'))
   })
 
-  it.each([
-    ['no metadata', undefined],
-    ['metadata without enc', '{"szw":10}'],
-    ['metadata that is not JSON', 'not json'],
-    [
-      'only the preview, before the video is uploaded',
-      JSON.stringify({ enc: { v: 1, alg: ALG, renditions: [{ role: 'thumbnail', attachmentId: 'a', key: 'a' }] } })
-    ]
-  ])('finds no file key in %s', (_name, metadata) => {
-    expect(getAttachmentEncryption(metadata)).toBeUndefined()
+  it('an unencrypted file, or metadata that is not JSON, has no key', () => {
+    expect(getAttachmentEncryption(JSON.stringify({ szw: 10 }))).toBeUndefined()
+    expect(getAttachmentEncryption('not json')).toBeUndefined()
+    expect(getAttachmentEncryption(undefined)).toBeUndefined()
   })
 
-  it('a video keeps its preview, a thumbnail rendition, when its own key is added after upload', () => {
-    const withPreview = withVideoThumbEncryption('{"szw":1280,"video_thumb":"https://cdn/p.jpg"}', previewKey)
-    const metadata = JSON.parse(withAttachmentEncryption(withPreview, videoKey))
+  it("writes the uploaded file's enc and keeps the other metadata", () => {
+    const metadata = JSON.parse(withAttachmentEncryption(JSON.stringify({ szw: 10 }), fakeEncryptionInfo('key-1')))
 
-    expect(metadata).toEqual({
-      szw: 1280,
-      video_thumb: 'https://cdn/p.jpg',
-      enc: {
-        v: 1,
-        alg: ALG,
-        attachmentId: 'video-id',
-        key: 'video-key',
-        renditions: [{ role: 'thumbnail', attachmentId: 'preview-id', key: 'preview-key' }]
-      }
-    })
-    expect(getAttachmentEncryption(metadata)).toEqual(metadata.enc)
-    expect(getVideoThumbEncryption(metadata)).toEqual(previewKey)
+    expect(metadata).toEqual({ szw: 10, enc: fakeEncryption('key-1') })
   })
 
-  it('a resent video replaces the preview of the earlier attempt', () => {
-    const first = withVideoThumbEncryption('{}', previewKey)
-    const newPreview = { ...previewKey, attachmentId: 'new-preview-id', key: 'new-preview-key' }
-    const again = withVideoThumbEncryption(first, newPreview)
-    expect(getVideoThumbEncryption(again)).toEqual(newPreview)
-    expect(JSON.parse(again).enc.renditions).toHaveLength(1)
+  it("a video keeps its preview's key as its thumbnail rendition", () => {
+    const metadata = withAttachmentEncryption(
+      JSON.stringify({ video_thumb: 'https://cdn.example/preview' }),
+      fakeEncryptionInfo('key-2'),
+      fakeEncryptionInfo('key-1')
+    )
+
+    expect(JSON.parse(metadata).enc.renditions).toEqual([{ role: 'thumbnail', attachmentId: 'id-1', key: 'key-1' }])
+    expect(getAttachmentEncryption(metadata)).toEqual(fakeEncryptionInfo('key-2'))
+    expect(getVideoThumbEncryption(metadata)).toEqual(fakeEncryptionInfo('key-1'))
   })
 
-  it('an unencrypted video has no preview key', () => {
-    expect(getVideoThumbEncryption('{"video_thumb":"https://cdn/p.jpg"}')).toBeUndefined()
+  it('a resent video replaces the preview key of the earlier attempt', () => {
+    const first = withAttachmentEncryption('{}', fakeEncryptionInfo('key-2'), fakeEncryptionInfo('key-1'))
+
+    const resent = withAttachmentEncryption(first, fakeEncryptionInfo('key-4'), fakeEncryptionInfo('key-3'))
+
+    expect(JSON.parse(resent).enc.renditions).toEqual([{ role: 'thumbnail', attachmentId: 'id-3', key: 'key-3' }])
   })
 
-  it.each([
-    ['photo.JPG', 'image/jpeg'],
-    ['clip.mp4', 'video/mp4'],
-    ['clip.mov', 'video/quicktime'],
-    ['voice.mp3', 'audio/mpeg'],
-    ['report.pdf', 'application/pdf'],
-    ['archive.zip', ''],
-    ['mp4', ''],
-    [undefined, '']
-  ])('the decrypted type of "%s" is "%s"', (name, type) => {
-    expect(getTypeFromFileName(name)).toBe(type)
+  it('an unencrypted video, or one whose preview is not encrypted, has no preview key', () => {
+    expect(getVideoThumbEncryption(JSON.stringify({ video_thumb: 'https://cdn.example/preview' }))).toBeUndefined()
+    expect(getVideoThumbEncryption(withAttachmentEncryption('{}', fakeEncryptionInfo('key-1')))).toBeUndefined()
   })
 
   it('describes what the download coordinator needs to decrypt a file and a video preview', () => {
-    const metadata = withAttachmentEncryption(withVideoThumbEncryption('{}', previewKey), videoKey)
+    const metadata = withAttachmentEncryption('{}', fakeEncryptionInfo('key-2'), fakeEncryptionInfo('key-1'))
+
     expect(attachmentDecryption({ metadata, name: 'clip.mp4' })).toEqual({
-      encryption: expect.objectContaining({ key: 'video-key' }),
+      encryption: fakeEncryptionInfo('key-2'),
       contentType: 'video/mp4'
     })
-    expect(videoThumbDecryption(metadata)).toEqual({ encryption: previewKey, contentType: 'image/jpeg' })
-    expect(attachmentDecryption({ metadata: '{}', name: 'a.txt' })).toEqual({ encryption: undefined, contentType: '' })
-  })
-
-  it('with an SDK that cannot prepare files, preparing one fails with a clear error', async () => {
-    setClient({})
-    expect(() => prepareDownloadFile(videoKey, 'video/mp4')).toThrow('client.prepareDownload')
-    expect(() => prepareDownloadFile(undefined)).toThrow('client.prepareDownload')
-  })
-
-  it('asks the SDK for a download file with the attachment id and key', () => {
-    const prepareDownload = jest.fn(() => 'download-file')
-    setClient({ prepareUpload: jest.fn(), prepareDownload })
-
-    expect(prepareDownloadFile(videoKey, 'video/mp4')).toBe('download-file')
-    expect(prepareDownload).toHaveBeenLastCalledWith({ metadata: { enc: videoKey }, type: 'video/mp4' })
-    prepareDownloadFile(undefined)
-    expect(prepareDownload).toHaveBeenLastCalledWith({ metadata: {}, type: '' })
-  })
-})
-
-describe('fileEncryption: what a custom uploader encrypts and opens files with', () => {
-  const photo = () => new File(['a picture'], 'photo.png', { type: 'image/png' })
-  // The test files are ASCII text.
-  const text = (bytes: Uint8Array) => String.fromCharCode(...Array.from(bytes))
-
-  beforeEach(() => {
-    installFakeFilesClient()
-  })
-
-  it('encrypts a file with a new key and attachment id each time, and describes what it stores', async () => {
-    const first = await fileEncryption.prepareEncryption(photo())
-    const second = await fileEncryption.prepareEncryption(photo())
-
-    expect(first.encryptionInfo).toEqual({ v: 1, alg: ALG, attachmentId: 'id-1', key: 'key-1' })
-    expect(second.encryptionInfo.key).toBe('key-2')
-    expect(first.plaintextSize).toBe('a picture'.length)
-    expect(first.ciphertextSize).toBe('enc(key-1@id-1):a picture'.length)
-    expect(first.contentType).toBe('application/octet-stream')
-  })
-
-  it('reads exactly the stored bytes asked for; parts read in any order make the whole stored file', async () => {
-    const session = await fileEncryption.prepareEncryption(photo())
-    const whole = await readBlobText(await session.readAll())
-
-    const parts = await Promise.all([
-      session.read(10, 10),
-      session.read(0, 10),
-      session.read(20, session.ciphertextSize - 20)
-    ])
-
-    expect(parts.map((part) => part.length)).toEqual([10, 10, session.ciphertextSize - 20])
-    expect(text(parts[1]) + text(parts[0]) + text(parts[2])).toBe(whole)
-  })
-
-  it('gives the same bytes for the same range again, so a failed part is sent as it was', async () => {
-    const session = await fileEncryption.prepareEncryption(photo())
-
-    expect(text(await session.read(3, 12))).toBe(text(await session.read(3, 12)))
-  })
-
-  it('reads nothing at the end of the file', async () => {
-    const session = await fileEncryption.prepareEncryption(photo())
-
-    expect(await session.read(session.ciphertextSize, 0)).toHaveLength(0)
-  })
-
-  it.each([
-    ['a negative offset', -1, 1],
-    ['a negative length', 0, -1],
-    ['past the end', 1, Number.MAX_SAFE_INTEGER],
-    ['a fractional offset', 0.5, 1]
-  ])('refuses a range with %s', async (_case, offset, length) => {
-    const session = await fileEncryption.prepareEncryption(photo())
-
-    await expect(session.read(offset, length)).rejects.toThrow(RangeError)
-  })
-
-  it('fails when the chat client does not encrypt the file (an older sceyt-chat)', async () => {
-    setClient({
-      prepareUpload: async (file: Blob) => ({ size: file.size, contentType: file.type }),
-      prepareDownload: jest.fn()
+    expect(videoThumbDecryption(metadata)).toEqual({
+      encryption: fakeEncryptionInfo('key-1'),
+      contentType: 'image/jpeg'
     })
-
-    await expect(fileEncryption.prepareEncryption(photo())).rejects.toThrow('without encrypting it')
+    expect(attachmentDecryption(null)).toEqual({ encryption: undefined, contentType: '' })
   })
 
-  it('fails with a clear error when the chat client cannot prepare files', async () => {
-    setClient({})
-
-    await expect(fileEncryption.prepareEncryption(photo())).rejects.toThrow('client.prepareUpload')
+  it('the real type of a decrypted file comes from its name', () => {
+    expect(getTypeFromFileName('photo.JPG')).toBe('image/jpeg')
+    expect(getTypeFromFileName('notes')).toBe('')
+    expect(getTypeFromFileName('archive.xyz')).toBe('')
   })
 
-  it('opens a downloaded encrypted file with its encryption info: decrypted, with its real type', async () => {
-    const session = await fileEncryption.prepareDecryption(
-      fakeEncrypted('key-7', 'a picture'),
-      {
-        v: 1,
-        alg: ALG,
-        attachmentId: 'id-7',
-        key: 'key-7'
-      },
-      'image/png'
-    )
-    const opened = await session.readAll()
-
-    expect(opened.type).toBe('image/png')
-    expect(await readBlobText(opened)).toBe('a picture')
-  })
-
-  it('opens what it encrypted', async () => {
-    const encrypted = await fileEncryption.prepareEncryption(photo())
-    const opened = await (
-      await fileEncryption.prepareDecryption(await encrypted.readAll(), encrypted.encryptionInfo, 'image/png')
-    ).readAll()
-
-    expect(await readBlobText(opened)).toBe('a picture')
-  })
-
-  it('does not open a file encrypted with another key', async () => {
-    const session = await fileEncryption.prepareDecryption(fakeEncrypted('key-7', 'a picture'), {
-      v: 1,
-      alg: ALG,
-      attachmentId: 'id-8',
-      key: 'key-8'
-    })
-
-    await expect(session.readAll()).rejects.toMatchObject({ type: 'AttachmentDecryptionFailed' })
-  })
-
-  it('needs the encryption info to open a file: without it, nothing is opened as plaintext', async () => {
-    await expect(fileEncryption.prepareDecryption(fakeEncrypted('key-7', 'x'), undefined as any)).rejects.toThrow(
-      'needs its encryption info'
-    )
+  it("a file that failed decryption or has invalid enc can't be opened by downloading it again", () => {
+    expect(isUnopenableAttachmentError({ type: 'Authentication' })).toBe(true)
+    expect(isUnopenableAttachmentError({ type: 'InvalidEncryption' })).toBe(true)
+    expect(isUnopenableAttachmentError({ type: 'DownloadFailed' })).toBe(false)
+    expect(isUnopenableAttachmentError(undefined)).toBe(false)
   })
 })

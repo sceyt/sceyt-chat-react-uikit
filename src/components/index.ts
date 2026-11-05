@@ -1,24 +1,5 @@
-import SceytChat, {
-  SceytChatUIKitTheme,
-  ThemeMode,
-  ICustomUploader,
-  ICustomUploaderDownloadOptions,
-  ICustomUploaderUploadOptions,
-  IFileTransfer,
-  IProgress,
-  IUploadTask
-} from './ChatContainer'
+import SceytChat, { SceytChatUIKitTheme, ThemeMode } from './ChatContainer'
 import { IAttachment } from '../types'
-import { defaultFileTransferTransport } from '../helpers/customUploader'
-import {
-  fileEncryption as chatSdkFileEncryption,
-  IAttachmentEncryption,
-  IAttachmentRendition,
-  IFileDecryptionSession,
-  IFileEncryption,
-  IFileEncryptionInfo,
-  IFileEncryptionSession
-} from '../helpers/attachmentEncryption'
 import ChannelList from './ChannelList'
 import Channel from './Channel'
 import Chat from './Chat'
@@ -87,25 +68,11 @@ export {
   IForwardPreviewMessage,
   CustomLoadErrorStateComponent,
   ILoadErrorStateProps,
-  // A custom uploader (the `customUploader` prop) and what it is given.
-  ICustomUploader,
-  ICustomUploaderDownloadOptions,
-  ICustomUploaderUploadOptions,
-  IProgress,
-  IUploadTask,
-  IAttachment,
-  IAttachmentEncryption,
-  IAttachmentRendition,
-  // File transfer (the `fileTransfer` prop) and its defaults, to wrap or delegate to.
-  IFileTransfer,
-  defaultFileTransferTransport,
-  chatSdkFileEncryption,
-  // Attachment encryption a custom uploader gets as `options.fileEncryption`.
-  IFileEncryption,
-  IFileEncryptionSession,
-  IFileDecryptionSession,
-  IFileEncryptionInfo
+  IAttachment
 }
+
+// File transfer (the `fileTransfer` prop): transports, the encryption module, and their defaults.
+export * from '../fileTransfer'
 
 declare global {
   interface Window {

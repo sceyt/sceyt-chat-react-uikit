@@ -187,20 +187,19 @@ import {
 } from '../../helpers/messagesHalper'
 import { navigateToLatest } from '../../helpers/messageListNavigator'
 import { CONNECTION_STATUS } from '../user/constants'
+import { getSendAttachmentsAsSeparateMessages, isConnectionLost } from '../../helpers/sendAttachments'
 import {
-  getSendAttachmentsAsSeparateMessages,
-  isConnectionLost,
   isUploadNotStarted,
   isUploadPausedBeforeStart,
   markUploadNotStarted,
   pauseUpload,
   resumeUpload,
-  uploadAttachmentFile
-} from '../../helpers/customUploader'
+  uploadAttachment
+} from '../../fileTransfer/attachmentUploadCoordinator'
+import { FileEncryptionInfo } from '../../fileTransfer/encryption/types'
 import { setAttachmentToCache } from '../../helpers/attachmentsCache'
 import { releaseBlobUrls } from '../../helpers/attachmentBlobUrls'
 import store from '../index'
-import { IProgress } from '../../components/ChatContainer'
 import { canBeViewOnce, isJSON } from '../../helpers/message'
 import log from 'loglevel'
 import { isRetryableLoadError } from '../../helpers/error'
@@ -217,11 +216,7 @@ import {
   waitForAttachmentPreview
 } from '../../helpers/attachmentPreparation'
 import { parseAttachmentMetadata, shouldExtractVideoFirstFrame, withVideoThumb } from '../../helpers/videoPreview'
-import {
-  IAttachmentEncryption,
-  withAttachmentEncryption,
-  withVideoThumbEncryption
-} from '../../helpers/attachmentEncryption'
+import { withAttachmentEncryption } from '../../helpers/attachmentEncryption'
 
 // Automatic reconnect resends per message tid — a message that keeps failing is
 // dropped from the auto-resend cycle after this many attempts; the manual retry
@@ -329,7 +324,7 @@ const getAttachmentSourceFile = (attachment: IAttachment): File | null => {
 
 // Uploads the preview image of a video (its first frame, or the one made when it
 // was added) and returns its URL and encryption.
-const uploadVideoPreview = async (attachment: IAttachment, videoFile: Blob, messageType: string | null | undefined) => {
+const uploadVideoPreview = async (attachment: IAttachment, videoFile: Blob) => {
   const previewBlob = attachment.videoPreviewBlob instanceof Blob ? attachment.videoPreviewBlob : undefined
   const frame = previewBlob ? undefined : await getVideoPreviewFrame(videoFile)
   const previewImageBlob = previewBlob || frame?.blob
@@ -339,10 +334,10 @@ const uploadVideoPreview = async (attachment: IAttachment, videoFile: Blob, mess
 
   const previewName = `${attachment.name?.replace(/\.[^.]+$/, '') || 'video'}-preview.jpg`
   const previewFile = new File([previewImageBlob], previewName, { type: previewImageBlob.type || 'image/jpeg' })
-  // Reuse the attachment uploader (the application's, or the SDK's client.upload)
-  // so preview and video follow the same auth, storage, retry, and lifecycle
-  // rules. Preview files are temporary backend objects and must expire if no
-  // sent message references their returned URL.
+  // Reuse the attachment transport (fileTransfer.transport) so preview and video
+  // follow the same auth, storage, encryption, retry, and lifecycle rules.
+  // Preview files are temporary backend objects and must expire if no sent
+  // message references their returned URL.
   const previewAttachment = {
     tid: `${attachment.tid || 'video'}-preview-${Date.now()}`,
     name: previewName,
@@ -353,14 +348,19 @@ const uploadVideoPreview = async (attachment: IAttachment, videoFile: Blob, mess
     metadata: '{}',
     upload: false
   } as IAttachment
-  const { uri, encryption } = await uploadAttachmentFile(previewAttachment, () => undefined, messageType)
-  if (typeof uri !== 'string' || !uri) {
-    throw new Error('Video preview upload did not return a URL')
-  }
-  return { url: uri, encryption }
+  const { url, encryptionInfo } = await uploadAttachment(
+    previewAttachment,
+    { file: previewFile, fileName: previewName, mimeType: previewFile.type },
+    () => undefined
+  )
+  return { url, encryption: encryptionInfo }
 }
 
-const prepareAndUploadVideoPreview = async (attachment: IAttachment, messageType: string | null | undefined) => {
+// The video with its preview image's URL in its metadata, and what opens the preview
+// when it was encrypted (it goes in the video's `enc` once the video is uploaded).
+const prepareAndUploadVideoPreview = async (
+  attachment: IAttachment
+): Promise<{ attachment: IAttachment; thumbnailEncryption?: FileEncryptionInfo }> => {
   const videoFile =
     attachment.url instanceof Blob ? attachment.url : attachment.data instanceof Blob ? attachment.data : null
   if (!videoFile) {
@@ -371,17 +371,19 @@ const prepareAndUploadVideoPreview = async (attachment: IAttachment, messageType
   // failed, e.g. the network went off) goes with the video again.
   let preview = attachment.tid ? getPendingAttachment(attachment.tid)?.videoPreview : undefined
   if (!preview) {
-    preview = await uploadVideoPreview(attachment, videoFile, messageType)
+    preview = await uploadVideoPreview(attachment, videoFile)
     if (attachment.tid) {
       setPendingAttachment(attachment.tid, { videoPreview: preview })
     }
   }
 
-  const metadata = withVideoThumb(attachment.metadata, preview.url)
   return {
-    ...attachment,
-    videoPreviewBlob: undefined,
-    metadata: preview.encryption ? withVideoThumbEncryption(metadata, preview.encryption) : metadata
+    attachment: {
+      ...attachment,
+      videoPreviewBlob: undefined,
+      metadata: withVideoThumb(attachment.metadata, preview.url)
+    },
+    thumbnailEncryption: preview.encryption
   }
 }
 
@@ -605,10 +607,11 @@ const getReconnectChannelSignature = (channel: Partial<IChannel> | null | undefi
 export const handleUploadAttachments = async (attachments: IAttachment[], message: IMessage, channel: IChannel) => {
   return await Promise.all(
     attachments.map(async (attachment) => {
-      const handleUploadProgress = ({ loaded, total }: IProgress) => {
+      const handleUploadProgress = (percent: number) => {
         // Bytes the browser reports while the connection is lost went into it.
         if (isConnectionLost()) return
-        store.dispatch(updateAttachmentUploadingProgressAC(loaded, total, attachment.tid))
+        const total = attachment.size || 0
+        store.dispatch(updateAttachmentUploadingProgressAC((total * percent) / 100, total, attachment.tid))
       }
       const shouldRecoverVideoSource = attachment.type === attachmentTypes.video && !(attachment.url instanceof Blob)
       if ((!attachment.cachedUrl || shouldRecoverVideoSource) && !(attachment.url instanceof Blob)) {
@@ -624,13 +627,14 @@ export const handleUploadAttachments = async (attachments: IAttachment[], messag
         }
       }
       const fileType = attachment.url?.type?.split('/')[0]
+      let thumbnailEncryption: FileEncryptionInfo | undefined
       if (attachment.type === attachmentTypes.video) {
         if (!attachment.cachedUrl) {
           // The stop control shows while the preview uploads; a pause pressed
           // then is kept and applied when the video upload starts.
           markUploadNotStarted(attachment.tid!)
         }
-        attachment = await prepareAndUploadVideoPreview(attachment, message.type)
+        ;({ attachment, thumbnailEncryption } = await prepareAndUploadVideoPreview(attachment))
         if (!attachment.cachedUrl) {
           // The preview upload is complete. From this point, progress belongs
           // only to the original video transfer.
@@ -645,32 +649,24 @@ export const handleUploadAttachments = async (attachments: IAttachment[], messag
       let fileSize = attachment.size
       let filePath: any
       let uploadedUri
-      const handleUpdateLocalPath = (updatedLink: string) => {
-        if (fileType === 'video') {
-          filePath = updatedLink
-        }
-      }
       let uploadedBlob: Blob | null = null
-      let encryption: IAttachmentEncryption | undefined
+      let encryption: FileEncryptionInfo | undefined
       if (attachment.cachedUrl) {
         uploadedUri = attachment.cachedUrl
         const dataSize = attachment.data?.size || 0
         store.dispatch(updateAttachmentUploadingProgressAC(dataSize, dataSize, attachment.tid))
       } else {
-        const uploaded = await uploadAttachmentFile(
+        // The file the transport sends: as it was prepared when it was added to the message.
+        const file = attachment.url as Blob
+        const uploaded = await uploadAttachment(
           attachment,
-          handleUploadProgress,
-          message.type,
-          handleUpdateLocalPath
+          { file, fileName: (file as File).name || attachment.name || 'file', mimeType: file.type || null },
+          handleUploadProgress
         )
-        uploadedUri = uploaded.uri
-        uploadedBlob = uploaded.blob
-        encryption = uploaded.encryption
-        if (uploadedBlob) {
-          fileSize = uploadedBlob.size
-        } else {
-          log.warn('Upload returned null blob for attachment:', attachment.name)
-        }
+        uploadedUri = uploaded.url
+        uploadedBlob = file
+        encryption = uploaded.encryptionInfo
+        fileSize = file.size
       }
       if (!attachment.cachedUrl && fileType === 'image') {
         try {
@@ -750,7 +746,7 @@ export const handleUploadAttachments = async (attachments: IAttachment[], messag
       const attachmentMeta = attachment.cachedUrl
         ? attachment.metadata
         : encryption
-          ? withAttachmentEncryption(attachment.metadata, encryption)
+          ? withAttachmentEncryption(attachment.metadata, encryption, thumbnailEncryption)
           : JSON.stringify({
               ...parsedAttachmentMeta
             })

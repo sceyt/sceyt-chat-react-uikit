@@ -34,7 +34,7 @@ import {
 } from '../../helpers'
 import { attachmentTypes, MESSAGE_DELIVERY_STATUS, MESSAGE_STATUS, THEME, UPLOAD_STATE } from '../../helpers/constants'
 import { THEME_COLORS } from '../../UIHelper/constants'
-import { getAttachmentDownloader, getCustomUploader } from '../../helpers/customUploader'
+import { getAttachmentDownloader } from '../../fileTransfer/attachmentDownloader'
 import { attachmentDecryption, getAttachmentEncryption, getTypeFromFileName } from '../../helpers/attachmentEncryption'
 import { AttachmentIconCont, UploadProgress, UploadPercent, CancelResumeWrapper } from '../../UIHelper'
 import {
@@ -204,10 +204,9 @@ const Attachment = ({
   const imageDownloadRequestRef = useRef(0)
   const imageResumeStartedRef = useRef(false)
   const fileNameRef: any = useRef(null)
-  // The CustomUploader's downloader, or the SDK's (client.download); decrypts encrypted files.
+  // Downloads through fileTransfer.transport; decrypts encrypted files.
   const downloader = getAttachmentDownloader(
     attachment,
-    'file',
     getAttachmentEncryption(attachment.metadata),
     getTypeFromFileName(attachment.name)
   )
@@ -899,7 +898,8 @@ const Attachment = ({
               setProgress(uploadPercent)
             },
             messageType
-          ).then(async (url) => {
+          ).then(async ({ Body }) => {
+            const url = URL.createObjectURL(Body)
             let downloadingUrl = url
             if (attachment.type === attachmentTypes.image) {
               const compressedUrl = await compressAndCacheImage(url, attachment.url, renderWidth, renderHeight)
@@ -908,8 +908,7 @@ const Attachment = ({
                 downloadingUrl = compressedUrl
               }
             } else {
-              const response = await fetch(url)
-              setAttachmentToCache(attachment.url, response)
+              setAttachmentToCache(attachment.url, new Response(Body))
             }
             setAttachmentUrl(downloadingUrl)
             dispatch(setUpdateMessageAttachmentAC(attachment.url, attachment.url))
@@ -947,16 +946,10 @@ const Attachment = ({
         setFailTimeout()
       }
       const uploadProgress = attachmentsUploadProgress[attachmentIndex]
-      if (getCustomUploader()) {
-        const uploadPercent =
-          uploadProgress.progress && uploadProgress.progress * 100 > 3 ? uploadProgress.progress * 100 : 3
-        setProgress(uploadPercent)
-        setSizeProgress({ loaded: uploadProgress.uploaded || 0, total: uploadProgress.total || 0 })
-      } else {
-        const uploadPercent = uploadProgress.progress * 100 > 3 ? uploadProgress.progress * 100 : 3
-        setProgress(uploadPercent)
-        setSizeProgress({ loaded: uploadProgress.uploaded || 0, total: uploadProgress.total || 0 })
-      }
+      const uploadPercent =
+        uploadProgress.progress && uploadProgress.progress * 100 > 3 ? uploadProgress.progress * 100 : 3
+      setProgress(uploadPercent)
+      setSizeProgress({ loaded: uploadProgress.uploaded || 0, total: uploadProgress.total || 0 })
     }
   }, [attachmentsUploadProgress])
 

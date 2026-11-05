@@ -1,12 +1,16 @@
 import { setClient } from '../common/client'
-import { IAttachmentDownloadFile, IAttachmentEncryption } from '../helpers/attachmentEncryption'
+import { FileEncryptionInfo } from '../fileTransfer/encryption/types'
 import { readResponseBlobWithProgress } from '../helpers/getVideoFrame'
 
-// Stand-ins for the SDK's AttachmentUploadFile and AttachmentDownloadFile. The
-// real ones are tested in sceyt-chat against the format's test vectors; UIKit
-// tests only check that files go through the SDK with the right attachment id and
-// key. "Encrypting" prefixes the bytes with `enc(<key>@<id>):`, and opening a
-// file with another key or attachment id fails. Key `key-n` has attachment id `id-n`.
+// A stand-in for the SDK's file encryption (sceyt-chat client.FileEncryption). The real
+// one is tested in sceyt-chat against the format's test vectors; UIKit tests only check
+// that files go through it with the right attachment id and key. "Encrypting" prefixes
+// the bytes with a fixed-length `enc(<key>@<id>):` header, and opening a file with
+// another key or attachment id fails. Key `key-n` has attachment id `id-n`.
+
+const ALG = 'tink-aes256-gcm-hkdf-64k+commit-v1'
+// Every fake header has this length, so a plaintext size follows from a stored size.
+const HEADER_SIZE = 32
 
 export const readBlobText = (blob: Blob): Promise<string> =>
   new Promise((resolve, reject) => {
@@ -16,19 +20,6 @@ export const readBlobText = (blob: Blob): Promise<string> =>
     reader.readAsText(blob)
   })
 
-const uniqueIdOf = (key: string) => key.replace(/^key-/, 'id-')
-const prefixOf = (key: string, id: string = uniqueIdOf(key)) => `enc(${key}@${id}):`
-const notUsed = () => {
-  throw new Error('not used by the UIKit')
-}
-
-export const fakeEncryption = (key: string): IAttachmentEncryption => ({
-  v: 1,
-  alg: 'tink-aes256-gcm-hkdf-64k+commit-v1',
-  attachmentId: uniqueIdOf(key),
-  key
-})
-
 const readBytes = (blob: Blob): Promise<Uint8Array> =>
   new Promise((resolve, reject) => {
     const reader = new FileReader()
@@ -37,70 +28,75 @@ const readBytes = (blob: Blob): Promise<Uint8Array> =>
     reader.readAsArrayBuffer(blob)
   })
 
-/** The file client.prepareUpload gives; encrypted with `key` when there is a key. */
-export const makeFakeUploadFile = (source: Blob, key?: string) => ({
-  source,
-  size: key ? source.size + prefixOf(key).length : source.size,
-  contentType: key ? 'application/octet-stream' : source.type,
-  partSize: 5 * 1024 * 1024,
-  partCount: Math.max(1, Math.ceil(source.size / (5 * 1024 * 1024))),
-  encryption: key ? fakeEncryption(key) : undefined,
-  getPart: notUsed,
-  // The stored bytes from `start` up to `end`, as the SDK reads a range.
-  getRange: (start: number, end: number) =>
-    readBytes((key ? new Blob([prefixOf(key), source]) : source).slice(start, end)),
-  getAll: async () => (key ? new Blob([prefixOf(key), source], { type: 'application/octet-stream' }) : source)
+const uniqueIdOf = (key: string) => key.replace(/^key-/, 'id-')
+const keyOf = (uniqueId: string) => uniqueId.replace(/^id-/, 'key-')
+const headerOf = (key: string, id: string = uniqueIdOf(key)) => `enc(${key}@${id})`.padEnd(HEADER_SIZE - 1) + ':'
+
+const sdkError = (type: string, message: string) => Object.assign(new Error(message), { type })
+
+/** What opens the fake file of `key`, as the UIKit's encryption gives it. */
+export const fakeEncryptionInfo = (key: string): FileEncryptionInfo => ({
+  algorithm: ALG,
+  attachmentId: uniqueIdOf(key),
+  key
 })
 
-/** The stored file of an attachment; encrypted with `key` and attachment id `id` when there is a key. */
-export const makeFakeDownloadFile = (
-  key: string | undefined,
-  type: string = '',
-  id?: string
-): IAttachmentDownloadFile => ({
-  type,
-  isEncrypted: !!key,
-  open: async (stored: Blob) => {
-    if (!key) return type && stored.type !== type ? new Blob([stored], { type }) : stored
-    if (!id) {
-      throw Object.assign(new Error('Attachment encryption: the attachment id is missing'), {
-        type: 'InvalidAttachmentEncryption'
-      })
-    }
-    const prefix = prefixOf(key, id)
-    const text = await readBlobText(stored)
-    if (!text.startsWith(prefix)) {
-      throw Object.assign(new Error(`Not encrypted with key ${key} and attachment id ${id}`), {
-        type: 'AttachmentDecryptionFailed'
-      })
-    }
-    return new Blob([text.slice(prefix.length)], { type })
-  },
-  resumeFrom: notUsed,
-  openStream: notUsed,
-  rangeFor: notUsed,
-  openRange: notUsed
-})
+/** The `enc` object of the fake file of `key`, as it is in attachment metadata. */
+export const fakeEncryption = (key: string) => ({ v: 1, alg: ALG, attachmentId: uniqueIdOf(key), key })
 
-const fakePrepareDownload = ({ metadata, type }: { metadata?: any; type?: string }) => {
-  const enc = (typeof metadata === 'string' ? JSON.parse(metadata) : metadata || {}).enc
-  return enc ? makeFakeDownloadFile(enc.key, type, enc.attachmentId) : makeFakeDownloadFile(undefined, type)
+/** A Blob encrypted the way the fake file of `key` (attachment id `id-n` for `key-n`) encrypts. */
+export const fakeEncrypted = (key: string, text: string) =>
+  new Blob([`${headerOf(key)}${text}`], { type: 'application/octet-stream' })
+
+/** The SDK's PreparedUpload of `source`, encrypted with `key`. */
+export const makeFakePreparedUpload = (source: Blob, key: string) => {
+  const uniqueId = uniqueIdOf(key)
+  const stored = new Blob([headerOf(key), source], { type: 'application/octet-stream' })
+  const encryptionInfo = { format: ALG, data: { uniqueId, key, plainSize: source.size } }
+  return {
+    source,
+    stored,
+    ciphertextSize: stored.size,
+    plaintextSize: source.size,
+    sourceId: `source-${uniqueId}`,
+    encryptionInfo,
+    checkpoint: () => ({ encryptionInfo, data: '{}' }),
+    readCiphertextRange: (offset: number, length: number) => readBytes(stored.slice(offset, offset + length)),
+    close: () => undefined
+  }
 }
 
-/**
- * client.download as the SDK does it, over the test's fetch (without resuming a
- * lost connection): one request for `url`, then the file opened (decrypted with
- * the `enc` in `metadata`) with its real type.
- */
+/** The SDK's PlaintextReader of a stored file; it fails unless the file is the one `info` opens. */
+const openFakeDownload = async (
+  source: { ciphertextSize: number; read: (offset: number, length: number) => Promise<Uint8Array> },
+  info: { format: string; data: { uniqueId: string; key: string; plainSize: number } }
+) => {
+  if (!info?.data?.uniqueId || !info.data.key) {
+    throw sdkError('InvalidEncryption', 'Attachment encryption: the attachment id or key is missing')
+  }
+  const bytes = await source.read(0, source.ciphertextSize)
+  const text = await readBlobText(new Blob([bytes as BlobPart]))
+  const header = headerOf(info.data.key, info.data.uniqueId)
+  const plaintext = text.slice(HEADER_SIZE)
+  if (!text.startsWith(header) || plaintext.length !== info.data.plainSize) {
+    throw sdkError('Authentication', `Not encrypted with key ${info.data.key} and attachment id ${info.data.uniqueId}`)
+  }
+  const plain = Uint8Array.from(plaintext, (char) => char.charCodeAt(0))
+  return {
+    plaintextSize: plain.length,
+    read: async (offset: number, length: number) => plain.slice(offset, offset + length),
+    close: () => undefined
+  }
+}
+
+/** client.download as the SDK does it, over the test's fetch: the stored bytes, typed `type`. */
 export const fakeSdkDownload = async (
   url: string,
   {
-    metadata,
     type,
     progress,
     signal
   }: {
-    metadata?: any
     type?: string
     // eslint-disable-next-line no-unused-vars
     progress?: (loaded: number, total?: number) => void
@@ -115,22 +111,25 @@ export const fakeSdkDownload = async (
     })
   }
   const stored = await readResponseBlobWithProgress(response, ({ loaded, total }) => progress?.(loaded, total))
-  return fakePrepareDownload({ metadata, type }).open(stored)
+  return type && stored.type !== type ? new Blob([stored], { type }) : stored
 }
 
-/** Installs a chat client whose files are fake ones; keys are numbered key-1, key-2, … */
+/**
+ * Installs a chat client whose file encryption is the fake one (keys are numbered key-1,
+ * key-2, …) and whose download goes over the test's fetch. A test adds `upload` and
+ * `uploadEncrypted` when it uploads.
+ */
 export const installFakeFilesClient = () => {
   let created = 0
-  const client = {
-    prepareUpload: async (file: Blob, options: { encrypt?: boolean } = {}) =>
-      options.encrypt ? makeFakeUploadFile(file, `key-${++created}`) : makeFakeUploadFile(file),
-    prepareDownload: fakePrepareDownload,
+  const client: any = {
+    FileEncryption: {
+      newUniqueId: () => `id-${++created}`,
+      prepareUpload: async (file: Blob, uniqueId: string) => makeFakePreparedUpload(file, keyOf(uniqueId)),
+      openDownload: openFakeDownload,
+      plaintextSize: (ciphertextSize: number) => Math.max(0, ciphertextSize - HEADER_SIZE)
+    },
     download: fakeSdkDownload
   }
   setClient(client)
   return client
 }
-
-/** A Blob encrypted the way the fake file of `key` (attachment id `id-n` for `key-n`) encrypts. */
-export const fakeEncrypted = (key: string, text: string) =>
-  new Blob([`${prefixOf(key)}${text}`], { type: 'application/octet-stream' })

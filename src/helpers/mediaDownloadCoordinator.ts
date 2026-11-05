@@ -1,8 +1,8 @@
-import { cancelDownloadRequest, getAttachmentDownloader, getCustomDownloader } from './customUploader'
-import { ICustomUploader } from '../components/ChatContainer'
 import { IAttachment } from '../types'
-import { IAttachmentEncryption, isUnopenableAttachmentError } from './attachmentEncryption'
-import { readResponseBlobWithProgress } from './getVideoFrame'
+import { isUnopenableAttachmentError } from './attachmentEncryption'
+import { attachmentTransferRouter } from '../fileTransfer/attachmentTransferRouter'
+import { FileEncryptionInfo } from '../fileTransfer/encryption/types'
+import { TransferExecutor } from '../fileTransfer/transferExecutor'
 import { getAttachmentURLWithVersion, getAttachmentUrlFromCache, setAttachmentToCache } from './attachmentsCache'
 import { registerBlobUrl } from './attachmentBlobUrls'
 import { ensurePlayableVideoBlob } from './videoConversion'
@@ -11,7 +11,7 @@ export type MediaDownloadKind = 'original-image' | 'original-video' | 'video-thu
 
 export interface MediaDownloadRequest {
   key: string
-  /** The attachment the file belongs to: the custom downloader gets it. */
+  /** The attachment the file belongs to: the transport gets it. */
   attachment: IAttachment
   url: string
   cacheKey: string
@@ -19,11 +19,9 @@ export interface MediaDownloadRequest {
   kind: MediaDownloadKind
   messageType?: string | null
   size?: number
-  downloader?: ICustomUploader['download']
-  customDownload?: boolean
   skipCacheLookup?: boolean
-  /** The file's `enc` metadata when it is encrypted: the download is decrypted before it is cached or shown. */
-  encryption?: IAttachmentEncryption
+  /** What opens the file when it is encrypted: the download is decrypted before it is cached or shown. */
+  encryption?: FileEncryptionInfo
   /** Type of the decrypted file (encrypted objects are stored as application/octet-stream). */
   contentType?: string
   /** The user asked to try again: a file that could not be opened before is downloaded again. */
@@ -46,8 +44,7 @@ interface MediaDownloadJob {
   version: number
   snapshot: MediaDownloadSnapshot
   promise: Promise<MediaDownloadResult>
-  abortController?: AbortController
-  customRequest?: Promise<any>
+  transfer?: TransferExecutor<Blob>
   cacheKeys: Set<string>
   cancelled?: boolean
 }
@@ -80,21 +77,6 @@ const setJobSnapshot = (key: string, job: MediaDownloadJob, snapshot: MediaDownl
   setSnapshot(key, snapshot)
 }
 
-const normalizeProgress = (progress: any, fallbackTotal: number = 0) => {
-  const loaded = progress?.loaded ?? progress?.uploaded ?? 0
-  const reportedTotal = progress?.total ?? 0
-  // Message attachment size is the authoritative server-side file size. Some
-  // custom downloaders report an intermediate/proxy response length instead,
-  // which made large files appear much smaller in the UI.
-  const total = Math.max(reportedTotal || 0, fallbackTotal || 0)
-  const fraction = total > 0 ? loaded / total : progress?.progress || 0
-  return {
-    loaded,
-    total,
-    progress: Math.max(0, Math.min(100, fraction * 100))
-  }
-}
-
 const makeObjectUrl = async (
   request: MediaDownloadRequest,
   sourceBlob: Blob,
@@ -123,62 +105,37 @@ const makeObjectUrl = async (
 }
 
 const download = async (request: MediaDownloadRequest, job: MediaDownloadJob): Promise<MediaDownloadResult> => {
-  const reportProgress = (progress: any) => {
-    // URL-returning custom downloaders may first emit a synthetic 1 B / 1 B
-    // completion while resolving the actual media URL. Do not surface that
-    // transport marker as attachment progress; the following media request
-    // reports the real bytes.
-    const rawLoaded = progress?.loaded ?? progress?.uploaded ?? 0
-    const rawTotal = progress?.total ?? 0
-    // A cancelled transfer that is still running (its downloader did not
-    // abort it) must not turn the shared state back to loading.
-    if (job.cancelled || (rawLoaded <= 1 && rawTotal <= 1)) {
-      return
-    }
-    const normalized = normalizeProgress(progress, request.size)
-    setJobSnapshot(request.key, job, { state: 'loading', ...normalized })
-  }
-  // The CustomUploader's downloader, or the SDK's (client.download); an
-  // encrypted file comes back from it already decrypted.
-  const downloader = getAttachmentDownloader(
+  // Message attachment size is the authoritative server-side file size; a file of
+  // unknown size (a video's preview image) is counted out of 100.
+  const total = Number(request.size) || 100
+  // The transport (fileTransfer.transport); an encrypted file comes back from it
+  // decrypted, checked against the attachment's size (a preview image has none).
+  // One transport operation per job: a video and its preview are separate ones.
+  const transfer = attachmentTransferRouter.download(
     request.attachment,
-    request.kind === 'video-thumbnail' ? 'thumbnail' : 'file',
-    request.encryption,
-    request.contentType,
-    request.downloader || getCustomDownloader()
+    {
+      url: request.url,
+      mimeType: request.contentType,
+      encryptionInfo: request.encryption,
+      plaintextSize: request.kind === 'video-thumbnail' ? undefined : request.attachment.size
+    },
+    request.key
   )
-
-  // Shared media needs a Blob to cache and to publish one reusable object
-  // URL. Custom uploader implementations (including AWS-based uploaders)
-  // use `download: true` for that full-download path; `false` only returns
-  // a short-lived URL which the coordinator would have to fetch again.
-  const requestBlob = request.customDownload ?? true
-  const customRequest = downloader(request.url, requestBlob, reportProgress, request.messageType)
-  job.customRequest = customRequest
-  const result = await customRequest
-  const body = result?.Body || result
-  if (body instanceof Blob) {
-    reportProgress({ loaded: body.size, total: body.size })
-    return makeObjectUrl(request, body, job.cacheKeys)
-  }
-  if (body instanceof ArrayBuffer || ArrayBuffer.isView(body)) {
-    const blob = new Blob([body], { type: 'application/octet-stream' })
-    reportProgress({ loaded: blob.size, total: blob.size })
-    return makeObjectUrl(request, blob, job.cacheKeys)
-  }
-  if (typeof body !== 'string') {
-    throw new Error('Media downloader returned an unsupported result')
-  }
-
-  // Some custom downloaders return a local/remote URL rather than a Blob.
-  // Fetch it once here so all subscribers still share the same blob result.
-  job.abortController = new AbortController()
-  const response = await fetch(body, { signal: job.abortController.signal })
-  if (!response.ok) {
-    throw new Error(`Unable to read downloaded media (${response.status})`)
-  }
-  const blob = await readResponseBlobWithProgress(response, reportProgress, request.size || 0)
-  return makeObjectUrl(request, blob, job.cacheKeys)
+  job.transfer = transfer
+  const result = await transfer.execute({
+    onProgress: (percent) => {
+      // A cancelled transfer that is still running must not turn the shared state back to loading.
+      if (job.cancelled) return
+      setJobSnapshot(request.key, job, {
+        state: 'loading',
+        loaded: (total * percent) / 100,
+        total,
+        progress: Math.max(0, Math.min(100, percent))
+      })
+    }
+  })
+  if (result.type !== 'success') throw result.error
+  return makeObjectUrl(request, result.result, job.cacheKeys)
 }
 
 const getCachedMediaResult = async (cacheKey: string): Promise<MediaDownloadResult | undefined> => {
@@ -290,8 +247,7 @@ export const cancelMediaDownload = (key: string) => {
   // slow native or custom downloader to reject.
   jobs.delete(key)
   setSnapshot(key, { state: 'cancelled', loaded: 0, total: 0, progress: 0 })
-  if (job.abortController) job.abortController.abort()
-  if (job.customRequest) cancelDownloadRequest(job.customRequest)
+  job.transfer?.discard()
 }
 
 export const getMediaDownloadSnapshot = (key?: string): MediaDownloadSnapshot =>

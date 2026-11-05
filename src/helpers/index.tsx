@@ -1,7 +1,7 @@
 import { IAttachment, IContact, IUser } from '../types'
 import FileSaver from 'file-saver'
 import moment from 'moment'
-import { cancelDownloadRequest, getAttachmentDownloader } from './customUploader'
+import { cancelDownloadRequest, getAttachmentDownloader } from '../fileTransfer/attachmentDownloader'
 import { getAttachmentEncryption, getTypeFromFileName } from './attachmentEncryption'
 import log from 'loglevel'
 
@@ -56,8 +56,8 @@ export const downloadFile = async (
   try {
     const encryption = getAttachmentEncryption(attachment.metadata)
     const type = getTypeFromFileName(attachment.name)
-    // The CustomUploader's downloader, or the SDK's (client.download); an encrypted file comes back decrypted.
-    const downloader = getAttachmentDownloader(attachment, 'file', encryption, type)
+    // Downloads through fileTransfer.transport; an encrypted file comes back decrypted.
+    const downloader = getAttachmentDownloader(attachment, encryption, type)
     const request = downloader(
       attachment.url,
       download,

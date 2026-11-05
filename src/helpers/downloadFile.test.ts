@@ -1,8 +1,15 @@
 import FileSaver from 'file-saver'
-import { fileEncryption } from './attachmentEncryption'
 import { cancelDownloadFile, downloadFile } from './index'
-import { setCustomUploader } from './customUploader'
-import { fakeEncrypted, installFakeFilesClient, readBlobText } from '../testUtils/fakeAttachmentFiles'
+import { fileTransfer } from '../fileTransfer/sceytChatUIKitFileTransfer'
+import { readDecryptedFile } from '../fileTransfer/defaults/defaultFileTransferTransport'
+import { FileDownloadRequest, FileTransferResult } from '../fileTransfer/types'
+import {
+  fakeEncrypted,
+  fakeEncryption,
+  fakeEncryptionInfo,
+  installFakeFilesClient,
+  readBlobText
+} from '../testUtils/fakeAttachmentFiles'
 
 jest.mock('file-saver', () => ({
   __esModule: true,
@@ -11,10 +18,41 @@ jest.mock('file-saver', () => ({
 
 const mockSaveAs = FileSaver.saveAs as jest.Mock
 
-describe('downloadFile without a custom uploader: the SDK downloads (client.download)', () => {
+/** Sets a custom transport (fileTransfer.transport) whose download is `download`. */
+const useTransport = (
+  // eslint-disable-next-line no-unused-vars
+  download: (request: FileDownloadRequest) => Promise<FileTransferResult<Blob>>
+) => {
+  const transport = { upload: jest.fn(), download: jest.fn(download), cancel: jest.fn() }
+  fileTransfer.transport = transport
+  return transport
+}
+
+/**
+ * A custom transport whose server stores `stored`: it opens it with the UIKit's encryption,
+ * as a transport is expected to.
+ */
+const useDecryptingTransport = (stored: Blob) =>
+  useTransport(async (request) => {
+    try {
+      const session = await fileTransfer.encryption.prepareDecryption(
+        stored,
+        request.encryptionInfo!,
+        request.plaintextSize
+      )
+      return FileTransferResult.success(await readDecryptedFile(session, request.mimeType || ''))
+    } catch (error) {
+      return FileTransferResult.failure(error as Error)
+    }
+  })
+
+afterEach(() => {
+  fileTransfer.configure()
+})
+
+describe('downloadFile without a custom transport: the SDK downloads (client.download)', () => {
   beforeEach(() => {
     jest.clearAllMocks()
-    setCustomUploader(undefined)
     installFakeFilesClient()
   })
 
@@ -56,18 +94,13 @@ describe('downloadFile without a custom uploader: the SDK downloads (client.down
   })
 })
 
-describe('downloadFile custom downloader', () => {
+describe('downloadFile with a custom transport', () => {
   beforeEach(() => {
     jest.clearAllMocks()
   })
 
-  afterEach(() => {
-    setCustomUploader(undefined)
-  })
-
-  it('gives a custom downloader the attachment, which carries its message id', async () => {
-    const download = jest.fn().mockResolvedValue({ Body: new Blob(['file']) })
-    setCustomUploader({ download, cancelRequest: jest.fn(), upload: jest.fn() } as any)
+  it('gives the transport the attachment, which carries its message id', async () => {
+    const transport = useTransport(async () => FileTransferResult.success(new Blob(['file'])))
     const attachment = {
       id: 'file-id',
       messageId: '9223372036854775807',
@@ -77,12 +110,14 @@ describe('downloadFile custom downloader', () => {
 
     await downloadFile(attachment, true, undefined, undefined, 'text')
 
-    expect(download).toHaveBeenCalledWith(attachment, true, expect.any(Function), 'text', {
-      kind: 'file',
+    const [request] = transport.download.mock.calls[0]
+    expect(request).toMatchObject({
+      operationId: 'download:file-id',
       url: 'https://cdn/file.pdf',
-      type: 'application/pdf',
-      fileEncryption
+      mimeType: 'application/pdf'
     })
+    expect((request.context as any).attachment === attachment).toBe(true)
+    expect((request.context as any).attachment.messageId).toBe('9223372036854775807')
     expect(mockSaveAs).toHaveBeenCalledWith(expect.any(Blob), 'file.pdf')
   })
 })
@@ -92,9 +127,9 @@ describe('downloadFile for an encrypted attachment', () => {
     id: 'doc-id',
     url: 'https://cdn/doc',
     name: 'report.pdf',
-    metadata: JSON.stringify({
-      enc: { v: 1, alg: 'tink-aes256-gcm-hkdf-64k+commit-v1', attachmentId: 'id-5', key: 'key-5' }
-    })
+    // The plaintext's size: 'pdf-bytes'.
+    size: 9,
+    metadata: JSON.stringify({ enc: fakeEncryption('key-5') })
   } as any
 
   beforeEach(() => {
@@ -102,18 +137,17 @@ describe('downloadFile for an encrypted attachment', () => {
     installFakeFilesClient()
   })
 
-  afterEach(() => setCustomUploader(undefined))
-
-  it('saves the decrypted file from the custom downloader', async () => {
-    setCustomUploader({
-      upload: jest.fn(),
-      download: async () => ({ Body: fakeEncrypted('key-5', 'pdf-bytes') }),
-      cancelRequest: jest.fn()
-    })
+  it('saves the file the custom transport decrypted with what the attachment metadata gives it', async () => {
+    const transport = useDecryptingTransport(fakeEncrypted('key-5', 'pdf-bytes'))
     const done = jest.fn()
 
     await downloadFile(attachment, true, done)
 
+    expect(transport.download.mock.calls[0][0]).toMatchObject({
+      encryptionInfo: fakeEncryptionInfo('key-5'),
+      plaintextSize: 9,
+      mimeType: 'application/pdf'
+    })
     const [saved, name] = mockSaveAs.mock.calls[0]
     expect(name).toBe('report.pdf')
     expect(saved.type).toBe('application/pdf')
@@ -122,20 +156,17 @@ describe('downloadFile for an encrypted attachment', () => {
   })
 
   it('saves the decrypted file the SDK downloaded', async () => {
-    setCustomUploader(undefined)
     global.fetch = jest.fn().mockResolvedValue({ ok: true, blob: async () => fakeEncrypted('key-5', 'pdf-bytes') })
 
     await downloadFile(attachment, true, jest.fn())
 
-    expect(await readBlobText(mockSaveAs.mock.calls[0][0])).toBe('pdf-bytes')
+    const [saved] = mockSaveAs.mock.calls[0]
+    expect(saved.type).toBe('application/pdf')
+    expect(await readBlobText(saved)).toBe('pdf-bytes')
   })
 
   it('saves nothing when the file does not decrypt', async () => {
-    setCustomUploader({
-      upload: jest.fn(),
-      download: async () => ({ Body: fakeEncrypted('another-key', 'pdf-bytes') }),
-      cancelRequest: jest.fn()
-    })
+    useDecryptingTransport(fakeEncrypted('another-key', 'pdf-bytes'))
     const done = jest.fn()
 
     await downloadFile(attachment, true, done)
@@ -144,15 +175,18 @@ describe('downloadFile for an encrypted attachment', () => {
     expect(done).toHaveBeenCalledWith('doc-id', true)
   })
 
-  it('cancelling the download cancels the uploader own request', () => {
-    const request = new Promise(() => undefined)
-    const cancelRequest = jest.fn()
-    setCustomUploader({ upload: jest.fn(), download: () => request, cancelRequest })
+  it('cancelling the download discards the transport operation', () => {
+    let signal: AbortSignal | undefined
+    const transport = useTransport((request) => {
+      signal = request.signal
+      return new Promise(() => undefined)
+    })
 
     downloadFile(attachment, true, jest.fn())
     cancelDownloadFile('doc-id')
 
-    // The same promise object: toHaveBeenCalledWith finds any two promises equal.
-    expect(cancelRequest.mock.calls[0][0] === request).toBe(true)
+    expect(signal?.aborted).toBe(true)
+    expect(transport.cancel).toHaveBeenCalledTimes(1)
+    expect(transport.cancel).toHaveBeenCalledWith('download:doc-id')
   })
 })

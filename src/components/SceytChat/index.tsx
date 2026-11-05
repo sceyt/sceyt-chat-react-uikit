@@ -56,8 +56,8 @@ import {
   requestPermissionOnUserInteraction
 } from '../../helpers/notifications'
 import { IChannel, IContactsMap } from '../../types'
-import { setCustomUploader, setSendAttachmentsAsSeparateMessages } from '../../helpers/customUploader'
-import { setEncryptAttachments, setFileEncryption } from '../../helpers/attachmentEncryption'
+import { setSendAttachmentsAsSeparateMessages } from '../../helpers/sendAttachments'
+import { fileTransfer as uikitFileTransfer } from '../../fileTransfer/sceytChatUIKitFileTransfer'
 import { IChatClientProps } from '../ChatContainer'
 import { defaultTheme, THEME_COLORS } from '../../UIHelper/constants'
 import { setHideUserPresence } from '../../helpers/userHelper'
@@ -84,8 +84,6 @@ const SceytChat = ({
   showOnlyContactUsers,
   logoSrc,
   fileTransfer,
-  CustomUploader,
-  encryptAttachments = false,
   handleNewMessages,
   sendAttachmentsAsSeparateMessages = true,
   membersDisplayTextByChannelTypesMap,
@@ -229,16 +227,13 @@ const SceytChat = ({
     }
   }
 
-  // fileTransfer takes the place of CustomUploader and encryptAttachments; without a
-  // transport, the default one (the chat client's) is used. A change applies to the
-  // transfers that start after it.
-  const transport = fileTransfer?.transport || CustomUploader
-  const encryptUploads = fileTransfer?.encryptUploads ?? encryptAttachments
+  // Without a transport or encryption, the default one (the chat client's) is used.
+  // A change applies to the transfers that start after it.
+  const transport = fileTransfer?.transport
+  const encryptUploads = fileTransfer?.encryptUploads
   const encryption = fileTransfer?.encryption
   useEffect(() => {
-    setCustomUploader(transport)
-    setEncryptAttachments(encryptUploads)
-    setFileEncryption(encryption)
+    uikitFileTransfer.configure({ transport, encryptUploads, encryption })
   }, [transport, encryptUploads, encryption])
 
   useEffect(() => {

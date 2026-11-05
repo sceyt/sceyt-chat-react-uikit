@@ -1,8 +1,15 @@
 import { getAttachmentUrlFromCache, setAttachmentToCache } from './attachmentsCache'
-import { fileEncryption } from './attachmentEncryption'
 import { registerBlobUrl } from './attachmentBlobUrls'
+import { withAttachmentEncryption } from './attachmentEncryption'
 import { downloadVideoThumb } from './videoPreview'
-import { installFakeFilesClient } from '../testUtils/fakeAttachmentFiles'
+import { fileTransfer } from '../fileTransfer/sceytChatUIKitFileTransfer'
+import { FileTransferResult } from '../fileTransfer/types'
+import {
+  fakeEncrypted,
+  fakeEncryptionInfo,
+  installFakeFilesClient,
+  readBlobText
+} from '../testUtils/fakeAttachmentFiles'
 
 jest.mock('./attachmentsCache', () => ({
   getAttachmentUrlFromCache: jest.fn(),
@@ -14,42 +21,42 @@ jest.mock('./attachmentBlobUrls', () => ({ registerBlobUrl: jest.fn() }))
 const mockGetAttachmentUrlFromCache = getAttachmentUrlFromCache as jest.Mock
 const mockSetAttachmentToCache = setAttachmentToCache as jest.Mock
 const mockRegisterBlobUrl = registerBlobUrl as jest.Mock
-// The video the preview belongs to: the custom downloader gets it whole.
+// The video the preview belongs to: the transport gets it as the request's attachment.
 const video = { url: 'https://cdn/clip.mp4', messageId: 'message-id', metadata: '{}' } as any
+
+/** Sets a custom transport (fileTransfer.transport) that returns `result`. */
+const useTransport = (result: FileTransferResult<Blob>) => {
+  const transport = { upload: jest.fn(), download: jest.fn(async () => result), cancel: jest.fn() }
+  fileTransfer.transport = transport
+  return transport
+}
 
 describe('downloadVideoThumb', () => {
   beforeEach(() => {
     jest.resetAllMocks()
     mockGetAttachmentUrlFromCache.mockResolvedValueOnce(false).mockResolvedValueOnce('blob:preview')
-    // Without a custom downloader the SDK downloads (client.download), over the test's fetch.
+    // Without a custom transport the SDK downloads (client.download), over the test's fetch.
     installFakeFilesClient()
   })
 
-  it('uses the custom attachment downloader and caches its preview blob', async () => {
+  afterEach(() => {
+    fileTransfer.configure()
+  })
+
+  it('uses the configured transport and caches its preview blob', async () => {
     const preview = new Blob(['preview'], { type: 'image/jpeg' })
-    const downloader = jest.fn().mockResolvedValue({ Body: preview })
+    const transport = useTransport(FileTransferResult.success(preview))
 
-    await expect(downloadVideoThumb('https://cdn/preview.jpg', video, downloader, 'text')).resolves.toBe('blob:preview')
+    await expect(downloadVideoThumb('https://cdn/preview.jpg', video, 'text')).resolves.toBe('blob:preview')
 
-    expect(downloader).toHaveBeenCalledWith(video, true, expect.any(Function), 'text', {
-      kind: 'thumbnail',
-      url: 'https://cdn/preview.jpg',
-      type: 'image/jpeg',
-      fileEncryption
-    })
+    const [request] = transport.download.mock.calls[0] as any[]
+    expect(request).toMatchObject({ url: 'https://cdn/preview.jpg', mimeType: 'image/jpeg' })
+    expect(request.context.attachment === video).toBe(true)
+    expect(request.encryptionInfo).toBeUndefined()
     expect(mockSetAttachmentToCache).toHaveBeenCalledWith('https://cdn/preview.jpg', expect.any(Response))
   })
 
-  it('accepts a raw Blob returned by a custom downloader', async () => {
-    const preview = new Blob(['preview'], { type: 'image/jpeg' })
-    const downloader = jest.fn().mockResolvedValue(preview)
-
-    await expect(downloadVideoThumb('https://cdn/preview.jpg', video, downloader)).resolves.toBe('blob:preview')
-
-    expect(mockSetAttachmentToCache).toHaveBeenCalledWith('https://cdn/preview.jpg', expect.any(Response))
-  })
-
-  it('is downloaded by the SDK when no custom downloader is configured', async () => {
+  it('is downloaded by the SDK when no custom transport is configured', async () => {
     const preview = new Blob(['preview'], { type: 'image/jpeg' })
     const fetchMock = jest
       .spyOn(global, 'fetch' as any)
@@ -61,6 +68,25 @@ describe('downloadVideoThumb', () => {
       'https://cdn/preview.jpg',
       expect.objectContaining({ signal: expect.anything() })
     )
+    fetchMock.mockRestore()
+  })
+
+  it('an encrypted preview is opened with its own key and sized from its encrypted bytes, not the video size', async () => {
+    const encryptedVideo = {
+      ...video,
+      size: 5000,
+      metadata: withAttachmentEncryption('{}', fakeEncryptionInfo('key-1'), fakeEncryptionInfo('key-2'))
+    }
+    const fetchMock = jest
+      .spyOn(global, 'fetch' as any)
+      .mockResolvedValue({ ok: true, blob: async () => fakeEncrypted('key-2', 'preview') } as any)
+
+    await expect(downloadVideoThumb('https://cdn/preview.jpg', encryptedVideo)).resolves.toBe('blob:preview')
+
+    const [, cached] = mockSetAttachmentToCache.mock.calls[0]
+    const saved = await (cached as Response).blob()
+    expect(saved.type).toBe('image/jpeg')
+    expect(await readBlobText(saved)).toBe('preview')
     fetchMock.mockRestore()
   })
 
@@ -76,13 +102,11 @@ describe('downloadVideoThumb', () => {
     fetchMock.mockRestore()
   })
 
-  it('does not fall back to a direct request when the configured attachment downloader fails', async () => {
+  it('does not fall back to a direct request when the configured transport fails', async () => {
     const fetchMock = jest.spyOn(global, 'fetch' as any)
-    const downloader = jest.fn().mockRejectedValue(new Error('preview download failed'))
+    useTransport(FileTransferResult.failure(new Error('preview download failed')))
 
-    await expect(downloadVideoThumb('https://cdn/preview.jpg', video, downloader)).rejects.toThrow(
-      'preview download failed'
-    )
+    await expect(downloadVideoThumb('https://cdn/preview.jpg', video)).rejects.toThrow('preview download failed')
 
     expect(fetchMock).not.toHaveBeenCalled()
     fetchMock.mockRestore()
@@ -90,11 +114,11 @@ describe('downloadVideoThumb', () => {
 
   it('returns a cached preview without downloading it again', async () => {
     mockGetAttachmentUrlFromCache.mockReset().mockResolvedValue('blob:cached-preview')
-    const downloader = jest.fn()
+    const transport = useTransport(FileTransferResult.success(new Blob(['preview'])))
 
-    await expect(downloadVideoThumb('https://cdn/preview.jpg', video, downloader)).resolves.toBe('blob:cached-preview')
+    await expect(downloadVideoThumb('https://cdn/preview.jpg', video)).resolves.toBe('blob:cached-preview')
 
-    expect(downloader).not.toHaveBeenCalled()
+    expect(transport.download).not.toHaveBeenCalled()
     expect(mockSetAttachmentToCache).not.toHaveBeenCalled()
   })
 
@@ -105,9 +129,9 @@ describe('downloadVideoThumb', () => {
       configurable: true,
       value: jest.fn().mockReturnValue('blob:local-preview')
     })
-    const downloader = jest.fn().mockResolvedValue({ Body: new Blob(['preview']) })
+    useTransport(FileTransferResult.success(new Blob(['preview'])))
 
-    await expect(downloadVideoThumb('https://cdn/preview.jpg', video, downloader)).resolves.toBe('blob:local-preview')
+    await expect(downloadVideoThumb('https://cdn/preview.jpg', video)).resolves.toBe('blob:local-preview')
 
     expect(mockRegisterBlobUrl).toHaveBeenCalledWith('https://cdn/preview.jpg_1_0_2', 'blob:local-preview')
     Object.defineProperty(URL, 'createObjectURL', { configurable: true, value: originalCreateObjectURL })
@@ -121,10 +145,9 @@ describe('downloadVideoThumb', () => {
       configurable: true,
       value: jest.fn().mockReturnValue('blob:uncached-preview')
     })
+    useTransport(FileTransferResult.success(new Blob(['preview'])))
 
-    await expect(
-      downloadVideoThumb('https://cdn/preview.jpg', video, jest.fn().mockResolvedValue({ Body: new Blob(['preview']) }))
-    ).resolves.toBe('blob:uncached-preview')
+    await expect(downloadVideoThumb('https://cdn/preview.jpg', video)).resolves.toBe('blob:uncached-preview')
 
     expect(mockRegisterBlobUrl).toHaveBeenCalledWith('https://cdn/preview.jpg_1_0_2', 'blob:uncached-preview')
     Object.defineProperty(URL, 'createObjectURL', { configurable: true, value: originalCreateObjectURL })

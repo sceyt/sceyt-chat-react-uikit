@@ -19,7 +19,7 @@ import { setUpdateMessageAttachmentAC } from 'store/message/actions'
 import { useDispatch, useSelector } from 'store/hooks'
 import { calculateRenderedImageWidth } from 'helpers'
 import { isJSON } from 'helpers/message'
-import { getCustomDownloader } from '../../helpers/customUploader'
+import { fileTransfer } from '../../fileTransfer/sceytChatUIKitFileTransfer'
 import { downloadVideoThumb, getVideoThumb, shouldExtractVideoFirstFrame } from '../../helpers/videoPreview'
 
 interface IVideoPreviewProps {
@@ -120,16 +120,15 @@ const VideoPreview = memo(
 
     useEffect(() => {
       if (!videoThumb || downloadedPreviewImage) return
-      const customDownloader = getCustomDownloader()
-      // A custom downloader authorizes by message ID. A pending (e.g. forwarded)
+      // A custom transport authorizes by message ID. A pending (e.g. forwarded)
       // video has none yet: show a cached preview, but download only once the
       // confirmed message ID arrives instead of sending a request that fails.
       const previewRequest: Promise<string | undefined> =
-        customDownloader && !file.messageId
+        fileTransfer.hasCustomTransport && !file.messageId
           ? getAttachmentUrlFromCache(videoThumb)
               .catch(() => false)
               .then((cachedUrl) => (typeof cachedUrl === 'string' ? cachedUrl : undefined))
-          : downloadVideoThumb(videoThumb, file, customDownloader, messageType)
+          : downloadVideoThumb(videoThumb, file, messageType)
 
       let cancelled = false
       previewRequest

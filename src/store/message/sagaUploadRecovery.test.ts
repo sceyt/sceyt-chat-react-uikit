@@ -1,4 +1,4 @@
-import { runSaga } from 'redux-saga'
+import { runSaga, Task } from 'redux-saga'
 import log from 'loglevel'
 import { getClient, setClient } from '../../common/client'
 import {
@@ -31,13 +31,24 @@ import {
   updateMessageAC
 } from './actions'
 import { RESEND_MESSAGE } from './constants'
+import { setSendAttachmentsAsSeparateMessages } from '../../helpers/sendAttachments'
 import {
   markUploadNotStarted,
   pauseUpload,
-  setCustomUploader,
-  setSendAttachmentsAsSeparateMessages,
-  uploadAttachmentFile
-} from '../../helpers/customUploader'
+  resetAttachmentUploadsForTests,
+  uploadAttachment
+} from '../../fileTransfer/attachmentUploadCoordinator'
+import { fileTransfer } from '../../fileTransfer/sceytChatUIKitFileTransfer'
+import {
+  AttachmentTransferContext,
+  FileTransferResult,
+  FileTransferTransport,
+  FileUploadRequest,
+  FileUploadResult,
+  FileUploadType
+} from '../../fileTransfer/types'
+import { FileEncryptionInfo } from '../../fileTransfer/encryption/types'
+import { IAttachment } from '../../types'
 import { handleUploadAttachments, __messageSagaTestables, __resetMessageSagaTestState } from './saga'
 import store from '../index'
 import {
@@ -45,8 +56,13 @@ import {
   completeAttachmentPreview,
   completeVideoPreparation
 } from '../../helpers/attachmentPreparation'
-import { setEncryptAttachments } from '../../helpers/attachmentEncryption'
-import { installFakeFilesClient, readBlobText } from '../../testUtils/fakeAttachmentFiles'
+import {
+  fakeEncrypted,
+  fakeEncryption,
+  installFakeFilesClient,
+  makeFakePreparedUpload,
+  readBlobText
+} from '../../testUtils/fakeAttachmentFiles'
 
 const mockGetVideoFirstFrame = jest.fn()
 const mockGetVideoPreviewFrame = jest.fn()
@@ -115,10 +131,53 @@ const runMessageSaga = async (saga: any, ...args: any[]) => {
   return dispatched
 }
 
-// Stub CustomUploader driven per test: records every attachment handed to
-// upload() and settles the upload task synchronously.
-let uploadCalls: any[] = []
-let uploadBehavior: (attachment: any, uploadTask: any) => void
+// One upload the fake transport was given; the test (or uploadBehavior) settles it.
+interface UploadCall {
+  request: FileUploadRequest
+  /** The attachment the UIKit uploads (a video's preview image is an image attachment of its own). */
+  attachment: IAttachment
+  /** The file sent. */
+  file: Blob
+  // eslint-disable-next-line no-unused-vars
+  onProgress: (percent: number) => void
+  // eslint-disable-next-line no-unused-vars
+  succeed: (url?: string, encryptionInfo?: FileEncryptionInfo) => void
+  // eslint-disable-next-line no-unused-vars
+  fail: (error: Error) => void
+}
+
+// The app's transport (fileTransfer.transport), driven per test: records every
+// upload request and lets uploadBehavior settle it.
+let uploadCalls: UploadCall[] = []
+// eslint-disable-next-line no-unused-vars
+let uploadBehavior: (call: UploadCall) => void
+// Operation ids the transport was told to abandon (transport.cancel).
+let cancelledOperations: string[] = []
+
+const makeFakeTransport = (): FileTransferTransport => ({
+  upload: (request, callback) =>
+    new Promise<FileTransferResult<FileUploadResult>>((resolve) => {
+      const call: UploadCall = {
+        request,
+        attachment: (request.context as AttachmentTransferContext).attachment,
+        file: request.sourceFile,
+        onProgress: callback.onProgress,
+        succeed: (url = 'https://cdn.example/uploaded-1', encryptionInfo) =>
+          resolve(FileTransferResult.success({ url, ...(encryptionInfo ? { encryptionInfo } : {}) })),
+        fail: (error) => resolve(FileTransferResult.failure(error))
+      }
+      // A stopped or abandoned attempt stops its work and settles.
+      request.signal.addEventListener('abort', () =>
+        resolve(FileTransferResult.interrupted(new Error('The upload was stopped')))
+      )
+      uploadCalls.push(call)
+      uploadBehavior(call)
+    }),
+  download: () => Promise.resolve(FileTransferResult.failure(new Error('Downloads are not used in these tests'))),
+  cancel: (operationId) => {
+    cancelledOperations.push(operationId)
+  }
+})
 
 const networkingError = () => {
   const error: any = new Error('Network Failure')
@@ -128,10 +187,19 @@ const networkingError = () => {
 
 const succeedUpload =
   (uri = 'https://cdn.example/uploaded-1') =>
-  (_attachment: any, uploadTask: any) =>
-    uploadTask.success({ uri, blob: null })
+  (call: UploadCall) =>
+    call.succeed(uri)
 
-const failUploadWithNetworkError = () => (_attachment: any, uploadTask: any) => uploadTask.failure(networkingError())
+const failUploadWithNetworkError = () => (call: UploadCall) => call.fail(networkingError())
+
+// Lets queued promise callbacks run (no timers) until `done`, or a bounded number of turns.
+const settleMicrotasks = async (done: () => boolean = () => false, turns = 200) => {
+  for (let attempt = 0; attempt < turns && !done(); attempt++) {
+    await Promise.resolve()
+  }
+}
+
+const originalCreateObjectURL = URL.createObjectURL
 
 const makeUploaderChannel = (id: string) => {
   const channel = makeChannel({
@@ -220,6 +288,12 @@ describe('attachment upload recovery', () => {
   let logWarnSpy: jest.SpyInstance
   let logInfoSpy: jest.SpyInstance
   const usedAttachmentTids: string[] = []
+  // Saga tasks a test leaves running (e.g. after a failed assertion): cancelled after it.
+  const runningTasks: Task[] = []
+  const track = (task: Task) => {
+    runningTasks.push(task)
+    return task
+  }
 
   const trackPendingAttachment = (tid: string, data: { file?: File }) => {
     usedAttachmentTids.push(tid)
@@ -240,14 +314,14 @@ describe('attachment upload recovery', () => {
     mockStore.dispatch.mockClear()
     mockStore.getState.mockImplementation(() => mockStoreState)
     uploadCalls = []
+    cancelledOperations = []
     uploadBehavior = succeedUpload()
     setSendAttachmentsAsSeparateMessages(false)
-    setCustomUploader({
-      upload: (attachment: any, uploadTask: any) => {
-        uploadCalls.push(attachment)
-        uploadBehavior(attachment, uploadTask)
-      },
-      download: jest.fn()
+    fileTransfer.configure({ transport: makeFakeTransport() })
+    // The sender plays an uploaded video from its own file (jsdom has no object URLs).
+    Object.defineProperty(URL, 'createObjectURL', {
+      configurable: true,
+      value: jest.fn((blob: Blob) => `blob:local-${blob.size}`)
     })
     setClient({
       user: { id: 'current-user' },
@@ -261,7 +335,11 @@ describe('attachment upload recovery', () => {
   })
 
   afterEach(() => {
-    setCustomUploader(undefined)
+    runningTasks.splice(0).forEach((task) => task.isRunning() && task.cancel())
+    fileTransfer.configure()
+    resetAttachmentUploadsForTests()
+    Object.defineProperty(URL, 'createObjectURL', { configurable: true, value: originalCreateObjectURL })
+    __resetMessageSagaTestState()
     usedAttachmentTids.splice(0).forEach((tid) => deletePendingAttachment(tid))
     logErrorSpy.mockRestore()
     logWarnSpy.mockRestore()
@@ -296,7 +374,7 @@ describe('attachment upload recovery', () => {
     )
 
     expect(uploadCalls).toHaveLength(1)
-    expect(uploadCalls[0].url).toBe(liveFile)
+    expect(uploadCalls[0].file).toBe(liveFile)
     expect(dispatched).toEqual(
       expect.arrayContaining([updateMessageAC('live-map-msg-tid', expect.objectContaining({ id: 'srv-1' }), true)])
     )
@@ -333,7 +411,7 @@ describe('attachment upload recovery', () => {
     })
 
     expect(uploadCalls).toHaveLength(1)
-    expect(uploadCalls[0].url).toBe(liveFile)
+    expect(uploadCalls[0].file).toBe(liveFile)
     expect(channel.sendMessage).toHaveBeenCalledTimes(1)
   })
 
@@ -493,39 +571,42 @@ describe('attachment upload recovery', () => {
       state: MESSAGE_STATUS.FAILED,
       attachments: [makeAttachment('delete-during-custom-upload-file-tid', liveFile)]
     })
-    uploadBehavior = (_attachment, uploadTask) => {
-      uploadTask.cancel = () => uploadTask.failure(new Error('Upload cancelled by user'))
-    }
+    // The upload stays in progress until the message is deleted.
+    uploadBehavior = () => undefined
 
     setActiveChannelId(channel.id)
     setChannelInMap(channel)
     addMessageToMap(channel.id, pendingMessage)
 
-    const task = runSaga(
-      {
-        dispatch: jest.fn(),
-        getState: () => mockStoreState
-      },
-      __messageSagaTestables.sendMessage,
-      {
-        type: RESEND_MESSAGE,
-        payload: {
-          message: pendingMessage,
-          connectionState: CONNECTION_STATUS.CONNECTED,
-          channelId: channel.id,
-          sendAttachmentsAsSeparateMessage: false
+    const task = track(
+      runSaga(
+        {
+          dispatch: jest.fn(),
+          getState: () => mockStoreState
+        },
+        __messageSagaTestables.sendMessage,
+        {
+          type: RESEND_MESSAGE,
+          payload: {
+            message: pendingMessage,
+            connectionState: CONNECTION_STATUS.CONNECTED,
+            channelId: channel.id,
+            sendAttachmentsAsSeparateMessage: false
+          }
         }
-      }
+      )
     )
 
-    for (let attempt = 0; attempt < 20 && uploadCalls.length === 0; attempt++) {
-      await Promise.resolve()
-    }
+    await settleMicrotasks(() => uploadCalls.length > 0)
     expect(uploadCalls).toHaveLength(1)
 
     deletePendingMessage(channel.id, pendingMessage)
-    await task.toPromise()
+    await settleMicrotasks(() => !task.isRunning())
 
+    // The transport is told to abandon the upload, and the send ends.
+    expect(uploadCalls[0].request.signal.aborted).toBe(true)
+    expect(cancelledOperations).toEqual(['upload:delete-during-custom-upload-file-tid'])
+    expect(task.isRunning()).toBe(false)
     expect(channel.sendMessage).not.toHaveBeenCalled()
     expect(channel.deleteMessageById).not.toHaveBeenCalled()
     expect(getMessageFromMap(channel.id, pendingMessage.tid!)).toBeNull()
@@ -663,8 +744,9 @@ describe('attachment upload recovery', () => {
     messageBuilder.create
       .mockImplementationOnce(() => makePendingMessage({ channelId: channel.id, tid: 'separate-msg-1' }))
       .mockImplementationOnce(() => makePendingMessage({ channelId: channel.id, tid: 'separate-msg-2' }))
-    const uploads: any[] = []
-    uploadBehavior = (_attachment, uploadTask) => uploads.push(uploadTask)
+    // Each upload stays in progress until the test completes it.
+    uploadBehavior = () => undefined
+    const uploads = uploadCalls
     channel.sendMessage = jest.fn((sent: any) =>
       Promise.resolve({
         ...makeServerResponse(sent.tid, sent.attachments[0].tid, currentUser),
@@ -674,7 +756,7 @@ describe('attachment upload recovery', () => {
     setActiveChannelId(channel.id)
     setChannelInMap(channel)
     const file = (tid: string, name: string) => ({
-      tid,
+      tid: trackedTid(tid),
       type: attachmentTypes.file,
       name,
       size: 3,
@@ -682,11 +764,7 @@ describe('attachment upload recovery', () => {
       metadata: '{}',
       upload: false
     })
-    const settle = async (done: () => boolean) => {
-      for (let attempt = 0; attempt < 200 && !done(); attempt++) {
-        await Promise.resolve()
-      }
-    }
+    const settle = settleMicrotasks
 
     const task = runSaga(
       { dispatch: () => undefined, getState: () => mockStoreState },
@@ -716,9 +794,9 @@ describe('attachment upload recovery', () => {
     ])
     expect(channel.sendMessage).not.toHaveBeenCalled()
 
-    uploads[0].success({ uri: 'https://cdn.example/first.pdf', blob: null })
+    uploads[0].succeed('https://cdn.example/first.pdf')
     await settle(() => uploads.length > 1)
-    uploads[1].success({ uri: 'https://cdn.example/second.pdf', blob: null })
+    uploads[1].succeed('https://cdn.example/second.pdf')
     await task.toPromise()
 
     expect((channel.sendMessage as jest.Mock).mock.calls.map(([sent]) => sent.tid)).toEqual([
@@ -734,22 +812,23 @@ describe('attachment upload recovery', () => {
     const attachment = {
       ...makeAttachment(trackedTid('offline-progress-tid'), file),
       url: file,
-      type: attachmentTypes.file
+      type: attachmentTypes.file,
+      // The progress shown is this size's share: 10% is 1.
+      size: 10
     }
-    let task: any
-    uploadBehavior = (_attachment, uploadTask) => (task = uploadTask)
+    uploadBehavior = () => undefined
     const onLine = jest.spyOn(window.navigator, 'onLine', 'get')
     try {
       const upload = handleUploadAttachments([attachment], { type: 'text' } as any, channel)
-      await Promise.resolve()
-      await Promise.resolve()
+      await settleMicrotasks(() => uploadCalls.length > 0)
+      const [call] = uploadCalls
       onLine.mockReturnValue(true)
-      task.progress({ loaded: 1, total: 10 })
+      call.onProgress(10)
       onLine.mockReturnValue(false)
-      task.progress({ loaded: 10, total: 10 })
+      call.onProgress(100)
       onLine.mockReturnValue(true)
-      task.progress({ loaded: 2, total: 10 })
-      task.success({ uri: 'https://cdn.example/report.pdf', blob: null })
+      call.onProgress(20)
+      call.succeed('https://cdn.example/report.pdf')
       await upload
 
       expect(
@@ -769,21 +848,22 @@ describe('attachment upload recovery', () => {
     const attachment = {
       ...makeAttachment(trackedTid('disconnected-progress-tid'), file),
       url: file,
-      type: attachmentTypes.file
+      type: attachmentTypes.file,
+      // The progress shown is this size's share: 10% is 1.
+      size: 10
     }
-    let task: any
-    uploadBehavior = (_attachment, uploadTask) => (task = uploadTask)
+    uploadBehavior = () => undefined
     const upload = handleUploadAttachments([attachment], { type: 'text' } as any, channel)
-    await Promise.resolve()
-    await Promise.resolve()
+    await settleMicrotasks(() => uploadCalls.length > 0)
+    const [call] = uploadCalls
     Object.assign(getClient(), { connectionState: CONNECTION_STATUS.CONNECTED })
-    task.progress({ loaded: 1, total: 10 })
+    call.onProgress(10)
     // The browser stays online; the chat connection timed out.
     Object.assign(getClient(), { connectionState: CONNECTION_STATUS.CONNECTING })
-    task.progress({ loaded: 10, total: 10 })
+    call.onProgress(100)
     Object.assign(getClient(), { connectionState: CONNECTION_STATUS.CONNECTED })
-    task.progress({ loaded: 2, total: 10 })
-    task.success({ uri: 'https://cdn.example/report.pdf', blob: null })
+    call.onProgress(20)
+    call.succeed('https://cdn.example/report.pdf')
     await upload
 
     expect(
@@ -814,8 +894,8 @@ describe('attachment upload recovery', () => {
         addMessageToMap(channelId, message)
         return message
       })
-      const uploads: { tid: string; task: any }[] = []
-      uploadBehavior = (attachment, uploadTask) => uploads.push({ tid: attachment.tid, task: uploadTask })
+      const uploads: { tid: string; call: UploadCall }[] = []
+      uploadBehavior = (call) => uploads.push({ tid: call.attachment.tid!, call })
       channel.sendMessage = jest.fn((sent: any) =>
         Promise.resolve({
           ...makeServerResponse(sent.tid, sent.attachments[0].tid, currentUser),
@@ -832,11 +912,7 @@ describe('attachment upload recovery', () => {
         __messageSagaTestables.sendPendingMessages,
         CONNECTION_STATUS.CONNECTED
       )
-    const settle = async (done: () => boolean = () => false) => {
-      for (let attempt = 0; attempt < 200 && !done(); attempt++) {
-        await Promise.resolve()
-      }
-    }
+    const settle = settleMicrotasks
 
     it('are sent one at a time, in order, even when two resends start at once (reconnect, and the chat loading)', async () => {
       const { channel, uploads } = setupPendingFiles('channel-resend-in-order')
@@ -847,13 +923,13 @@ describe('attachment upload recovery', () => {
       // Only the first message's file uploads.
       expect(uploads.map((upload) => upload.tid)).toEqual(['channel-resend-in-order-file-1'])
 
-      uploads[0].task.success({ uri: 'https://cdn.example/file-1.pdf', blob: null })
+      uploads[0].call.succeed('https://cdn.example/file-1.pdf')
       await settle(() => uploads.length > 1)
       expect(uploads.map((upload) => upload.tid)).toEqual([
         'channel-resend-in-order-file-1',
         'channel-resend-in-order-file-2'
       ])
-      uploads[1].task.success({ uri: 'https://cdn.example/file-2.pdf', blob: null })
+      uploads[1].call.succeed('https://cdn.example/file-2.pdf')
       await first.toPromise()
       await second.toPromise()
 
@@ -867,16 +943,16 @@ describe('attachment upload recovery', () => {
     it('when one fails again, the ones after it wait: the next round sends them after it, in order', async () => {
       const { channel, uploads } = setupPendingFiles('channel-resend-fails-again')
       // Were the second message tried, its small file would go through (the network came back meanwhile).
-      uploadBehavior = (attachment, uploadTask) => {
-        uploads.push({ tid: attachment.tid, task: uploadTask })
-        if (attachment.tid === 'channel-resend-fails-again-file-2') {
-          uploadTask.success({ uri: 'https://cdn.example/file-2.pdf', blob: null })
+      uploadBehavior = (call) => {
+        uploads.push({ tid: call.attachment.tid!, call })
+        if (call.attachment.tid === 'channel-resend-fails-again-file-2') {
+          call.succeed('https://cdn.example/file-2.pdf')
         }
       }
       const run = resendPending()
       await settle(() => uploads.length > 0)
       // The connection is lost again while the first message's file uploads.
-      uploads[0].task.failure(networkingError())
+      uploads[0].call.fail(networkingError())
       await run.toPromise()
 
       // The second message was not tried meanwhile (it would be sent before the first).
@@ -888,9 +964,9 @@ describe('attachment upload recovery', () => {
       ])
 
       // The connection is back: the next round sends both, in order.
-      uploadBehavior = (attachment, uploadTask) => {
-        uploads.push({ tid: attachment.tid, task: uploadTask })
-        uploadTask.success({ uri: `https://cdn.example/${attachment.tid}`, blob: null })
+      uploadBehavior = (call) => {
+        uploads.push({ tid: call.attachment.tid!, call })
+        call.succeed(`https://cdn.example/${call.attachment.tid}`)
       }
       await resendPending().toPromise()
 
@@ -905,10 +981,10 @@ describe('attachment upload recovery', () => {
 
     it('a message that can never be sent (too large) does not hold back the ones after it', async () => {
       const { channel, uploads } = setupPendingFiles('channel-resend-too-large')
-      uploadBehavior = (attachment, uploadTask) => {
-        uploads.push({ tid: attachment.tid, task: uploadTask })
-        if (attachment.tid === 'channel-resend-too-large-file-1') uploadTask.failure(tooLarge())
-        else uploadTask.success({ uri: `https://cdn.example/${attachment.tid}`, blob: null })
+      uploadBehavior = (call) => {
+        uploads.push({ tid: call.attachment.tid!, call })
+        if (call.attachment.tid === 'channel-resend-too-large-file-1') call.fail(tooLarge())
+        else call.succeed(`https://cdn.example/${call.attachment.tid}`)
       }
 
       await resendPending().toPromise()
@@ -928,10 +1004,10 @@ describe('attachment upload recovery', () => {
       const first = setupPendingFiles('channel-resend-chat-a')
       const second = setupPendingFiles('channel-resend-chat-b')
       const uploaded: string[] = []
-      uploadBehavior = (attachment, uploadTask) => {
-        uploaded.push(attachment.tid)
-        if (attachment.tid === 'channel-resend-chat-a-file-1') uploadTask.failure(networkingError())
-        else uploadTask.success({ uri: `https://cdn.example/${attachment.tid}`, blob: null })
+      uploadBehavior = (call) => {
+        uploaded.push(call.attachment.tid!)
+        if (call.attachment.tid === 'channel-resend-chat-a-file-1') call.fail(networkingError())
+        else call.succeed(`https://cdn.example/${call.attachment.tid}`)
       }
 
       await resendPending().toPromise()
@@ -951,20 +1027,21 @@ describe('attachment upload recovery', () => {
 
     it('a message deleted while it is sent again does not hold back the ones after it', async () => {
       const { channel, pending, uploads } = setupPendingFiles('channel-resend-deleted')
-      uploadBehavior = (attachment, uploadTask) => {
-        uploads.push({ tid: attachment.tid, task: uploadTask })
-        if (attachment.tid === 'channel-resend-deleted-file-1') {
-          uploadTask.cancel = () => uploadTask.failure(new Error('Upload cancelled by user'))
-        } else {
-          uploadTask.success({ uri: `https://cdn.example/${attachment.tid}`, blob: null })
+      uploadBehavior = (call) => {
+        uploads.push({ tid: call.attachment.tid!, call })
+        // The first file uploads until its message is deleted; the second goes through.
+        if (call.attachment.tid !== 'channel-resend-deleted-file-1') {
+          call.succeed(`https://cdn.example/${call.attachment.tid}`)
         }
       }
-      const run = resendPending()
+      const run = track(resendPending())
       await settle(() => uploads.length > 0)
 
       deletePendingMessage(channel.id, pending[0])
-      await run.toPromise()
+      await settle(() => !run.isRunning())
 
+      expect(cancelledOperations).toEqual(['upload:channel-resend-deleted-file-1'])
+      expect(run.isRunning()).toBe(false)
       expect(uploads.map((upload) => upload.tid)).toEqual([
         'channel-resend-deleted-file-1',
         'channel-resend-deleted-file-2'
@@ -977,10 +1054,10 @@ describe('attachment upload recovery', () => {
 
     it('a message that keeps failing holds back the ones after it until its attempts run out; then they are sent', async () => {
       const { channel, uploads } = setupPendingFiles('channel-resend-out-of-attempts')
-      uploadBehavior = (attachment, uploadTask) => {
-        uploads.push({ tid: attachment.tid, task: uploadTask })
-        if (attachment.tid === 'channel-resend-out-of-attempts-file-1') uploadTask.failure(networkingError())
-        else uploadTask.success({ uri: `https://cdn.example/${attachment.tid}`, blob: null })
+      uploadBehavior = (call) => {
+        uploads.push({ tid: call.attachment.tid!, call })
+        if (call.attachment.tid === 'channel-resend-out-of-attempts-file-1') call.fail(networkingError())
+        else call.succeed(`https://cdn.example/${call.attachment.tid}`)
       }
 
       // Five reconnects (the attempt budget): each tries the first message only.
@@ -1005,10 +1082,10 @@ describe('attachment upload recovery', () => {
     it('a message sent meanwhile (by another send) is not sent again, nor shown as failed', async () => {
       const { channel, uploads } = setupPendingFiles('channel-resend-sent-meanwhile')
       // A second file to upload (were message 2 sent again) is stored at once.
-      uploadBehavior = (attachment, uploadTask) => {
-        uploads.push({ tid: attachment.tid, task: uploadTask })
-        if (attachment.tid === 'channel-resend-sent-meanwhile-file-2') {
-          uploadTask.success({ uri: 'https://cdn.example/file-2.pdf', blob: null })
+      uploadBehavior = (call) => {
+        uploads.push({ tid: call.attachment.tid!, call })
+        if (call.attachment.tid === 'channel-resend-sent-meanwhile-file-2') {
+          call.succeed('https://cdn.example/file-2.pdf')
         }
       }
       const run = resendPending()
@@ -1020,7 +1097,7 @@ describe('attachment upload recovery', () => {
         params: { id: 'srv-msg-2', state: MESSAGE_STATUS.UNMODIFIED }
       })
       // The first message's upload is lost again.
-      uploads[0].task.failure(networkingError())
+      uploads[0].call.fail(networkingError())
       await run.toPromise()
 
       expect(uploads.map((upload) => upload.tid)).toEqual(['channel-resend-sent-meanwhile-file-1'])
@@ -1041,10 +1118,10 @@ describe('attachment upload recovery', () => {
       .mockImplementationOnce(() => makePendingMessage({ channelId: channel.id, tid: 'wait-msg-2' }))
     const uploads: string[] = []
     // The first upload is cut by a lost connection; every later one goes through.
-    uploadBehavior = (attachment, uploadTask) => {
-      uploads.push(attachment.tid)
-      if (uploads.length === 1) uploadTask.failure(networkingError())
-      else uploadTask.success({ uri: `https://cdn.example/${attachment.tid}`, blob: null })
+    uploadBehavior = (call) => {
+      uploads.push(call.attachment.tid!)
+      if (uploads.length === 1) call.fail(networkingError())
+      else call.succeed(`https://cdn.example/${call.attachment.tid}`)
     }
     channel.sendMessage = jest.fn((sent: any) =>
       Promise.resolve({ ...makeServerResponse(sent.tid, sent.attachments[0].tid, currentUser), id: `srv-${sent.tid}` })
@@ -1102,12 +1179,12 @@ describe('attachment upload recovery', () => {
       .mockImplementationOnce(() => makePendingMessage({ channelId: channel.id, tid: 'too-large-msg-2' }))
     const uploads: string[] = []
     // The first file is refused by the server; the second goes through.
-    uploadBehavior = (attachment, uploadTask) => {
-      uploads.push(attachment.tid)
+    uploadBehavior = (call) => {
+      uploads.push(call.attachment.tid!)
       if (uploads.length === 1) {
-        uploadTask.failure(Object.assign(new Error('The file is too large'), { type: 'TooLargeRequest' }))
+        call.fail(Object.assign(new Error('The file is too large'), { type: 'TooLargeRequest' }))
       } else {
-        uploadTask.success({ uri: `https://cdn.example/${attachment.tid}`, blob: null })
+        call.succeed(`https://cdn.example/${call.attachment.tid}`)
       }
     }
     channel.sendMessage = jest.fn((sent: any) =>
@@ -1161,8 +1238,9 @@ describe('attachment upload recovery', () => {
     messageBuilder.create
       .mockImplementationOnce(() => makePendingMessage({ channelId: channel.id, tid: 'uploading-msg-1' }))
       .mockImplementationOnce(() => makePendingMessage({ channelId: channel.id, tid: 'uploading-msg-2' }))
-    const uploads: any[] = []
-    uploadBehavior = (_attachment, uploadTask) => uploads.push(uploadTask)
+    // Each upload stays in progress until the test completes it.
+    uploadBehavior = () => undefined
+    const uploads = uploadCalls
     channel.sendMessage = jest.fn((sent: any) =>
       Promise.resolve({
         ...makeServerResponse(sent.tid, sent.attachments[0].tid, currentUser),
@@ -1180,11 +1258,7 @@ describe('attachment upload recovery', () => {
       metadata: '{}',
       upload: false
     })
-    const settle = async (done: () => boolean = () => false) => {
-      for (let attempt = 0; attempt < 200 && !done(); attempt++) {
-        await Promise.resolve()
-      }
-    }
+    const settle = settleMicrotasks
     const send = runSaga(
       { dispatch: () => undefined, getState: () => mockStoreState },
       __messageSagaTestables.sendMessage,
@@ -1217,9 +1291,9 @@ describe('attachment upload recovery', () => {
       await settle()
       expect(uploads).toHaveLength(1)
 
-      uploads[0].success({ uri: 'https://cdn.example/first.pdf', blob: null })
+      uploads[0].succeed('https://cdn.example/first.pdf')
       await settle(() => uploads.length > 1)
-      uploads[1].success({ uri: 'https://cdn.example/second.pdf', blob: null })
+      uploads[1].succeed('https://cdn.example/second.pdf')
       await send.toPromise()
       await reconnect.toPromise()
     } finally {
@@ -1308,8 +1382,10 @@ describe('attachment upload recovery', () => {
 
     // The preview image, then the converted video (not the original .mov).
     expect(uploadCalls).toHaveLength(2)
-    expect(uploadCalls[1].url === converted).toBe(true)
-    expect(uploadCalls[1].name).toBe('clip.mp4')
+    expect(uploadCalls[0].attachment.type).toBe(attachmentTypes.image)
+    expect(uploadCalls[1].file === converted).toBe(true)
+    expect(uploadCalls[1].request.fileName).toBe('clip.mp4')
+    expect(uploadCalls[1].attachment.name).toBe('clip.mp4')
     // The pending row now describes the converted file too.
     const pendingAttachment = getMessageFromMap(channel.id, pendingMessage.tid!)!.attachments[0]
     expect(pendingAttachment.name).toBe('clip.mp4')
@@ -1408,9 +1484,8 @@ describe('attachment upload recovery', () => {
 
     await runMessageSaga(__messageSagaTestables.sendPendingMessages, CONNECTION_STATUS.CONNECTED)
 
-    expect(uploadCalls).toEqual(
-      expect.arrayContaining([expect.objectContaining({ type: attachmentTypes.video, url: video })])
-    )
+    // Compared by reference: a failing diff of File objects runs the test worker out of memory.
+    expect(uploadCalls.some((call) => call.attachment.type === attachmentTypes.video && call.file === video)).toBe(true)
     expect(channel.sendMessage).toHaveBeenCalledTimes(1)
     expect(getPendingMessagesFromMap(channel.id)).toHaveLength(0)
     expect(getMessageFromMap(channel.id, offlinePendingMessage.tid!)?.attachments).toEqual([
@@ -1484,7 +1559,7 @@ describe('attachment upload recovery', () => {
     const result = await handleUploadAttachments([attachment], { type: 'text' } as any, channel)
 
     expect(uploadCalls).toHaveLength(1)
-    expect(uploadCalls[0].url).toBe(liveFile)
+    expect(uploadCalls[0].file).toBe(liveFile)
     expect(result[0]).toEqual(expect.objectContaining({ tid: 'direct-rehydrate-file-tid' }))
   })
 
@@ -1507,22 +1582,15 @@ describe('attachment upload recovery', () => {
     const previewBlob = new Blob(['preview-bytes'], { type: 'image/jpeg' })
     const uploadOrder: string[] = []
     mockGetVideoFirstFrame.mockResolvedValue({ blob: previewBlob })
-    uploadBehavior = (uploadedAttachment, uploadTask) => {
-      if (uploadedAttachment.type === attachmentTypes.image) {
+    uploadBehavior = (call) => {
+      if (call.attachment.type === attachmentTypes.image) {
         uploadOrder.push('preview')
-        uploadTask.success({ uri: 'https://cdn.example/clip-preview.jpg', blob: null })
+        call.succeed('https://cdn.example/clip-preview.jpg')
         return
       }
       uploadOrder.push('video')
-      uploadTask.success({ uri: 'https://cdn.example/clip.mp4', blob: null })
+      call.succeed('https://cdn.example/clip.mp4')
     }
-    setCustomUploader({
-      upload: (attachment: any, uploadTask: any) => {
-        uploadCalls.push(attachment)
-        uploadBehavior(attachment, uploadTask)
-      },
-      download: jest.fn()
-    })
     const attachment = {
       tid: 'video-preview-tid',
       type: attachmentTypes.video,
@@ -1537,7 +1605,13 @@ describe('attachment upload recovery', () => {
     await handleUploadAttachments([attachment], { type: 'text' } as any, channel)
 
     expect(mockGetVideoFirstFrame).toHaveBeenCalledWith(video)
-    expect(uploadCalls[0]).toEqual(expect.objectContaining({ name: 'clip-preview.jpg', type: attachmentTypes.image }))
+    expect(uploadCalls[0].attachment).toEqual(
+      expect.objectContaining({ name: 'clip-preview.jpg', type: attachmentTypes.image })
+    )
+    expect(uploadCalls[0].request).toEqual(
+      expect.objectContaining({ fileName: 'clip-preview.jpg', mimeType: 'image/jpeg' })
+    )
+    expect(await readBlobText(uploadCalls[0].file)).toBe('preview-bytes')
     expect(uploadOrder).toEqual(['preview', 'video'])
     expect(channel.createAttachmentBuilder).toHaveBeenCalledWith('https://cdn.example/clip.mp4', attachmentTypes.video)
     expect((channel as any).__attachmentBuilder.setMetadata).toHaveBeenCalledWith(
@@ -1549,26 +1623,20 @@ describe('attachment upload recovery', () => {
     const channel = makeUploaderChannel('channel-video-preview-stop')
     const video = new File(['video-bytes'], 'clip.mp4', { type: 'video/mp4' })
     mockGetVideoFirstFrame.mockResolvedValue({ blob: new Blob(['preview-bytes'], { type: 'image/jpeg' }) })
-    let videoTask: any
-    const videoStopped = jest.fn()
     const pauseDispatched: any[] = []
-    setCustomUploader({
-      upload: (uploadedAttachment: any, uploadTask: any) => {
-        if (uploadedAttachment.type === attachmentTypes.image) {
-          // The user presses stop while the preview is uploading.
-          runSaga(
-            { dispatch: (action: any) => pauseDispatched.push(action), getState: () => ({}) },
-            __messageSagaTestables.pauseAttachmentUploading as any,
-            { payload: { attachmentId: 'video-stop-tid' } }
-          )
-          uploadTask.success({ uri: 'https://cdn.example/clip-preview.jpg', blob: null })
-          return
-        }
-        videoTask = uploadTask
-        uploadTask.stop = videoStopped
-      },
-      download: jest.fn()
-    })
+    uploadBehavior = (call) => {
+      if (call.attachment.type === attachmentTypes.image) {
+        // The user presses stop while the preview is uploading.
+        runSaga(
+          { dispatch: (action: any) => pauseDispatched.push(action), getState: () => ({}) },
+          __messageSagaTestables.pauseAttachmentUploading as any,
+          { payload: { attachmentId: 'video-stop-tid' } }
+        )
+        call.succeed('https://cdn.example/clip-preview.jpg')
+        return
+      }
+      call.succeed('https://cdn.example/clip.mp4')
+    }
     const attachment = {
       tid: 'video-stop-tid',
       type: attachmentTypes.video,
@@ -1581,26 +1649,37 @@ describe('attachment upload recovery', () => {
     } as any
 
     const storeDispatch = jest.spyOn(store, 'dispatch')
-    const sending = handleUploadAttachments([attachment], { type: 'text' } as any, channel)
+    let sent = false
+    const sending = handleUploadAttachments([attachment], { type: 'text' } as any, channel).then((result) => {
+      sent = true
+      return result
+    })
     // Let the preview upload, the state change and the video upload's start run.
-    for (let i = 0; i < 20; i += 1) await Promise.resolve()
+    await settleMicrotasks(() => storeDispatch.mock.calls.length > 0)
+    await settleMicrotasks()
 
     expect(pauseDispatched).toEqual([updateAttachmentUploadingStateAC(UPLOAD_STATE.PAUSED, 'video-stop-tid')])
-    expect(videoStopped).toHaveBeenCalledTimes(1)
+    // Nothing of the video is sent while it is stopped.
+    expect(uploadCalls.map((call) => call.attachment.type)).toEqual([attachmentTypes.image])
+    expect(sent).toBe(false)
     // After the preview, the video shows as paused, not uploading.
     expect(storeDispatch).toHaveBeenCalledWith(updateAttachmentUploadingStateAC(UPLOAD_STATE.PAUSED, 'video-stop-tid'))
     expect(storeDispatch).not.toHaveBeenCalledWith(
       updateAttachmentUploadingStateAC(UPLOAD_STATE.UPLOADING, 'video-stop-tid')
     )
 
-    videoTask?.success({ uri: 'https://cdn.example/clip.mp4', blob: null })
-    await sending
+    // Resumed: the video is uploaded.
+    await runMessageSaga(__messageSagaTestables.resumeAttachmentUploading, {
+      payload: { attachmentId: 'video-stop-tid' }
+    })
+    const [uploadedVideo] = await sending
+    expect(uploadCalls.map((call) => call.attachment.type)).toEqual([attachmentTypes.image, attachmentTypes.video])
+    expect(uploadedVideo).toEqual(expect.objectContaining({ tid: 'video-stop-tid' }))
   })
 
   it('a resume pressed while the video preview still uploads shows it as preparing again', () => {
     markUploadNotStarted('video-resume-tid')
     pauseUpload('video-resume-tid')
-    setCustomUploader({ upload: jest.fn(), download: jest.fn() })
     const dispatched: any[] = []
 
     runSaga(
@@ -1616,15 +1695,12 @@ describe('attachment upload recovery', () => {
     const channel = makeUploaderChannel('channel-reuse-video-preview')
     const video = new File(['video-bytes'], 'clip.mp4', { type: 'video/mp4' })
     const composePreviewBlob = new Blob(['compose-preview'], { type: 'image/jpeg' })
-    uploadBehavior = (uploadedAttachment, uploadTask) => {
-      uploadTask.success({
-        uri:
-          uploadedAttachment.type === attachmentTypes.image
-            ? 'https://cdn.example/compose-preview.jpg'
-            : 'https://cdn.example/clip.mp4',
-        blob: null
-      })
-    }
+    uploadBehavior = (call) =>
+      call.succeed(
+        call.attachment.type === attachmentTypes.image
+          ? 'https://cdn.example/compose-preview.jpg'
+          : 'https://cdn.example/clip.mp4'
+      )
     const attachment = {
       tid: 'reuse-video-preview-tid',
       type: attachmentTypes.video,
@@ -1640,9 +1716,10 @@ describe('attachment upload recovery', () => {
     await handleUploadAttachments([attachment], { type: 'text' } as any, channel)
 
     expect(mockGetVideoFirstFrame).not.toHaveBeenCalled()
-    expect(uploadCalls[0]).toEqual(
+    expect(uploadCalls[0].attachment).toEqual(
       expect.objectContaining({ type: attachmentTypes.image, data: expect.any(File), size: composePreviewBlob.size })
     )
+    expect(await readBlobText(uploadCalls[0].file)).toBe('compose-preview')
     expect((channel as any).__attachmentBuilder.setMetadata).toHaveBeenCalledWith(
       expect.stringContaining('"video_thumb":"https://cdn.example/compose-preview.jpg"')
     )
@@ -1652,19 +1729,12 @@ describe('attachment upload recovery', () => {
     const channel = makeUploaderChannel('channel-video-thumb-metadata')
     const video = new File(['video-bytes'], 'clip.mp4', { type: 'video/mp4' })
     mockGetVideoFirstFrame.mockResolvedValue({ blob: new Blob(['preview'], { type: 'image/jpeg' }) })
-    setCustomUploader({
-      upload: (attachment: any, uploadTask: any) => {
-        uploadCalls.push(attachment)
-        uploadTask.success({
-          uri:
-            attachment.type === attachmentTypes.image
-              ? 'https://cdn.example/new-thumb.jpg'
-              : 'https://cdn.example/clip.mp4',
-          blob: attachment.type === attachmentTypes.video ? video : null
-        })
-      },
-      download: jest.fn()
-    })
+    uploadBehavior = (call) =>
+      call.succeed(
+        call.attachment.type === attachmentTypes.image
+          ? 'https://cdn.example/new-thumb.jpg'
+          : 'https://cdn.example/clip.mp4'
+      )
     const attachment = {
       tid: 'video-thumb-metadata-tid',
       type: attachmentTypes.video,
@@ -1800,17 +1870,13 @@ describe('attachment upload recovery', () => {
       upload: false
     } as any
     mockGetVideoFirstFrame.mockResolvedValue({ blob: new Blob(['preview'], { type: 'image/jpeg' }) })
-    setCustomUploader({
-      upload: (attachment: any, uploadTask: any) => {
-        uploadCalls.push(attachment)
-        if (attachment.type === attachmentTypes.image) {
-          uploadTask.failure(new Error('preview upload failed'))
-          return
-        }
-        uploadBehavior(attachment, uploadTask)
-      },
-      download: jest.fn()
-    })
+    uploadBehavior = (call) => {
+      if (call.attachment.type === attachmentTypes.image) {
+        call.fail(new Error('preview upload failed'))
+        return
+      }
+      call.succeed()
+    }
 
     await expect(handleUploadAttachments([attachment], { type: 'text' } as any, channel)).rejects.toThrow(
       'preview upload failed'
@@ -1840,17 +1906,13 @@ describe('attachment upload recovery', () => {
       ]
     })
     mockGetVideoFirstFrame.mockResolvedValue({ blob: new Blob(['preview'], { type: 'image/jpeg' }) })
-    setCustomUploader({
-      upload: (attachment: any, uploadTask: any) => {
-        uploadCalls.push(attachment)
-        if (attachment.type === attachmentTypes.image) {
-          uploadTask.failure(new Error('preview upload failed'))
-          return
-        }
-        uploadBehavior(attachment, uploadTask)
-      },
-      download: jest.fn()
-    })
+    uploadBehavior = (call) => {
+      if (call.attachment.type === attachmentTypes.image) {
+        call.fail(new Error('preview upload failed'))
+        return
+      }
+      call.succeed()
+    }
     setActiveChannelId(channel.id)
     setChannelInMap(channel)
     addMessageToMap(channel.id, pendingMessage)
@@ -1893,35 +1955,29 @@ describe('attachment upload recovery', () => {
     } as any
     mockGetVideoFirstFrame.mockResolvedValue({ blob: new Blob(['preview'], { type: 'image/jpeg' }) })
     let failVideoUpload = true
-    setCustomUploader({
-      upload: (attachment: any, uploadTask: any) => {
-        uploadCalls.push(attachment)
-        if (attachment.type === attachmentTypes.image) {
-          uploadTask.success({ uri: 'https://cdn.example/clip-preview.jpg', blob: null })
-          return
-        }
-        if (failVideoUpload) {
-          uploadTask.failure(networkingError())
-          return
-        }
-        uploadTask.success({ uri: 'https://cdn.example/clip.mp4', blob: null })
-      },
-      download: jest.fn()
-    })
+    uploadBehavior = (call) => {
+      if (call.attachment.type === attachmentTypes.image) {
+        call.succeed('https://cdn.example/clip-preview.jpg')
+        return
+      }
+      if (failVideoUpload) {
+        call.fail(networkingError())
+        return
+      }
+      call.succeed('https://cdn.example/clip.mp4')
+    }
 
     await expect(handleUploadAttachments([attachment], { type: 'text' } as any, channel)).rejects.toMatchObject({
       code: 'NetworkingError'
     })
 
-    expect(uploadCalls.filter((uploadedAttachment) => uploadedAttachment.type === attachmentTypes.image)).toHaveLength(
-      1
-    )
+    expect(uploadCalls.filter((call) => call.attachment.type === attachmentTypes.image)).toHaveLength(1)
 
     failVideoUpload = false
     const [sent] = await handleUploadAttachments([attachment], { type: 'text' } as any, channel)
 
     // The preview the first send stored goes with the video: it is not made or uploaded again.
-    expect(uploadCalls.map((uploadedAttachment) => uploadedAttachment.type)).toEqual([
+    expect(uploadCalls.map((call) => call.attachment.type)).toEqual([
       attachmentTypes.image,
       attachmentTypes.video,
       attachmentTypes.video
@@ -1930,31 +1986,29 @@ describe('attachment upload recovery', () => {
     expect(JSON.parse(sent.metadata)).toMatchObject({ video_thumb: 'https://cdn.example/clip-preview.jpg' })
   })
 
-  describe('with encryptAttachments', () => {
-    // Like Waafi's uploader: it encrypts the file with the fileEncryption it is
-    // given, stores it and reports its encryption.
+  describe('with encryptUploads and a transport of the app', () => {
+    // Like Waafi's transport: it encrypts the file with fileTransfer.encryption,
+    // stores the encrypted bytes and reports the session's encryption.
     let stored: Blob[]
-    let uriFor: (attachment: any) => string
+    // eslint-disable-next-line no-unused-vars
+    let uriFor: (attachment: IAttachment) => string
     beforeEach(() => {
       const client = installFakeFilesClient()
       Object.assign(client, { user: { id: 'current-user' }, Channel: { create: jest.fn() } })
-      setEncryptAttachments(true)
       stored = []
       uriFor = () => 'https://cdn.example/uploaded-1'
-      setCustomUploader({
-        preparesFiles: true,
-        upload: async (attachment: any, uploadTask: any, _messageType: any, options: any) => {
-          uploadCalls.push(attachment)
-          const uri = uriFor(attachment)
-          const prepared = await options.fileEncryption.prepareEncryption(attachment.data)
-          stored.push(await prepared.readAll())
-          uploadTask.success({ uri, blob: attachment.data, encryption: prepared.encryptionInfo })
-        },
-        download: jest.fn()
-      })
+      uploadBehavior = async (call) => {
+        const session = await fileTransfer.encryption.prepareEncryption(call.file)
+        try {
+          const ciphertext = await session.read(0, session.ciphertextSize)
+          stored.push(new Blob([ciphertext as BlobPart], { type: 'application/octet-stream' }))
+          call.succeed(uriFor(call.attachment), session.encryptionInfo)
+        } finally {
+          session.close()
+        }
+      }
+      fileTransfer.configure({ encryptUploads: true, transport: makeFakeTransport() })
     })
-
-    afterEach(() => setEncryptAttachments(false))
 
     it('uploads the encrypted file and sends its key in the attachment metadata', async () => {
       const channel = makeUploaderChannel('channel-encrypted-image')
@@ -1967,13 +2021,11 @@ describe('attachment upload recovery', () => {
 
       const [sent] = await handleUploadAttachments([attachment], { type: 'text' } as any, channel)
 
-      expect(stored[0].type).toBe('application/octet-stream')
-      expect(await readBlobText(stored[0])).toBe('enc(key-1@id-1):file-bytes')
-      expect(JSON.parse(sent.metadata)).toEqual({
-        szw: 10,
-        szh: 20,
-        enc: { v: 1, alg: 'tink-aes256-gcm-hkdf-64k+commit-v1', attachmentId: 'id-1', key: 'key-1' }
-      })
+      // The transport is asked for an encrypted upload of the plaintext file.
+      expect(uploadCalls.map((call) => call.request.type)).toEqual([FileUploadType.ENCRYPTED])
+      expect(uploadCalls[0].file).toBe(image)
+      expect(await readBlobText(stored[0])).toBe(await readBlobText(fakeEncrypted('key-1', 'file-bytes')))
+      expect(JSON.parse(sent.metadata)).toEqual({ szw: 10, szh: 20, enc: fakeEncryption('key-1') })
       // The size shown and sent is the plaintext's.
       expect((channel as any).__attachmentBuilder.setFileSize).toHaveBeenCalledWith(image.size)
     })
@@ -2007,46 +2059,47 @@ describe('attachment upload recovery', () => {
         Object.defineProperty(URL, 'createObjectURL', { configurable: true, value: originalCreateObjectURL })
       }
 
-      expect(await readBlobText(stored[0])).toBe('enc(key-1@id-1):preview-bytes')
-      expect(await readBlobText(stored[1])).toBe('enc(key-2@id-2):video-bytes')
+      expect(uploadCalls.map((call) => call.request.type)).toEqual([FileUploadType.ENCRYPTED, FileUploadType.ENCRYPTED])
+      expect(await readBlobText(stored[0])).toBe(await readBlobText(fakeEncrypted('key-1', 'preview-bytes')))
+      expect(await readBlobText(stored[1])).toBe(await readBlobText(fakeEncrypted('key-2', 'video-bytes')))
       expect(JSON.parse(sent.metadata)).toEqual({
         video_thumb: 'https://cdn.example/clip-preview.jpg',
         enc: {
-          v: 1,
-          alg: 'tink-aes256-gcm-hkdf-64k+commit-v1',
-          attachmentId: 'id-2',
-          key: 'key-2',
+          ...fakeEncryption('key-2'),
           renditions: [{ role: 'thumbnail', attachmentId: 'id-1', key: 'key-1' }]
         }
       })
     })
 
-    it('with an uploader without preparesFiles, the message fails instead of sending the file unencrypted', async () => {
-      const channel = makeUploaderChannel('channel-encrypted-simple-uploader')
+    it('with a transport that reports no encryption, the message fails instead of sending the file unencrypted', async () => {
+      const channel = makeUploaderChannel('channel-encrypted-plain-transport')
       const image = makeLiveFile()
-      setCustomUploader({ upload: jest.fn(), download: jest.fn() })
+      // It stores the file as it is given, and reports only its URL.
+      uploadBehavior = (call) => call.succeed('https://cdn.example/plain.png')
 
       await expect(
         handleUploadAttachments(
-          [{ ...makeAttachment('encrypted-simple-uploader-tid', image), url: image }],
+          [{ ...makeAttachment('encrypted-plain-transport-tid', image), url: image }],
           { type: 'text' } as any,
           channel
         )
-      ).rejects.toThrow('preparesFiles')
+      ).rejects.toThrow('Encrypted upload returned no encryption information')
+      expect(channel.createAttachmentBuilder).not.toHaveBeenCalled()
       expect(channel.sendMessage).not.toHaveBeenCalled()
     })
 
-    it('without a custom uploader and with an SDK that has no client.upload, the message fails before anything is uploaded', async () => {
+    it('with the default transport and an SDK without client.uploadEncrypted, the message fails, nothing goes unencrypted', async () => {
       const currentUser = makeUser({ id: 'current-user' })
       const channel = makeUploaderChannel('channel-encrypted-old-sdk')
       const video = new File(['video-bytes'], 'clip.mp4', { type: 'video/mp4' })
+      mockGetVideoFirstFrame.mockResolvedValue({ blob: new Blob(['preview-bytes'], { type: 'image/jpeg' }) })
       const pendingMessage = makePendingMessage({
         channelId: channel.id,
         tid: 'encrypted-old-sdk-message-tid',
         user: currentUser,
         attachments: [
           {
-            tid: 'encrypted-old-sdk-attachment-tid',
+            tid: trackedTid('encrypted-old-sdk-attachment-tid'),
             type: attachmentTypes.video,
             name: 'clip.mp4',
             size: video.size,
@@ -2056,9 +2109,11 @@ describe('attachment upload recovery', () => {
           } as any
         ]
       })
+      // An SDK that uploads plaintext files only.
+      const upload = jest.fn(async () => ({ url: 'https://cdn.example/plain' }))
       const uploadFile = jest.fn()
-      Object.assign(getClient(), { uploadFile })
-      setCustomUploader(undefined)
+      Object.assign(getClient(), { upload, uploadFile })
+      fileTransfer.configure({ encryptUploads: true })
       setActiveChannelId(channel.id)
       setChannelInMap(channel)
       addMessageToMap(channel.id, pendingMessage)
@@ -2074,6 +2129,7 @@ describe('attachment upload recovery', () => {
       })
 
       // Neither the preview nor the video is uploaded unencrypted, and nothing is sent.
+      expect(upload).not.toHaveBeenCalled()
       expect(uploadFile).not.toHaveBeenCalled()
       expect(channel.sendMessage).not.toHaveBeenCalled()
       expect(getPendingMessagesFromMap(channel.id)).toEqual([
@@ -2082,26 +2138,25 @@ describe('attachment upload recovery', () => {
     })
   })
 
-  describe('with an SDK that has client.upload and no custom uploader', () => {
+  describe('with the default transport (the SDK uploads each file)', () => {
     // The SDK uploads one file per call; the uikit uploads each attachment and
     // sends the message with their URLs.
     let sdkUploads: { file: File; options: any }[]
+    // client.uploadEncrypted calls: the SDK's prepared (encrypted) upload of each file.
+    let encryptedUploads: { prepared: ReturnType<typeof makeFakePreparedUpload>; options: any }[]
+    // eslint-disable-next-line no-unused-vars
     let uploadAnswer: (file: File, options: any) => Promise<any>
     let uploadFile: jest.Mock
-    const encryptionFor = (n: number) => ({
-      v: 1,
-      alg: 'tink-aes256-gcm-hkdf-64k+commit-v1',
-      attachmentId: `id-${n}`,
-      key: `key-${n}`
-    })
 
     beforeEach(() => {
       sdkUploads = []
+      encryptedUploads = []
       uploadFile = jest.fn()
       uploadAnswer = async (file) => ({ url: `https://cdn.example/${file.name}`, size: file.size })
-      setCustomUploader(undefined)
-      // The default transport: the chat client stores the bytes it is given, encrypted
-      // before by the default encryption (its prepareUpload; keys are key-1, key-2, …).
+      fileTransfer.configure()
+      // The default transport: the chat client stores a file (client.upload), or the
+      // encrypted bytes of the SDK's prepared upload (client.uploadEncrypted; keys are
+      // key-1, key-2, … in the order files are encrypted).
       setClient({
         ...installFakeFilesClient(),
         user: { id: 'current-user' },
@@ -2110,11 +2165,13 @@ describe('attachment upload recovery', () => {
         upload: (file: File, options: any) => {
           sdkUploads.push({ file, options })
           return uploadAnswer(file, options)
+        },
+        uploadEncrypted: (prepared: ReturnType<typeof makeFakePreparedUpload>, options: any) => {
+          encryptedUploads.push({ prepared, options })
+          return uploadAnswer(prepared.source as File, options)
         }
       })
     })
-
-    afterEach(() => setEncryptAttachments(false))
 
     const sendPending = async (channel: any, pendingMessage: any) => {
       setActiveChannelId(channel.id)
@@ -2136,7 +2193,7 @@ describe('attachment upload recovery', () => {
         tid,
         user: makeUser({ id: 'current-user' }),
         attachments: attachments.map((file: File, i: number) => ({
-          tid: `${tid}-attachment-${i}`,
+          tid: trackedTid(`${tid}-attachment-${i}`),
           type: file.type.startsWith('video/') ? attachmentTypes.video : attachmentTypes.file,
           name: file.name,
           size: file.size,
@@ -2161,7 +2218,8 @@ describe('attachment upload recovery', () => {
       // Compared by name: a failing diff of File objects runs the test worker out of memory.
       expect(sdkUploads.map(({ file }) => file.name)).toEqual(['first.pdf', 'second.txt'])
       expect(sdkUploads.every(({ file }, i) => file === [first, second][i])).toBe(true)
-      expect(sdkUploads.every(({ options }) => options.encrypt === false)).toBe(true)
+      // Not encrypted: the files are stored as they are.
+      expect(encryptedUploads).toHaveLength(0)
       expect(uploadFile).not.toHaveBeenCalled()
       const sent = (channel.sendMessage as jest.Mock).mock.calls[0][0].attachments
       expect(sent).toEqual([
@@ -2177,10 +2235,11 @@ describe('attachment upload recovery', () => {
         })
       ])
       expect(sent[0].completion).toBeUndefined()
+      expect(sent.map((attachment: any) => JSON.parse(attachment.metadata).enc)).toEqual([undefined, undefined])
     })
 
-    it('with encryptAttachments, each file is encrypted before it is sent and its own key goes in its metadata', async () => {
-      setEncryptAttachments(true)
+    it('with encryptUploads, each file is encrypted before it is sent and its own key goes in its metadata', async () => {
+      fileTransfer.encryptUploads = true
       const channel = makeUploaderChannel('channel-sdk-upload-encrypted')
       const first = new File(['first'], 'first.pdf', { type: 'application/pdf' })
       const second = new File(['second'], 'second.pdf', { type: 'application/pdf' })
@@ -2192,22 +2251,24 @@ describe('attachment upload recovery', () => {
 
       await sendPending(channel, pendingWith(channel, 'sdk-encrypted', [first, second]))
 
-      // The client is given the stored bytes, encrypted with each file's own key, with the file's name.
-      expect(sdkUploads.every(({ options }) => options.encrypt === false)).toBe(true)
-      expect(sdkUploads.map(({ file }) => file.name)).toEqual(['first.pdf', 'second.pdf'])
-      expect(await Promise.all(sdkUploads.map(({ file }) => readBlobText(file)))).toEqual([
-        'enc(key-1@id-1):first',
-        'enc(key-2@id-2):second'
+      // The client is given each file's encrypted upload, with the file's own key; nothing goes unencrypted.
+      expect(sdkUploads).toHaveLength(0)
+      expect(encryptedUploads.map(({ prepared }) => (prepared.source as File).name)).toEqual([
+        'first.pdf',
+        'second.pdf'
       ])
+      expect(await Promise.all(encryptedUploads.map(({ prepared }) => readBlobText(prepared.stored)))).toEqual(
+        await Promise.all([fakeEncrypted('key-1', 'first'), fakeEncrypted('key-2', 'second')].map(readBlobText))
+      )
       const sent = (channel.sendMessage as jest.Mock).mock.calls[0][0].attachments
-      expect(sent.map((attachment: any) => JSON.parse(attachment.metadata).enc.attachmentId).sort()).toEqual([
-        'id-1',
-        'id-2'
+      expect(sent.map((attachment: any) => JSON.parse(attachment.metadata).enc)).toEqual([
+        fakeEncryption('key-1'),
+        fakeEncryption('key-2')
       ])
     })
 
-    it('uploads a video preview with client.upload before the video, each with its own key', async () => {
-      setEncryptAttachments(true)
+    it('uploads a video preview with client.uploadEncrypted before the video, each with its own key', async () => {
+      fileTransfer.encryptUploads = true
       const channel = makeUploaderChannel('channel-sdk-upload-video')
       const video = new File(['video-bytes'], 'clip.mp4', { type: 'video/mp4' })
       mockGetVideoFirstFrame.mockResolvedValue({ blob: new Blob(['preview-bytes'], { type: 'image/jpeg' }) })
@@ -2223,16 +2284,23 @@ describe('attachment upload recovery', () => {
       }
 
       // The test's attachment builder keeps no name, so the preview is "video-preview.jpg".
-      expect(sdkUploads.map(({ file }) => file.name)).toEqual(['video-preview.jpg', 'clip.mp4'])
+      expect(encryptedUploads.map(({ prepared }) => (prepared.source as File).name)).toEqual([
+        'video-preview.jpg',
+        'clip.mp4'
+      ])
       // Both are stored encrypted, the preview with its own key.
-      expect(sdkUploads.map(({ file }) => file.type)).toEqual(['application/octet-stream', 'application/octet-stream'])
-      expect(await readBlobText(sdkUploads[0].file)).toBe('enc(key-1@id-1):preview-bytes')
+      expect(await Promise.all(encryptedUploads.map(({ prepared }) => readBlobText(prepared.stored)))).toEqual(
+        await Promise.all(
+          [fakeEncrypted('key-1', 'preview-bytes'), fakeEncrypted('key-2', 'video-bytes')].map(readBlobText)
+        )
+      )
+      expect(sdkUploads).toHaveLength(0)
       expect(uploadFile).not.toHaveBeenCalled()
       const [sent] = (channel.sendMessage as jest.Mock).mock.calls[0][0].attachments
       expect(sent).toMatchObject({ url: 'https://cdn.example/clip.mp4', upload: false })
       expect(JSON.parse(sent.metadata)).toEqual({
         video_thumb: 'https://cdn.example/video-preview.jpg',
-        enc: { ...encryptionFor(2), renditions: [{ role: 'thumbnail', attachmentId: 'id-1', key: 'key-1' }] }
+        enc: { ...fakeEncryption('key-2'), renditions: [{ role: 'thumbnail', attachmentId: 'id-1', key: 'key-1' }] }
       })
     })
 
@@ -2254,7 +2322,12 @@ describe('attachment upload recovery', () => {
     it('stop and resume work on an attachment the SDK uploads', async () => {
       uploadAnswer = () => new Promise(() => undefined)
       const file = new File(['x'], 'x.pdf', { type: 'application/pdf' })
-      uploadAttachmentFile({ tid: 'sdk-stop-tid', url: file } as any, () => undefined, 'text')
+      uploadAttachment(
+        { tid: 'sdk-stop-tid', url: file } as IAttachment,
+        { file, fileName: file.name, mimeType: file.type },
+        () => undefined
+      )
+      await settleMicrotasks(() => sdkUploads.length > 0)
 
       const paused = await runMessageSaga(__messageSagaTestables.pauseAttachmentUploading, {
         payload: { attachmentId: 'sdk-stop-tid' }
@@ -2266,13 +2339,21 @@ describe('attachment upload recovery', () => {
         payload: { attachmentId: 'sdk-stop-tid' }
       })
       expect(resumed).toContainEqual(updateAttachmentUploadingStateAC(UPLOAD_STATE.UPLOADING, 'sdk-stop-tid'))
+      await settleMicrotasks(() => sdkUploads.length > 1)
       expect(sdkUploads).toHaveLength(2)
+      expect(sdkUploads[1].file).toBe(file)
+      expect(sdkUploads[1].options.signal.aborted).toBe(false)
     })
 
-    it('deleting a pending message stops the SDK upload of its attachment', () => {
+    it('deleting a pending message stops the SDK upload of its attachment', async () => {
       uploadAnswer = () => new Promise(() => undefined)
       const file = new File(['x'], 'x.pdf', { type: 'application/pdf' })
-      uploadAttachmentFile({ tid: 'sdk-delete-tid', url: file } as any, () => undefined, 'text')
+      uploadAttachment(
+        { tid: 'sdk-delete-tid', url: file } as IAttachment,
+        { file, fileName: file.name, mimeType: file.type },
+        () => undefined
+      )
+      await settleMicrotasks(() => sdkUploads.length > 0)
 
       deletePendingMessage('channel-sdk-delete', {
         tid: 'sdk-delete-msg',

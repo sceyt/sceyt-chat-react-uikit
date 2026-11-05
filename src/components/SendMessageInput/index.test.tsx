@@ -21,7 +21,9 @@ import {
 import * as videoContainer from '../../helpers/videoContainer'
 import { releaseAllBlobUrls } from '../../helpers/attachmentBlobUrls'
 import * as imagePreparation from '../../helpers/resizeImage'
-import { setCustomUploader, setSendAttachmentsAsSeparateMessages } from '../../helpers/customUploader'
+import { setSendAttachmentsAsSeparateMessages } from '../../helpers/sendAttachments'
+import { fileTransfer } from '../../fileTransfer/sceytChatUIKitFileTransfer'
+import { FileTransferTransport } from '../../fileTransfer/types'
 
 jest.mock('../../helpers/messagesHalper', () => {
   const drafts: Record<string, any> = {}
@@ -328,11 +330,12 @@ describe('file-drop integration: MessageList, Redux and SendMessageInput', () =>
     view.unmount()
   })
 
-  it.each([
+  it.each<[string, FileTransferTransport | undefined]>([
     ['the SDK upload', undefined],
-    ['a custom uploader', { upload: jest.fn(), download: jest.fn(), cancelRequest: jest.fn() }]
-  ])('a media image sent through %s is encoded once, as JPEG of quality 0.8', async (_name, uploader) => {
-    setCustomUploader(uploader)
+    ['a custom uploader', { upload: jest.fn(), download: jest.fn(), cancel: jest.fn() }]
+  ])('a media image sent through %s is encoded once, as JPEG of quality 0.8', async (_name, transport) => {
+    fileTransfer.configure({ transport })
+    expect(fileTransfer.hasCustomTransport).toBe(!!transport)
     try {
       const view = renderFileDropFlow()
       const file = new File(['photo'], 'photo.jpg', { type: 'image/jpeg' })
@@ -343,7 +346,7 @@ describe('file-drop integration: MessageList, Redux and SendMessageInput', () =>
       expect(imagePreparation.resizeImage).toHaveBeenCalledWith(file, undefined, undefined, 0.8)
       view.unmount()
     } finally {
-      setCustomUploader(undefined)
+      fileTransfer.configure()
     }
   })
 

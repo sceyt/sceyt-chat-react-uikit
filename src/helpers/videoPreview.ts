@@ -2,7 +2,6 @@ import { getAttachmentUrlFromCache } from './attachmentsCache'
 import { requestMediaDownload } from './mediaDownloadCoordinator'
 import { videoThumbDecryption } from './attachmentEncryption'
 import { IAttachment } from '../types'
-import { ICustomUploader } from '../components/ChatContainer'
 
 export const parseAttachmentMetadata = (metadata: any): Record<string, any> => {
   if (!metadata) return {}
@@ -46,14 +45,13 @@ export const getVideoAttachmentCacheKeys = (videoUrl: string, metadata: any) => 
 })
 
 /**
- * Downloads a video preview through the same downloader and Cache Storage path
+ * Downloads a video preview through the same transport and Cache Storage path
  * as attachments. The returned object URL is safe to use as an img source.
  * `video` is the video attachment: its metadata holds the preview's key when it is encrypted.
  */
 export const downloadVideoThumb = async (
   videoThumb: string,
   video: IAttachment,
-  downloader?: ICustomUploader['download'],
   messageType?: string | null
 ): Promise<string> => {
   const cachedUrl = await getAttachmentUrlFromCache(videoThumb).catch(() => false)
@@ -66,8 +64,6 @@ export const downloadVideoThumb = async (
     cacheKey: videoThumb,
     kind: 'video-thumbnail',
     messageType,
-    downloader,
-    customDownload: true,
     // This helper already checked the preview cache above. Avoid consuming a
     // second cache lookup before the downloader has produced the thumbnail.
     skipCacheLookup: true,
