@@ -1,16 +1,10 @@
-/** Parameters recipients need to decrypt one file. Contains the file key: do not log it. */
+/**
+ * What opens one file: its keys, one base64url string the chat SDK makes and reads
+ * (FileEncryption.encodeKeys and decodeKeys), kept in the attachment's metadata as `enc`.
+ * The UIKit only carries it. Contains the file key: do not log it.
+ */
 export interface FileEncryptionInfo {
-  algorithm: string
-  attachmentId: string
-  key: string
-  /**
-   * What else an app's encryption method needs to decrypt the file (e.g. an IV or a key
-   * version), as strings. Stored in the attachment's `enc` as it is; the chat SDK's has none.
-   */
-  params?: Record<string, string>
-  /** The stored header's salt and nonce prefix (base64url), when the encryption gives them: not secret. */
-  salt?: string
-  noncePrefix?: string
+  encodedKeys: string
 }
 
 /** Private recovery state for one encryption session. Contains key material: do not log it. */
@@ -26,9 +20,6 @@ export interface FileEncryptionSession {
   readonly plaintextSize: number
   readonly ciphertextSize: number
   readonly encryptionInfo: FileEncryptionInfo
-  /** The stored header's salt and nonce prefix (base64url), when the encryption gives them: not secret. */
-  readonly salt?: string
-  readonly noncePrefix?: string
   /** The exact ciphertext range, including overhead. Repeated reads return identical bytes. */
   // eslint-disable-next-line no-unused-vars
   read: (offset: number, length: number) => Promise<Uint8Array>

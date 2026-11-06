@@ -11,8 +11,8 @@ import { fileTransfer } from './sceytChatUIKitFileTransfer'
 /** The metadata key the apps' entries are kept under, each in its own namespace. */
 export const EXT = 'ext'
 
-/** What an app's entry is: a JSON object (e.g. what its encryption needs to resume). */
-export type UploadExtEntry = Record<string, unknown>
+/** What an app's entry is: a string (e.g. the chat SDK's keys string) or a JSON object. */
+export type UploadExtEntry = string | Record<string, unknown>
 
 /** What `prepare` gets. */
 export interface UploadPreparation {
@@ -35,20 +35,22 @@ export interface UploadPreparer {
   prepare(preparation: UploadPreparation): UploadExtEntry | undefined | Promise<UploadExtEntry | undefined>
 }
 
-const isEntry = (value: unknown): value is UploadExtEntry =>
+const isObject = (value: unknown): value is Record<string, unknown> =>
   !!value && typeof value === 'object' && !Array.isArray(value)
+
+const isEntry = (value: unknown): value is UploadExtEntry => (typeof value === 'string' && !!value) || isObject(value)
 
 /** The app's entry under `namespace` in `metadata`, if there is one. */
 export const getUploadExt = (metadata: unknown, namespace: string): UploadExtEntry | undefined => {
   const ext = parseAttachmentMetadata(metadata)[EXT]
-  const entry = isEntry(ext) ? ext[namespace] : undefined
+  const entry = isObject(ext) ? ext[namespace] : undefined
   return isEntry(entry) ? entry : undefined
 }
 
 /** `metadata` (as JSON) with `entry` under ext[namespace], keeping everything else. */
 export const withUploadExt = (metadata: unknown, namespace: string, entry: UploadExtEntry): string => {
   const parsed = parseAttachmentMetadata(metadata)
-  const ext = isEntry(parsed[EXT]) ? parsed[EXT] : {}
+  const ext = isObject(parsed[EXT]) ? parsed[EXT] : {}
   return JSON.stringify({ ...parsed, [EXT]: { ...ext, [namespace]: entry } })
 }
 
@@ -68,7 +70,7 @@ export const prepareAttachmentUpload = async (attachment: IAttachment, file: Blo
     getUploadExt(attachment.metadata, namespace) || (tid ? getPendingAttachment(tid)?.uploadExt : undefined)
   const prepared = await preparer.prepare({ attachment, file, ...(existing ? { existing } : {}) })
   if (prepared !== undefined && !isEntry(prepared)) {
-    throw new Error('uploadPreparer.prepare returned an entry that is not an object')
+    throw new Error('uploadPreparer.prepare returned an entry that is not a string or an object')
   }
   const entry = prepared || existing
   if (!entry) return attachment.metadata

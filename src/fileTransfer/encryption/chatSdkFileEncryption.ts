@@ -17,8 +17,7 @@ interface SdkPreparedUpload {
   readonly plaintextSize: number
   readonly sourceId: string
   readonly encryptionInfo: SdkFileEncryptionInfo
-  readonly salt?: string
-  readonly noncePrefix?: string
+  readonly encodedKeys: string
   checkpoint(): { encryptionInfo: SdkFileEncryptionInfo; data: string }
   // eslint-disable-next-line no-unused-vars
   readCiphertextRange(offset: number, length: number): Promise<Uint8Array>
@@ -40,17 +39,6 @@ const sdkFileEncryption = () => {
   return provider
 }
 
-const toUIKitInfo = (info: SdkFileEncryptionInfo): FileEncryptionInfo => ({
-  algorithm: info.format,
-  attachmentId: info.data.uniqueId,
-  key: info.data.key
-})
-
-const toSdkInfo = (info: FileEncryptionInfo, plaintextSize: number): SdkFileEncryptionInfo => ({
-  format: info.algorithm,
-  data: { uniqueId: info.attachmentId, key: info.key, plainSize: plaintextSize }
-})
-
 const closedError = (what: string) => new Error(`${what} session is closed`)
 
 const readBytes = (blob: Blob): Promise<Uint8Array> =>
@@ -67,21 +55,14 @@ export class ChatSdkEncryptionSession implements FileEncryptionSession {
   readonly plaintextSize: number
   readonly ciphertextSize: number
   readonly encryptionInfo: FileEncryptionInfo
-  readonly salt?: string
-  readonly noncePrefix?: string
   private closed = false
 
   constructor(readonly upload: SdkPreparedUpload) {
     this.sourceId = upload.sourceId
     this.plaintextSize = upload.plaintextSize
     this.ciphertextSize = upload.ciphertextSize
-    this.salt = upload.salt
-    this.noncePrefix = upload.noncePrefix
-    this.encryptionInfo = {
-      ...toUIKitInfo(upload.encryptionInfo),
-      ...(upload.salt ? { salt: upload.salt } : {}),
-      ...(upload.noncePrefix ? { noncePrefix: upload.noncePrefix } : {})
-    }
+    // The keys string the SDK made goes to the attachment's metadata as `enc`.
+    this.encryptionInfo = { encodedKeys: upload.encodedKeys }
   }
 
   read(offset: number, length: number): Promise<Uint8Array> {
@@ -93,7 +74,7 @@ export class ChatSdkEncryptionSession implements FileEncryptionSession {
     if (this.closed) throw closedError('Encryption')
     const checkpoint = this.upload.checkpoint()
     return {
-      encryptionInfo: toUIKitInfo(checkpoint.encryptionInfo),
+      encryptionInfo: this.encryptionInfo,
       plaintextSize: checkpoint.encryptionInfo.data.plainSize,
       data: checkpoint.data
     }
@@ -141,8 +122,9 @@ export class ChatSdkFileEncryption implements FileEncryption {
   }
 
   async restoreEncryption(file: Blob, checkpoint: FileEncryptionCheckpoint): Promise<FileEncryptionSession> {
-    const upload = await sdkFileEncryption().restoreUpload(file, {
-      encryptionInfo: toSdkInfo(checkpoint.encryptionInfo, checkpoint.plaintextSize),
+    const provider = sdkFileEncryption()
+    const upload = await provider.restoreUpload(file, {
+      encryptionInfo: provider.decodeKeys(checkpoint.encryptionInfo.encodedKeys, checkpoint.plaintextSize),
       data: checkpoint.data
     })
     return new ChatSdkEncryptionSession(upload)
@@ -154,15 +136,18 @@ export class ChatSdkFileEncryption implements FileEncryption {
     plaintextSize: number | undefined
   ): Promise<FileDecryptionSession> {
     const provider = sdkFileEncryption()
-    // A file whose message carries no size (a video's preview) is sized from its encrypted bytes.
-    const size = plaintextSize === undefined ? provider.plaintextSize(encryptedFile.size) : plaintextSize
+    // The SDK reads the keys; a file whose message carries no size (a video's preview) is sized from its encrypted bytes.
+    const info: SdkFileEncryptionInfo = provider.decodeKeys(
+      encryptionInfo.encodedKeys,
+      plaintextSize === undefined ? provider.unknownPlainSize : plaintextSize
+    )
     const reader: SdkPlaintextReader = await provider.openDownload(
       {
         ciphertextSize: encryptedFile.size,
         read: (offset: number, length: number) => readBytes(encryptedFile.slice(offset, offset + length))
       },
-      toSdkInfo(encryptionInfo, size)
+      info
     )
-    return new ChatSdkDecryptionSession(`${encryptionInfo.attachmentId}:${encryptedFile.size}`, reader)
+    return new ChatSdkDecryptionSession(`${info.data.uniqueId}:${encryptedFile.size}`, reader)
   }
 }

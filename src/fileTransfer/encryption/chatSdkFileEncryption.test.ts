@@ -4,7 +4,9 @@ import { ChatSdkEncryptionSession, ChatSdkFileEncryption } from './chatSdkFileEn
 const ALG = 'tink-aes256-gcm-hkdf-64k+commit-v1'
 
 // A stand-in for the SDK's FileEncryption (sceyt-chat): it records what it is given.
-// The SDK's own tests check the cryptography.
+// The SDK's own tests check the cryptography. Its keys string is `keys:<id>:<key>`.
+const keysOf = (uniqueId: string, key: string) => `keys:${uniqueId}:${key}`
+
 const installSdk = () => {
   const uploads: any[] = []
   const readers: any[] = []
@@ -15,6 +17,7 @@ const installSdk = () => {
       plaintextSize: file.size,
       sourceId: `source-${uniqueId}`,
       encryptionInfo: { format: ALG, data: { uniqueId, key, plainSize: file.size } },
+      encodedKeys: keysOf(uniqueId, key),
       checkpoint: jest.fn(() => ({ encryptionInfo: upload.encryptionInfo, data })),
       readCiphertextRange: jest.fn(async (offset: number, length: number) => new Uint8Array(length).fill(offset % 256)),
       close: jest.fn()
@@ -23,6 +26,12 @@ const installSdk = () => {
     return upload
   }
   const sdk = {
+    unknownPlainSize: -1,
+    decodeKeys: jest.fn((encoded: string, plainSize = -1) => {
+      const [tag, uniqueId, key] = encoded.split(':')
+      if (tag !== 'keys') throw Object.assign(new Error('Not a keys string'), { type: 'InvalidEncryption' })
+      return { format: ALG, data: { uniqueId, key, plainSize } }
+    }),
     newUniqueId: jest.fn(() => 'gIGCg4SFhoeIiYqLjI2Ojw'),
     ciphertextSize: jest.fn((plaintextSize: number) => plaintextSize + 88),
     prepareUpload: jest.fn(async (file: Blob, uniqueId: string) => makeUpload(file, uniqueId)),
@@ -56,10 +65,10 @@ describe('ChatSdkFileEncryption', () => {
 
     expect(sdk.prepareUpload).toHaveBeenCalledWith(file, 'c2VydmVyLWlzc3VlZC1pZA')
     expect(sdk.newUniqueId).not.toHaveBeenCalled()
-    expect(session.encryptionInfo.attachmentId).toBe('c2VydmVyLWlzc3VlZC1pZA')
+    expect(session.encryptionInfo).toEqual({ encodedKeys: keysOf('c2VydmVyLWlzc3VlZC1pZA', 'key-1') })
   })
 
-  it("a session's encryption info has the SDK upload's salt and nonce prefix, so they are stored in enc", async () => {
+  it("a session's encryption info has the SDK upload's keys string, which is stored as enc", async () => {
     const { sdk } = installSdk()
     sdk.prepareUpload.mockImplementationOnce(async (source: Blob, uniqueId: string) =>
       Object.assign(
@@ -72,13 +81,14 @@ describe('ChatSdkFileEncryption', () => {
           readCiphertextRange: jest.fn(),
           close: jest.fn()
         },
-        { salt: 'c2FsdA', noncePrefix: 'bnA' }
+        { encodedKeys: 'AYCBgoOEhYaHiImKi4yNjo8' }
       )
     )
 
     const session = await new ChatSdkFileEncryption().prepareEncryption(file)
 
-    expect(session.encryptionInfo).toMatchObject({ salt: 'c2FsdA', noncePrefix: 'bnA' })
+    // Only the SDK's string: the UIKit neither encodes nor reads the keys.
+    expect(session.encryptionInfo).toEqual({ encodedKeys: 'AYCBgoOEhYaHiImKi4yNjo8' })
   })
 
   it("gives the encrypted size of a file before it is encrypted, from the SDK's", () => {
@@ -88,7 +98,7 @@ describe('ChatSdkFileEncryption', () => {
     expect(sdk.ciphertextSize).toHaveBeenCalledWith(100)
   })
 
-  it('a prepared session has a new attachment id from the SDK, kept in its info and checkpoint', async () => {
+  it('a prepared session has a new attachment id from the SDK, in its keys and checkpoint', async () => {
     const { sdk, uploads } = installSdk()
 
     const session = await new ChatSdkFileEncryption().prepareEncryption(file)
@@ -96,7 +106,7 @@ describe('ChatSdkFileEncryption', () => {
     expect(sdk.prepareUpload).toHaveBeenCalledWith(file, 'gIGCg4SFhoeIiYqLjI2Ojw')
     expect(session).toBeInstanceOf(ChatSdkEncryptionSession)
     expect((session as ChatSdkEncryptionSession).upload).toBe(uploads[0])
-    expect(session.encryptionInfo).toEqual({ algorithm: ALG, attachmentId: 'gIGCg4SFhoeIiYqLjI2Ojw', key: 'key-1' })
+    expect(session.encryptionInfo).toEqual({ encodedKeys: keysOf('gIGCg4SFhoeIiYqLjI2Ojw', 'key-1') })
     expect(session.sourceId).toBe('source-gIGCg4SFhoeIiYqLjI2Ojw')
     expect(session.plaintextSize).toBe(file.size)
     expect(session.ciphertextSize).toBe(file.size + 88)
@@ -116,6 +126,8 @@ describe('ChatSdkFileEncryption', () => {
 
     const restored = await encryption.restoreEncryption(file, saved)
 
+    // The SDK reads the keys again, with the checkpoint's size.
+    expect(sdk.decodeKeys).toHaveBeenCalledWith(keysOf('gIGCg4SFhoeIiYqLjI2Ojw', 'key-1'), file.size)
     expect(sdk.restoreUpload).toHaveBeenCalledWith(file, {
       encryptionInfo: { format: ALG, data: { uniqueId: 'gIGCg4SFhoeIiYqLjI2Ojw', key: 'key-1', plainSize: file.size } },
       data: '{"v":1}'
@@ -127,7 +139,7 @@ describe('ChatSdkFileEncryption', () => {
     const { sdk } = installSdk()
     sdk.restoreUpload.mockRejectedValueOnce(Object.assign(new Error('changed'), { type: 'FileChanged' }))
     const checkpoint = {
-      encryptionInfo: { algorithm: ALG, attachmentId: 'a', key: 'k' },
+      encryptionInfo: { encodedKeys: keysOf('a', 'k') },
       plaintextSize: file.size,
       data: '{}'
     }
@@ -153,10 +165,11 @@ describe('ChatSdkFileEncryption', () => {
   it("decryption gives the SDK the attachment's own size and reads ranges of the encrypted file", async () => {
     const { sdk, readers } = installSdk()
     const encrypted = new Blob([new Uint8Array([1, 2, 3, 4, 5, 6])])
-    const info = { algorithm: ALG, attachmentId: 'file-id', key: 'file-key' }
+    const info = { encodedKeys: keysOf('file-id', 'file-key') }
 
     const session = await new ChatSdkFileEncryption().prepareDecryption(encrypted, info, 1234)
 
+    expect(sdk.decodeKeys).toHaveBeenCalledWith(info.encodedKeys, 1234)
     expect(sdk.openDownload).toHaveBeenCalledWith(expect.anything(), {
       format: ALG,
       data: { uniqueId: 'file-id', key: 'file-key', plainSize: 1234 }
@@ -174,12 +187,32 @@ describe('ChatSdkFileEncryption', () => {
     await expect(session.read(0, 1)).rejects.toThrow('closed')
   })
 
+  it('without a size (a preview), the SDK reads the keys with an unknown size and sizes the file from its bytes', async () => {
+    const { sdk } = installSdk()
+
+    await new ChatSdkFileEncryption().prepareDecryption(new Blob(['x']), { encodedKeys: keysOf('a', 'k') }, undefined)
+
+    expect(sdk.openDownload).toHaveBeenCalledWith(expect.anything(), {
+      format: ALG,
+      data: { uniqueId: 'a', key: 'k', plainSize: -1 }
+    })
+  })
+
+  it('keys the SDK cannot read fail the decryption, opening nothing', async () => {
+    const { sdk } = installSdk()
+
+    await expect(
+      new ChatSdkFileEncryption().prepareDecryption(new Blob(['x']), { encodedKeys: 'not-keys' }, 1)
+    ).rejects.toMatchObject({ type: 'InvalidEncryption' })
+    expect(sdk.openDownload).not.toHaveBeenCalled()
+  })
+
   it('a file that does not verify fails at decryption, before any plaintext', async () => {
     const { sdk } = installSdk()
     sdk.openDownload.mockRejectedValueOnce(Object.assign(new Error('commitment'), { type: 'Authentication' }))
 
     await expect(
-      new ChatSdkFileEncryption().prepareDecryption(new Blob(['x']), { algorithm: ALG, attachmentId: 'a', key: 'k' }, 1)
+      new ChatSdkFileEncryption().prepareDecryption(new Blob(['x']), { encodedKeys: keysOf('a', 'k') }, 1)
     ).rejects.toMatchObject({ type: 'Authentication' })
   })
 

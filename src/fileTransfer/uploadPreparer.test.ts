@@ -123,11 +123,25 @@ describe('prepareAttachmentUpload', () => {
 
   it.each([
     ['a list', ['aid']],
-    ['a string', 'aid']
-  ])('an entry that is not an object (%s) is refused, so nothing is uploaded with it', async (_case, value) => {
-    usePreparer(async () => value as any)
+    ['a number', 5],
+    ['an empty string', '']
+  ])(
+    'an entry that is not a string or an object (%s) is refused, so nothing is uploaded with it',
+    async (_case, value) => {
+      usePreparer(async () => value as any)
 
-    await expect(prepareAttachmentUpload(attachmentWith('tid-1'), photo)).rejects.toThrow('not an object')
+      await expect(prepareAttachmentUpload(attachmentWith('tid-1'), photo)).rejects.toThrow('not a string or an object')
+    }
+  )
+
+  it("an entry may be a string (the SDK's keys string): it is saved and given back as existing", async () => {
+    const preparer = usePreparer(async ({ existing }) => existing || 'AYCBgoOEhYaHiImKi4yNjo8')
+
+    const prepared = await prepareAttachmentUpload(attachmentWith('tid-1'), photo)
+    await prepareAttachmentUpload({ ...attachmentWith('tid-1'), metadata: prepared }, photo)
+
+    expect(getUploadExt(prepared, NAMESPACE)).toBe('AYCBgoOEhYaHiImKi4yNjo8')
+    expect(preparer.prepare.mock.calls[1][0].existing).toBe('AYCBgoOEhYaHiImKi4yNjo8')
   })
 
   it('an entry that cannot be stored as JSON fails before the upload', async () => {

@@ -68,7 +68,7 @@ export const attachmentTransferRouter = {
       if (result.type === 'success') {
         if (!result.result.url) return FileTransferResult.failure(new Error('The upload returned no URL'))
         // A transport with a preparer encrypts with the parameters it saved in ext.
-        if (encrypted && !result.result.encryptionInfo && !transport.uploadPreparer) {
+        if (encrypted && !result.result.encryptionInfo?.encodedKeys && !transport.uploadPreparer) {
           // The receiver would have no way to decrypt the file.
           return FileTransferResult.failure(new Error('Encrypted upload returned no encryption information'))
         }

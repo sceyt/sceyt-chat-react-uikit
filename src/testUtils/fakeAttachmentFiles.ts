@@ -6,7 +6,8 @@ import { readResponseBlobWithProgress } from '../helpers/getVideoFrame'
 // one is tested in sceyt-chat against the format's test vectors; UIKit tests only check
 // that files go through it with the right attachment id and key. "Encrypting" prefixes
 // the bytes with a fixed-length `enc(<key>@<id>):` header, and opening a file with
-// another key or attachment id fails. Key `key-n` has attachment id `id-n`.
+// another key or attachment id fails. Key `key-n` has attachment id `id-n`. Its keys string
+// (the SDK's FileEncryption.encodeKeys, kept in metadata as `enc`) is `fake-keys.id-n.key-n`.
 
 const ALG = 'tink-aes256-gcm-hkdf-64k+commit-v1'
 // Every fake header has this length, so a plaintext size follows from a stored size.
@@ -34,15 +35,18 @@ const headerOf = (key: string, id: string = uniqueIdOf(key)) => `enc(${key}@${id
 
 const sdkError = (type: string, message: string) => Object.assign(new Error(message), { type })
 
-/** What opens the fake file of `key`, as the UIKit's encryption gives it. */
-export const fakeEncryptionInfo = (key: string): FileEncryptionInfo => ({
-  algorithm: ALG,
-  attachmentId: uniqueIdOf(key),
-  key
-})
+/** The `enc` of the fake file of `key`, as it is in attachment metadata: its keys string. */
+export const fakeEncryption = (key: string) => `fake-keys.${uniqueIdOf(key)}.${key}`
 
-/** The `enc` object of the fake file of `key`, as it is in attachment metadata. */
-export const fakeEncryption = (key: string) => ({ v: 1, alg: ALG, aid: uniqueIdOf(key), k: key })
+/** What opens the fake file of `key`, as the UIKit's encryption gives it. */
+export const fakeEncryptionInfo = (key: string): FileEncryptionInfo => ({ encodedKeys: fakeEncryption(key) })
+
+/** The SDK's FileEncryption.decodeKeys, for fake keys strings. */
+const decodeFakeKeys = (encoded: unknown, plainSize = -1) => {
+  const match = typeof encoded === 'string' ? /^fake-keys\.([^.]+)\.([^.]+)$/.exec(encoded) : null
+  if (!match) throw sdkError('InvalidEncryption', 'Not a keys string')
+  return { format: ALG, data: { uniqueId: match[1], key: match[2], plainSize } }
+}
 
 /** A Blob encrypted the way the fake file of `key` (attachment id `id-n` for `key-n`) encrypts. */
 export const fakeEncrypted = (key: string, text: string) =>
@@ -60,6 +64,7 @@ export const makeFakePreparedUpload = (source: Blob, key: string) => {
     plaintextSize: source.size,
     sourceId: `source-${uniqueId}`,
     encryptionInfo,
+    encodedKeys: fakeEncryption(key),
     checkpoint: () => ({ encryptionInfo, data: '{}' }),
     readCiphertextRange: (offset: number, length: number) => readBytes(stored.slice(offset, offset + length)),
     close: () => undefined
@@ -78,7 +83,8 @@ const openFakeDownload = async (
   const text = await readBlobText(new Blob([bytes as BlobPart]))
   const header = headerOf(info.data.key, info.data.uniqueId)
   const plaintext = text.slice(HEADER_SIZE)
-  if (!text.startsWith(header) || plaintext.length !== info.data.plainSize) {
+  // A size of -1 (FileEncryption.unknownPlainSize) is taken from the stored file.
+  if (!text.startsWith(header) || (info.data.plainSize !== -1 && plaintext.length !== info.data.plainSize)) {
     throw sdkError('Authentication', `Not encrypted with key ${info.data.key} and attachment id ${info.data.uniqueId}`)
   }
   const plain = Uint8Array.from(plaintext, (char) => char.charCodeAt(0))
@@ -126,6 +132,8 @@ export const installFakeFilesClient = () => {
       newUniqueId: () => `id-${++created}`,
       prepareUpload: async (file: Blob, uniqueId: string) => makeFakePreparedUpload(file, keyOf(uniqueId)),
       openDownload: openFakeDownload,
+      decodeKeys: decodeFakeKeys,
+      unknownPlainSize: -1,
       plaintextSize: (ciphertextSize: number) => Math.max(0, ciphertextSize - HEADER_SIZE)
     },
     download: fakeSdkDownload

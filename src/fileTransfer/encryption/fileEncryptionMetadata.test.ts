@@ -1,27 +1,32 @@
 import { FileEncryptionMetadata } from './fileEncryptionMetadata'
-
-const ALG = 'tink-aes256-gcm-hkdf-64k+commit-v1'
+import { setClient } from '../../common/client'
+import { fakeEncryption, fakeEncryptionInfo, installFakeFilesClient } from '../../testUtils/fakeAttachmentFiles'
 
 describe('FileEncryptionMetadata', () => {
-  it('keeps the algorithm, the binding id, the key and the media fields', () => {
-    const envelope = FileEncryptionMetadata.fromEncryptionInfo({
-      algorithm: ALG,
-      attachmentId: 'file-id',
-      key: 'file-key'
-    })
+  beforeEach(() => {
+    installFakeFilesClient()
+  })
+
+  afterEach(() => {
+    setClient(undefined as any)
+  })
+
+  it("keeps enc as the SDK's keys string next to the media fields, and reads it back with the SDK", () => {
+    const envelope = FileEncryptionMetadata.fromEncryptionInfo(fakeEncryptionInfo('key-1'))
 
     const written = FileEncryptionMetadata.write('{"tmb":"blur","szw":1280,"szh":203}', envelope)
 
-    // Stored as aid and k.
-    expect(JSON.parse(written)).toEqual({
-      tmb: 'blur',
-      szw: 1280,
-      szh: 203,
-      enc: { v: 1, alg: ALG, aid: 'file-id', k: 'file-key' }
-    })
-    const read = FileEncryptionMetadata.read(written)!
-    expect(read.toEncryptionInfo()).toEqual({ algorithm: ALG, attachmentId: 'file-id', key: 'file-key' })
+    expect(JSON.parse(written)).toEqual({ tmb: 'blur', szw: 1280, szh: 203, enc: fakeEncryption('key-1') })
+    expect(FileEncryptionMetadata.read(written)!.toEncryptionInfo()).toEqual(fakeEncryptionInfo('key-1'))
     expect(FileEncryptionMetadata.isEncrypted(written)).toBe(true)
+    // As JSON, the envelope is the keys string itself.
+    expect(JSON.stringify({ enc: envelope })).toBe(JSON.stringify({ enc: fakeEncryption('key-1') }))
+  })
+
+  it('an encryption without a keys string cannot be kept in metadata', () => {
+    const { encodedKeys, ...withoutKeys } = fakeEncryptionInfo('key-1')
+    expect(encodedKeys).toBeTruthy()
+    expect(() => FileEncryptionMetadata.fromEncryptionInfo(withoutKeys)).toThrow('encodedKeys')
   })
 
   it('malformed metadata does not escape the parser', () => {
@@ -29,92 +34,31 @@ describe('FileEncryptionMetadata', () => {
       expect(FileEncryptionMetadata.read(metadata)).toBeUndefined()
       expect(FileEncryptionMetadata.isEncrypted(metadata)).toBe(false)
     }
-    // A malformed `enc` is still encrypted: shown as unavailable, never as plain.
-    for (const enc of [null, 'x', {}, { alg: ALG, key: 'k' }]) {
+  })
+
+  it('an enc the SDK cannot read (not a keys string, or the old object) has no encryption info, but is encrypted', () => {
+    for (const enc of ['x', 5, { v: 1, alg: 'tink-aes256-gcm-hkdf-64k+commit-v1', aid: 'id-1', k: 'key-1' }]) {
       const metadata = JSON.stringify({ enc })
       expect(FileEncryptionMetadata.read(metadata)).toBeUndefined()
       expect(FileEncryptionMetadata.isEncrypted(metadata)).toBe(true)
     }
   })
 
-  it("stores the encryption's salt and nonce prefix as salt and np, and gives them back", () => {
-    const info = { algorithm: ALG, attachmentId: 'file-id', key: 'file-key', salt: 'c2FsdA', noncePrefix: 'bnA' }
-
-    const written = FileEncryptionMetadata.write('{}', FileEncryptionMetadata.fromEncryptionInfo(info))
-
-    expect(JSON.parse(written).enc).toEqual({
-      v: 1,
-      alg: ALG,
-      aid: 'file-id',
-      k: 'file-key',
-      salt: 'c2FsdA',
-      np: 'bnA'
-    })
-    expect(FileEncryptionMetadata.read(written)!.toEncryptionInfo()).toEqual(info)
+  it('without a chat client that reads keys strings, enc gives no encryption info', () => {
+    setClient(undefined as any)
+    expect(FileEncryptionMetadata.read({ enc: fakeEncryption('key-1') })).toBeUndefined()
   })
 
   it('removes `enc` and keeps the other keys', () => {
-    const written = FileEncryptionMetadata.write(
-      '{"szw":1}',
-      FileEncryptionMetadata.fromEncryptionInfo({ algorithm: ALG, attachmentId: 'a', key: 'k' })
-    )
-
-    expect(FileEncryptionMetadata.remove(written)).toBe('{"szw":1}')
+    const metadata = JSON.stringify({ szw: 10, enc: fakeEncryption('key-1') })
+    expect(JSON.parse(FileEncryptionMetadata.remove(metadata)!)).toEqual({ szw: 10 })
+    expect(FileEncryptionMetadata.remove(JSON.stringify({ enc: fakeEncryption('key-1') }))).toBeUndefined()
     expect(FileEncryptionMetadata.remove('{"szw":1}')).toBe('{"szw":1}')
-    expect(FileEncryptionMetadata.remove(JSON.stringify({ enc: { alg: ALG } }))).toBeUndefined()
   })
 
   it('key-bearing models leave the key out of their diagnostic string', () => {
-    const envelope = FileEncryptionMetadata.fromEncryptionInfo({ algorithm: ALG, attachmentId: 'a', key: 'secret-key' })
-
-    expect(String(envelope)).not.toContain('secret-key')
-    expect(String(envelope)).toContain('attachmentId=a')
-  })
-
-  describe("an app's encryption params", () => {
-    const info = { algorithm: 'my-aes-gcm', attachmentId: 'a', key: 'k', params: { iv: 'aXY', keyVersion: '3' } }
-
-    it('are stored in enc and come back with the encryption info', () => {
-      const metadata = FileEncryptionMetadata.write({ szw: 10 }, FileEncryptionMetadata.fromEncryptionInfo(info))
-
-      expect(JSON.parse(metadata).enc).toEqual({
-        v: 1,
-        alg: 'my-aes-gcm',
-        aid: 'a',
-        k: 'k',
-        params: { iv: 'aXY', keyVersion: '3' }
-      })
-      expect(FileEncryptionMetadata.read(metadata)!.toEncryptionInfo()).toEqual(info)
-    })
-
-    it('are left out when there are none', () => {
-      const metadata = FileEncryptionMetadata.write(
-        '{}',
-        FileEncryptionMetadata.fromEncryptionInfo({ ...info, params: undefined })
-      )
-
-      expect('params' in JSON.parse(metadata).enc).toBe(false)
-      expect('params' in FileEncryptionMetadata.read(metadata)!.toEncryptionInfo()).toBe(false)
-    })
-
-    it.each([
-      ['not an object', 'iv=aXY'],
-      ['a list', ['aXY']],
-      ['a value that is not a string', { iv: 'aXY', keyVersion: 3 }]
-    ])('malformed params (%s) are dropped, the rest of enc is kept', (_case, params) => {
-      const metadata = JSON.stringify({
-        enc: {
-          v: 1,
-          alg: 'my-aes-gcm',
-          aid: 'a',
-          k: 'k',
-          params
-        }
-      })
-
-      const read = FileEncryptionMetadata.read(metadata)!
-
-      expect(read.toEncryptionInfo()).toEqual({ algorithm: 'my-aes-gcm', attachmentId: 'a', key: 'k' })
-    })
+    const envelope = FileEncryptionMetadata.fromEncryptionInfo(fakeEncryptionInfo('key-1'))
+    expect(String(envelope)).not.toContain('key-1')
+    expect(String(envelope)).not.toContain(fakeEncryption('key-1'))
   })
 })

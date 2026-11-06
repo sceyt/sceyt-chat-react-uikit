@@ -5,9 +5,19 @@ import {
   isUnopenableAttachmentError,
   withAttachmentEncryption
 } from './attachmentEncryption'
-import { fakeEncryption, fakeEncryptionInfo } from '../testUtils/fakeAttachmentFiles'
+import { setClient } from '../common/client'
+import { fakeEncryption, fakeEncryptionInfo, installFakeFilesClient } from '../testUtils/fakeAttachmentFiles'
 
 describe('attachment encryption metadata', () => {
+  // The chat SDK reads the keys string in enc.
+  beforeEach(() => {
+    installFakeFilesClient()
+  })
+
+  afterEach(() => {
+    setClient(undefined as any)
+  })
+
   it('reads the file key from metadata stored as a JSON string', () => {
     const metadata = JSON.stringify({ szw: 10, enc: fakeEncryption('key-1') })
 
@@ -25,21 +35,6 @@ describe('attachment encryption metadata', () => {
     const metadata = JSON.parse(withAttachmentEncryption(JSON.stringify({ szw: 10 }), fakeEncryptionInfo('key-1')))
 
     expect(metadata).toEqual({ szw: 10, enc: fakeEncryption('key-1') })
-  })
-
-  it("an app's encryption params, salt and nonce prefix are kept", () => {
-    const info = {
-      ...fakeEncryptionInfo('key-2'),
-      algorithm: 'my-aes-gcm',
-      params: { iv: 'dmlkZW8' },
-      salt: 'c2FsdA',
-      noncePrefix: 'bnA'
-    }
-
-    const metadata = withAttachmentEncryption('{}', info)
-
-    expect(JSON.parse(metadata).enc).toMatchObject({ salt: 'c2FsdA', np: 'bnA' })
-    expect(getAttachmentEncryption(metadata)).toEqual(info)
   })
 
   it('a resent file replaces the enc of the earlier attempt', () => {

@@ -6,7 +6,7 @@ import { FileUploadType } from '../types'
 import { DefaultFileTransferTransport } from './defaultFileTransferTransport'
 
 const ALG = 'tink-aes256-gcm-hkdf-64k+commit-v1'
-const info: FileEncryptionInfo = { algorithm: ALG, attachmentId: 'file-id', key: 'file-key' }
+const info: FileEncryptionInfo = { encodedKeys: 'keys-of-file-id' }
 
 const readText = (blob: Blob): Promise<string> =>
   new Promise((resolve, reject) => {
@@ -22,6 +22,7 @@ const sdkUpload = () => ({
   plaintextSize: 5,
   sourceId: 'source-1',
   encryptionInfo: { format: ALG, data: { uniqueId: 'file-id', key: 'file-key', plainSize: 5 } },
+  encodedKeys: 'keys-of-file-id',
   checkpoint: jest.fn(),
   readCiphertextRange: jest.fn(),
   close: jest.fn()
@@ -143,7 +144,8 @@ describe('DefaultFileTransferTransport', () => {
     })
 
     describe("an app's encryption", () => {
-      const appInfo = { ...info, algorithm: 'my-aes-gcm', params: { iv: 'aXY', keyVersion: '3' } }
+      // The app's encryption makes its own keys string, kept in enc as it is.
+      const appInfo: FileEncryptionInfo = { encodedKeys: 'my-aes-gcm:aXY:3' }
       // A session of an app's encryption: its "ciphertext" is `sealed:` and the file.
       const appSession = (plaintext: string) => {
         const bytes = Uint8Array.from(`sealed:${plaintext}`, (char) => char.charCodeAt(0))
@@ -158,7 +160,7 @@ describe('DefaultFileTransferTransport', () => {
         }
       }
 
-      it('is uploaded as its encrypted bytes with client.upload, under the file name; its info and params come back', async () => {
+      it('is uploaded as its encrypted bytes with client.upload, under the file name; its keys come back', async () => {
         const session = appSession('hello')
         fileTransfer.encryption = { ...decryptingTo(''), prepareEncryption: jest.fn(async () => session) }
         const progress: number[] = []
@@ -209,7 +211,7 @@ describe('DefaultFileTransferTransport', () => {
         expect(session.close).toHaveBeenCalledTimes(1)
       })
 
-      it('a download is decrypted with it, given the info and params the upload stored', async () => {
+      it('a download is decrypted with it, given the keys the upload stored', async () => {
         const encryption = decryptingTo('picture')
         fileTransfer.encryption = encryption
 

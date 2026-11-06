@@ -612,7 +612,7 @@ describe('mediaDownloadCoordinator', () => {
 
     it('whose encryption metadata is not valid is not downloaded again when it is shown again', async () => {
       global.fetch = storedFile(fakeEncrypted('key-3', 'pixels'))
-      const invalid = { ...request, encryption: { ...fakeEncryptionInfo('key-3'), attachmentId: '' } }
+      const invalid = { ...request, encryption: { encodedKeys: 'not-a-keys-string' } }
       await expect(requestMediaDownload(invalid)).rejects.toMatchObject({ type: 'InvalidEncryption' })
 
       await expect(requestMediaDownload(invalid)).rejects.toMatchObject({ type: 'InvalidEncryption' })

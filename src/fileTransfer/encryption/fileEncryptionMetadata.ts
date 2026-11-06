@@ -1,19 +1,7 @@
+import { getClient } from '../../common/client'
 import { FileEncryptionInfo } from './types'
 
 const FIELD = 'enc'
-
-// `value` as encryption params: an object of strings, else undefined (malformed params are dropped).
-const paramsOf = (value: unknown): Record<string, string> | undefined =>
-  value &&
-  typeof value === 'object' &&
-  !Array.isArray(value) &&
-  Object.values(value).every((param) => typeof param === 'string')
-    ? { ...(value as Record<string, string>) }
-    : undefined
-
-const withParams = (params: Record<string, string> | undefined) => (params ? { params } : {})
-
-const stringOf = (value: unknown) => (typeof value === 'string' && value ? value : undefined)
 
 const parse = (metadata: unknown): Record<string, any> | undefined => {
   try {
@@ -24,77 +12,49 @@ const parse = (metadata: unknown): Record<string, any> | undefined => {
   }
 }
 
+// Whether the chat SDK reads `encodedKeys` as a keys string (FileEncryption.decodeKeys).
+const isKeys = (encodedKeys: string): boolean => {
+  const provider = getClient()?.FileEncryption
+  if (!provider?.decodeKeys) return false
+  try {
+    provider.decodeKeys(encodedKeys)
+    return true
+  } catch {
+    return false
+  }
+}
+
 /**
- * Attachment encryption metadata: the `enc` object `{ v, alg, aid, k, salt, np, params }` kept next
- * to the other metadata keys (`aid`: the attachment id, `k`: the key, `np`: the nonce prefix). The
- * plaintext size remains the attachment's file size. Every encrypted file is an attachment with its
- * own `enc` (a video's preview image is a preview attachment of its own).
+ * Attachment encryption metadata: `enc`, one base64url string the chat SDK makes and reads
+ * (FileEncryption.encodeKeys and decodeKeys) of the version, attachment id and key, kept next
+ * to the other metadata keys; the salt and nonce prefix are in the stored file's header. The
+ * plaintext size remains the attachment's file size. Every encrypted file is an attachment
+ * with its own `enc` (a video's preview image is a preview attachment of its own).
  */
 export class FileEncryptionMetadata {
-  readonly version: number
-  readonly algorithm: string
-  readonly attachmentId: string
-  readonly key: string
-  readonly params?: Record<string, string>
-  readonly salt?: string
-  readonly noncePrefix?: string
+  readonly encodedKeys: string
 
-  constructor(
-    algorithm: string,
-    attachmentId: string,
-    key: string,
-    version = 1,
-    params?: Record<string, string>,
-    salt?: string,
-    noncePrefix?: string
-  ) {
-    this.version = version
-    this.algorithm = algorithm
-    this.attachmentId = attachmentId
-    this.key = key
-    this.params = params
-    this.salt = salt
-    this.noncePrefix = noncePrefix
+  private constructor(encodedKeys: string) {
+    this.encodedKeys = encodedKeys
   }
 
   toEncryptionInfo(): FileEncryptionInfo {
-    return {
-      algorithm: this.algorithm,
-      attachmentId: this.attachmentId,
-      key: this.key,
-      ...withParams(this.params),
-      ...(this.salt ? { salt: this.salt } : {}),
-      ...(this.noncePrefix ? { noncePrefix: this.noncePrefix } : {})
-    }
+    return { encodedKeys: this.encodedKeys }
   }
 
-  /** The `enc` object as it is stored. */
+  /** `enc` as it is stored. */
   toJSON() {
-    return {
-      v: this.version,
-      alg: this.algorithm,
-      aid: this.attachmentId,
-      k: this.key,
-      ...(this.salt ? { salt: this.salt } : {}),
-      ...(this.noncePrefix ? { np: this.noncePrefix } : {}),
-      ...withParams(this.params)
-    }
+    return this.encodedKeys
   }
 
   toString() {
-    return `FileEncryptionMetadata(version=${this.version}, algorithm=${this.algorithm}, attachmentId=${this.attachmentId})`
+    return 'FileEncryptionMetadata'
   }
 
+  /** The `enc` of an upload's encryption; throws when it has no keys string. */
   static fromEncryptionInfo(info: FileEncryptionInfo) {
-    return new FileEncryptionMetadata(
-      info.algorithm,
-      info.attachmentId,
-      info.key,
-      1,
-      paramsOf(info.params),
-      stringOf(info.salt),
-      stringOf(info.noncePrefix)
-    )
+    if (!info.encodedKeys) throw new Error('The encryption has no keys string (encodedKeys) to keep in metadata')
+    return new FileEncryptionMetadata(info.encodedKeys)
   }
 
   /** Whether the attachment's metadata has encryption info (even malformed). */
@@ -103,33 +63,16 @@ export class FileEncryptionMetadata {
     return !!json && FIELD in json
   }
 
-  /** The encryption metadata, or undefined when there is none or it is malformed. */
+  /** The encryption metadata, or undefined when there is none or the SDK cannot read it. */
   static read(metadata: unknown): FileEncryptionMetadata | undefined {
     const enc = parse(metadata)?.[FIELD]
-    if (
-      !enc ||
-      typeof enc !== 'object' ||
-      typeof enc.alg !== 'string' ||
-      typeof enc.aid !== 'string' ||
-      typeof enc.k !== 'string'
-    ) {
-      return undefined
-    }
-    return new FileEncryptionMetadata(
-      enc.alg,
-      enc.aid,
-      enc.k,
-      typeof enc.v === 'number' ? enc.v : 1,
-      paramsOf(enc.params),
-      stringOf(enc.salt),
-      stringOf(enc.np)
-    )
+    return typeof enc === 'string' && enc && isKeys(enc) ? new FileEncryptionMetadata(enc) : undefined
   }
 
   /** `metadata` with `envelope` as its `enc`, keeping the other keys. */
   static write(metadata: unknown, envelope: FileEncryptionMetadata): string {
     const json = parse(metadata) || {}
-    json[FIELD] = envelope.toJSON()
+    json[FIELD] = envelope.encodedKeys
     return JSON.stringify(json)
   }
 

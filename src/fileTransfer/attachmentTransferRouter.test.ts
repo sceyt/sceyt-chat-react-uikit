@@ -4,7 +4,8 @@ import { fileTransfer } from './sceytChatUIKitFileTransfer'
 import { FileTransferResult, FileTransferTransport, FileUploadType } from './types'
 
 const ALG = 'tink-aes256-gcm-hkdf-64k+commit-v1'
-const info: FileEncryptionInfo = { algorithm: ALG, attachmentId: 'file-id', key: 'file-key' }
+const KEYS = 'AYCBgoOEhYaHiImKi4yNjo8'
+const info: FileEncryptionInfo = { algorithm: ALG, attachmentId: 'file-id', key: 'file-key', encodedKeys: KEYS }
 const attachment: any = { tid: 'tid-1', type: 'file', name: 'a.txt' }
 const callback = { onProgress: jest.fn() }
 
@@ -69,6 +70,19 @@ describe('attachmentTransferRouter', () => {
     it('an encrypted upload without encryption info is a failure: nobody could open the file', async () => {
       fileTransfer.encryptUploads = true
       fileTransfer.transport = transportReturning(FileTransferResult.success({ url: 'https://cdn.example/a' }))
+
+      const result = await attachmentTransferRouter.upload(attachment, source()).execute(callback)
+
+      expect(result).toMatchObject({ type: 'failure', error: { message: expect.stringContaining('no encryption') } })
+    })
+
+    it('an encrypted upload whose encryption has no keys string for enc is a failure', async () => {
+      fileTransfer.encryptUploads = true
+      const { encodedKeys, ...withoutKeys } = info
+      expect(encodedKeys).toBe(KEYS)
+      fileTransfer.transport = transportReturning(
+        FileTransferResult.success({ url: 'https://cdn.example/a', encryptionInfo: withoutKeys })
+      )
 
       const result = await attachmentTransferRouter.upload(attachment, source()).execute(callback)
 
@@ -163,17 +177,16 @@ describe('attachmentTransferRouter', () => {
   })
 
   describe('applyUploadResult', () => {
-    it("writes the upload's encryption as enc and keeps the other metadata", () => {
+    it("writes the upload's keys string as enc and keeps the other metadata", () => {
       const metadata = JSON.parse(
         attachmentTransferRouter.applyUploadResult({ szw: 10 }, { url: 'u', encryptionInfo: info })!
       )
 
-      expect(metadata.szw).toBe(10)
-      expect(metadata.enc).toMatchObject({ alg: ALG, aid: 'file-id', k: 'file-key' })
+      expect(metadata).toEqual({ szw: 10, enc: KEYS })
     })
 
     it('a plain upload removes enc', () => {
-      const before = { szw: 10, enc: { v: 1, alg: ALG, aid: 'old-id', k: 'old-key' } }
+      const before = { szw: 10, enc: 'old-keys' }
 
       const metadata = JSON.parse(attachmentTransferRouter.applyUploadResult(before, { url: 'u' })!)
 
