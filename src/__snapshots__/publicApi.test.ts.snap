@@ -45,10 +45,12 @@ Object {
   "createOrGetDirectChannel": "function",
   "extractUrlMatches": "function",
   "fileTransfer": "object",
+  "getUploadExt": "function",
   "handleGetMessage": "function",
   "handleSendMessage": "function",
   "readDecryptedFile": "function",
   "switchChannelActiveChannel": "function",
   "unBlockUsers": "function",
+  "withVideoPreviews": "function",
 }
 `;

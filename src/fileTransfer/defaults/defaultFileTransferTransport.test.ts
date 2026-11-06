@@ -142,21 +142,91 @@ describe('DefaultFileTransferTransport', () => {
       expect(upload.close).toHaveBeenCalledTimes(1)
     })
 
-    it('with encryption other than the Chat SDK, the native uploader fails and closes the session', async () => {
-      const close = jest.fn()
-      fileTransfer.encryption = {
-        ...decryptingTo(''),
-        prepareEncryption: jest.fn(async () => ({ sourceId: 's', encryptionInfo: info, close }) as any)
+    describe("an app's encryption", () => {
+      const appInfo = { ...info, algorithm: 'my-aes-gcm', params: { iv: 'aXY', keyVersion: '3' } }
+      // A session of an app's encryption: its "ciphertext" is `sealed:` and the file.
+      const appSession = (plaintext: string) => {
+        const bytes = Uint8Array.from(`sealed:${plaintext}`, (char) => char.charCodeAt(0))
+        return {
+          sourceId: 'app-source',
+          plaintextSize: plaintext.length,
+          ciphertextSize: bytes.length,
+          encryptionInfo: appInfo,
+          read: jest.fn(async (offset: number, length: number) => bytes.slice(offset, offset + length)),
+          checkpoint: jest.fn(),
+          close: jest.fn()
+        }
       }
 
-      const result = await transport.upload(request({ type: FileUploadType.ENCRYPTED }), { onProgress: jest.fn() })
+      it('is uploaded as its encrypted bytes with client.upload, under the file name; its info and params come back', async () => {
+        const session = appSession('hello')
+        fileTransfer.encryption = { ...decryptingTo(''), prepareEncryption: jest.fn(async () => session) }
+        const progress: number[] = []
 
-      expect(result).toMatchObject({
-        type: 'failure',
-        error: { message: expect.stringContaining('Chat SDK encryption') }
+        const result = await transport.upload(request({ type: FileUploadType.ENCRYPTED }), {
+          onProgress: (percent) => progress.push(percent)
+        })
+
+        expect(result).toEqual({
+          type: 'success',
+          result: { url: 'https://cdn.example/plain', encryptionInfo: appInfo }
+        })
+        expect(client.uploadEncrypted).not.toHaveBeenCalled()
+        const stored = client.upload.mock.calls[0][0] as File
+        expect(stored.name).toBe('a.txt')
+        expect(stored.type).toBe('application/octet-stream')
+        expect(await readText(stored)).toBe('sealed:hello')
+        expect(progress).toEqual([25, 100])
+        expect(session.close).toHaveBeenCalledTimes(1)
       })
-      expect(client.uploadEncrypted).not.toHaveBeenCalled()
-      expect(close).toHaveBeenCalledTimes(1)
+
+      it('a failed upload is a failure, and its session is closed', async () => {
+        const session = appSession('hello')
+        fileTransfer.encryption = { ...decryptingTo(''), prepareEncryption: jest.fn(async () => session) }
+        client.upload.mockRejectedValueOnce(new Error('network'))
+
+        const result = await transport.upload(request({ type: FileUploadType.ENCRYPTED }), { onProgress: jest.fn() })
+
+        expect(result).toMatchObject({ type: 'failure', error: { message: 'network' } })
+        expect(session.close).toHaveBeenCalledTimes(1)
+      })
+
+      it('an upload stopped while it is encrypted sends nothing', async () => {
+        const controller = new AbortController()
+        const session = appSession('hello')
+        session.read.mockImplementation(async (offset: number, length: number) => {
+          controller.abort()
+          return new Uint8Array(length).fill(offset)
+        })
+        fileTransfer.encryption = { ...decryptingTo(''), prepareEncryption: jest.fn(async () => session) }
+
+        const result = await transport.upload(request({ type: FileUploadType.ENCRYPTED, signal: controller.signal }), {
+          onProgress: jest.fn()
+        })
+
+        expect(result.type).toBe('interrupted')
+        expect(client.upload).not.toHaveBeenCalled()
+        expect(session.close).toHaveBeenCalledTimes(1)
+      })
+
+      it('a download is decrypted with it, given the info and params the upload stored', async () => {
+        const encryption = decryptingTo('picture')
+        fileTransfer.encryption = encryption
+
+        await transport.download(
+          {
+            operationId: 'download:1',
+            url: 'https://cdn.example/file',
+            mimeType: 'image/png',
+            encryptionInfo: appInfo,
+            plaintextSize: 7,
+            signal: new AbortController().signal
+          },
+          { onProgress: jest.fn() }
+        )
+
+        expect(encryption.decrypted[0].encryptionInfo).toEqual(appInfo)
+      })
     })
   })
 

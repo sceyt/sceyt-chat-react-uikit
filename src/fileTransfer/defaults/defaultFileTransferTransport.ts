@@ -22,28 +22,37 @@ const asError = (error: unknown): Error =>
 
 const percentOf = (loaded: number, total?: number) => (total ? Math.min(100, (loaded / total) * 100) : 0)
 
-/**
- * The verified plaintext of `session` as a Blob of `type`, grown range by range: browsers keep
- * the Blob so far by reference, so the whole file is not held in JavaScript memory.
- */
-export const readDecryptedFile = async (
-  session: FileDecryptionSession,
+// `size` bytes of `read` as a Blob of `type`, grown range by range: browsers keep the Blob so far
+// by reference, so the whole file is not held in JavaScript memory.
+const readWhole = async (
+  size: number,
+  // eslint-disable-next-line no-unused-vars
+  read: (offset: number, length: number) => Promise<Uint8Array>,
   type: string,
   // eslint-disable-next-line no-unused-vars
   onProgress?: (fraction: number) => void
 ): Promise<Blob> => {
   let done = new Blob([], { type })
-  for (let offset = 0; offset < session.plaintextSize; offset += READ_SIZE) {
-    const length = Math.min(READ_SIZE, session.plaintextSize - offset)
-    done = new Blob([done, (await session.read(offset, length)) as BlobPart], { type })
-    if (onProgress) onProgress((offset + length) / session.plaintextSize)
+  for (let offset = 0; offset < size; offset += READ_SIZE) {
+    const length = Math.min(READ_SIZE, size - offset)
+    done = new Blob([done, (await read(offset, length)) as BlobPart], { type })
+    if (onProgress) onProgress((offset + length) / size)
   }
   return done
 }
 
+/** The verified plaintext of `session` as a Blob of `type`, read range by range. */
+export const readDecryptedFile = (
+  session: FileDecryptionSession,
+  type: string,
+  // eslint-disable-next-line no-unused-vars
+  onProgress?: (fraction: number) => void
+): Promise<Blob> => readWhole(session.plaintextSize, (offset, length) => session.read(offset, length), type, onProgress)
+
 /**
  * The built-in transport: files go to the chat server with the chat client, one request per
- * file. An encrypted upload uses an SDK encryption session (`ChatSdkFileEncryption`); a
+ * file. An upload is encrypted with `fileTransfer.encryption`: a chat SDK session is sent
+ * natively (client.uploadEncrypted), an app's as its encrypted bytes (client.upload). A
  * download is decrypted with `fileTransfer.encryption`. It has no native pause: the UIKit
  * stops an upload and sends it again from the start.
  */
@@ -72,10 +81,20 @@ export class DefaultFileTransferTransport implements FileTransferTransport {
       return FileTransferResult.failure(asError(error))
     }
     try {
-      if (!(session instanceof ChatSdkEncryptionSession)) {
-        return FileTransferResult.failure(new Error('The native uploader requires Chat SDK encryption'))
+      if (session instanceof ChatSdkEncryptionSession) {
+        const { url } = await client.uploadEncrypted(session.upload, options)
+        return FileTransferResult.success({ url, encryptionInfo: session.encryptionInfo })
       }
-      const { url } = await client.uploadEncrypted(session.upload, options)
+      // An app's encryption: its encrypted bytes are stored as they are, under the file's name.
+      const encrypted = session
+      const stored = await readWhole(
+        encrypted.ciphertextSize,
+        (offset, length) => encrypted.read(offset, length),
+        'application/octet-stream'
+      )
+      if (request.signal.aborted) return FileTransferResult.interrupted(new Error('The upload was stopped'))
+      const file = new File([stored], request.fileName || 'file', { type: 'application/octet-stream' })
+      const { url } = await client.upload(file, options)
       return FileTransferResult.success({ url, encryptionInfo: session.encryptionInfo })
     } catch (error) {
       return FileTransferResult.failure(asError(error))

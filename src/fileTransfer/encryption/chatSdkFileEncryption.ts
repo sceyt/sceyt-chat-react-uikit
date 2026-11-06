@@ -17,6 +17,8 @@ interface SdkPreparedUpload {
   readonly plaintextSize: number
   readonly sourceId: string
   readonly encryptionInfo: SdkFileEncryptionInfo
+  readonly salt?: string
+  readonly noncePrefix?: string
   checkpoint(): { encryptionInfo: SdkFileEncryptionInfo; data: string }
   // eslint-disable-next-line no-unused-vars
   readCiphertextRange(offset: number, length: number): Promise<Uint8Array>
@@ -65,13 +67,21 @@ export class ChatSdkEncryptionSession implements FileEncryptionSession {
   readonly plaintextSize: number
   readonly ciphertextSize: number
   readonly encryptionInfo: FileEncryptionInfo
+  readonly salt?: string
+  readonly noncePrefix?: string
   private closed = false
 
   constructor(readonly upload: SdkPreparedUpload) {
     this.sourceId = upload.sourceId
     this.plaintextSize = upload.plaintextSize
     this.ciphertextSize = upload.ciphertextSize
-    this.encryptionInfo = toUIKitInfo(upload.encryptionInfo)
+    this.salt = upload.salt
+    this.noncePrefix = upload.noncePrefix
+    this.encryptionInfo = {
+      ...toUIKitInfo(upload.encryptionInfo),
+      ...(upload.salt ? { salt: upload.salt } : {}),
+      ...(upload.noncePrefix ? { noncePrefix: upload.noncePrefix } : {})
+    }
   }
 
   read(offset: number, length: number): Promise<Uint8Array> {
@@ -121,9 +131,13 @@ class ChatSdkDecryptionSession implements FileDecryptionSession {
 
 /** The SDK's file encryption behind the UIKit's encryption interface. */
 export class ChatSdkFileEncryption implements FileEncryption {
-  async prepareEncryption(file: Blob): Promise<FileEncryptionSession> {
+  async prepareEncryption(file: Blob, attachmentId?: string): Promise<FileEncryptionSession> {
     const provider = sdkFileEncryption()
-    return new ChatSdkEncryptionSession(await provider.prepareUpload(file, provider.newUniqueId()))
+    return new ChatSdkEncryptionSession(await provider.prepareUpload(file, attachmentId || provider.newUniqueId()))
+  }
+
+  ciphertextSize(plaintextSize: number): number {
+    return sdkFileEncryption().ciphertextSize(plaintextSize)
   }
 
   async restoreEncryption(file: Blob, checkpoint: FileEncryptionCheckpoint): Promise<FileEncryptionSession> {

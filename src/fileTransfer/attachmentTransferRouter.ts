@@ -67,7 +67,8 @@ export const attachmentTransferRouter = {
       const result = await execution.executeTransport(() => transport.upload(request, callback))
       if (result.type === 'success') {
         if (!result.result.url) return FileTransferResult.failure(new Error('The upload returned no URL'))
-        if (encrypted && !result.result.encryptionInfo) {
+        // A transport with a preparer encrypts with the parameters it saved in ext.
+        if (encrypted && !result.result.encryptionInfo && !transport.uploadPreparer) {
           // The receiver would have no way to decrypt the file.
           return FileTransferResult.failure(new Error('Encrypted upload returned no encryption information'))
         }
@@ -102,13 +103,9 @@ export const attachmentTransferRouter = {
     })
   },
 
-  /** `metadata` with the upload's encryption as its `enc` (renditions kept), or without `enc`. */
+  /** `metadata` with the upload's encryption as its `enc`, or without `enc`. */
   applyUploadResult(metadata: unknown, result: FileUploadResult): string | undefined {
     if (!result.encryptionInfo) return FileEncryptionMetadata.remove(metadata)
-    const renditions = FileEncryptionMetadata.read(metadata)?.renditions || []
-    return FileEncryptionMetadata.write(
-      metadata,
-      FileEncryptionMetadata.fromEncryptionInfo(result.encryptionInfo, renditions)
-    )
+    return FileEncryptionMetadata.write(metadata, FileEncryptionMetadata.fromEncryptionInfo(result.encryptionInfo))
   }
 }

@@ -2,7 +2,7 @@ import { IAttachment, IMarker, IMessage, IPollVote, IReaction } from '../../type
 import { checkArraysEqual } from '../index'
 import { attachmentTypes, MESSAGE_DELIVERY_STATUS, MESSAGE_STATUS } from '../constants'
 import { cancelUpload } from '../../fileTransfer/attachmentUploadCoordinator'
-import { FileEncryptionInfo } from '../../fileTransfer/encryption/types'
+import type { UploadExtEntry } from '../../fileTransfer/uploadPreparer'
 import { releaseBlobUrls } from '../attachmentBlobUrls'
 import { clearVideoPreparation } from '../attachmentPreparation'
 import { handleVoteDetails } from '../message'
@@ -330,7 +330,11 @@ type PendingAttachment = {
   channelId?: string
   // A video's preview image, once uploaded: a later send of the message (after its
   // video upload failed) uses it instead of uploading another one.
-  videoPreview?: { url: string; encryption?: FileEncryptionInfo }
+  videoPreview?: { url: string }
+  // With the transport's preparer: a video's preview image sent as its own attachment, once uploaded.
+  videoPreviewAttachment?: { url: string; name: string; size: number; metadata: string }
+  // The transport's entry (its uploadPreparer) saved by the last attempt: the next one gets it as `existing`.
+  uploadExt?: UploadExtEntry
 }
 
 const pendingAttachments: { [key: string]: PendingAttachment } = {}

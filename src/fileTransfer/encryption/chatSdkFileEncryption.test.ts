@@ -24,6 +24,7 @@ const installSdk = () => {
   }
   const sdk = {
     newUniqueId: jest.fn(() => 'gIGCg4SFhoeIiYqLjI2Ojw'),
+    ciphertextSize: jest.fn((plaintextSize: number) => plaintextSize + 88),
     prepareUpload: jest.fn(async (file: Blob, uniqueId: string) => makeUpload(file, uniqueId)),
     restoreUpload: jest.fn(async (file: Blob, checkpoint: any) =>
       makeUpload(file, checkpoint.encryptionInfo.data.uniqueId, checkpoint.encryptionInfo.data.key, checkpoint.data)
@@ -47,6 +48,45 @@ const installSdk = () => {
 describe('ChatSdkFileEncryption', () => {
   const file = new File(['hello world'], 'clip.mp4', { type: 'video/mp4' })
   afterEach(() => setClient({}))
+
+  it('a server-issued attachment id is the one the file is encrypted with; no id is made', async () => {
+    const { sdk } = installSdk()
+
+    const session = await new ChatSdkFileEncryption().prepareEncryption(file, 'c2VydmVyLWlzc3VlZC1pZA')
+
+    expect(sdk.prepareUpload).toHaveBeenCalledWith(file, 'c2VydmVyLWlzc3VlZC1pZA')
+    expect(sdk.newUniqueId).not.toHaveBeenCalled()
+    expect(session.encryptionInfo.attachmentId).toBe('c2VydmVyLWlzc3VlZC1pZA')
+  })
+
+  it("a session's encryption info has the SDK upload's salt and nonce prefix, so they are stored in enc", async () => {
+    const { sdk } = installSdk()
+    sdk.prepareUpload.mockImplementationOnce(async (source: Blob, uniqueId: string) =>
+      Object.assign(
+        {
+          ciphertextSize: source.size + 88,
+          plaintextSize: source.size,
+          sourceId: 's',
+          encryptionInfo: { format: ALG, data: { uniqueId, key: 'key-1', plainSize: source.size } },
+          checkpoint: jest.fn(),
+          readCiphertextRange: jest.fn(),
+          close: jest.fn()
+        },
+        { salt: 'c2FsdA', noncePrefix: 'bnA' }
+      )
+    )
+
+    const session = await new ChatSdkFileEncryption().prepareEncryption(file)
+
+    expect(session.encryptionInfo).toMatchObject({ salt: 'c2FsdA', noncePrefix: 'bnA' })
+  })
+
+  it("gives the encrypted size of a file before it is encrypted, from the SDK's", () => {
+    const { sdk } = installSdk()
+
+    expect(new ChatSdkFileEncryption().ciphertextSize(100)).toBe(188)
+    expect(sdk.ciphertextSize).toHaveBeenCalledWith(100)
+  })
 
   it('a prepared session has a new attachment id from the SDK, kept in its info and checkpoint', async () => {
     const { sdk, uploads } = installSdk()

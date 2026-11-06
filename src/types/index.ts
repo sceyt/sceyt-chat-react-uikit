@@ -50,6 +50,8 @@ export interface IAttachment {
   tid?: string
   attachmentUrl: string
   videoPreviewBlob?: Blob
+  /** For display: the message's preview attachment that is this video's preview image. */
+  videoPreviewAttachment?: IAttachment
   data: any
   cachedUrl?: string
 }

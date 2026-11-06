@@ -2,9 +2,7 @@ import {
   attachmentDecryption,
   getAttachmentEncryption,
   getTypeFromFileName,
-  getVideoThumbEncryption,
   isUnopenableAttachmentError,
-  videoThumbDecryption,
   withAttachmentEncryption
 } from './attachmentEncryption'
 import { fakeEncryption, fakeEncryptionInfo } from '../testUtils/fakeAttachmentFiles'
@@ -29,41 +27,35 @@ describe('attachment encryption metadata', () => {
     expect(metadata).toEqual({ szw: 10, enc: fakeEncryption('key-1') })
   })
 
-  it("a video keeps its preview's key as its thumbnail rendition", () => {
-    const metadata = withAttachmentEncryption(
-      JSON.stringify({ video_thumb: 'https://cdn.example/preview' }),
-      fakeEncryptionInfo('key-2'),
-      fakeEncryptionInfo('key-1')
-    )
+  it("an app's encryption params, salt and nonce prefix are kept", () => {
+    const info = {
+      ...fakeEncryptionInfo('key-2'),
+      algorithm: 'my-aes-gcm',
+      params: { iv: 'dmlkZW8' },
+      salt: 'c2FsdA',
+      noncePrefix: 'bnA'
+    }
 
-    expect(JSON.parse(metadata).enc.renditions).toEqual([{ role: 'thumbnail', attachmentId: 'id-1', key: 'key-1' }])
-    expect(getAttachmentEncryption(metadata)).toEqual(fakeEncryptionInfo('key-2'))
-    expect(getVideoThumbEncryption(metadata)).toEqual(fakeEncryptionInfo('key-1'))
+    const metadata = withAttachmentEncryption('{}', info)
+
+    expect(JSON.parse(metadata).enc).toMatchObject({ salt: 'c2FsdA', np: 'bnA' })
+    expect(getAttachmentEncryption(metadata)).toEqual(info)
   })
 
-  it('a resent video replaces the preview key of the earlier attempt', () => {
-    const first = withAttachmentEncryption('{}', fakeEncryptionInfo('key-2'), fakeEncryptionInfo('key-1'))
+  it('a resent file replaces the enc of the earlier attempt', () => {
+    const first = withAttachmentEncryption('{"szw":1}', fakeEncryptionInfo('key-1'))
 
-    const resent = withAttachmentEncryption(first, fakeEncryptionInfo('key-4'), fakeEncryptionInfo('key-3'))
+    const resent = withAttachmentEncryption(first, fakeEncryptionInfo('key-3'))
 
-    expect(JSON.parse(resent).enc.renditions).toEqual([{ role: 'thumbnail', attachmentId: 'id-3', key: 'key-3' }])
+    expect(JSON.parse(resent)).toEqual({ szw: 1, enc: fakeEncryption('key-3') })
   })
 
-  it('an unencrypted video, or one whose preview is not encrypted, has no preview key', () => {
-    expect(getVideoThumbEncryption(JSON.stringify({ video_thumb: 'https://cdn.example/preview' }))).toBeUndefined()
-    expect(getVideoThumbEncryption(withAttachmentEncryption('{}', fakeEncryptionInfo('key-1')))).toBeUndefined()
-  })
-
-  it('describes what the download coordinator needs to decrypt a file and a video preview', () => {
-    const metadata = withAttachmentEncryption('{}', fakeEncryptionInfo('key-2'), fakeEncryptionInfo('key-1'))
+  it('describes what the download coordinator needs to decrypt a file', () => {
+    const metadata = withAttachmentEncryption('{}', fakeEncryptionInfo('key-2'))
 
     expect(attachmentDecryption({ metadata, name: 'clip.mp4' })).toEqual({
       encryption: fakeEncryptionInfo('key-2'),
       contentType: 'video/mp4'
-    })
-    expect(videoThumbDecryption(metadata)).toEqual({
-      encryption: fakeEncryptionInfo('key-1'),
-      contentType: 'image/jpeg'
     })
     expect(attachmentDecryption(null)).toEqual({ encryption: undefined, contentType: '' })
   })

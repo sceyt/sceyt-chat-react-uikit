@@ -197,6 +197,8 @@ import {
   uploadAttachment
 } from '../../fileTransfer/attachmentUploadCoordinator'
 import { FileEncryptionInfo } from '../../fileTransfer/encryption/types'
+import { prepareAttachmentUpload } from '../../fileTransfer/uploadPreparer'
+import { fileTransfer } from '../../fileTransfer/sceytChatUIKitFileTransfer'
 import { setAttachmentToCache } from '../../helpers/attachmentsCache'
 import { releaseBlobUrls } from '../../helpers/attachmentBlobUrls'
 import store from '../index'
@@ -322,24 +324,28 @@ const getAttachmentSourceFile = (attachment: IAttachment): File | null => {
     : new File([source], attachment.name || 'attachment', { type: source.type || 'application/octet-stream' })
 }
 
-// Uploads the preview image of a video (its first frame, or the one made when it
-// was added) and returns its URL and encryption.
-const uploadVideoPreview = async (attachment: IAttachment, videoFile: Blob) => {
+// The preview image of a video: its first frame, or the one made when it was added.
+const makeVideoPreviewFile = async (attachment: IAttachment, videoFile: Blob) => {
   const previewBlob = attachment.videoPreviewBlob instanceof Blob ? attachment.videoPreviewBlob : undefined
   const frame = previewBlob ? undefined : await getVideoPreviewFrame(videoFile)
   const previewImageBlob = previewBlob || frame?.blob
   if (!previewImageBlob) {
     throw new Error('Unable to generate video preview image')
   }
-
   const previewName = `${attachment.name?.replace(/\.[^.]+$/, '') || 'video'}-preview.jpg`
-  const previewFile = new File([previewImageBlob], previewName, { type: previewImageBlob.type || 'image/jpeg' })
+  return new File([previewImageBlob], previewName, { type: previewImageBlob.type || 'image/jpeg' })
+}
+
+// Uploads the preview image of a video and returns its URL and encryption.
+const uploadVideoPreview = async (attachment: IAttachment, previewFile: File) => {
+  const previewName = previewFile.name
   // Reuse the attachment transport (fileTransfer.transport) so preview and video
   // follow the same auth, storage, encryption, retry, and lifecycle rules.
   // Preview files are temporary backend objects and must expire if no sent
-  // message references their returned URL.
+  // message references their returned URL. Its tid (and so its operation id) is
+  // the video's thumbnail: the app's preparer prepared it under that tid.
   const previewAttachment = {
-    tid: `${attachment.tid || 'video'}-preview-${Date.now()}`,
+    tid: `${attachment.tid || 'video'}-thumbnail`,
     name: previewName,
     type: attachmentTypes.image,
     size: previewFile.size,
@@ -348,19 +354,17 @@ const uploadVideoPreview = async (attachment: IAttachment, videoFile: Blob) => {
     metadata: '{}',
     upload: false
   } as IAttachment
-  const { url, encryptionInfo } = await uploadAttachment(
+  const { url } = await uploadAttachment(
     previewAttachment,
     { file: previewFile, fileName: previewName, mimeType: previewFile.type },
     () => undefined
   )
-  return { url, encryption: encryptionInfo }
+  return { url }
 }
 
-// The video with its preview image's URL in its metadata, and what opens the preview
-// when it was encrypted (it goes in the video's `enc` once the video is uploaded).
-const prepareAndUploadVideoPreview = async (
-  attachment: IAttachment
-): Promise<{ attachment: IAttachment; thumbnailEncryption?: FileEncryptionInfo }> => {
+// The video with its preview image's URL in its metadata, for a video that is not
+// encrypted (an encrypted video's preview is an attachment of its own).
+const prepareAndUploadVideoPreview = async (attachment: IAttachment): Promise<IAttachment> => {
   const videoFile =
     attachment.url instanceof Blob ? attachment.url : attachment.data instanceof Blob ? attachment.data : null
   if (!videoFile) {
@@ -371,20 +375,70 @@ const prepareAndUploadVideoPreview = async (
   // failed, e.g. the network went off) goes with the video again.
   let preview = attachment.tid ? getPendingAttachment(attachment.tid)?.videoPreview : undefined
   if (!preview) {
-    preview = await uploadVideoPreview(attachment, videoFile)
+    preview = await uploadVideoPreview(attachment, await makeVideoPreviewFile(attachment, videoFile))
     if (attachment.tid) {
       setPendingAttachment(attachment.tid, { videoPreview: preview })
     }
   }
 
   return {
-    attachment: {
-      ...attachment,
-      videoPreviewBlob: undefined,
-      metadata: withVideoThumb(attachment.metadata, preview.url)
-    },
-    thumbnailEncryption: preview.encryption
+    ...attachment,
+    videoPreviewBlob: undefined,
+    metadata: withVideoThumb(attachment.metadata, preview.url)
   }
+}
+
+// An encrypted video's preview image (encryptUploads, or a transport with a preparer) is an
+// attachment of its own in the same message, of type preview, with its own key (its own enc,
+// or its own ext entry), prepared and uploaded like any file. The video points to it by its
+// URL (video_thumb).
+const uploadVideoPreviewAttachment = async (video: IAttachment, channel: IChannel): Promise<IAttachment> => {
+  const tid = `${video.tid || 'video'}-thumbnail`
+  // A preview an earlier send of this message uploaded goes with the video again.
+  let preview = video.tid ? getPendingAttachment(video.tid)?.videoPreviewAttachment : undefined
+  if (!preview) {
+    const videoFile = video.url instanceof Blob ? video.url : video.data instanceof Blob ? video.data : null
+    if (!videoFile) {
+      throw createAttachmentUnavailableError(`Video file for tid ${video.tid} is unavailable for preview generation`)
+    }
+    const file = await makeVideoPreviewFile(video, videoFile)
+    // Shown like any image: the video's dimensions and thumbnail hash.
+    const { szw, szh, tmb } = parseAttachmentMetadata(video.metadata)
+    const attachment = {
+      tid,
+      name: file.name,
+      type: attachmentTypes.preview,
+      size: file.size,
+      url: file,
+      data: file,
+      metadata: JSON.stringify({ ...(szw ? { szw } : {}), ...(szh ? { szh } : {}), ...(tmb ? { tmb } : {}) }),
+      upload: false
+    } as IAttachment
+    const prepared = await prepareAttachmentUpload(attachment, file)
+    const { url, encryptionInfo } = await uploadAttachment(
+      { ...attachment, metadata: prepared },
+      { file, fileName: file.name, mimeType: file.type },
+      () => undefined
+    )
+    // A transport with a preparer owns the encryption (its entry is in ext); else the preview's own enc.
+    const metadata =
+      encryptionInfo && !fileTransfer.transport.uploadPreparer
+        ? withAttachmentEncryption(prepared, encryptionInfo)
+        : typeof prepared === 'string'
+          ? prepared
+          : JSON.stringify(prepared)
+    preview = { url, name: file.name, size: file.size, metadata }
+    if (video.tid) setPendingAttachment(video.tid, { videoPreviewAttachment: preview })
+  }
+  const previewToSend = channel
+    .createAttachmentBuilder(preview.url, attachmentTypes.preview)
+    .setName(preview.name)
+    .setMetadata(preview.metadata)
+    .setFileSize(preview.size)
+    .setUpload(false)
+    .create()
+  previewToSend.tid = tid
+  return previewToSend
 }
 
 let activeDisplayedCacheKey: string | null = null
@@ -605,8 +659,12 @@ const getReconnectChannelSignature = (channel: Partial<IChannel> | null | undefi
   ].join('|')
 
 export const handleUploadAttachments = async (attachments: IAttachment[], message: IMessage, channel: IChannel) => {
-  return await Promise.all(
-    attachments.map(async (attachment) => {
+  // Videos' preview images sent as attachments of their own: after the message's own
+  // attachments, which keep their places (the sent message's are matched by place), in the
+  // order of their videos. Receivers pair them by URL (the video's video_thumb).
+  const previewAttachments: (IAttachment | undefined)[] = []
+  const sent = await Promise.all(
+    attachments.map(async (attachment, index) => {
       const handleUploadProgress = (percent: number) => {
         // Bytes the browser reports while the connection is lost went into it.
         if (isConnectionLost()) return
@@ -627,14 +685,22 @@ export const handleUploadAttachments = async (attachments: IAttachment[], messag
         }
       }
       const fileType = attachment.url?.type?.split('/')[0]
-      let thumbnailEncryption: FileEncryptionInfo | undefined
       if (attachment.type === attachmentTypes.video) {
         if (!attachment.cachedUrl) {
           // The stop control shows while the preview uploads; a pause pressed
           // then is kept and applied when the video upload starts.
           markUploadNotStarted(attachment.tid!)
         }
-        ;({ attachment, thumbnailEncryption } = await prepareAndUploadVideoPreview(attachment))
+        // An encrypted video's preview goes as a separate attachment (a forwarded video's
+        // preview is forwarded with it); a plain video's is its video_thumb.
+        if (!fileTransfer.encryptUploads && !fileTransfer.transport.uploadPreparer) {
+          attachment = await prepareAndUploadVideoPreview(attachment)
+        } else if (!attachment.cachedUrl) {
+          const preview = await uploadVideoPreviewAttachment(attachment, channel)
+          previewAttachments[index] = preview
+          // Receivers find the video's preview by this URL, whatever the order of the attachments.
+          attachment = { ...attachment, metadata: withVideoThumb(attachment.metadata, preview.url) }
+        }
         if (!attachment.cachedUrl) {
           // The preview upload is complete. From this point, progress belongs
           // only to the original video transfer.
@@ -656,16 +722,23 @@ export const handleUploadAttachments = async (attachments: IAttachment[], messag
         const dataSize = attachment.data?.size || 0
         store.dispatch(updateAttachmentUploadingProgressAC(dataSize, dataSize, attachment.tid))
       } else {
-        // The file the transport sends: as it was prepared when it was added to the message.
+        // The file as it was prepared when it was added to the message. The app's step
+        // (fileTransfer.transport.uploadPreparer) saves its entry to the metadata's ext first.
         const file = attachment.url as Blob
+        attachment = { ...attachment, metadata: await prepareAttachmentUpload(attachment, file) }
         const uploaded = await uploadAttachment(
           attachment,
-          { file, fileName: (file as File).name || attachment.name || 'file', mimeType: file.type || null },
+          {
+            file,
+            fileName: (file as File).name || attachment.name || 'file',
+            mimeType: file.type || null
+          },
           handleUploadProgress
         )
         uploadedUri = uploaded.url
         uploadedBlob = file
-        encryption = uploaded.encryptionInfo
+        // With the app's preparer the app owns the encryption: its entry is in ext, and no `enc` is written.
+        encryption = fileTransfer.transport.uploadPreparer ? undefined : uploaded.encryptionInfo
         fileSize = file.size
       }
       if (!attachment.cachedUrl && fileType === 'image') {
@@ -746,7 +819,7 @@ export const handleUploadAttachments = async (attachments: IAttachment[], messag
       const attachmentMeta = attachment.cachedUrl
         ? attachment.metadata
         : encryption
-          ? withAttachmentEncryption(attachment.metadata, encryption, thumbnailEncryption)
+          ? withAttachmentEncryption(attachment.metadata, encryption)
           : JSON.stringify({
               ...parsedAttachmentMeta
             })
@@ -764,6 +837,7 @@ export const handleUploadAttachments = async (attachments: IAttachment[], messag
       return attachmentToSend
     })
   )
+  return [...sent, ...previewAttachments.filter((preview): preview is IAttachment => !!preview)]
 }
 
 const addPendingMessage = (

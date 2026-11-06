@@ -3,24 +3,24 @@ import { FileEncryptionMetadata } from './fileEncryptionMetadata'
 const ALG = 'tink-aes256-gcm-hkdf-64k+commit-v1'
 
 describe('FileEncryptionMetadata', () => {
-  it('keeps the algorithm, binding ids, independent rendition keys and the media fields', () => {
-    const thumbnail = { role: 'thumbnail', attachmentId: 'thumb-id', key: 'thumb-key' }
-    const envelope = FileEncryptionMetadata.fromEncryptionInfo(
-      { algorithm: ALG, attachmentId: 'file-id', key: 'file-key' },
-      [thumbnail]
-    )
+  it('keeps the algorithm, the binding id, the key and the media fields', () => {
+    const envelope = FileEncryptionMetadata.fromEncryptionInfo({
+      algorithm: ALG,
+      attachmentId: 'file-id',
+      key: 'file-key'
+    })
 
     const written = FileEncryptionMetadata.write('{"tmb":"blur","szw":1280,"szh":203}', envelope)
 
+    // Stored as aid and k.
     expect(JSON.parse(written)).toEqual({
       tmb: 'blur',
       szw: 1280,
       szh: 203,
-      enc: { v: 1, alg: ALG, attachmentId: 'file-id', key: 'file-key', renditions: [thumbnail] }
+      enc: { v: 1, alg: ALG, aid: 'file-id', k: 'file-key' }
     })
     const read = FileEncryptionMetadata.read(written)!
     expect(read.toEncryptionInfo()).toEqual({ algorithm: ALG, attachmentId: 'file-id', key: 'file-key' })
-    expect(read.renditions).toEqual([thumbnail])
     expect(FileEncryptionMetadata.isEncrypted(written)).toBe(true)
   })
 
@@ -35,6 +35,22 @@ describe('FileEncryptionMetadata', () => {
       expect(FileEncryptionMetadata.read(metadata)).toBeUndefined()
       expect(FileEncryptionMetadata.isEncrypted(metadata)).toBe(true)
     }
+  })
+
+  it("stores the encryption's salt and nonce prefix as salt and np, and gives them back", () => {
+    const info = { algorithm: ALG, attachmentId: 'file-id', key: 'file-key', salt: 'c2FsdA', noncePrefix: 'bnA' }
+
+    const written = FileEncryptionMetadata.write('{}', FileEncryptionMetadata.fromEncryptionInfo(info))
+
+    expect(JSON.parse(written).enc).toEqual({
+      v: 1,
+      alg: ALG,
+      aid: 'file-id',
+      k: 'file-key',
+      salt: 'c2FsdA',
+      np: 'bnA'
+    })
+    expect(FileEncryptionMetadata.read(written)!.toEncryptionInfo()).toEqual(info)
   })
 
   it('removes `enc` and keeps the other keys', () => {
@@ -53,5 +69,52 @@ describe('FileEncryptionMetadata', () => {
 
     expect(String(envelope)).not.toContain('secret-key')
     expect(String(envelope)).toContain('attachmentId=a')
+  })
+
+  describe("an app's encryption params", () => {
+    const info = { algorithm: 'my-aes-gcm', attachmentId: 'a', key: 'k', params: { iv: 'aXY', keyVersion: '3' } }
+
+    it('are stored in enc and come back with the encryption info', () => {
+      const metadata = FileEncryptionMetadata.write({ szw: 10 }, FileEncryptionMetadata.fromEncryptionInfo(info))
+
+      expect(JSON.parse(metadata).enc).toEqual({
+        v: 1,
+        alg: 'my-aes-gcm',
+        aid: 'a',
+        k: 'k',
+        params: { iv: 'aXY', keyVersion: '3' }
+      })
+      expect(FileEncryptionMetadata.read(metadata)!.toEncryptionInfo()).toEqual(info)
+    })
+
+    it('are left out when there are none', () => {
+      const metadata = FileEncryptionMetadata.write(
+        '{}',
+        FileEncryptionMetadata.fromEncryptionInfo({ ...info, params: undefined })
+      )
+
+      expect('params' in JSON.parse(metadata).enc).toBe(false)
+      expect('params' in FileEncryptionMetadata.read(metadata)!.toEncryptionInfo()).toBe(false)
+    })
+
+    it.each([
+      ['not an object', 'iv=aXY'],
+      ['a list', ['aXY']],
+      ['a value that is not a string', { iv: 'aXY', keyVersion: 3 }]
+    ])('malformed params (%s) are dropped, the rest of enc is kept', (_case, params) => {
+      const metadata = JSON.stringify({
+        enc: {
+          v: 1,
+          alg: 'my-aes-gcm',
+          aid: 'a',
+          k: 'k',
+          params
+        }
+      })
+
+      const read = FileEncryptionMetadata.read(metadata)!
+
+      expect(read.toEncryptionInfo()).toEqual({ algorithm: 'my-aes-gcm', attachmentId: 'a', key: 'k' })
+    })
   })
 })

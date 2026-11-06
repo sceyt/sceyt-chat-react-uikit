@@ -2,12 +2,18 @@ import { FileEncryptionInfo } from './types'
 
 const FIELD = 'enc'
 
-/** Another file of an attachment (a video's preview image), encrypted with its own id and key. */
-export interface FileEncryptionRendition {
-  role: string
-  attachmentId: string
-  key: string
-}
+// `value` as encryption params: an object of strings, else undefined (malformed params are dropped).
+const paramsOf = (value: unknown): Record<string, string> | undefined =>
+  value &&
+  typeof value === 'object' &&
+  !Array.isArray(value) &&
+  Object.values(value).every((param) => typeof param === 'string')
+    ? { ...(value as Record<string, string>) }
+    : undefined
+
+const withParams = (params: Record<string, string> | undefined) => (params ? { params } : {})
+
+const stringOf = (value: unknown) => (typeof value === 'string' && value ? value : undefined)
 
 const parse = (metadata: unknown): Record<string, any> | undefined => {
   try {
@@ -19,32 +25,47 @@ const parse = (metadata: unknown): Record<string, any> | undefined => {
 }
 
 /**
- * Attachment encryption metadata: the `enc` object `{ v, alg, attachmentId, key, renditions }`
- * kept next to the other metadata keys. The plaintext size remains the attachment's file size.
+ * Attachment encryption metadata: the `enc` object `{ v, alg, aid, k, salt, np, params }` kept next
+ * to the other metadata keys (`aid`: the attachment id, `k`: the key, `np`: the nonce prefix). The
+ * plaintext size remains the attachment's file size. Every encrypted file is an attachment with its
+ * own `enc` (a video's preview image is a preview attachment of its own).
  */
 export class FileEncryptionMetadata {
   readonly version: number
   readonly algorithm: string
   readonly attachmentId: string
   readonly key: string
-  readonly renditions: FileEncryptionRendition[]
+  readonly params?: Record<string, string>
+  readonly salt?: string
+  readonly noncePrefix?: string
 
   constructor(
     algorithm: string,
     attachmentId: string,
     key: string,
-    renditions: FileEncryptionRendition[] = [],
-    version = 1
+    version = 1,
+    params?: Record<string, string>,
+    salt?: string,
+    noncePrefix?: string
   ) {
     this.version = version
     this.algorithm = algorithm
     this.attachmentId = attachmentId
     this.key = key
-    this.renditions = renditions
+    this.params = params
+    this.salt = salt
+    this.noncePrefix = noncePrefix
   }
 
   toEncryptionInfo(): FileEncryptionInfo {
-    return { algorithm: this.algorithm, attachmentId: this.attachmentId, key: this.key }
+    return {
+      algorithm: this.algorithm,
+      attachmentId: this.attachmentId,
+      key: this.key,
+      ...withParams(this.params),
+      ...(this.salt ? { salt: this.salt } : {}),
+      ...(this.noncePrefix ? { noncePrefix: this.noncePrefix } : {})
+    }
   }
 
   /** The `enc` object as it is stored. */
@@ -52,9 +73,11 @@ export class FileEncryptionMetadata {
     return {
       v: this.version,
       alg: this.algorithm,
-      attachmentId: this.attachmentId,
-      key: this.key,
-      ...(this.renditions.length ? { renditions: this.renditions } : {})
+      aid: this.attachmentId,
+      k: this.key,
+      ...(this.salt ? { salt: this.salt } : {}),
+      ...(this.noncePrefix ? { np: this.noncePrefix } : {}),
+      ...withParams(this.params)
     }
   }
 
@@ -62,8 +85,16 @@ export class FileEncryptionMetadata {
     return `FileEncryptionMetadata(version=${this.version}, algorithm=${this.algorithm}, attachmentId=${this.attachmentId})`
   }
 
-  static fromEncryptionInfo(info: FileEncryptionInfo, renditions: FileEncryptionRendition[] = []) {
-    return new FileEncryptionMetadata(info.algorithm, info.attachmentId, info.key, renditions)
+  static fromEncryptionInfo(info: FileEncryptionInfo) {
+    return new FileEncryptionMetadata(
+      info.algorithm,
+      info.attachmentId,
+      info.key,
+      1,
+      paramsOf(info.params),
+      stringOf(info.salt),
+      stringOf(info.noncePrefix)
+    )
   }
 
   /** Whether the attachment's metadata has encryption info (even malformed). */
@@ -79,26 +110,19 @@ export class FileEncryptionMetadata {
       !enc ||
       typeof enc !== 'object' ||
       typeof enc.alg !== 'string' ||
-      typeof enc.attachmentId !== 'string' ||
-      typeof enc.key !== 'string'
+      typeof enc.aid !== 'string' ||
+      typeof enc.k !== 'string'
     ) {
       return undefined
     }
-    const renditions = Array.isArray(enc.renditions)
-      ? enc.renditions.filter(
-          (rendition: any) =>
-            rendition &&
-            typeof rendition.role === 'string' &&
-            typeof rendition.attachmentId === 'string' &&
-            typeof rendition.key === 'string'
-        )
-      : []
     return new FileEncryptionMetadata(
       enc.alg,
-      enc.attachmentId,
-      enc.key,
-      renditions,
-      typeof enc.v === 'number' ? enc.v : 1
+      enc.aid,
+      enc.k,
+      typeof enc.v === 'number' ? enc.v : 1,
+      paramsOf(enc.params),
+      stringOf(enc.salt),
+      stringOf(enc.np)
     )
   }
 

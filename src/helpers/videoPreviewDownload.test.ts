@@ -56,6 +56,22 @@ describe('downloadVideoThumb', () => {
     expect(mockSetAttachmentToCache).toHaveBeenCalledWith('https://cdn/preview.jpg', expect.any(Response))
   })
 
+  it('a preview sent as a preview attachment of its own is downloaded as that attachment (its own key)', async () => {
+    const transport = useTransport(FileTransferResult.success(new Blob(['preview'], { type: 'image/jpeg' })))
+    const previewAttachment = {
+      type: 'preview',
+      url: 'https://cdn/clip-preview',
+      metadata: JSON.stringify({ ext: { 'app.enc': { aid: 'preview-id' } } })
+    } as any
+    const shownVideo = { ...video, videoPreviewAttachment: previewAttachment }
+
+    await downloadVideoThumb('https://cdn/clip-preview', shownVideo, 'text')
+
+    const [request] = transport.download.mock.calls[0] as any[]
+    expect(request.context.attachment === previewAttachment).toBe(true)
+    expect(request).toMatchObject({ url: 'https://cdn/clip-preview', mimeType: 'image/jpeg' })
+  })
+
   it('is downloaded by the SDK when no custom transport is configured', async () => {
     const preview = new Blob(['preview'], { type: 'image/jpeg' })
     const fetchMock = jest
@@ -71,11 +87,18 @@ describe('downloadVideoThumb', () => {
     fetchMock.mockRestore()
   })
 
-  it('an encrypted preview is opened with its own key and sized from its encrypted bytes, not the video size', async () => {
+  it("an encrypted preview attachment is opened with its own key and sized from its encrypted bytes, not the video's", async () => {
+    // The preview is an attachment of its own with its own enc; the video points to it by URL.
+    const previewAttachment = {
+      type: 'preview',
+      url: 'https://cdn/preview.jpg',
+      metadata: withAttachmentEncryption('{}', fakeEncryptionInfo('key-2'))
+    } as any
     const encryptedVideo = {
       ...video,
       size: 5000,
-      metadata: withAttachmentEncryption('{}', fakeEncryptionInfo('key-1'), fakeEncryptionInfo('key-2'))
+      metadata: withAttachmentEncryption('{"video_thumb":"https://cdn/preview.jpg"}', fakeEncryptionInfo('key-1')),
+      videoPreviewAttachment: previewAttachment
     }
     const fetchMock = jest
       .spyOn(global, 'fetch' as any)

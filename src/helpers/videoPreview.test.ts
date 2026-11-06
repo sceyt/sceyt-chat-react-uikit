@@ -3,6 +3,7 @@ import {
   getVideoThumb,
   parseAttachmentMetadata,
   shouldExtractVideoFirstFrame,
+  withVideoPreviews,
   withVideoThumb
 } from './videoPreview'
 
@@ -52,5 +53,57 @@ describe('video thumbnail metadata', () => {
       videoThumb: undefined,
       originalVideo: 'https://cdn/old-video.mp4_original_video_url'
     })
+  })
+})
+
+describe('withVideoPreviews: preview attachments are shown on their videos', () => {
+  const video = (id: string, previewUrl?: string) =>
+    ({
+      id,
+      type: 'video',
+      url: `${id}.mp4`,
+      metadata: JSON.stringify({ szw: 10, ...(previewUrl ? { video_thumb: previewUrl } : {}) })
+    }) as any
+  const preview = (id: string) => ({ id, type: 'preview', url: `https://cdn/${id}` }) as any
+  const image = (id: string) => ({ id, type: 'image', url: `${id}.png`, metadata: '{}' }) as any
+
+  it('hides the previews; each video gets the preview its video_thumb names, whatever the order', () => {
+    const first = preview('p1')
+    const second = preview('p2')
+
+    // The server may return the previews in another order than they were sent.
+    const shown = withVideoPreviews([
+      second,
+      video('v1', 'https://cdn/p1'),
+      image('i1'),
+      first,
+      video('v2', 'https://cdn/p2')
+    ])
+
+    expect(shown.map((attachment) => attachment.id)).toEqual(['v1', 'i1', 'v2'])
+    expect(shown[0].videoPreviewAttachment).toBe(first)
+    expect(shown[2].videoPreviewAttachment).toBe(second)
+    expect(getVideoThumb(shown[0].metadata)).toBe('https://cdn/p1')
+    expect(shouldExtractVideoFirstFrame(shown[2].metadata)).toBe(false)
+  })
+
+  it('a message without previews is returned as it is', () => {
+    const attachments = [video('v1'), image('i1')]
+
+    expect(withVideoPreviews(attachments)).toBe(attachments)
+  })
+
+  it('a video whose video_thumb names no preview attachment (a plain preview) is shown as it is', () => {
+    const plain = video('v1', 'https://cdn/plain-preview')
+
+    const shown = withVideoPreviews([plain, preview('p1')])
+
+    expect(shown).toEqual([plain])
+  })
+
+  it('a video without video_thumb gets no preview, even when the message has one', () => {
+    const shown = withVideoPreviews([video('v1'), preview('p1')])
+
+    expect(shown[0].videoPreviewAttachment).toBeUndefined()
   })
 })

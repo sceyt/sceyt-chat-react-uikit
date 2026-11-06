@@ -169,22 +169,11 @@ describe('attachmentTransferRouter', () => {
       )
 
       expect(metadata.szw).toBe(10)
-      expect(metadata.enc).toMatchObject({ alg: ALG, attachmentId: 'file-id', key: 'file-key' })
-    })
-
-    it("keeps the renditions of the attachment's enc", () => {
-      const rendition = { role: 'thumbnail', attachmentId: 'thumb-id', key: 'thumb-key' }
-      const before = { enc: { v: 1, alg: ALG, attachmentId: 'old-id', key: 'old-key', renditions: [rendition] } }
-
-      const metadata = JSON.parse(
-        attachmentTransferRouter.applyUploadResult(before, { url: 'u', encryptionInfo: info })!
-      )
-
-      expect(metadata.enc).toMatchObject({ attachmentId: 'file-id', key: 'file-key', renditions: [rendition] })
+      expect(metadata.enc).toMatchObject({ alg: ALG, aid: 'file-id', k: 'file-key' })
     })
 
     it('a plain upload removes enc', () => {
-      const before = { szw: 10, enc: { v: 1, alg: ALG, attachmentId: 'old-id', key: 'old-key' } }
+      const before = { szw: 10, enc: { v: 1, alg: ALG, aid: 'old-id', k: 'old-key' } }
 
       const metadata = JSON.parse(attachmentTransferRouter.applyUploadResult(before, { url: 'u' })!)
 

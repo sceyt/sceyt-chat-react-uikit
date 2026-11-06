@@ -956,7 +956,7 @@ describe('a failed download is not shown as downloaded', () => {
       ...videoAttachment,
       metadata: JSON.stringify({
         ...JSON.parse(videoAttachment.metadata),
-        enc: { v: 1, alg: 'tink-aes256-gcm-hkdf-64k+commit-v1', attachmentId: 'id-9', key: 'key-9' }
+        enc: { v: 1, alg: 'tink-aes256-gcm-hkdf-64k+commit-v1', aid: 'id-9', k: 'key-9' }
       })
     }
     const videoDownloads = () =>
@@ -1255,7 +1255,7 @@ describe('the upload stop and resume control', () => {
       size: 'movie'.length,
       metadata: JSON.stringify({
         ...JSON.parse(videoAttachment.metadata),
-        enc: { v: 1, alg: 'tink-aes256-gcm-hkdf-64k+commit-v1', attachmentId: 'id-9', key: 'key-9' }
+        enc: { v: 1, alg: 'tink-aes256-gcm-hkdf-64k+commit-v1', aid: 'id-9', k: 'key-9' }
       })
     }
     try {

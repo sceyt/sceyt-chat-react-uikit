@@ -42,7 +42,7 @@ export const fakeEncryptionInfo = (key: string): FileEncryptionInfo => ({
 })
 
 /** The `enc` object of the fake file of `key`, as it is in attachment metadata. */
-export const fakeEncryption = (key: string) => ({ v: 1, alg: ALG, attachmentId: uniqueIdOf(key), key })
+export const fakeEncryption = (key: string) => ({ v: 1, alg: ALG, aid: uniqueIdOf(key), k: key })
 
 /** A Blob encrypted the way the fake file of `key` (attachment id `id-n` for `key-n`) encrypts. */
 export const fakeEncrypted = (key: string, text: string) =>

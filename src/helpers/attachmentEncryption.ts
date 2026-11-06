@@ -1,4 +1,4 @@
-import { FileEncryptionMetadata, FileEncryptionRendition } from '../fileTransfer/encryption/fileEncryptionMetadata'
+import { FileEncryptionMetadata } from '../fileTransfer/encryption/fileEncryptionMetadata'
 import { FileEncryptionInfo } from '../fileTransfer/encryption/types'
 
 // Attachment encryption metadata (format: sceyt-chat-js-sdk spec/attachment-encryption).
@@ -6,35 +6,13 @@ import { FileEncryptionInfo } from '../fileTransfer/encryption/types'
 // transports encrypt and decrypt with `fileTransfer.encryption`. This file holds the
 // UIKit's side: reading and writing `enc`, and the real type of a decrypted file.
 
-const THUMBNAIL = 'thumbnail'
-
 /** What opens the attachment's file, or undefined when it is not encrypted. */
 export const getAttachmentEncryption = (metadata: any): FileEncryptionInfo | undefined =>
   FileEncryptionMetadata.read(metadata)?.toEncryptionInfo()
 
-/** What opens the video preview image (its rendition), or undefined when it is not encrypted. */
-export const getVideoThumbEncryption = (metadata: any): FileEncryptionInfo | undefined => {
-  const enc = FileEncryptionMetadata.read(metadata)
-  const thumbnail = enc?.renditions.find((rendition) => rendition.role === THUMBNAIL)
-  return enc && thumbnail
-    ? { algorithm: enc.algorithm, attachmentId: thumbnail.attachmentId, key: thumbnail.key }
-    : undefined
-}
-
-/**
- * Metadata with the file's `enc`; a video's preview image (`thumbnail`, encrypted with its
- * own key) is kept as its thumbnail rendition.
- */
-export const withAttachmentEncryption = (
-  metadata: any,
-  encryption: FileEncryptionInfo,
-  thumbnail?: FileEncryptionInfo
-): string => {
-  const renditions: FileEncryptionRendition[] = thumbnail
-    ? [{ role: THUMBNAIL, attachmentId: thumbnail.attachmentId, key: thumbnail.key }]
-    : []
-  return FileEncryptionMetadata.write(metadata, FileEncryptionMetadata.fromEncryptionInfo(encryption, renditions))
-}
+/** Metadata with the file's `enc`. */
+export const withAttachmentEncryption = (metadata: any, encryption: FileEncryptionInfo): string =>
+  FileEncryptionMetadata.write(metadata, FileEncryptionMetadata.fromEncryptionInfo(encryption))
 
 /**
  * Whether an error says the file cannot be opened: it failed decryption, or its `enc`
@@ -84,10 +62,4 @@ export const getTypeFromFileName = (name?: string) => {
 export const attachmentDecryption = (attachment?: { metadata?: any; name?: string } | null) => ({
   encryption: getAttachmentEncryption(attachment?.metadata),
   contentType: getTypeFromFileName(attachment?.name)
-})
-
-/** The same for a video's preview image. */
-export const videoThumbDecryption = (metadata: any) => ({
-  encryption: getVideoThumbEncryption(metadata),
-  contentType: 'image/jpeg'
 })

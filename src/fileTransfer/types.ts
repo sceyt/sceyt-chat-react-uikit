@@ -1,5 +1,6 @@
 import { IAttachment } from '../types'
 import { FileEncryptionInfo } from './encryption/types'
+import type { UploadPreparer } from './uploadPreparer'
 
 // File transfer: the same structure as the Android UIKit (com.sceyt.chatuikit.filetransfer).
 // The UIKit owns attachment scheduling, preparation and persistence; a transport moves the
@@ -93,6 +94,13 @@ export interface FileTransferCallback {
  * transport stops and the UIKit ignores its result.
  */
 export interface FileTransferTransport {
+  /**
+   * The transport's step before each upload attempt: prepare(attachment, file, existing) returns
+   * its entry for the attachment, saved to metadata.ext[namespace] before the upload; the next
+   * attempt gets it back as `existing`. With it the transport owns the encryption: the UIKit
+   * writes no `enc`. A failure fails the message.
+   */
+  uploadPreparer?: UploadPreparer
   /** Uploads the prepared source and returns its remote reference. */
   // eslint-disable-next-line no-unused-vars
   upload: (request: FileUploadRequest, callback: FileTransferCallback) => Promise<FileTransferResult<FileUploadResult>>
