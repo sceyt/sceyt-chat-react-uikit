@@ -37,10 +37,10 @@ type TransportDownload = (
   callback: FileTransferCallback
 ) => Promise<FileTransferResult<Blob>>
 
-/** Sets a custom transport (fileTransfer.transport) whose download is `download`. */
+/** Sets a custom transport (fileTransfer.provider) whose download is `download`. */
 const useTransport = (download: TransportDownload = async () => FileTransferResult.success(new Blob(['media']))) => {
   const transport = { upload: jest.fn(), download: jest.fn(download), cancel: jest.fn() }
-  fileTransfer.transport = transport
+  fileTransfer.provider = transport
   return transport
 }
 

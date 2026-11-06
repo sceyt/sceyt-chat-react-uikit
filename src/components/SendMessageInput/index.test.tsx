@@ -23,7 +23,7 @@ import { releaseAllBlobUrls } from '../../helpers/attachmentBlobUrls'
 import * as imagePreparation from '../../helpers/resizeImage'
 import { setSendAttachmentsAsSeparateMessages } from '../../helpers/sendAttachments'
 import { fileTransfer } from '../../fileTransfer/sceytChatUIKitFileTransfer'
-import { FileTransferTransport } from '../../fileTransfer/types'
+import { FileTransferProvider } from '../../fileTransfer/types'
 
 jest.mock('../../helpers/messagesHalper', () => {
   const drafts: Record<string, any> = {}
@@ -330,12 +330,12 @@ describe('file-drop integration: MessageList, Redux and SendMessageInput', () =>
     view.unmount()
   })
 
-  it.each<[string, FileTransferTransport | undefined]>([
+  it.each<[string, FileTransferProvider | undefined]>([
     ['the SDK upload', undefined],
     ['a custom uploader', { upload: jest.fn(), download: jest.fn(), cancel: jest.fn() }]
   ])('a media image sent through %s is encoded once, as JPEG of quality 0.8', async (_name, transport) => {
-    fileTransfer.configure({ transport })
-    expect(fileTransfer.hasCustomTransport).toBe(!!transport)
+    fileTransfer.configure({ provider: transport })
+    expect(fileTransfer.hasCustomProvider).toBe(!!transport)
     try {
       const view = renderFileDropFlow()
       const file = new File(['photo'], 'photo.jpg', { type: 'image/jpeg' })

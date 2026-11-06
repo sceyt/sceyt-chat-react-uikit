@@ -1433,7 +1433,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
   }
 
   const handleAddAttachment = async (file: File, isMediaAttachment: boolean) => {
-    const customUploader = fileTransfer.hasCustomTransport
+    const customUploader = fileTransfer.hasCustomProvider
     const fileType = file.type.split('/')[0]
     const tid = uuidv4()
 

@@ -1,21 +1,23 @@
 import { IAttachment } from '../types'
 import { FileEncryptionInfo } from './encryption/types'
-import type { UploadPreparer } from './uploadPreparer'
 
 // File transfer: the same structure as the Android UIKit (com.sceyt.chatuikit.filetransfer).
-// The UIKit owns attachment scheduling, preparation and persistence; a transport moves the
+// The UIKit owns attachment scheduling, preparation and persistence; a provider moves the
 // bytes, and encrypts and decrypts them with the encryption module it is given
-// (`fileTransfer.encryption`).
+// (`fileTransfer.encryption`), or with its own.
+
+/** Metadata entries a provider's prepareUpload returns: string keys with string values. */
+export type FileTransferEntries = Record<string, string>
 
 /**
- * Optional caller information passed unchanged to the transport. File-transfer
+ * Optional caller information passed unchanged to the provider. File-transfer
  * coordination does not inspect it or use it to identify an operation.
  */
 // eslint-disable-next-line @typescript-eslint/no-empty-interface
 export interface FileTransferContext {}
 
 /**
- * Attachment information supplied by the UIKit for customer transport integrations.
+ * Attachment information supplied by the UIKit for customer provider integrations.
  * The attachment is a snapshot; the transfer uses the request's file and operation id.
  */
 export interface AttachmentTransferContext extends FileTransferContext {
@@ -28,7 +30,7 @@ export enum FileUploadType {
   ENCRYPTED = 'ENCRYPTED'
 }
 
-/** The source is plaintext in both modes; the transport owns encryption when requested. */
+/** The source is plaintext in both modes; the provider owns encryption when requested. */
 export interface FileUploadRequest {
   operationId: string
   sourceFile: Blob
@@ -36,7 +38,12 @@ export interface FileUploadRequest {
   mimeType: string | null
   context?: FileTransferContext
   type: FileUploadType
-  /** Aborted when the UIKit stops the attempt: the transport stops its work and settles. */
+  /**
+   * The attachment's metadata, with what prepareUpload returned for it merged in: a provider
+   * with its own entry (e.g. "waafi.enc") reads it here.
+   */
+  metadata?: Record<string, unknown>
+  /** Aborted when the UIKit stops the attempt: the provider stops its work and settles. */
   signal: AbortSignal
 }
 
@@ -49,7 +56,7 @@ export interface FileUploadResult {
 /**
  * Downloads `url`. For an encrypted file, `encryptionInfo` and `plaintextSize` (the
  * attachment's trusted size; undefined for a video's preview, whose message has none) are
- * given: the transport decrypts the downloaded bytes with the encryption module and returns
+ * given: the provider decrypts the downloaded bytes with the encryption module and returns
  * the verified plaintext.
  */
 export interface FileDownloadRequest {
@@ -59,19 +66,24 @@ export interface FileDownloadRequest {
   headers?: Record<string, string>
   encryptionInfo?: FileEncryptionInfo
   plaintextSize?: number
+  /**
+   * The attachment's metadata: a provider with its own entry decides from it whether the file is
+   * encrypted (the UIKit does not know its key); missing or invalid data fails, never plain bytes.
+   */
+  metadata?: Record<string, unknown>
   /** The file's type, given to the returned file. */
   mimeType?: string
-  /** Aborted when the UIKit stops the attempt: the transport stops its work and settles. */
+  /** Aborted when the UIKit stops the attempt: the provider stops its work and settles. */
   signal: AbortSignal
 }
 
-/** The outcome of one transport attempt. */
+/** The outcome of one provider attempt. */
 export type FileTransferResult<T> =
   | { type: 'success'; result: T }
   /** A terminal failure. */
   | { type: 'failure'; error: Error }
   /**
-   * The attempt ended before completion, e.g. because connectivity was lost. The transport
+   * The attempt ended before completion, e.g. because connectivity was lost. The provider
    * stopped reading and writing, but keeps any resumable backend state.
    */
   | { type: 'interrupted'; error: Error }
@@ -91,16 +103,22 @@ export interface FileTransferCallback {
 /**
  * Transfers prepared files. Expected failures are returned as `failure`, recoverable
  * interruptions as `interrupted`. An aborted request's signal is not a failure: the
- * transport stops and the UIKit ignores its result.
+ * provider stops and the UIKit ignores its result.
  */
-export interface FileTransferTransport {
+export interface FileTransferProvider {
   /**
-   * The transport's step before each upload attempt: prepare(attachment, file, existing) returns
-   * its entry for the attachment, saved to metadata.ext[namespace] before the upload; the next
-   * attempt gets it back as `existing`. With it the transport owns the encryption: the UIKit
-   * writes no `enc`. A failure fails the message.
+   * Runs before every upload attempt of an attachment (its first send and every retry; not on
+   * pause or resume). `request.metadata` is the attachment's metadata, with what an earlier attempt
+   * returned. Returns entries the UIKit merges into the metadata (returned keys are added or
+   * overwritten, the rest kept) and saves before it calls `upload`; null or undefined changes
+   * nothing (e.g. the provider's entry is there already). With it the provider owns the
+   * encryption: the UIKit writes no "sceyt.enc". A failure fails the message.
    */
-  uploadPreparer?: UploadPreparer
+  // eslint-disable-next-line no-unused-vars
+  prepareUpload?: (
+    // eslint-disable-next-line no-unused-vars
+    request: FileUploadRequest
+  ) => FileTransferEntries | null | undefined | Promise<FileTransferEntries | null | undefined>
   /** Uploads the prepared source and returns its remote reference. */
   // eslint-disable-next-line no-unused-vars
   upload: (request: FileUploadRequest, callback: FileTransferCallback) => Promise<FileTransferResult<FileUploadResult>>

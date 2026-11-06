@@ -7,9 +7,9 @@ import { resetUpdatedUserMapAC } from '../../store/user/actions'
 import { CONNECTION_STATUS } from '../../store/user/constants'
 import { IUser } from '../../types'
 import { fileTransfer as uikitFileTransfer } from '../../fileTransfer/sceytChatUIKitFileTransfer'
-import { DefaultFileTransferTransport } from '../../fileTransfer/defaults/defaultFileTransferTransport'
+import { DefaultFileTransferProvider } from '../../fileTransfer/defaults/defaultFileTransferProvider'
 import { ChatSdkFileEncryption } from '../../fileTransfer/encryption/chatSdkFileEncryption'
-import { FileTransferTransport } from '../../fileTransfer/types'
+import { FileTransferProvider } from '../../fileTransfer/types'
 import { FileEncryption } from '../../fileTransfer/encryption/types'
 
 jest.mock('../../helpers/messagesIdb', () => ({
@@ -165,7 +165,7 @@ describe('SceytChat presence lifecycle', () => {
 })
 
 describe('SceytChat file transfer settings', () => {
-  const makeTransport = (): FileTransferTransport => ({ upload: jest.fn(), download: jest.fn(), cancel: jest.fn() })
+  const makeTransport = (): FileTransferProvider => ({ upload: jest.fn(), download: jest.fn(), cancel: jest.fn() })
   const transport = makeTransport()
   const encryption: FileEncryption = {
     prepareEncryption: jest.fn(),
@@ -187,8 +187,8 @@ describe('SceytChat file transfer settings', () => {
   }
 
   const expectDefaults = () => {
-    expect(uikitFileTransfer.transport).toBeInstanceOf(DefaultFileTransferTransport)
-    expect(uikitFileTransfer.hasCustomTransport).toBe(false)
+    expect(uikitFileTransfer.provider).toBeInstanceOf(DefaultFileTransferProvider)
+    expect(uikitFileTransfer.hasCustomProvider).toBe(false)
     expect(uikitFileTransfer.encryption).toBeInstanceOf(ChatSdkFileEncryption)
     expect(uikitFileTransfer.encryptUploads).toBe(false)
   }
@@ -198,18 +198,18 @@ describe('SceytChat file transfer settings', () => {
     presenceRegistry.dispose()
   })
 
-  it('fileTransfer sets the transport, the encryption and whether uploads are encrypted', async () => {
-    const view = await renderWith({ fileTransfer: { transport, encryption, encryptUploads: true } })
+  it('fileTransfer sets the provider, the encryption and whether uploads are encrypted', async () => {
+    const view = await renderWith({ fileTransfer: { provider: transport, encryption, encryptUploads: true } })
 
-    expect(uikitFileTransfer.transport).toBe(transport)
-    expect(uikitFileTransfer.hasCustomTransport).toBe(true)
+    expect(uikitFileTransfer.provider).toBe(transport)
+    expect(uikitFileTransfer.hasCustomProvider).toBe(true)
     expect(uikitFileTransfer.encryption).toBe(encryption)
     expect(uikitFileTransfer.encryptUploads).toBe(true)
     await unmountChat(view.unmount)
   })
 
   it('without fileTransfer, the defaults are used: the chat client transfers and encrypts, uploads are not encrypted', async () => {
-    uikitFileTransfer.transport = transport
+    uikitFileTransfer.provider = transport
     uikitFileTransfer.encryption = encryption
     uikitFileTransfer.encryptUploads = true
     const view = await renderWith({})
@@ -222,17 +222,19 @@ describe('SceytChat file transfer settings', () => {
     const appTransport = makeTransport()
     const chatClient = client()
     const store = createMessageListStore()
-    const view = renderWithSceytProvider(<SceytChat client={chatClient} fileTransfer={{ transport }} />, { store })
+    const view = renderWithSceytProvider(<SceytChat client={chatClient} fileTransfer={{ provider: transport }} />, {
+      store
+    })
     await flushPromises()
-    expect(uikitFileTransfer.transport).toBe(transport)
+    expect(uikitFileTransfer.provider).toBe(transport)
     expect(uikitFileTransfer.encryption).toBeInstanceOf(ChatSdkFileEncryption)
     expect(uikitFileTransfer.encryptUploads).toBe(false)
 
     view.rerender(
-      <SceytChat client={chatClient} fileTransfer={{ transport: appTransport, encryption, encryptUploads: true }} />
+      <SceytChat client={chatClient} fileTransfer={{ provider: appTransport, encryption, encryptUploads: true }} />
     )
     await flushPromises()
-    expect(uikitFileTransfer.transport).toBe(appTransport)
+    expect(uikitFileTransfer.provider).toBe(appTransport)
     expect(uikitFileTransfer.encryption).toBe(encryption)
     expect(uikitFileTransfer.encryptUploads).toBe(true)
 

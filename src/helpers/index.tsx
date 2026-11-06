@@ -56,7 +56,7 @@ export const downloadFile = async (
   try {
     const encryption = getAttachmentEncryption(attachment.metadata)
     const type = getTypeFromFileName(attachment.name)
-    // Downloads through fileTransfer.transport; an encrypted file comes back decrypted.
+    // Downloads through fileTransfer.provider; an encrypted file comes back decrypted.
     const downloader = getAttachmentDownloader(attachment, encryption, type)
     const request = downloader(
       attachment.url,

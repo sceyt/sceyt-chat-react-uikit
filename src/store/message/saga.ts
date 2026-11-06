@@ -339,7 +339,7 @@ const makeVideoPreviewFile = async (attachment: IAttachment, videoFile: Blob) =>
 // Uploads the preview image of a video and returns its URL and encryption.
 const uploadVideoPreview = async (attachment: IAttachment, previewFile: File) => {
   const previewName = previewFile.name
-  // Reuse the attachment transport (fileTransfer.transport) so preview and video
+  // Reuse the attachment transport (fileTransfer.provider) so preview and video
   // follow the same auth, storage, encryption, retry, and lifecycle rules.
   // Preview files are temporary backend objects and must expire if no sent
   // message references their returned URL. Its tid (and so its operation id) is
@@ -388,9 +388,9 @@ const prepareAndUploadVideoPreview = async (attachment: IAttachment): Promise<IA
   }
 }
 
-// An encrypted video's preview image (encryptUploads, or a transport with a preparer) is an
-// attachment of its own in the same message, of type preview, with its own key (its own enc,
-// or its own ext entry), prepared and uploaded like any file. The video points to it by its
+// An encrypted video's preview image (encryptUploads, or a provider with prepareUpload) is an
+// attachment of its own in the same message, of type preview, with its own key (its own
+// "sceyt.enc", or the provider's own entry), prepared and uploaded like any file. The video points to it by its
 // URL (video_thumb).
 const uploadVideoPreviewAttachment = async (video: IAttachment, channel: IChannel): Promise<IAttachment> => {
   const tid = `${video.tid || 'video'}-thumbnail`
@@ -420,9 +420,9 @@ const uploadVideoPreviewAttachment = async (video: IAttachment, channel: IChanne
       { file, fileName: file.name, mimeType: file.type },
       () => undefined
     )
-    // A transport with a preparer owns the encryption (its entry is in ext); else the preview's own enc.
+    // A provider with prepareUpload owns the encryption (its entry is in the metadata); else the preview's own "sceyt.enc".
     const metadata =
-      encryptionInfo && !fileTransfer.transport.uploadPreparer
+      encryptionInfo && !fileTransfer.provider.prepareUpload
         ? withAttachmentEncryption(prepared, encryptionInfo)
         : typeof prepared === 'string'
           ? prepared
@@ -693,7 +693,7 @@ export const handleUploadAttachments = async (attachments: IAttachment[], messag
         }
         // An encrypted video's preview goes as a separate attachment (a forwarded video's
         // preview is forwarded with it); a plain video's is its video_thumb.
-        if (!fileTransfer.encryptUploads && !fileTransfer.transport.uploadPreparer) {
+        if (!fileTransfer.encryptUploads && !fileTransfer.provider.prepareUpload) {
           attachment = await prepareAndUploadVideoPreview(attachment)
         } else if (!attachment.cachedUrl) {
           const preview = await uploadVideoPreviewAttachment(attachment, channel)
@@ -722,8 +722,8 @@ export const handleUploadAttachments = async (attachments: IAttachment[], messag
         const dataSize = attachment.data?.size || 0
         store.dispatch(updateAttachmentUploadingProgressAC(dataSize, dataSize, attachment.tid))
       } else {
-        // The file as it was prepared when it was added to the message. The app's step
-        // (fileTransfer.transport.uploadPreparer) saves its entry to the metadata's ext first.
+        // The file as it was prepared when it was added to the message. The provider's step
+        // (fileTransfer.provider.prepareUpload) merges its entries into the metadata first.
         const file = attachment.url as Blob
         attachment = { ...attachment, metadata: await prepareAttachmentUpload(attachment, file) }
         const uploaded = await uploadAttachment(
@@ -737,8 +737,9 @@ export const handleUploadAttachments = async (attachments: IAttachment[], messag
         )
         uploadedUri = uploaded.url
         uploadedBlob = file
-        // With the app's preparer the app owns the encryption: its entry is in ext, and no `enc` is written.
-        encryption = fileTransfer.transport.uploadPreparer ? undefined : uploaded.encryptionInfo
+        // With the provider's prepareUpload the provider owns the encryption: its entry is in the
+        // metadata, and no "sceyt.enc" is written.
+        encryption = fileTransfer.provider.prepareUpload ? undefined : uploaded.encryptionInfo
         fileSize = file.size
       }
       if (!attachment.cachedUrl && fileType === 'image') {

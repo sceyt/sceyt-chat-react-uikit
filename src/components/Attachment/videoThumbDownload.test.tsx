@@ -23,7 +23,7 @@ import {
   readBlobText
 } from '../../testUtils/fakeAttachmentFiles'
 import { fileTransfer } from '../../fileTransfer/sceytChatUIKitFileTransfer'
-import { DefaultFileTransferTransport } from '../../fileTransfer/defaults/defaultFileTransferTransport'
+import { DefaultFileTransferProvider } from '../../fileTransfer/defaults/defaultFileTransferProvider'
 import {
   AttachmentTransferContext,
   FileDownloadRequest,
@@ -36,16 +36,16 @@ type DownloadMock = jest.Mock<Promise<FileTransferResult<Blob>>, [FileDownloadRe
 // A download that stays open until the test settles it.
 const openDownload = (): DownloadMock => jest.fn(() => new Promise<FileTransferResult<Blob>>(() => undefined))
 
-// Sets a custom transport (fileTransfer.transport) whose downloads are `download`.
+// Sets a custom transport (fileTransfer.provider) whose downloads are `download`.
 const setCustomTransport = (download: DownloadMock = openDownload()) => {
   const transport = { upload: jest.fn(), download, cancel: jest.fn() }
-  fileTransfer.transport = transport
+  fileTransfer.provider = transport
   return transport
 }
 
 // The built-in transport (the chat client over the test's fetch), recording what it is asked for.
 const setRecordingDefaultTransport = () => {
-  const builtIn = new DefaultFileTransferTransport()
+  const builtIn = new DefaultFileTransferProvider()
   return setCustomTransport(jest.fn((request, callback) => builtIn.download(request, callback)))
 }
 
@@ -957,7 +957,7 @@ describe('a failed download is not shown as downloaded', () => {
       ...videoAttachment,
       metadata: JSON.stringify({
         ...JSON.parse(videoAttachment.metadata),
-        enc: fakeEncryption('key-9')
+        'sceyt.enc': fakeEncryption('key-9')
       })
     }
     const videoDownloads = () =>
@@ -1256,7 +1256,7 @@ describe('the upload stop and resume control', () => {
       size: 'movie'.length,
       metadata: JSON.stringify({
         ...JSON.parse(videoAttachment.metadata),
-        enc: fakeEncryption('key-9')
+        'sceyt.enc': fakeEncryption('key-9')
       })
     }
     try {

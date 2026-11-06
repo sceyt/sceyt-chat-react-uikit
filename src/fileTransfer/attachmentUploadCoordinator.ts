@@ -85,7 +85,7 @@ export const isUploadNotStarted = (attachmentTid: string) => notStartedUploads.h
 export const isUploadPausedBeforeStart = (attachmentTid: string) => !!notStartedUploads.get(attachmentTid)?.paused
 
 /**
- * Uploads one attachment's file with `fileTransfer.transport`. `onProgress` gets the percent
+ * Uploads one attachment's file with `fileTransfer.provider`. `onProgress` gets the percent
  * sent. It settles once the file is stored or the upload fails; a cancelled upload rejects
  * with an AbortError.
  */

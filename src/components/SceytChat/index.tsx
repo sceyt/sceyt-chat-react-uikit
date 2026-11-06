@@ -227,14 +227,14 @@ const SceytChat = ({
     }
   }
 
-  // Without a transport or encryption, the default one (the chat client's) is used.
+  // Without a provider or encryption, the default one (the chat client's) is used.
   // A change applies to the transfers that start after it.
-  const transport = fileTransfer?.transport
+  const provider = fileTransfer?.provider
   const encryptUploads = fileTransfer?.encryptUploads
   const encryption = fileTransfer?.encryption
   useEffect(() => {
-    uikitFileTransfer.configure({ transport, encryptUploads, encryption })
-  }, [transport, encryptUploads, encryption])
+    uikitFileTransfer.configure({ provider, encryptUploads, encryption })
+  }, [provider, encryptUploads, encryption])
 
   useEffect(() => {
     if (membersDisplayTextByChannelTypesMap) {

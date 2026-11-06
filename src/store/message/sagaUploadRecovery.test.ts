@@ -42,7 +42,7 @@ import { fileTransfer } from '../../fileTransfer/sceytChatUIKitFileTransfer'
 import {
   AttachmentTransferContext,
   FileTransferResult,
-  FileTransferTransport,
+  FileTransferProvider,
   FileUploadRequest,
   FileUploadResult,
   FileUploadType
@@ -146,7 +146,7 @@ interface UploadCall {
   fail: (error: Error) => void
 }
 
-// The app's transport (fileTransfer.transport), driven per test: records every
+// The app's transport (fileTransfer.provider), driven per test: records every
 // upload request and lets uploadBehavior settle it.
 let uploadCalls: UploadCall[] = []
 // eslint-disable-next-line no-unused-vars
@@ -154,7 +154,7 @@ let uploadBehavior: (call: UploadCall) => void
 // Operation ids the transport was told to abandon (transport.cancel).
 let cancelledOperations: string[] = []
 
-const makeFakeTransport = (): FileTransferTransport => ({
+const makeFakeTransport = (): FileTransferProvider => ({
   upload: (request, callback) =>
     new Promise<FileTransferResult<FileUploadResult>>((resolve) => {
       const call: UploadCall = {
@@ -317,7 +317,7 @@ describe('attachment upload recovery', () => {
     cancelledOperations = []
     uploadBehavior = succeedUpload()
     setSendAttachmentsAsSeparateMessages(false)
-    fileTransfer.configure({ transport: makeFakeTransport() })
+    fileTransfer.configure({ provider: makeFakeTransport() })
     // The sender plays an uploaded video from its own file (jsdom has no object URLs).
     Object.defineProperty(URL, 'createObjectURL', {
       configurable: true,
@@ -2007,7 +2007,7 @@ describe('attachment upload recovery', () => {
           session.close()
         }
       }
-      fileTransfer.configure({ encryptUploads: true, transport: makeFakeTransport() })
+      fileTransfer.configure({ encryptUploads: true, provider: makeFakeTransport() })
     })
 
     it('uploads the encrypted file and sends its key in the attachment metadata', async () => {
@@ -2025,7 +2025,7 @@ describe('attachment upload recovery', () => {
       expect(uploadCalls.map((call) => call.request.type)).toEqual([FileUploadType.ENCRYPTED])
       expect(uploadCalls[0].file).toBe(image)
       expect(await readBlobText(stored[0])).toBe(await readBlobText(fakeEncrypted('key-1', 'file-bytes')))
-      expect(JSON.parse(sent.metadata)).toEqual({ szw: 10, szh: 20, enc: fakeEncryption('key-1') })
+      expect(JSON.parse(sent.metadata)).toEqual({ szw: 10, szh: 20, 'sceyt.enc': fakeEncryption('key-1') })
       // The size shown and sent is the plaintext's.
       expect((channel as any).__attachmentBuilder.setFileSize).toHaveBeenCalledWith(image.size)
     })
@@ -2066,11 +2066,11 @@ describe('attachment upload recovery', () => {
       // The video has its own enc and names its preview by URL.
       expect(JSON.parse(sentVideo.metadata)).toEqual({
         video_thumb: 'https://cdn.example/clip-preview.jpg',
-        enc: fakeEncryption('key-2')
+        'sceyt.enc': fakeEncryption('key-2')
       })
       // The preview is a preview attachment with its own enc.
       expect(sentPreview).toMatchObject({ type: attachmentTypes.preview, url: 'https://cdn.example/clip-preview.jpg' })
-      expect(JSON.parse(sentPreview.metadata)).toEqual({ enc: fakeEncryption('key-1') })
+      expect(JSON.parse(sentPreview.metadata)).toEqual({ 'sceyt.enc': fakeEncryption('key-1') })
     })
 
     it('with a transport that reports no encryption, the message fails instead of sending the file unencrypted', async () => {
@@ -2090,14 +2090,13 @@ describe('attachment upload recovery', () => {
       expect(channel.sendMessage).not.toHaveBeenCalled()
     })
 
-    it("the transport's uploadPreparer: its entry is saved to ext[namespace] before the upload and sent; no enc", async () => {
+    it("the provider's prepareUpload: its entries are merged into the metadata before the upload and sent; no sceyt.enc", async () => {
       const channel = makeUploaderChannel('channel-prepared-upload')
       const image = makeLiveFile()
-      const entry = { aid: 'slot-1', k: 'key', salt: 's', np: 'n', ps: image.size }
-      const prepare = jest.fn(async () => entry)
+      const prepareUpload = jest.fn(async () => ({ 'app.enc': 'keys-slot-1' }))
       fileTransfer.configure({
         encryptUploads: true,
-        transport: Object.assign(makeFakeTransport(), { uploadPreparer: { namespace: 'app.enc', prepare } })
+        provider: Object.assign(makeFakeTransport(), { prepareUpload })
       })
       const attachment = {
         ...makeAttachment('prepared-upload-tid', image),
@@ -2107,24 +2106,25 @@ describe('attachment upload recovery', () => {
 
       const [sent] = await handleUploadAttachments([attachment], { type: 'text' } as any, channel)
 
-      expect(prepare).toHaveBeenCalledTimes(1)
+      expect(prepareUpload).toHaveBeenCalledTimes(1)
       expect(uploadCalls[0].file).toBe(image)
-      // Saved before the upload: the transport gets the attachment with it.
-      expect(JSON.parse(uploadCalls[0].request.context.attachment.metadata).ext).toEqual({ 'app.enc': entry })
-      // The app owns the encryption: its entry is in ext, and no enc is written.
-      expect(JSON.parse(sent.metadata)).toEqual({ szw: 10, szh: 20, ext: { 'app.enc': entry } })
+      // Saved before the upload: the provider gets it in the attachment and in the request's metadata.
+      expect(JSON.parse(uploadCalls[0].request.context.attachment.metadata)['app.enc']).toBe('keys-slot-1')
+      expect(uploadCalls[0].request.metadata).toEqual({ szw: 10, szh: 20, 'app.enc': 'keys-slot-1' })
+      // The provider owns the encryption: its entry is in the metadata, and no "sceyt.enc" is written.
+      expect(JSON.parse(sent.metadata)).toEqual({ szw: 10, szh: 20, 'app.enc': 'keys-slot-1' })
     })
 
-    it("the transport's uploadPreparer: a video's preview is a preview attachment of its own, named by its video_thumb", async () => {
+    it("the provider's prepareUpload: a video's preview is a preview attachment of its own, named by its video_thumb", async () => {
       const channel = makeUploaderChannel('channel-prepared-video')
       const video = new File(['video-bytes'], 'clip.mp4', { type: 'video/mp4' })
       const photo = makeLiveFile()
       mockGetVideoFirstFrame.mockResolvedValue({ blob: new Blob(['preview-bytes'], { type: 'image/jpeg' }) })
-      const prepare = jest.fn(async ({ attachment }: any) => ({ aid: `slot-${attachment.tid}` }))
+      const prepareUpload = jest.fn(async ({ context }: any) => ({ 'app.enc': `keys-${context.attachment.tid}` }))
       uriFor = (uploadedAttachment) => `https://cdn.example/${uploadedAttachment.tid}`
       fileTransfer.configure({
         encryptUploads: true,
-        transport: Object.assign(makeFakeTransport(), { uploadPreparer: { namespace: 'app.enc', prepare } })
+        provider: Object.assign(makeFakeTransport(), { prepareUpload })
       })
       const videoAttachment = {
         tid: 'prepared-video-tid',
@@ -2158,14 +2158,14 @@ describe('attachment upload recovery', () => {
         'prepared-video-tid-thumbnail'
       ])
       const [sentVideo, , sentPreview] = sent
-      // The video names its preview by URL, and carries no enc: only its own entry.
+      // The video names its preview by URL, and carries no sceyt.enc: only the provider's entry.
       expect(JSON.parse(sentVideo.metadata)).toEqual({
         szw: 1280,
         szh: 720,
         tmb: 'hash',
         dur: 12,
         video_thumb: 'https://cdn.example/prepared-video-tid-thumbnail',
-        ext: { 'app.enc': { aid: 'slot-prepared-video-tid' } }
+        'app.enc': 'keys-prepared-video-tid'
       })
       // The preview is a preview attachment with its own entry, the video's dimensions and hash.
       expect(sentPreview.type).toBe('preview')
@@ -2174,24 +2174,24 @@ describe('attachment upload recovery', () => {
         szw: 1280,
         szh: 720,
         tmb: 'hash',
-        ext: { 'app.enc': { aid: 'slot-prepared-video-tid-thumbnail' } }
+        'app.enc': 'keys-prepared-video-tid-thumbnail'
       })
-      expect(prepare.mock.calls.map(([call]: any) => call.attachment.tid).sort()).toEqual([
+      expect(prepareUpload.mock.calls.map(([request]: any) => request.context.attachment.tid).sort()).toEqual([
         'prepared-photo-tid',
         'prepared-video-tid',
         'prepared-video-tid-thumbnail'
       ])
     })
 
-    it("the transport's uploadPreparer: previews go in their videos' order, whichever finishes uploading first", async () => {
+    it("the provider's prepareUpload: previews go in their videos' order, whichever finishes uploading first", async () => {
       const channel = makeUploaderChannel('channel-two-videos')
       const first = new File(['first-video'], 'first.mp4', { type: 'video/mp4' })
       const second = new File(['second-video'], 'second.mp4', { type: 'video/mp4' })
       mockGetVideoFirstFrame.mockResolvedValue({ blob: new Blob(['preview-bytes'], { type: 'image/jpeg' }) })
-      const prepare = jest.fn(async () => ({ aid: 'slot' }))
+      const prepareUpload = jest.fn(async () => ({ 'app.enc': 'keys' }))
       fileTransfer.configure({
         encryptUploads: true,
-        transport: Object.assign(makeFakeTransport(), { uploadPreparer: { namespace: 'app.enc', prepare } })
+        provider: Object.assign(makeFakeTransport(), { prepareUpload })
       })
       // The first video's preview is stored only after the second's.
       let releaseFirstPreview: () => void = () => undefined
@@ -2238,16 +2238,13 @@ describe('attachment upload recovery', () => {
       expect(JSON.parse(sent[1].metadata).video_thumb).toBe('https://cdn.example/second-video-tid-thumbnail')
     })
 
-    it('a failed uploadPreparer of the transport fails the message, uploading nothing', async () => {
+    it('a failed prepareUpload of the provider fails the message, uploading nothing', async () => {
       const channel = makeUploaderChannel('channel-prepare-failed')
       const image = makeLiveFile()
       fileTransfer.configure({
         encryptUploads: true,
-        transport: Object.assign(makeFakeTransport(), {
-          uploadPreparer: {
-            namespace: 'app.enc',
-            prepare: () => Promise.reject(new Error('the app could not prepare it'))
-          }
+        provider: Object.assign(makeFakeTransport(), {
+          prepareUpload: () => Promise.reject(new Error('the app could not prepare it'))
         })
       })
 
@@ -2409,7 +2406,10 @@ describe('attachment upload recovery', () => {
         })
       ])
       expect(sent[0].completion).toBeUndefined()
-      expect(sent.map((attachment: any) => JSON.parse(attachment.metadata).enc)).toEqual([undefined, undefined])
+      expect(sent.map((attachment: any) => JSON.parse(attachment.metadata)['sceyt.enc'])).toEqual([
+        undefined,
+        undefined
+      ])
     })
 
     it('with encryptUploads, each file is encrypted before it is sent and its own key goes in its metadata', async () => {
@@ -2435,7 +2435,7 @@ describe('attachment upload recovery', () => {
         await Promise.all([fakeEncrypted('key-1', 'first'), fakeEncrypted('key-2', 'second')].map(readBlobText))
       )
       const sent = (channel.sendMessage as jest.Mock).mock.calls[0][0].attachments
-      expect(sent.map((attachment: any) => JSON.parse(attachment.metadata).enc)).toEqual([
+      expect(sent.map((attachment: any) => JSON.parse(attachment.metadata)['sceyt.enc'])).toEqual([
         fakeEncryption('key-1'),
         fakeEncryption('key-2')
       ])
@@ -2475,7 +2475,7 @@ describe('attachment upload recovery', () => {
       // The video has its own enc and names its preview by URL.
       expect(JSON.parse(sent.metadata)).toEqual({
         video_thumb: 'https://cdn.example/video-preview.jpg',
-        enc: fakeEncryption('key-2')
+        'sceyt.enc': fakeEncryption('key-2')
       })
       // The preview is a preview attachment with its own enc.
       expect(sentPreview).toMatchObject({
@@ -2483,7 +2483,7 @@ describe('attachment upload recovery', () => {
         url: 'https://cdn.example/video-preview.jpg',
         upload: false
       })
-      expect(JSON.parse(sentPreview.metadata)).toEqual({ enc: fakeEncryption('key-1') })
+      expect(JSON.parse(sentPreview.metadata)).toEqual({ 'sceyt.enc': fakeEncryption('key-1') })
     })
 
     it('a failed upload fails the message, and nothing is sent', async () => {

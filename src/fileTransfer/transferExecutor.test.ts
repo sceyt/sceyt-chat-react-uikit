@@ -1,7 +1,7 @@
 import { TransferExecutor } from './transferExecutor'
-import { FileTransferResult, FileTransferTransport } from './types'
+import { FileTransferResult, FileTransferProvider } from './types'
 
-const transportWith = (overrides: Partial<FileTransferTransport> = {}): FileTransferTransport => ({
+const transportWith = (overrides: Partial<FileTransferProvider> = {}): FileTransferProvider => ({
   upload: jest.fn(),
   download: jest.fn(),
   pause: jest.fn(() => true),

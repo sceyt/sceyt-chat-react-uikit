@@ -124,7 +124,7 @@ const VideoPreview = memo(
       // video has none yet: show a cached preview, but download only once the
       // confirmed message ID arrives instead of sending a request that fails.
       const previewRequest: Promise<string | undefined> =
-        fileTransfer.hasCustomTransport && !file.messageId
+        fileTransfer.hasCustomProvider && !file.messageId
           ? getAttachmentUrlFromCache(videoThumb)
               .catch(() => false)
               .then((cachedUrl) => (typeof cachedUrl === 'string' ? cachedUrl : undefined))

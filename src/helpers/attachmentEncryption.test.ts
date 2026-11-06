@@ -19,10 +19,10 @@ describe('attachment encryption metadata', () => {
   })
 
   it('reads the file key from metadata stored as a JSON string', () => {
-    const metadata = JSON.stringify({ szw: 10, enc: fakeEncryption('key-1') })
+    const metadata = JSON.stringify({ szw: 10, 'sceyt.enc': fakeEncryption('key-1') })
 
     expect(getAttachmentEncryption(metadata)).toEqual(fakeEncryptionInfo('key-1'))
-    expect(getAttachmentEncryption({ enc: fakeEncryption('key-1') })).toEqual(fakeEncryptionInfo('key-1'))
+    expect(getAttachmentEncryption({ 'sceyt.enc': fakeEncryption('key-1') })).toEqual(fakeEncryptionInfo('key-1'))
   })
 
   it('an unencrypted file, or metadata that is not JSON, has no key', () => {
@@ -34,7 +34,7 @@ describe('attachment encryption metadata', () => {
   it("writes the uploaded file's enc and keeps the other metadata", () => {
     const metadata = JSON.parse(withAttachmentEncryption(JSON.stringify({ szw: 10 }), fakeEncryptionInfo('key-1')))
 
-    expect(metadata).toEqual({ szw: 10, enc: fakeEncryption('key-1') })
+    expect(metadata).toEqual({ szw: 10, 'sceyt.enc': fakeEncryption('key-1') })
   })
 
   it('a resent file replaces the enc of the earlier attempt', () => {
@@ -42,7 +42,7 @@ describe('attachment encryption metadata', () => {
 
     const resent = withAttachmentEncryption(first, fakeEncryptionInfo('key-3'))
 
-    expect(JSON.parse(resent)).toEqual({ szw: 1, enc: fakeEncryption('key-3') })
+    expect(JSON.parse(resent)).toEqual({ szw: 1, 'sceyt.enc': fakeEncryption('key-3') })
   })
 
   it('describes what the download coordinator needs to decrypt a file', () => {

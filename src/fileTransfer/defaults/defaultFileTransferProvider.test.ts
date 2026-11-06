@@ -3,7 +3,7 @@ import { ChatSdkEncryptionSession, ChatSdkFileEncryption } from '../encryption/c
 import { FileDecryptionSession, FileEncryption, FileEncryptionInfo } from '../encryption/types'
 import { fileTransfer } from '../sceytChatUIKitFileTransfer'
 import { FileUploadType } from '../types'
-import { DefaultFileTransferTransport } from './defaultFileTransferTransport'
+import { DefaultFileTransferProvider } from './defaultFileTransferProvider'
 
 const ALG = 'tink-aes256-gcm-hkdf-64k+commit-v1'
 const info: FileEncryptionInfo = { encodedKeys: 'keys-of-file-id' }
@@ -64,8 +64,8 @@ const request = (overrides: any = {}) => ({
   ...overrides
 })
 
-describe('DefaultFileTransferTransport', () => {
-  const transport = new DefaultFileTransferTransport()
+describe('DefaultFileTransferProvider', () => {
+  const transport = new DefaultFileTransferProvider()
   let client: any
 
   beforeEach(() => {

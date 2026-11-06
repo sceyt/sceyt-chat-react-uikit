@@ -1,7 +1,7 @@
 import { getClient } from '../../common/client'
 import { FileEncryptionInfo } from './types'
 
-const FIELD = 'enc'
+const FIELD = 'sceyt.enc'
 
 const parse = (metadata: unknown): Record<string, any> | undefined => {
   try {
@@ -25,11 +25,11 @@ const isKeys = (encodedKeys: string): boolean => {
 }
 
 /**
- * Attachment encryption metadata: `enc`, one base64url string the chat SDK makes and reads
+ * Attachment encryption metadata: "sceyt.enc", one base64url string the chat SDK makes and reads
  * (FileEncryption.encodeKeys and decodeKeys) of the version, attachment id and key, kept next
  * to the other metadata keys; the salt and nonce prefix are in the stored file's header. The
  * plaintext size remains the attachment's file size. Every encrypted file is an attachment
- * with its own `enc` (a video's preview image is a preview attachment of its own).
+ * with its own "sceyt.enc" (a video's preview image is a preview attachment of its own).
  */
 export class FileEncryptionMetadata {
   readonly encodedKeys: string
@@ -42,7 +42,7 @@ export class FileEncryptionMetadata {
     return { encodedKeys: this.encodedKeys }
   }
 
-  /** `enc` as it is stored. */
+  /** "sceyt.enc" as it is stored. */
   toJSON() {
     return this.encodedKeys
   }
@@ -51,7 +51,7 @@ export class FileEncryptionMetadata {
     return 'FileEncryptionMetadata'
   }
 
-  /** The `enc` of an upload's encryption; throws when it has no keys string. */
+  /** The "sceyt.enc" of an upload's encryption; throws when it has no keys string. */
   static fromEncryptionInfo(info: FileEncryptionInfo) {
     if (!info.encodedKeys) throw new Error('The encryption has no keys string (encodedKeys) to keep in metadata')
     return new FileEncryptionMetadata(info.encodedKeys)
@@ -69,14 +69,14 @@ export class FileEncryptionMetadata {
     return typeof enc === 'string' && enc && isKeys(enc) ? new FileEncryptionMetadata(enc) : undefined
   }
 
-  /** `metadata` with `envelope` as its `enc`, keeping the other keys. */
+  /** `metadata` with `envelope` as its "sceyt.enc", keeping the other keys. */
   static write(metadata: unknown, envelope: FileEncryptionMetadata): string {
     const json = parse(metadata) || {}
     json[FIELD] = envelope.encodedKeys
     return JSON.stringify(json)
   }
 
-  /** `metadata` without `enc` (unchanged when it has none). */
+  /** `metadata` without "sceyt.enc" (unchanged when it has none). */
   static remove(metadata: unknown): string | undefined {
     const json = parse(metadata)
     if (!json || !(FIELD in json)) return typeof metadata === 'string' ? metadata : undefined

@@ -12,7 +12,7 @@ import {
   FileUploadType
 } from './types'
 
-/** Operation ids the UIKit gives transports: stable per upload, and per download of a file. */
+/** Operation ids the UIKit gives providers: stable per upload, and per download of a file. */
 export const uploadOperationId = (attachmentTid: string) => `upload:${attachmentTid}`
 export const downloadOperationId = (attachmentKey: string) => `download:${attachmentKey}`
 
@@ -31,6 +31,16 @@ const trustedSizeOf = (size: unknown): number | undefined => {
   return typeof bytes === 'number' && Number.isSafeInteger(bytes) && bytes > 0 ? bytes : undefined
 }
 
+// An attachment's metadata as an object: what a provider reads its own entries from.
+const metadataOf = (metadata: unknown): Record<string, unknown> => {
+  try {
+    const parsed = typeof metadata === 'string' ? JSON.parse(metadata) : metadata
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? { ...parsed } : {}
+  } catch {
+    return {}
+  }
+}
+
 export interface IDownloadSource {
   /** The URL to download: the attachment's, or a video's preview. */
   url: string
@@ -45,15 +55,15 @@ export interface IDownloadSource {
 }
 
 /**
- * Selects the transport once per attempt and builds its request; the executor's controls
- * keep targeting that transport. Transports encrypt and decrypt with `fileTransfer.encryption`.
+ * Selects the provider once per attempt and builds its request; the executor's controls
+ * keep targeting that provider. Providers encrypt and decrypt with `fileTransfer.encryption`, or their own.
  */
 export const attachmentTransferRouter = {
   upload(attachment: IAttachment, source: IUploadSource): TransferExecutor<FileUploadResult> {
     const operationId = uploadOperationId(attachment.tid!)
-    const transport = fileTransfer.transport
+    const provider = fileTransfer.provider
     const encrypted = fileTransfer.encryptUploads
-    return new TransferExecutor<FileUploadResult>(operationId, transport, async (execution, callback) => {
+    return new TransferExecutor<FileUploadResult>(operationId, provider, async (execution, callback) => {
       const context: AttachmentTransferContext = { attachment, isSharedUpload: !!source.isSharedUpload }
       const request: FileUploadRequest = {
         operationId,
@@ -62,13 +72,14 @@ export const attachmentTransferRouter = {
         mimeType: source.mimeType || null,
         context,
         type: encrypted ? FileUploadType.ENCRYPTED : FileUploadType.PLAIN,
+        metadata: metadataOf(attachment.metadata),
         signal: execution.signal
       }
-      const result = await execution.executeTransport(() => transport.upload(request, callback))
+      const result = await execution.executeTransport(() => provider.upload(request, callback))
       if (result.type === 'success') {
         if (!result.result.url) return FileTransferResult.failure(new Error('The upload returned no URL'))
-        // A transport with a preparer encrypts with the parameters it saved in ext.
-        if (encrypted && !result.result.encryptionInfo?.encodedKeys && !transport.uploadPreparer) {
+        // A provider with prepareUpload encrypts with the keys it saved in its own metadata entry.
+        if (encrypted && !result.result.encryptionInfo?.encodedKeys && !provider.prepareUpload) {
           // The receiver would have no way to decrypt the file.
           return FileTransferResult.failure(new Error('Encrypted upload returned no encryption information'))
         }
@@ -87,23 +98,24 @@ export const attachmentTransferRouter = {
     transferKey: string = attachment.tid || attachment.id || source.url
   ): TransferExecutor<Blob> {
     const operationId = downloadOperationId(transferKey)
-    const transport = fileTransfer.transport
-    return new TransferExecutor<Blob>(operationId, transport, (execution, callback) => {
+    const provider = fileTransfer.provider
+    return new TransferExecutor<Blob>(operationId, provider, (execution, callback) => {
       const request: FileDownloadRequest = {
         operationId,
         url: source.url,
         context: { attachment, isSharedUpload: false } as AttachmentTransferContext,
+        metadata: metadataOf(attachment.metadata),
         mimeType: source.mimeType,
         ...(source.encryptionInfo
           ? { encryptionInfo: source.encryptionInfo, plaintextSize: trustedSizeOf(source.plaintextSize) }
           : {}),
         signal: execution.signal
       }
-      return execution.executeTransport(() => transport.download(request, callback))
+      return execution.executeTransport(() => provider.download(request, callback))
     })
   },
 
-  /** `metadata` with the upload's encryption as its `enc`, or without `enc`. */
+  /** `metadata` with the upload's encryption as its `sceyt.enc`, or without it. */
   applyUploadResult(metadata: unknown, result: FileUploadResult): string | undefined {
     if (!result.encryptionInfo) return FileEncryptionMetadata.remove(metadata)
     return FileEncryptionMetadata.write(metadata, FileEncryptionMetadata.fromEncryptionInfo(result.encryptionInfo))

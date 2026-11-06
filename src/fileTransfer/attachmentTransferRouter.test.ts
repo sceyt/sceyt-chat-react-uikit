@@ -1,7 +1,7 @@
 import { attachmentTransferRouter, downloadOperationId, uploadOperationId } from './attachmentTransferRouter'
 import { FileEncryptionInfo } from './encryption/types'
 import { fileTransfer } from './sceytChatUIKitFileTransfer'
-import { FileTransferResult, FileTransferTransport, FileUploadType } from './types'
+import { FileTransferResult, FileTransferProvider, FileUploadType } from './types'
 
 const ALG = 'tink-aes256-gcm-hkdf-64k+commit-v1'
 const KEYS = 'AYCBgoOEhYaHiImKi4yNjo8'
@@ -14,15 +14,15 @@ const transportReturning = (upload: any, download: any = FileTransferResult.succ
     upload: jest.fn(async () => upload),
     download: jest.fn(async () => download),
     cancel: jest.fn()
-  }) as FileTransferTransport & { upload: jest.Mock; download: jest.Mock }
+  }) as FileTransferProvider & { upload: jest.Mock; download: jest.Mock }
 
 const source = () => ({ file: new Blob(['hello']), fileName: 'a.txt', mimeType: 'text/plain' })
 
 describe('attachmentTransferRouter', () => {
-  const defaults = { transport: fileTransfer.transport, encryptUploads: fileTransfer.encryptUploads }
+  const defaults = { provider: fileTransfer.provider, encryptUploads: fileTransfer.encryptUploads }
 
   afterEach(() => {
-    fileTransfer.transport = defaults.transport
+    fileTransfer.provider = defaults.provider
     fileTransfer.encryptUploads = defaults.encryptUploads
   })
 
@@ -34,7 +34,7 @@ describe('attachmentTransferRouter', () => {
   describe('upload', () => {
     it("builds a plain request for the selected transport, with the attachment and the attempt's signal", async () => {
       const transport = transportReturning(FileTransferResult.success({ url: 'https://cdn.example/a' }))
-      fileTransfer.transport = transport
+      fileTransfer.provider = transport
       const file = source()
 
       const executor = attachmentTransferRouter.upload(attachment, { ...file, isSharedUpload: true })
@@ -59,7 +59,7 @@ describe('attachmentTransferRouter', () => {
       const transport = transportReturning(
         FileTransferResult.success({ url: 'https://cdn.example/a', encryptionInfo: info })
       )
-      fileTransfer.transport = transport
+      fileTransfer.provider = transport
 
       const result = await attachmentTransferRouter.upload(attachment, source()).execute(callback)
 
@@ -69,7 +69,7 @@ describe('attachmentTransferRouter', () => {
 
     it('an encrypted upload without encryption info is a failure: nobody could open the file', async () => {
       fileTransfer.encryptUploads = true
-      fileTransfer.transport = transportReturning(FileTransferResult.success({ url: 'https://cdn.example/a' }))
+      fileTransfer.provider = transportReturning(FileTransferResult.success({ url: 'https://cdn.example/a' }))
 
       const result = await attachmentTransferRouter.upload(attachment, source()).execute(callback)
 
@@ -80,7 +80,7 @@ describe('attachmentTransferRouter', () => {
       fileTransfer.encryptUploads = true
       const { encodedKeys, ...withoutKeys } = info
       expect(encodedKeys).toBe(KEYS)
-      fileTransfer.transport = transportReturning(
+      fileTransfer.provider = transportReturning(
         FileTransferResult.success({ url: 'https://cdn.example/a', encryptionInfo: withoutKeys })
       )
 
@@ -90,7 +90,7 @@ describe('attachmentTransferRouter', () => {
     })
 
     it('an upload without a URL is a failure', async () => {
-      fileTransfer.transport = transportReturning(FileTransferResult.success({ url: '' }))
+      fileTransfer.provider = transportReturning(FileTransferResult.success({ url: '' }))
 
       const result = await attachmentTransferRouter.upload(attachment, source()).execute(callback)
 
@@ -99,9 +99,9 @@ describe('attachmentTransferRouter', () => {
 
     it('the transport selected for the attempt keeps it after the transport changes', async () => {
       const first = transportReturning(FileTransferResult.success({ url: 'https://cdn.example/a' }))
-      fileTransfer.transport = first
+      fileTransfer.provider = first
       const executor = attachmentTransferRouter.upload(attachment, source())
-      fileTransfer.transport = transportReturning(FileTransferResult.success({ url: 'https://cdn.example/b' }))
+      fileTransfer.provider = transportReturning(FileTransferResult.success({ url: 'https://cdn.example/b' }))
 
       await executor.execute(callback)
       executor.discard()
@@ -114,7 +114,7 @@ describe('attachmentTransferRouter', () => {
   describe('download', () => {
     it("an encrypted download carries its encryption info and the attachment's size", async () => {
       const transport = transportReturning(undefined)
-      fileTransfer.transport = transport
+      fileTransfer.provider = transport
 
       const executor = attachmentTransferRouter.download(attachment, {
         url: 'https://cdn.example/a',
@@ -137,7 +137,7 @@ describe('attachmentTransferRouter', () => {
 
     it('a download named by its transfer key is its own operation', async () => {
       const transport = transportReturning(undefined)
-      fileTransfer.transport = transport
+      fileTransfer.provider = transport
 
       await attachmentTransferRouter
         .download(attachment, { url: 'https://cdn.example/thumb' }, 'video-thumbnail:https://cdn.example/thumb')
@@ -154,7 +154,7 @@ describe('attachmentTransferRouter', () => {
       ['it is missing', undefined, undefined]
     ])("an encrypted download's trusted size is a byte count when %s", async (_case, size, expected) => {
       const transport = transportReturning(undefined)
-      fileTransfer.transport = transport
+      fileTransfer.provider = transport
 
       await attachmentTransferRouter
         .download(attachment, { url: 'https://cdn.example/a', encryptionInfo: info, plaintextSize: size })
@@ -165,7 +165,7 @@ describe('attachmentTransferRouter', () => {
 
     it('a plain download has no encryption fields', async () => {
       const transport = transportReturning(undefined)
-      fileTransfer.transport = transport
+      fileTransfer.provider = transport
 
       await attachmentTransferRouter.download({ id: 'id-1' }, { url: 'https://cdn.example/a' } as any).execute(callback)
 
@@ -182,11 +182,11 @@ describe('attachmentTransferRouter', () => {
         attachmentTransferRouter.applyUploadResult({ szw: 10 }, { url: 'u', encryptionInfo: info })!
       )
 
-      expect(metadata).toEqual({ szw: 10, enc: KEYS })
+      expect(metadata).toEqual({ szw: 10, 'sceyt.enc': KEYS })
     })
 
     it('a plain upload removes enc', () => {
-      const before = { szw: 10, enc: 'old-keys' }
+      const before = { szw: 10, 'sceyt.enc': 'old-keys' }
 
       const metadata = JSON.parse(attachmentTransferRouter.applyUploadResult(before, { url: 'u' })!)
 

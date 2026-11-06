@@ -9,10 +9,10 @@ import {
   uploadAttachment
 } from './attachmentUploadCoordinator'
 import { fileTransfer } from './sceytChatUIKitFileTransfer'
-import { FileTransferCallback, FileTransferResult, FileTransferTransport, FileUploadRequest } from './types'
+import { FileTransferCallback, FileTransferResult, FileTransferProvider, FileUploadRequest } from './types'
 
 // A transport whose calls the test ends by hand.
-const manualTransport = (overrides: Partial<FileTransferTransport> = {}) => {
+const manualTransport = (overrides: Partial<FileTransferProvider> = {}) => {
   const calls: { request: FileUploadRequest; callback: FileTransferCallback; finish: (result: any) => void }[] = []
   const transport = {
     upload: jest.fn(
@@ -27,7 +27,7 @@ const manualTransport = (overrides: Partial<FileTransferTransport> = {}) => {
     cancel: jest.fn(),
     ...overrides
   }
-  fileTransfer.transport = transport
+  fileTransfer.provider = transport
   return { transport, calls }
 }
 
@@ -126,7 +126,7 @@ describe('attachment uploads', () => {
     it('an upload that finishes as it is stopped still counts: the file is stored', async () => {
       const finished = FileTransferResult.success({ url: 'https://cdn.example/a' })
       // A transport that stored the file before it saw the abort.
-      fileTransfer.transport = { upload: jest.fn(async () => finished), download: jest.fn(), cancel: jest.fn() }
+      fileTransfer.provider = { upload: jest.fn(async () => finished), download: jest.fn(), cancel: jest.fn() }
 
       const upload = uploadAttachment(attachment('tid-1'), source(), jest.fn())
       pauseUpload('tid-1')

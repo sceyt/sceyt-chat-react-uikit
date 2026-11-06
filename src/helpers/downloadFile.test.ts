@@ -1,7 +1,7 @@
 import FileSaver from 'file-saver'
 import { cancelDownloadFile, downloadFile } from './index'
 import { fileTransfer } from '../fileTransfer/sceytChatUIKitFileTransfer'
-import { readDecryptedFile } from '../fileTransfer/defaults/defaultFileTransferTransport'
+import { readDecryptedFile } from '../fileTransfer/defaults/defaultFileTransferProvider'
 import { FileDownloadRequest, FileTransferResult } from '../fileTransfer/types'
 import {
   fakeEncrypted,
@@ -18,13 +18,13 @@ jest.mock('file-saver', () => ({
 
 const mockSaveAs = FileSaver.saveAs as jest.Mock
 
-/** Sets a custom transport (fileTransfer.transport) whose download is `download`. */
+/** Sets a custom transport (fileTransfer.provider) whose download is `download`. */
 const useTransport = (
   // eslint-disable-next-line no-unused-vars
   download: (request: FileDownloadRequest) => Promise<FileTransferResult<Blob>>
 ) => {
   const transport = { upload: jest.fn(), download: jest.fn(download), cancel: jest.fn() }
-  fileTransfer.transport = transport
+  fileTransfer.provider = transport
   return transport
 }
 
@@ -129,7 +129,7 @@ describe('downloadFile for an encrypted attachment', () => {
     name: 'report.pdf',
     // The plaintext's size: 'pdf-bytes'.
     size: 9,
-    metadata: JSON.stringify({ enc: fakeEncryption('key-5') })
+    metadata: JSON.stringify({ 'sceyt.enc': fakeEncryption('key-5') })
   } as any
 
   beforeEach(() => {

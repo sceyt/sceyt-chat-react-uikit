@@ -110,7 +110,7 @@ describe('WAAF-3290: delivery status after sending or retrying a text', () => {
     }
     if (kind === 'attachment') {
       // The app's transport stores the file at once.
-      fileTransfer.transport = {
+      fileTransfer.provider = {
         upload: () => Promise.resolve(FileTransferResult.success({ url: 'https://cdn.example/notes.txt' })),
         download: () => Promise.resolve(FileTransferResult.failure(new Error('Downloads are not used in these tests'))),
         cancel: () => undefined

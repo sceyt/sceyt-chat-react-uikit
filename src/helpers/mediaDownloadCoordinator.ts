@@ -108,7 +108,7 @@ const download = async (request: MediaDownloadRequest, job: MediaDownloadJob): P
   // Message attachment size is the authoritative server-side file size; a file of
   // unknown size (a video's preview image) is counted out of 100.
   const total = Number(request.size) || 100
-  // The transport (fileTransfer.transport); an encrypted file comes back from it
+  // The transport (fileTransfer.provider); an encrypted file comes back from it
   // decrypted, checked against the attachment's size (a preview image has none).
   // One transport operation per job: a video and its preview are separate ones.
   const transfer = attachmentTransferRouter.download(

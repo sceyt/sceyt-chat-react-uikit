@@ -71,7 +71,7 @@ export {
   IAttachment
 }
 
-// File transfer (the `fileTransfer` prop): transports, the encryption module, and their defaults.
+// File transfer (the `fileTransfer` prop): providers, the encryption module, and their defaults.
 export * from '../fileTransfer'
 
 declare global {

@@ -6,7 +6,7 @@ import {
   FileDownloadRequest,
   FileTransferCallback,
   FileTransferResult,
-  FileTransferTransport,
+  FileTransferProvider,
   FileUploadRequest,
   FileUploadResult,
   FileUploadType
@@ -50,13 +50,13 @@ export const readDecryptedFile = (
 ): Promise<Blob> => readWhole(session.plaintextSize, (offset, length) => session.read(offset, length), type, onProgress)
 
 /**
- * The built-in transport: files go to the chat server with the chat client, one request per
+ * The built-in provider: files go to the chat server with the chat client, one request per
  * file. An upload is encrypted with `fileTransfer.encryption`: a chat SDK session is sent
  * natively (client.uploadEncrypted), an app's as its encrypted bytes (client.upload). A
  * download is decrypted with `fileTransfer.encryption`. It has no native pause: the UIKit
  * stops an upload and sends it again from the start.
  */
-export class DefaultFileTransferTransport implements FileTransferTransport {
+export class DefaultFileTransferProvider implements FileTransferProvider {
   async upload(
     request: FileUploadRequest,
     callback: FileTransferCallback

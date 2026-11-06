@@ -2,20 +2,20 @@ import { FileEncryptionMetadata } from '../fileTransfer/encryption/fileEncryptio
 import { FileEncryptionInfo } from '../fileTransfer/encryption/types'
 
 // Attachment encryption metadata (format: sceyt-chat-js-sdk spec/attachment-encryption).
-// An encrypted file's attachment id and key travel in the attachment's metadata as `enc`;
+// An encrypted file's attachment id and key travel in the attachment's metadata as "sceyt.enc";
 // transports encrypt and decrypt with `fileTransfer.encryption`. This file holds the
-// UIKit's side: reading and writing `enc`, and the real type of a decrypted file.
+// UIKit's side: reading and writing "sceyt.enc", and the real type of a decrypted file.
 
 /** What opens the attachment's file, or undefined when it is not encrypted. */
 export const getAttachmentEncryption = (metadata: any): FileEncryptionInfo | undefined =>
   FileEncryptionMetadata.read(metadata)?.toEncryptionInfo()
 
-/** Metadata with the file's `enc`. */
+/** Metadata with the file's "sceyt.enc". */
 export const withAttachmentEncryption = (metadata: any, encryption: FileEncryptionInfo): string =>
   FileEncryptionMetadata.write(metadata, FileEncryptionMetadata.fromEncryptionInfo(encryption))
 
 /**
- * Whether an error says the file cannot be opened: it failed decryption, or its `enc`
+ * Whether an error says the file cannot be opened: it failed decryption, or its "sceyt.enc"
  * metadata is not valid (sceyt-chat FileEncryptionErrorCode). Downloading it again gives
  * the same result.
  */

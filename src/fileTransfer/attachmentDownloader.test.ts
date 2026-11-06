@@ -7,7 +7,7 @@ const attachment: any = { id: 'id-1', tid: 'tid-1', name: 'photo.png', size: 200
 
 const transportDownloading = (download: (request: FileDownloadRequest, callback: FileTransferCallback) => any) => {
   const transport = { upload: jest.fn(), download: jest.fn(download), cancel: jest.fn() }
-  fileTransfer.transport = transport
+  fileTransfer.provider = transport
   return transport
 }
 

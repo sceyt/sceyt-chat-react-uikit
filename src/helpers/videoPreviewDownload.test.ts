@@ -24,10 +24,10 @@ const mockRegisterBlobUrl = registerBlobUrl as jest.Mock
 // The video the preview belongs to: the transport gets it as the request's attachment.
 const video = { url: 'https://cdn/clip.mp4', messageId: 'message-id', metadata: '{}' } as any
 
-/** Sets a custom transport (fileTransfer.transport) that returns `result`. */
+/** Sets a custom transport (fileTransfer.provider) that returns `result`. */
 const useTransport = (result: FileTransferResult<Blob>) => {
   const transport = { upload: jest.fn(), download: jest.fn(async () => result), cancel: jest.fn() }
-  fileTransfer.transport = transport
+  fileTransfer.provider = transport
   return transport
 }
 

@@ -1,81 +1,52 @@
 import { IAttachment } from '../types'
 import { getPendingAttachment, setPendingAttachment } from '../helpers/messagesHalper'
 import { parseAttachmentMetadata } from '../helpers/videoPreview'
+import { uploadOperationId } from './attachmentTransferRouter'
 import { fileTransfer } from './sceytChatUIKitFileTransfer'
+import { FileTransferEntries, FileUploadRequest, FileUploadType } from './types'
 
-// The app's step before each upload attempt (the same contract as the native UIKits):
-// the UIKit calls prepare(attachment, existing); the app returns its entry for the
-// attachment, which the UIKit saves to metadata.ext[namespace] before the upload. Only
-// the UIKit writes metadata, and it keeps `ext` whenever it rewrites it.
+// The provider's step before each upload attempt (the same contract as the native UIKits):
+// the UIKit calls provider.prepareUpload(request), where request.metadata is the attachment's
+// metadata with what an earlier attempt returned; the entries it returns are merged into the
+// metadata (returned keys added or overwritten, the rest kept) and saved before the upload.
+// Only the UIKit writes metadata.
 
-/** The metadata key the apps' entries are kept under, each in its own namespace. */
-export const EXT = 'ext'
-
-/** What an app's entry is: a string (e.g. the chat SDK's keys string) or a JSON object. */
-export type UploadExtEntry = string | Record<string, unknown>
-
-/** What `prepare` gets. */
-export interface UploadPreparation {
-  attachment: IAttachment
-  /** The file to upload (an image already resized, a video already converted). */
-  file: Blob
-  /**
-   * The entry an earlier attempt saved for this attachment, else undefined: return it to go
-   * on with it (e.g. without asking a server or creating an encryptor again).
-   */
-  existing?: UploadExtEntry
-}
-
-/** The app's step before each upload attempt of an attachment's file. */
-export interface UploadPreparer {
-  /** Where the entry is saved: metadata.ext[namespace], e.g. "app.enc". */
-  namespace: string
-  /** The attachment's entry; undefined keeps the existing one (or none). A failure fails the message. */
-  // eslint-disable-next-line no-unused-vars
-  prepare(preparation: UploadPreparation): UploadExtEntry | undefined | Promise<UploadExtEntry | undefined>
-}
-
-const isObject = (value: unknown): value is Record<string, unknown> =>
-  !!value && typeof value === 'object' && !Array.isArray(value)
-
-const isEntry = (value: unknown): value is UploadExtEntry => (typeof value === 'string' && !!value) || isObject(value)
-
-/** The app's entry under `namespace` in `metadata`, if there is one. */
-export const getUploadExt = (metadata: unknown, namespace: string): UploadExtEntry | undefined => {
-  const ext = parseAttachmentMetadata(metadata)[EXT]
-  const entry = isObject(ext) ? ext[namespace] : undefined
-  return isEntry(entry) ? entry : undefined
-}
-
-/** `metadata` (as JSON) with `entry` under ext[namespace], keeping everything else. */
-export const withUploadExt = (metadata: unknown, namespace: string, entry: UploadExtEntry): string => {
-  const parsed = parseAttachmentMetadata(metadata)
-  const ext = isObject(parsed[EXT]) ? parsed[EXT] : {}
-  return JSON.stringify({ ...parsed, [EXT]: { ...ext, [namespace]: entry } })
-}
+const isEntries = (value: unknown): value is FileTransferEntries =>
+  !!value &&
+  typeof value === 'object' &&
+  !Array.isArray(value) &&
+  Object.values(value as object).every((entry) => typeof entry === 'string')
 
 /**
- * The attachment's metadata to upload with, after the transport's `uploadPreparer`:
- * on every attempt (a retry or a resend too) it is given the entry saved before, if any, and
- * its entry is saved to metadata.ext[namespace]. Without a preparer the metadata is as it
- * was. Rejects when the app's step fails, so the message is never sent unprepared.
+ * The attachment's metadata to upload with, after the provider's prepareUpload: on every attempt
+ * (a retry or a resend too, not a pause or resume) it gets the metadata with what an earlier attempt
+ * returned, and what it returns is merged in. Without prepareUpload the metadata is as it was.
+ * Rejects when the provider's step fails, so the message is never sent unprepared.
  */
 export const prepareAttachmentUpload = async (attachment: IAttachment, file: Blob): Promise<unknown> => {
-  const preparer = fileTransfer.transport.uploadPreparer
-  if (!preparer) return attachment.metadata
-  const { namespace } = preparer
+  const provider = fileTransfer.provider
+  if (!provider.prepareUpload) return attachment.metadata
   const tid = attachment.tid
-  // The attachment's file does not change once it is added, so a saved entry is its own.
-  const existing =
-    getUploadExt(attachment.metadata, namespace) || (tid ? getPendingAttachment(tid)?.uploadExt : undefined)
-  const prepared = await preparer.prepare({ attachment, file, ...(existing ? { existing } : {}) })
-  if (prepared !== undefined && !isEntry(prepared)) {
-    throw new Error('uploadPreparer.prepare returned an entry that is not a string or an object')
+  // What an earlier attempt returned, kept in case the attachment's metadata lost it (a resend).
+  const saved = tid ? getPendingAttachment(tid)?.preparedEntries : undefined
+  const metadata = { ...parseAttachmentMetadata(attachment.metadata), ...saved }
+  const request: FileUploadRequest = {
+    operationId: uploadOperationId(tid || ''),
+    sourceFile: file,
+    fileName: (file as File).name || attachment.name || 'file',
+    mimeType: file.type || null,
+    context: { attachment, isSharedUpload: false },
+    type: fileTransfer.encryptUploads ? FileUploadType.ENCRYPTED : FileUploadType.PLAIN,
+    metadata,
+    signal: new AbortController().signal
   }
-  const entry = prepared || existing
-  if (!entry) return attachment.metadata
-  // Saved as JSON: an entry that cannot be stored fails here, before anything is uploaded.
-  const saved = JSON.parse(JSON.stringify(entry)) as UploadExtEntry
-  if (tid) setPendingAttachment(tid, { uploadExt: saved })
-  return withUploadExt(attachment.metadata, namespace, saved)
+  const entries = await provider.prepareUpload(request)
+  if (entries === null || entries === undefined) {
+    return saved ? JSON.stringify(metadata) : attachment.metadata
+  }
+  if (!isEntries(entries)) {
+    throw new Error('prepareUpload returned entries that are not string keys with string values')
+  }
+  if (tid) setPendingAttachment(tid, { preparedEntries: { ...saved, ...entries } })
+  return JSON.stringify({ ...metadata, ...entries })
 }

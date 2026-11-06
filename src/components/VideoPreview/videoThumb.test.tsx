@@ -7,7 +7,7 @@ import { downloadVideoThumb } from '../../helpers/videoPreview'
 import { getAttachmentUrlFromCache } from '../../helpers/attachmentsCache'
 import { createMessageListStore, renderWithSceytProvider } from '../../testUtils/messageListHarness'
 import { fileTransfer } from '../../fileTransfer/sceytChatUIKitFileTransfer'
-import { FileTransferResult, FileTransferTransport } from '../../fileTransfer/types'
+import { FileTransferResult, FileTransferProvider } from '../../fileTransfer/types'
 
 jest.mock('../../hooks', () => {
   const { THEME_COLORS } = require('../../UIHelper/constants')
@@ -441,12 +441,12 @@ describe('VideoPreview video_thumb with a custom transport', () => {
 
   beforeEach(() => {
     jest.clearAllMocks()
-    const transport: FileTransferTransport = {
+    const transport: FileTransferProvider = {
       upload: async () => FileTransferResult.failure(new Error('not used')),
       download: async () => FileTransferResult.failure(new Error('not used')),
       cancel: () => undefined
     }
-    fileTransfer.transport = transport
+    fileTransfer.provider = transport
     mockGetAttachmentUrlFromCache.mockResolvedValue(false)
   })
 

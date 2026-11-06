@@ -204,7 +204,7 @@ const Attachment = ({
   const imageDownloadRequestRef = useRef(0)
   const imageResumeStartedRef = useRef(false)
   const fileNameRef: any = useRef(null)
-  // Downloads through fileTransfer.transport; decrypts encrypted files.
+  // Downloads through fileTransfer.provider; decrypts encrypted files.
   const downloader = getAttachmentDownloader(
     attachment,
     getAttachmentEncryption(attachment.metadata),

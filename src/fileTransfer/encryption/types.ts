@@ -1,6 +1,6 @@
 /**
  * What opens one file: its keys, one base64url string the chat SDK makes and reads
- * (FileEncryption.encodeKeys and decodeKeys), kept in the attachment's metadata as `enc`.
+ * (FileEncryption.encodeKeys and decodeKeys), kept in the attachment's metadata as "sceyt.enc".
  * The UIKit only carries it. Contains the file key: do not log it.
  */
 export interface FileEncryptionInfo {

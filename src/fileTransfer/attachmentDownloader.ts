@@ -23,7 +23,7 @@ export type AttachmentDownloader = (
 const requests = new WeakMap<Promise<any>, TransferExecutor<Blob>>()
 
 /**
- * Downloads files of `attachment` through `fileTransfer.transport`. An encrypted file
+ * Downloads files of `attachment` through `fileTransfer.provider`. An encrypted file
  * (`encryptionInfo`) is decrypted with its trusted size, `plaintextSize` (the attachment's).
  * `type` is the file's real type.
  */
