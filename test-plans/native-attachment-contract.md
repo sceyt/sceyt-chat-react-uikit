@@ -30,6 +30,9 @@ Use this instead of the binary 49-byte token. Do not include `alg`, `ps`, salt,
 nonce prefix or header. Version 1 fixes the algorithm. The decoded key and ID
 must be exactly 32 and 16 bytes; malformed keys or unsupported versions fail
 with InvalidEncryption. JSON property order has no semantic significance.
+The outer token and both encoded fields must be canonical, unpadded base64url:
+padding and nonzero unused trailing bits are rejected with InvalidEncryption.
+JSON whitespace and member order remain unrestricted.
 
 The cipher API takes 16 raw attachment-ID bytes. Encoding the ID happens only
 inside the JSON key representation; it does not change the cipher input type.
