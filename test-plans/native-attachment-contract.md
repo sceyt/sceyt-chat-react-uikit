@@ -4,6 +4,20 @@ Keep the new fixed-header AttachmentCipher design and the current algorithm:
 `tink-aes256-gcm-hkdf-64k+commit-v1`, with the commitment label
 `sceyt.attachment.key-commitment.v1` and a 72-byte combined header.
 
+The updated shared spec derives a dedicated commitment key:
+
+```text
+commitKey = HKDF-SHA256(ikm, salt = empty,
+                       info = "sceyt.attachment.key-commitment.v1", length = 32)
+commitment = HMAC-SHA256(commitKey, attachmentId || Tink header)
+```
+
+The label has no terminator. The HMAC input is exactly 56 bytes (16-byte ID and
+40-byte Tink header), with no separator. Do not use the input key directly as
+the HMAC key. Tink's segment-key derivation and ciphertext are unchanged; only
+the first 32 bytes of a fixed test object's combined header change. This is a
+pre-release correction within version 1, with no old-commitment fallback.
+
 ## 1. Attachment key: base64url JSON
 
 The attachment key is unpadded base64url of UTF-8 JSON containing exactly:
