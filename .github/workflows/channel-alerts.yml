@@ -9,6 +9,7 @@ name: Waafi Alerts
 #   If it is missing the alert is skipped with a warning; CI is not affected.
 # - Channel id: the `channel-id` input; the repository variable
 #   WAAFI_CHANNEL_ID overrides it.
+# - Notification delivery is best-effort and cannot fail the calling pipeline.
 # - Every run is posted, pass or fail. Optional variable WAAFI_ALERT_SUCCESS:
 #   "changes" posts passes only on the default branch or when a failing
 #   branch is fixed (failures are always posted).
@@ -53,6 +54,7 @@ jobs:
           node-version: 22
 
       - name: Send the result to Waafi
+        continue-on-error: true
         env:
           GITHUB_TOKEN: ${{ github.token }}
           WAAFI_PLATFORM_API_KEY: ${{ secrets.WAAFI_PLATFORM_API_KEY }}
