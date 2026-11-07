@@ -12,12 +12,12 @@ const parse = (metadata: unknown): Record<string, any> | undefined => {
   }
 }
 
-// Whether the chat SDK reads `encodedKeys` as a keys string (FileEncryption.decodeKeys).
+// Whether the chat SDK reads `encodedKeys` as a keys string (FileEncryption.restore).
 const isKeys = (encodedKeys: string): boolean => {
   const provider = getClient()?.FileEncryption
-  if (!provider?.decodeKeys) return false
+  if (!provider?.restore) return false
   try {
-    provider.decodeKeys(encodedKeys)
+    provider.restore(encodedKeys)
     return true
   } catch {
     return false
@@ -26,9 +26,9 @@ const isKeys = (encodedKeys: string): boolean => {
 
 /**
  * Attachment encryption metadata: "sceyt.enc", one base64url string the chat SDK makes and reads
- * (FileEncryption.encodeKeys and decodeKeys) of the version, attachment id and key, kept next
+ * (AttachmentCipher.getToken and restore) of JSON {v, alg, aid, k, ps?}, kept next
  * to the other metadata keys; the salt and nonce prefix are in the stored file's header. The
- * plaintext size remains the attachment's file size. Every encrypted file is an attachment
+ * optional ps and the attachment's file size are checked by the SDK. Every encrypted file is an attachment
  * with its own "sceyt.enc" (a video's preview image is a preview attachment of its own).
  */
 export class FileEncryptionMetadata {

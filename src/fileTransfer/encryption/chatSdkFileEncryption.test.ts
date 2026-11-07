@@ -16,9 +16,8 @@ const installSdk = () => {
       ciphertextSize: file.size + 88,
       plaintextSize: file.size,
       sourceId: `source-${uniqueId}`,
-      encryptionInfo: { format: ALG, data: { uniqueId, key, plainSize: file.size } },
-      encodedKeys: keysOf(uniqueId, key),
-      checkpoint: jest.fn(() => ({ encryptionInfo: upload.encryptionInfo, data })),
+      cipher: { format: ALG, data: { uniqueId, key, plainSize: file.size }, getToken: () => keysOf(uniqueId, key) },
+      checkpoint: jest.fn(() => ({ cipher: upload.cipher, data })),
       readCiphertextRange: jest.fn(async (offset: number, length: number) => new Uint8Array(length).fill(offset % 256)),
       close: jest.fn()
     }
@@ -27,7 +26,7 @@ const installSdk = () => {
   }
   const sdk = {
     unknownPlainSize: -1,
-    decodeKeys: jest.fn((encoded: string, plainSize = -1) => {
+    restore: jest.fn((encoded: string, plainSize = -1) => {
       const [tag, uniqueId, key] = encoded.split(':')
       if (tag !== 'keys') throw Object.assign(new Error('Not a keys string'), { type: 'InvalidEncryption' })
       return { format: ALG, data: { uniqueId, key, plainSize } }
@@ -36,7 +35,7 @@ const installSdk = () => {
     ciphertextSize: jest.fn((plaintextSize: number) => plaintextSize + 88),
     prepareUpload: jest.fn(async (file: Blob, uniqueId: string) => makeUpload(file, uniqueId)),
     restoreUpload: jest.fn(async (file: Blob, checkpoint: any) =>
-      makeUpload(file, checkpoint.encryptionInfo.data.uniqueId, checkpoint.encryptionInfo.data.key, checkpoint.data)
+      makeUpload(file, checkpoint.cipher.data.uniqueId, checkpoint.cipher.data.key, checkpoint.data)
     ),
     openDownload: jest.fn(async (source: any, info: any) => {
       const reader = {
@@ -76,19 +75,23 @@ describe('ChatSdkFileEncryption', () => {
           ciphertextSize: source.size + 88,
           plaintextSize: source.size,
           sourceId: 's',
-          encryptionInfo: { format: ALG, data: { uniqueId, key: 'key-1', plainSize: source.size } },
+          cipher: {
+            format: ALG,
+            data: { uniqueId, key: 'key-1', plainSize: source.size },
+            getToken: () => 'sdk-json-keys'
+          },
           checkpoint: jest.fn(),
           readCiphertextRange: jest.fn(),
           close: jest.fn()
         },
-        { encodedKeys: 'AYCBgoOEhYaHiImKi4yNjo8' }
+        { encodedKeys: 'sdk-json-keys' }
       )
     )
 
     const session = await new ChatSdkFileEncryption().prepareEncryption(file)
 
     // Only the SDK's string: the UIKit neither encodes nor reads the keys.
-    expect(session.encryptionInfo).toEqual({ encodedKeys: 'AYCBgoOEhYaHiImKi4yNjo8' })
+    expect(session.encryptionInfo).toEqual({ encodedKeys: 'sdk-json-keys' })
   })
 
   it("gives the encrypted size of a file before it is encrypted, from the SDK's", () => {
@@ -127,9 +130,9 @@ describe('ChatSdkFileEncryption', () => {
     const restored = await encryption.restoreEncryption(file, saved)
 
     // The SDK reads the keys again, with the checkpoint's size.
-    expect(sdk.decodeKeys).toHaveBeenCalledWith(keysOf('gIGCg4SFhoeIiYqLjI2Ojw', 'key-1'), file.size)
+    expect(sdk.restore).toHaveBeenCalledWith(keysOf('gIGCg4SFhoeIiYqLjI2Ojw', 'key-1'), file.size)
     expect(sdk.restoreUpload).toHaveBeenCalledWith(file, {
-      encryptionInfo: { format: ALG, data: { uniqueId: 'gIGCg4SFhoeIiYqLjI2Ojw', key: 'key-1', plainSize: file.size } },
+      cipher: { format: ALG, data: { uniqueId: 'gIGCg4SFhoeIiYqLjI2Ojw', key: 'key-1', plainSize: file.size } },
       data: '{"v":1}'
     })
     expect(restored.encryptionInfo).toEqual(saved.encryptionInfo)
@@ -169,7 +172,7 @@ describe('ChatSdkFileEncryption', () => {
 
     const session = await new ChatSdkFileEncryption().prepareDecryption(encrypted, info, 1234)
 
-    expect(sdk.decodeKeys).toHaveBeenCalledWith(info.encodedKeys, 1234)
+    expect(sdk.restore).toHaveBeenCalledWith(info.encodedKeys, 1234)
     expect(sdk.openDownload).toHaveBeenCalledWith(expect.anything(), {
       format: ALG,
       data: { uniqueId: 'file-id', key: 'file-key', plainSize: 1234 }

@@ -16,9 +16,8 @@ interface SdkPreparedUpload {
   readonly ciphertextSize: number
   readonly plaintextSize: number
   readonly sourceId: string
-  readonly encryptionInfo: SdkFileEncryptionInfo
-  readonly encodedKeys: string
-  checkpoint(): { encryptionInfo: SdkFileEncryptionInfo; data: string }
+  readonly cipher: SdkFileEncryptionInfo & { getToken(): string }
+  checkpoint(): { cipher: SdkFileEncryptionInfo; data: string }
   // eslint-disable-next-line no-unused-vars
   readCiphertextRange(offset: number, length: number): Promise<Uint8Array>
   close(): void
@@ -62,7 +61,7 @@ export class ChatSdkEncryptionSession implements FileEncryptionSession {
     this.plaintextSize = upload.plaintextSize
     this.ciphertextSize = upload.ciphertextSize
     // The keys string the SDK made goes to the attachment's metadata as `enc`.
-    this.encryptionInfo = { encodedKeys: upload.encodedKeys }
+    this.encryptionInfo = { encodedKeys: upload.cipher.getToken() }
   }
 
   read(offset: number, length: number): Promise<Uint8Array> {
@@ -75,7 +74,7 @@ export class ChatSdkEncryptionSession implements FileEncryptionSession {
     const checkpoint = this.upload.checkpoint()
     return {
       encryptionInfo: this.encryptionInfo,
-      plaintextSize: checkpoint.encryptionInfo.data.plainSize,
+      plaintextSize: checkpoint.cipher.data.plainSize,
       data: checkpoint.data
     }
   }
@@ -124,7 +123,7 @@ export class ChatSdkFileEncryption implements FileEncryption {
   async restoreEncryption(file: Blob, checkpoint: FileEncryptionCheckpoint): Promise<FileEncryptionSession> {
     const provider = sdkFileEncryption()
     const upload = await provider.restoreUpload(file, {
-      encryptionInfo: provider.decodeKeys(checkpoint.encryptionInfo.encodedKeys, checkpoint.plaintextSize),
+      cipher: provider.restore(checkpoint.encryptionInfo.encodedKeys, checkpoint.plaintextSize),
       data: checkpoint.data
     })
     return new ChatSdkEncryptionSession(upload)
@@ -137,7 +136,7 @@ export class ChatSdkFileEncryption implements FileEncryption {
   ): Promise<FileDecryptionSession> {
     const provider = sdkFileEncryption()
     // The SDK reads the keys; a file whose message carries no size (a video's preview) is sized from its encrypted bytes.
-    const info: SdkFileEncryptionInfo = provider.decodeKeys(
+    const info: SdkFileEncryptionInfo = provider.restore(
       encryptionInfo.encodedKeys,
       plaintextSize === undefined ? provider.unknownPlainSize : plaintextSize
     )

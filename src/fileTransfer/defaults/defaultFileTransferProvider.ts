@@ -1,5 +1,5 @@
 import { getClient } from '../../common/client'
-import { ChatSdkEncryptionSession } from '../encryption/chatSdkFileEncryption'
+import { ChatSdkEncryptionSession, ChatSdkFileEncryption } from '../encryption/chatSdkFileEncryption'
 import { FileDecryptionSession } from '../encryption/types'
 import { fileTransfer } from '../sceytChatUIKitFileTransfer'
 import {
@@ -104,6 +104,28 @@ export class DefaultFileTransferProvider implements FileTransferProvider {
   }
 
   async download(request: FileDownloadRequest, callback: FileTransferCallback): Promise<FileTransferResult<Blob>> {
+    const client = getClient()
+    if (
+      request.encryptionInfo &&
+      fileTransfer.encryption instanceof ChatSdkFileEncryption &&
+      client.downloadEncrypted
+    ) {
+      try {
+        const cipher = client.FileEncryption.restore(
+          request.encryptionInfo.encodedKeys,
+          request.plaintextSize ?? client.FileEncryption.unknownPlainSize
+        )
+        const plaintext = await client.downloadEncrypted(request.url, cipher, {
+          type: request.mimeType || '',
+          signal: request.signal,
+          progress: (loaded: number, total?: number) => callback.onProgress(percentOf(loaded, total) * 0.9)
+        })
+        callback.onProgress(100)
+        return FileTransferResult.success(plaintext)
+      } catch (error) {
+        return FileTransferResult.failure(asError(error))
+      }
+    }
     const encrypted = !!request.encryptionInfo
     const share = encrypted ? DOWNLOAD_SHARE : 100
     let stored: Blob

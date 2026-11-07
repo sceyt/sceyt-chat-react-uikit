@@ -21,8 +21,11 @@ const sdkUpload = () => ({
   ciphertextSize: 20,
   plaintextSize: 5,
   sourceId: 'source-1',
-  encryptionInfo: { format: ALG, data: { uniqueId: 'file-id', key: 'file-key', plainSize: 5 } },
-  encodedKeys: 'keys-of-file-id',
+  cipher: {
+    format: ALG,
+    data: { uniqueId: 'file-id', key: 'file-key', plainSize: 5 },
+    getToken: () => 'keys-of-file-id'
+  },
   checkpoint: jest.fn(),
   readCiphertextRange: jest.fn(),
   close: jest.fn()
@@ -239,6 +242,36 @@ describe('DefaultFileTransferProvider', () => {
       mimeType: 'image/png',
       signal: new AbortController().signal,
       ...overrides
+    })
+
+    it('delegates encrypted downloads to the SDK with its decoded cipher and attachment size', async () => {
+      const cipher = { data: { plainSize: 7 } }
+      client.FileEncryption = { restore: jest.fn(() => cipher), unknownPlainSize: -1 }
+      client.downloadEncrypted = jest.fn(async () => new Blob(['picture'], { type: 'image/png' }))
+      const req = download({ encryptionInfo: info, plaintextSize: 7 })
+
+      const result = await transport.download(req, { onProgress: jest.fn() })
+
+      expect(client.FileEncryption.restore).toHaveBeenCalledWith(info.encodedKeys, 7)
+      expect(client.downloadEncrypted).toHaveBeenCalledWith(
+        req.url,
+        cipher,
+        expect.objectContaining({ signal: req.signal })
+      )
+      expect(client.download).not.toHaveBeenCalled()
+      expect(await readText((result as any).result)).toBe('picture')
+    })
+
+    it('reports an SDK encrypted-download verification failure', async () => {
+      client.FileEncryption = { restore: () => ({}), unknownPlainSize: -1 }
+      const error = Object.assign(new Error('tampered'), { type: 'Authentication' })
+      client.downloadEncrypted = jest.fn(async () => {
+        throw error
+      })
+
+      const result = await transport.download(download({ encryptionInfo: info }), { onProgress: jest.fn() })
+
+      expect(result).toEqual({ type: 'failure', error })
     })
 
     it('a plain file comes from client.download with its type and progress in percent', async () => {

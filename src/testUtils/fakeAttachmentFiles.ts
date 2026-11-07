@@ -7,7 +7,7 @@ import { readResponseBlobWithProgress } from '../helpers/getVideoFrame'
 // that files go through it with the right attachment id and key. "Encrypting" prefixes
 // the bytes with a fixed-length `enc(<key>@<id>):` header, and opening a file with
 // another key or attachment id fails. Key `key-n` has attachment id `id-n`. Its keys string
-// (the SDK's FileEncryption.encodeKeys, kept in metadata as `enc`) is `fake-keys.id-n.key-n`.
+// (the SDK's AttachmentCipher.getToken, kept in metadata as `enc`) is `fake-keys.id-n.key-n`.
 
 const ALG = 'tink-aes256-gcm-hkdf-64k+commit-v1'
 // Every fake header has this length, so a plaintext size follows from a stored size.
@@ -41,7 +41,7 @@ export const fakeEncryption = (key: string) => `fake-keys.${uniqueIdOf(key)}.${k
 /** What opens the fake file of `key`, as the UIKit's encryption gives it. */
 export const fakeEncryptionInfo = (key: string): FileEncryptionInfo => ({ encodedKeys: fakeEncryption(key) })
 
-/** The SDK's FileEncryption.decodeKeys, for fake keys strings. */
+/** The SDK's FileEncryption.restore, for fake keys strings. */
 const decodeFakeKeys = (encoded: unknown, plainSize = -1) => {
   const match = typeof encoded === 'string' ? /^fake-keys\.([^.]+)\.([^.]+)$/.exec(encoded) : null
   if (!match) throw sdkError('InvalidEncryption', 'Not a keys string')
@@ -63,9 +63,8 @@ export const makeFakePreparedUpload = (source: Blob, key: string) => {
     ciphertextSize: stored.size,
     plaintextSize: source.size,
     sourceId: `source-${uniqueId}`,
-    encryptionInfo,
-    encodedKeys: fakeEncryption(key),
-    checkpoint: () => ({ encryptionInfo, data: '{}' }),
+    cipher: { ...encryptionInfo, getToken: () => fakeEncryption(key) },
+    checkpoint: () => ({ cipher: encryptionInfo, data: '{}' }),
     readCiphertextRange: (offset: number, length: number) => readBytes(stored.slice(offset, offset + length)),
     close: () => undefined
   }
@@ -132,7 +131,7 @@ export const installFakeFilesClient = () => {
       newUniqueId: () => `id-${++created}`,
       prepareUpload: async (file: Blob, uniqueId: string) => makeFakePreparedUpload(file, keyOf(uniqueId)),
       openDownload: openFakeDownload,
-      decodeKeys: decodeFakeKeys,
+      restore: decodeFakeKeys,
       unknownPlainSize: -1,
       plaintextSize: (ciphertextSize: number) => Math.max(0, ciphertextSize - HEADER_SIZE)
     },
