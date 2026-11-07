@@ -72,7 +72,7 @@
         "lines": 100,
         "branches": 100
       },
-      "./src/helpers/customUploader.ts": {
+      "./src/fileTransfer/attachmentUploadCoordinator.ts": {
         "lines": 95,
         "branches": 85
       },
