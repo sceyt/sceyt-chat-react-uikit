@@ -111,15 +111,14 @@ export class DefaultFileTransferProvider implements FileTransferProvider {
       client.downloadEncrypted
     ) {
       try {
-        const cipher = client.FileEncryption.restore(
-          request.encryptionInfo.encodedKeys,
-          request.plaintextSize ?? client.FileEncryption.unknownPlainSize
-        )
-        const plaintext = await client.downloadEncrypted(request.url, cipher, {
+        const plaintext = await client.downloadEncrypted(request.url, request.encryptionInfo.encodedKeys, {
           type: request.mimeType || '',
           signal: request.signal,
           progress: (loaded: number, total?: number) => callback.onProgress(percentOf(loaded, total) * 0.9)
         })
+        if (request.plaintextSize !== undefined && plaintext.size !== request.plaintextSize) {
+          throw Object.assign(new Error('The plaintext size does not match the attachment'), { type: 'Authentication' })
+        }
         callback.onProgress(100)
         return FileTransferResult.success(plaintext)
       } catch (error) {

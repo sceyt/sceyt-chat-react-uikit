@@ -30,7 +30,6 @@ const readBytes = (blob: Blob): Promise<Uint8Array> =>
   })
 
 const uniqueIdOf = (key: string) => key.replace(/^key-/, 'id-')
-const keyOf = (uniqueId: string) => uniqueId.replace(/^id-/, 'key-')
 const headerOf = (key: string, id: string = uniqueIdOf(key)) => `enc(${key}@${id})`.padEnd(HEADER_SIZE - 1) + ':'
 
 const sdkError = (type: string, message: string) => Object.assign(new Error(message), { type })
@@ -56,15 +55,23 @@ export const fakeEncrypted = (key: string, text: string) =>
 export const makeFakePreparedUpload = (source: Blob, key: string) => {
   const uniqueId = uniqueIdOf(key)
   const stored = new Blob([headerOf(key), source], { type: 'application/octet-stream' })
-  const encryptionInfo = { format: ALG, data: { uniqueId, key, plainSize: source.size } }
   return {
     source,
     stored,
     ciphertextSize: stored.size,
     plaintextSize: source.size,
     sourceId: `source-${uniqueId}`,
-    cipher: { ...encryptionInfo, getToken: () => fakeEncryption(key) },
-    checkpoint: () => ({ cipher: encryptionInfo, data: '{}' }),
+    cipher: {
+      attachmentKey: fakeEncryption(key),
+      header: Uint8Array.from(headerOf(key), (char) => char.charCodeAt(0))
+    },
+    checkpoint: () => ({
+      cipher: {
+        attachmentKey: fakeEncryption(key),
+        header: Uint8Array.from(headerOf(key), (char) => char.charCodeAt(0))
+      },
+      data: '{}'
+    }),
     readCiphertextRange: (offset: number, length: number) => readBytes(stored.slice(offset, offset + length)),
     close: () => undefined
   }
@@ -128,12 +135,22 @@ export const installFakeFilesClient = () => {
   let created = 0
   const client: any = {
     FileEncryption: {
-      newUniqueId: () => `id-${++created}`,
-      prepareUpload: async (file: Blob, uniqueId: string) => makeFakePreparedUpload(file, keyOf(uniqueId)),
-      openDownload: openFakeDownload,
-      restore: decodeFakeKeys,
-      unknownPlainSize: -1,
-      plaintextSize: (ciphertextSize: number) => Math.max(0, ciphertextSize - HEADER_SIZE)
+      newAttachmentId: () => Uint8Array.from([++created, ...new Array(15).fill(0)]),
+      prepareUpload: async (file: Blob, id: Uint8Array) => makeFakePreparedUpload(file, `key-${id[0]}`)
+    },
+    AttachmentCipher: {
+      restore: async (encoded: unknown, _header: Uint8Array) => {
+        const info = decodeFakeKeys(encoded)
+        return {
+          newDecryptingRandomAccessStream: async (source: {
+            size: number
+            read: (o: number, n: number) => Promise<Uint8Array>
+          }) => {
+            const reader = await openFakeDownload({ ciphertextSize: source.size, read: source.read }, info)
+            return { size: reader.plaintextSize, read: reader.read, close: reader.close }
+          }
+        }
+      }
     },
     download: fakeSdkDownload
   }

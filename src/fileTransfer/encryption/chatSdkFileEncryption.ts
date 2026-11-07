@@ -8,27 +8,32 @@ import {
 } from './types'
 
 // The SDK's types (sceyt-chat FileEncryption), as far as this adapter uses them.
-interface SdkFileEncryptionInfo {
-  format: string
-  data: { uniqueId: string; key: string; plainSize: number }
-}
-interface SdkPreparedUpload {
-  readonly ciphertextSize: number
-  readonly plaintextSize: number
-  readonly sourceId: string
-  readonly cipher: SdkFileEncryptionInfo & { getToken(): string }
-  checkpoint(): { cipher: SdkFileEncryptionInfo; data: string }
-  // eslint-disable-next-line no-unused-vars
-  readCiphertextRange(offset: number, length: number): Promise<Uint8Array>
-  close(): void
-}
 interface SdkPlaintextReader {
-  readonly plaintextSize: number
+  readonly size: number
   // eslint-disable-next-line no-unused-vars
   read(offset: number, length: number): Promise<Uint8Array>
   close(): void
 }
 
+interface SdkAttachmentCipher {
+  readonly attachmentKey: string
+  readonly header: Uint8Array
+  newDecryptingRandomAccessStream(source: {
+    size: number
+    // eslint-disable-next-line no-unused-vars
+    read: (offset: number, length: number) => Promise<Uint8Array>
+  }): Promise<SdkPlaintextReader>
+}
+interface SdkPreparedUpload {
+  readonly ciphertextSize: number
+  readonly plaintextSize: number
+  readonly sourceId: string
+  readonly cipher: SdkAttachmentCipher
+  checkpoint(): { cipher: SdkAttachmentCipher; data: string }
+  // eslint-disable-next-line no-unused-vars
+  readCiphertextRange(offset: number, length: number): Promise<Uint8Array>
+  close(): void
+}
 // The SDK's FileEncryption, from the chat client.
 const sdkFileEncryption = () => {
   const provider = getClient()?.FileEncryption
@@ -61,7 +66,7 @@ export class ChatSdkEncryptionSession implements FileEncryptionSession {
     this.plaintextSize = upload.plaintextSize
     this.ciphertextSize = upload.ciphertextSize
     // The keys string the SDK made goes to the attachment's metadata as `enc`.
-    this.encryptionInfo = { encodedKeys: upload.cipher.getToken() }
+    this.encryptionInfo = { encodedKeys: upload.cipher.attachmentKey }
   }
 
   read(offset: number, length: number): Promise<Uint8Array> {
@@ -74,7 +79,8 @@ export class ChatSdkEncryptionSession implements FileEncryptionSession {
     const checkpoint = this.upload.checkpoint()
     return {
       encryptionInfo: this.encryptionInfo,
-      plaintextSize: checkpoint.cipher.data.plainSize,
+      plaintextSize: this.plaintextSize,
+      header: Array.from(checkpoint.cipher.header),
       data: checkpoint.data
     }
   }
@@ -94,7 +100,7 @@ class ChatSdkDecryptionSession implements FileDecryptionSession {
     readonly sourceId: string,
     private readonly reader: SdkPlaintextReader
   ) {
-    this.plaintextSize = reader.plaintextSize
+    this.plaintextSize = reader.size
   }
 
   read(offset: number, length: number): Promise<Uint8Array> {
@@ -111,19 +117,29 @@ class ChatSdkDecryptionSession implements FileDecryptionSession {
 
 /** The SDK's file encryption behind the UIKit's encryption interface. */
 export class ChatSdkFileEncryption implements FileEncryption {
-  async prepareEncryption(file: Blob, attachmentId?: string): Promise<FileEncryptionSession> {
+  async prepareEncryption(file: Blob, attachmentId?: Uint8Array): Promise<FileEncryptionSession> {
     const provider = sdkFileEncryption()
-    return new ChatSdkEncryptionSession(await provider.prepareUpload(file, attachmentId || provider.newUniqueId()))
+    return new ChatSdkEncryptionSession(await provider.prepareUpload(file, attachmentId || provider.newAttachmentId()))
   }
 
   ciphertextSize(plaintextSize: number): number {
-    return sdkFileEncryption().ciphertextSize(plaintextSize)
+    if (!Number.isSafeInteger(plaintextSize) || plaintextSize < 0) {
+      throw Object.assign(new Error('The plaintext size must be a non-negative whole number'), {
+        type: 'InvalidArgument'
+      })
+    }
+    // Storage planning for the fixed algorithm; cryptography and key handling stay in the SDK.
+    const segments = plaintextSize <= 65480 ? 1 : 1 + Math.ceil((plaintextSize - 65480) / 65520)
+    return 72 + plaintextSize + 16 * segments
   }
 
   async restoreEncryption(file: Blob, checkpoint: FileEncryptionCheckpoint): Promise<FileEncryptionSession> {
     const provider = sdkFileEncryption()
     const upload = await provider.restoreUpload(file, {
-      cipher: provider.restore(checkpoint.encryptionInfo.encodedKeys, checkpoint.plaintextSize),
+      cipher: await getClient().AttachmentCipher.restore(
+        checkpoint.encryptionInfo.encodedKeys,
+        Uint8Array.from(checkpoint.header)
+      ),
       data: checkpoint.data
     })
     return new ChatSdkEncryptionSession(upload)
@@ -134,19 +150,18 @@ export class ChatSdkFileEncryption implements FileEncryption {
     encryptionInfo: FileEncryptionInfo,
     plaintextSize: number | undefined
   ): Promise<FileDecryptionSession> {
-    const provider = sdkFileEncryption()
+    sdkFileEncryption()
     // The SDK reads the keys; a file whose message carries no size (a video's preview) is sized from its encrypted bytes.
-    const info: SdkFileEncryptionInfo = provider.restore(
-      encryptionInfo.encodedKeys,
-      plaintextSize === undefined ? provider.unknownPlainSize : plaintextSize
-    )
-    const reader: SdkPlaintextReader = await provider.openDownload(
-      {
-        ciphertextSize: encryptedFile.size,
-        read: (offset: number, length: number) => readBytes(encryptedFile.slice(offset, offset + length))
-      },
-      info
-    )
-    return new ChatSdkDecryptionSession(`${info.data.uniqueId}:${encryptedFile.size}`, reader)
+    const header = await readBytes(encryptedFile.slice(0, 72))
+    const cipher: SdkAttachmentCipher = await getClient().AttachmentCipher.restore(encryptionInfo.encodedKeys, header)
+    const reader = await cipher.newDecryptingRandomAccessStream({
+      size: encryptedFile.size,
+      read: (offset, length) => readBytes(encryptedFile.slice(offset, offset + length))
+    })
+    if (plaintextSize !== undefined && reader.size !== plaintextSize) {
+      reader.close()
+      throw Object.assign(new Error('The plaintext size does not match the attachment'), { type: 'Authentication' })
+    }
+    return new ChatSdkDecryptionSession(`${Array.from(header).join('.')}:${encryptedFile.size}`, reader)
   }
 }

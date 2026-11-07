@@ -1,6 +1,6 @@
 /**
  * What opens one file: its keys, one base64url string the chat SDK makes and reads
- * (AttachmentCipher.getToken and restore), kept in the attachment's metadata as "sceyt.enc".
+ * (AttachmentCipher.attachmentKey and restore), kept in the attachment's metadata as "sceyt.enc".
  * The UIKit only carries it. Contains the file key: do not log it.
  */
 export interface FileEncryptionInfo {
@@ -11,6 +11,8 @@ export interface FileEncryptionInfo {
 export interface FileEncryptionCheckpoint {
   encryptionInfo: FileEncryptionInfo
   plaintextSize: number
+  /** Original 72-byte header, kept privately with the pending upload. */
+  header: number[]
   data: string
 }
 
@@ -43,10 +45,10 @@ export interface FileDecryptionSession {
 export interface FileEncryption {
   /**
    * Encrypts `file` with a new key. `attachmentId` is the id the file is bound to when a
-   * server issued one (16 bytes, base64url); without it the encryption makes one.
+   * server issued one (16 raw bytes); without it the encryption makes one.
    */
   // eslint-disable-next-line no-unused-vars
-  prepareEncryption: (file: Blob, attachmentId?: string) => Promise<FileEncryptionSession>
+  prepareEncryption: (file: Blob, attachmentId?: Uint8Array) => Promise<FileEncryptionSession>
   /** The encrypted size of a `plaintextSize`-byte file, before it is encrypted (e.g. to plan upload parts). */
   // eslint-disable-next-line no-unused-vars
   ciphertextSize?: (plaintextSize: number) => number

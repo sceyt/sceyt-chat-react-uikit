@@ -37,16 +37,18 @@ describe('FileEncryptionMetadata', () => {
   })
 
   it('an enc the SDK cannot read (not a keys string, or the old object) has no encryption info, but is encrypted', () => {
-    for (const enc of ['x', 5, { v: 1, alg: 'tink-aes256-gcm-hkdf-64k+commit-v1', aid: 'id-1', k: 'key-1' }]) {
+    for (const enc of ['', 5, { v: 1, alg: 'tink-aes256-gcm-hkdf-64k+commit-v1', aid: 'id-1', k: 'key-1' }]) {
       const metadata = JSON.stringify({ 'sceyt.enc': enc })
       expect(FileEncryptionMetadata.read(metadata)).toBeUndefined()
       expect(FileEncryptionMetadata.isEncrypted(metadata)).toBe(true)
     }
   })
 
-  it('without a chat client that reads keys strings, enc gives no encryption info', () => {
+  it('carries the opaque key string even before a chat client is installed', () => {
     setClient(undefined as any)
-    expect(FileEncryptionMetadata.read({ 'sceyt.enc': fakeEncryption('key-1') })).toBeUndefined()
+    expect(FileEncryptionMetadata.read({ 'sceyt.enc': fakeEncryption('key-1') })!.encodedKeys).toBe(
+      fakeEncryption('key-1')
+    )
   })
 
   it('removes `enc` and keeps the other keys', () => {

@@ -24,7 +24,8 @@ const sdkUpload = () => ({
   cipher: {
     format: ALG,
     data: { uniqueId: 'file-id', key: 'file-key', plainSize: 5 },
-    getToken: () => 'keys-of-file-id'
+    attachmentKey: 'keys-of-file-id',
+    header: new Uint8Array(72)
   },
   checkpoint: jest.fn(),
   readCiphertextRange: jest.fn(),
@@ -244,7 +245,7 @@ describe('DefaultFileTransferProvider', () => {
       ...overrides
     })
 
-    it('delegates encrypted downloads to the SDK with its decoded cipher and attachment size', async () => {
+    it('delegates key restoration and encrypted downloads to the SDK', async () => {
       const cipher = { data: { plainSize: 7 } }
       client.FileEncryption = { restore: jest.fn(() => cipher), unknownPlainSize: -1 }
       client.downloadEncrypted = jest.fn(async () => new Blob(['picture'], { type: 'image/png' }))
@@ -252,10 +253,10 @@ describe('DefaultFileTransferProvider', () => {
 
       const result = await transport.download(req, { onProgress: jest.fn() })
 
-      expect(client.FileEncryption.restore).toHaveBeenCalledWith(info.encodedKeys, 7)
+      expect(client.FileEncryption.restore).not.toHaveBeenCalled()
       expect(client.downloadEncrypted).toHaveBeenCalledWith(
         req.url,
-        cipher,
+        info.encodedKeys,
         expect.objectContaining({ signal: req.signal })
       )
       expect(client.download).not.toHaveBeenCalled()

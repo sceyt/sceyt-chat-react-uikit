@@ -1,4 +1,3 @@
-import { getClient } from '../../common/client'
 import { FileEncryptionInfo } from './types'
 
 const FIELD = 'sceyt.enc'
@@ -12,23 +11,12 @@ const parse = (metadata: unknown): Record<string, any> | undefined => {
   }
 }
 
-// Whether the chat SDK reads `encodedKeys` as a keys string (FileEncryption.restore).
-const isKeys = (encodedKeys: string): boolean => {
-  const provider = getClient()?.FileEncryption
-  if (!provider?.restore) return false
-  try {
-    provider.restore(encodedKeys)
-    return true
-  } catch {
-    return false
-  }
-}
-
 /**
  * Attachment encryption metadata: "sceyt.enc", one base64url string the chat SDK makes and reads
- * (AttachmentCipher.getToken and restore) of JSON {v, alg, aid, k, ps?}, kept next
- * to the other metadata keys; the salt and nonce prefix are in the stored file's header. The
- * optional ps and the attachment's file size are checked by the SDK. Every encrypted file is an attachment
+ * (AttachmentCipher.attachmentKey and restore) of JSON {v, k, aid}, kept next
+ * to the other metadata keys. Salt and nonce prefix are in the stored file's header.
+ * The attachment's file size remains outside the key token.
+ * Every encrypted file is an attachment
  * with its own "sceyt.enc" (a video's preview image is a preview attachment of its own).
  */
 export class FileEncryptionMetadata {
@@ -63,10 +51,10 @@ export class FileEncryptionMetadata {
     return !!json && FIELD in json
   }
 
-  /** The encryption metadata, or undefined when there is none or the SDK cannot read it. */
+  /** The encryption metadata, or undefined when there is none or its value is not a nonempty string. */
   static read(metadata: unknown): FileEncryptionMetadata | undefined {
     const enc = parse(metadata)?.[FIELD]
-    return typeof enc === 'string' && enc && isKeys(enc) ? new FileEncryptionMetadata(enc) : undefined
+    return typeof enc === 'string' && enc ? new FileEncryptionMetadata(enc) : undefined
   }
 
   /** `metadata` with `envelope` as its "sceyt.enc", keeping the other keys. */
