@@ -10,7 +10,7 @@ import {
   FileUploadRequest,
   FileUploadResult,
   FileUploadType
-} from '../types'
+} from '../../types/fileTransfer/types'
 
 // Plaintext is read from a decryption session this many bytes at a time.
 const READ_SIZE = 5 * 1024 * 1024

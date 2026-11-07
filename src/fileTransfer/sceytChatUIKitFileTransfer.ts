@@ -1,6 +1,6 @@
 import { ChatSdkFileEncryption } from './encryption/chatSdkFileEncryption'
 import { FileEncryption } from './encryption/types'
-import { FileTransferProvider } from './types'
+import { FileTransferProvider } from '../types/fileTransfer/types'
 import { DefaultFileTransferProvider } from './defaults/defaultFileTransferProvider'
 
 /** The `fileTransfer` prop of SceytChat: every field is optional and falls back to its default. */

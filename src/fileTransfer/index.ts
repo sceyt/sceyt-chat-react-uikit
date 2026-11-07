@@ -1,4 +1,4 @@
-export * from './types'
+export * from '../types/fileTransfer/types'
 export * from './encryption/types'
 export { FileEncryptionMetadata } from './encryption/fileEncryptionMetadata'
 export { ChatSdkFileEncryption, ChatSdkEncryptionSession } from './encryption/chatSdkFileEncryption'

@@ -1,5 +1,5 @@
-import { IAttachment } from '../types'
-import { FileEncryptionInfo } from './encryption/types'
+import { IAttachment } from '..'
+import { FileEncryptionInfo } from '../../fileTransfer/encryption/types'
 
 // File transfer: the same structure as the Android UIKit (com.sceyt.chatuikit.filetransfer).
 // The UIKit owns attachment scheduling, preparation and persistence; a provider moves the

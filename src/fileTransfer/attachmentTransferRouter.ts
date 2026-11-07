@@ -10,7 +10,7 @@ import {
   FileUploadRequest,
   FileUploadResult,
   FileUploadType
-} from './types'
+} from '../types/fileTransfer/types'
 
 /** Operation ids the UIKit gives providers: stable per upload, and per download of a file. */
 export const uploadOperationId = (attachmentTid: string) => `upload:${attachmentTid}`

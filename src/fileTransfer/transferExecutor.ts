@@ -1,4 +1,4 @@
-import { FileTransferCallback, FileTransferResult, FileTransferProvider } from './types'
+import { FileTransferCallback, FileTransferResult, FileTransferProvider } from '../types/fileTransfer/types'
 
 // The attempt: given the executor (its signal and provider controls) and the progress callback.
 // eslint-disable-next-line no-unused-vars, no-use-before-define

@@ -3,7 +3,7 @@ import { IAttachment } from '../types'
 import { isConnectionLost } from '../helpers/sendAttachments'
 import { attachmentTransferRouter, IUploadSource } from './attachmentTransferRouter'
 import { TransferExecutor } from './transferExecutor'
-import { FileUploadResult } from './types'
+import { FileUploadResult } from '../types/fileTransfer/types'
 
 // Schedules attachment uploads through the router, as the Android UIKit's
 // AttachmentUploadCoordinator does: a pause asks the transport to pause natively and

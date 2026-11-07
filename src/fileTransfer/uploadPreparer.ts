@@ -3,7 +3,7 @@ import { getPendingAttachment, setPendingAttachment } from '../helpers/messagesH
 import { parseAttachmentMetadata } from '../helpers/videoPreview'
 import { uploadOperationId } from './attachmentTransferRouter'
 import { fileTransfer } from './sceytChatUIKitFileTransfer'
-import { FileTransferEntries, FileUploadRequest, FileUploadType } from './types'
+import { FileTransferEntries, FileUploadRequest, FileUploadType } from '../types/fileTransfer/types'
 
 // The provider's step before each upload attempt (the same contract as the native UIKits):
 // the UIKit calls provider.prepareUpload(request), where request.metadata is the attachment's

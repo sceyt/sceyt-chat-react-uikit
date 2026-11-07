@@ -2,7 +2,7 @@ import { IAttachment, IMarker, IMessage, IPollVote, IReaction } from '../../type
 import { checkArraysEqual } from '../index'
 import { attachmentTypes, MESSAGE_DELIVERY_STATUS, MESSAGE_STATUS } from '../constants'
 import { cancelUpload } from '../../fileTransfer/attachmentUploadCoordinator'
-import type { FileTransferEntries } from '../../fileTransfer/types'
+import type { FileTransferEntries } from '../../types/fileTransfer/types'
 import { releaseBlobUrls } from '../attachmentBlobUrls'
 import { clearVideoPreparation } from '../attachmentPreparation'
 import { handleVoteDetails } from '../message'
