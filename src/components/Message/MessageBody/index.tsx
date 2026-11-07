@@ -11,9 +11,10 @@ import { ReactComponent as ViewOnceIconOpen } from '../../../assets/svg/view-onc
 // Helpers
 import { calculateRenderedImageWidth } from 'helpers'
 import { isJSON } from 'helpers/message'
+import { withVideoPreviews } from 'helpers/videoPreview'
 import { getClient } from 'common/client'
 import { getShowOnlyContactUsers } from 'helpers/contacts'
-import { getSendAttachmentsAsSeparateMessages } from 'helpers/customUploader'
+import { getSendAttachmentsAsSeparateMessages } from 'helpers/sendAttachments'
 import { attachmentTypes, DEFAULT_CHANNEL_TYPE, MESSAGE_DELIVERY_STATUS, MESSAGE_STATUS } from 'helpers/constants'
 import { MessageText } from 'UIHelper'
 import { THEME_COLORS } from 'UIHelper/constants'
@@ -455,21 +456,23 @@ const MessageBody = ({
       (showMessageStatusForEachMessage || !nextMessage),
     [message.incoming, showMessageStatus, message.state, showMessageStatusForEachMessage, nextMessage]
   )
+  // Video previews sent as attachments of their own are shown on their videos.
+  const displayedAttachments = useMemo(() => withVideoPreviews(message.attachments || []), [message.attachments])
   const withAttachments = useMemo(
-    () => message.attachments && message.attachments.length > 0 && (!viewOnce || isViewOnceAndVoiceMessage),
-    [message.attachments, viewOnce, isViewOnceAndVoiceMessage]
+    () => displayedAttachments && displayedAttachments.length > 0 && (!viewOnce || isViewOnceAndVoiceMessage),
+    [displayedAttachments, viewOnce, isViewOnceAndVoiceMessage]
   )
 
   const notLinkAttachment = useMemo(
     () =>
       withAttachments &&
-      message.attachments.some(
+      displayedAttachments.some(
         (a: IAttachment) => a.type !== attachmentTypes.link && (!viewOnce || isViewOnceAndVoiceMessage)
       ),
-    [withAttachments, message.attachments, viewOnce]
+    [withAttachments, displayedAttachments, viewOnce]
   )
 
-  const linkAttachment = message.attachments.find(
+  const linkAttachment = displayedAttachments.find(
     (a: IAttachment) => a.type === attachmentTypes.link && (!viewOnce || isViewOnceAndVoiceMessage)
   )
   const ogContainerOrder = (ogMetadataProps && ogMetadataProps.ogLayoutOrder) || 'og-first'
@@ -483,12 +486,12 @@ const MessageBody = ({
     () =>
       withAttachments &&
       (!viewOnce || isViewOnceAndVoiceMessage) &&
-      message.attachments.find(
+      displayedAttachments.find(
         (attachment: IAttachment) =>
           attachment.type === attachmentTypes.video || attachment.type === attachmentTypes.image,
-        [withAttachments, message.attachments, viewOnce, isViewOnceAndVoiceMessage]
+        [withAttachments, displayedAttachments, viewOnce, isViewOnceAndVoiceMessage]
       ),
-    [withAttachments, message.attachments, viewOnce, isViewOnceAndVoiceMessage]
+    [withAttachments, displayedAttachments, viewOnce, isViewOnceAndVoiceMessage]
   )
   const withMediaAttachment = useMemo(
     () => !!mediaAttachment && (!viewOnce || isViewOnceAndVoiceMessage),
@@ -502,16 +505,16 @@ const MessageBody = ({
   )
 
   const fileAttachment = useMemo(() => {
-    return message.attachments.find(
+    return displayedAttachments.find(
       (attachment: IAttachment) => attachment.type === attachmentTypes.file && (!viewOnce || isViewOnceAndVoiceMessage)
     )
-  }, [message.attachments, viewOnce, isViewOnceAndVoiceMessage])
+  }, [displayedAttachments, viewOnce, isViewOnceAndVoiceMessage])
 
   const showOGMetadata = useMemo(() => {
     if (!(linkAttachment && !mediaAttachment && !withMediaAttachment && !fileAttachment)) {
       return false
     }
-    const attachment = message.attachments[0]
+    const attachment = displayedAttachments[0]
     const attachmentMetadata = isJSON(attachment?.metadata) ? JSON.parse(attachment.metadata) : attachment.metadata
     if (!attachmentMetadata || attachmentMetadata?.hld) {
       return false
@@ -625,7 +628,7 @@ const MessageBody = ({
     // TODO implement remove failed attachment
     // dispatch(removeFailedAttachment(message.tid, attachmentId));
   }
-  if (message.id === '847315742421716992') {
+  if (message.id === '874469181820293120') {
     console.log(message)
   }
 
@@ -663,11 +666,11 @@ const MessageBody = ({
                   // imageAttachmentMaxHeight
                 )[0]) ||
               400
-            : /*: message.attachments[0].type === attachmentTypes.link
+            : /*: displayedAttachments[0].type === attachmentTypes.link
                 ? 324 */
-              message.attachments[0].type === attachmentTypes.voice
+              displayedAttachments[0].type === attachmentTypes.voice
               ? 254
-              : message.attachments[0].type === attachmentTypes.file
+              : displayedAttachments[0].type === attachmentTypes.file
                 ? fileAttachmentsBoxWidth
                 : undefined
           : undefined
@@ -756,9 +759,9 @@ const MessageBody = ({
               editMessage &&
               !message.forwardingDetails &&
               !(
-                message.attachments &&
-                message.attachments.length &&
-                message.attachments[0].type === attachmentTypes.voice
+                displayedAttachments &&
+                displayedAttachments.length &&
+                displayedAttachments[0].type === attachmentTypes.voice
               )
             }
             showCopyMessage={copyMessage && message.body}
@@ -901,7 +904,7 @@ const MessageBody = ({
           />
         )}
         {message.type !== MESSAGE_TYPE.POLL &&
-          (viewOnce && message.attachments?.length === 1 && message.attachments[0].type !== attachmentTypes.voice ? (
+          (viewOnce && displayedAttachments?.length === 1 && displayedAttachments[0].type !== attachmentTypes.voice ? (
             <TextContentContainer>
               <ViewOnceMessageWrapper color={hasOpened ? iconInactive : accentColor}>
                 {hasOpened ? (
@@ -982,7 +985,7 @@ const MessageBody = ({
         messageStatusAndTimePosition === 'onMessage' &&
         (messageStatusVisible || messageTimeVisible) &&
         (() => {
-          const nonLinkAttachment = message.attachments.find((a: IAttachment) => a.type !== attachmentTypes.link)
+          const nonLinkAttachment = displayedAttachments.find((a: IAttachment) => a.type !== attachmentTypes.link)
           const attachmentType = nonLinkAttachment?.type
           return (
             <MessageStatusAndTime
@@ -1021,7 +1024,7 @@ const MessageBody = ({
 
       {
         withAttachments &&
-          (message.attachments as any[]).map((attachment: any) => (
+          (displayedAttachments as any[]).map((attachment: any) => (
             <Attachment
               viewOnce={viewOnce}
               key={attachment.tid || attachment.url}

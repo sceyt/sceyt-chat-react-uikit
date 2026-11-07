@@ -74,7 +74,8 @@ import { THEME_COLORS } from '../../UIHelper/constants'
 import { createImageThumbnail, resizeImage } from '../../helpers/resizeImage'
 import { detectBrowser, detectOS } from '../../helpers'
 import { IMember, IMessage, IUser } from '../../types'
-import { getCustomUploader, getSendAttachmentsAsSeparateMessages } from '../../helpers/customUploader'
+import { getSendAttachmentsAsSeparateMessages } from '../../helpers/sendAttachments'
+import { fileTransfer } from '../../fileTransfer/sceytChatUIKitFileTransfer'
 import {
   checkDraftMessagesIsEmpty,
   areDraftMessagesHydrated,
@@ -96,10 +97,12 @@ import { getReplyLinkPreviewImage, shouldShowLinkPreviewErrorFallback } from '..
 import { getShowOnlyContactUsers } from '../../helpers/contacts'
 import { getFrame, VideoThumbnailFrame } from '../../helpers/getVideoFrame'
 import { remuxVideoFileForUpload } from '../../helpers/videoConversion'
+import { canPlayQuickTime, inspectVideoBlob, isQuickTimeContainer } from '../../helpers/videoContainer'
 import {
   beginAttachmentPreparation,
   clearAttachmentPreparation,
   completeAttachmentPreparation,
+  completeAttachmentPreview,
   failAttachmentPreparation
 } from '../../helpers/attachmentPreparation'
 import { CAN_USE_DOM } from '../../helpers/canUseDOM'
@@ -228,6 +231,9 @@ function onError(error: any) {
 
 let attachmentsUpdate: any = []
 const UNSUPPORTED_PASTED_FILE_MESSAGE = 'This file format is not supported.'
+// JPEG quality of an image sent as media. This is its only encode: uploaders
+// store the file as given.
+const MEDIA_IMAGE_QUALITY = 0.8
 const useComposerLayoutEffect = CAN_USE_DOM ? useLayoutEffect : useEffect
 
 export interface SendMessageProps {
@@ -1427,7 +1433,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
   }
 
   const handleAddAttachment = async (file: File, isMediaAttachment: boolean) => {
-    const customUploader = getCustomUploader()
+    const customUploader = fileTransfer.hasCustomProvider
     const fileType = file.type.split('/')[0]
     const tid = uuidv4()
 
@@ -1458,7 +1464,8 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
       // a persisted File as a Blob, and the explicit name lets hydration rebuild a
       // real File without changing the image bytes.
       name: file.name,
-      upload: !customUploader,
+      // The uikit uploads the file (custom uploader or client.upload), not sendMessage.
+      upload: false,
       type,
       tid,
       size: file.size,
@@ -1499,13 +1506,13 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
               let preparedFile = file
               let metadata: any
               if (customUploader) {
-                const resizedFile = await resizeImage(file)
+                const resized = await resizeImage(file, undefined, undefined, MEDIA_IMAGE_QUALITY)
                 const patch = {
-                  size: isMediaAttachment && resizedFile?.blob ? resizedFile.blob.size : file.size,
+                  size: isMediaAttachment && resized?.blob ? resized.blob.size : file.size,
                   metadata: { szw: imageWidth, szh: imageHeight, tmb: thumbnail }
                 }
-                if (isMediaAttachment && resizedFile?.blob) {
-                  preparedFile = new File([resizedFile.blob], resizedFile.file.name, { type: file.type })
+                if (isMediaAttachment && resized?.blob) {
+                  preparedFile = new File([resized.blob], resized.file.name, { type: file.type })
                   patch.size = preparedFile.size
                   updateAttachment({ ...patch, data: preparedFile })
                   setPendingAttachment(tid, { file: preparedFile })
@@ -1515,7 +1522,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
                 metadata = patch.metadata
                 handleAttachmentImageForCache({ ...attachment, ...patch })
               } else if (isMediaAttachment && file.type !== 'image/gif') {
-                const resizedFileData = await resizeImage(file)
+                const resizedFileData = await resizeImage(file, undefined, undefined, MEDIA_IMAGE_QUALITY)
                 // canvas.toBlob may return null (for example when memory is constrained).
                 // Keep the original file usable rather than failing the attachment flow.
                 const resizedFile = resizedFileData.blob
@@ -1547,7 +1554,12 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
             }
           } else if (fileType === 'video') {
             const remuxPromise = remuxVideoFileForUpload(file)
-            let thumbnailSource = file
+            // Firefox before 157 cannot decode a QuickTime (.mov) container: take its frame
+            // from the MP4 the upload remux makes, instead of remuxing the file a second time.
+            let thumbnailSource =
+              isQuickTimeContainer(await inspectVideoBlob(file)) && !(await canPlayQuickTime(file))
+                ? await remuxPromise
+                : file
             let metadata: any
             let frame: VideoThumbnailFrame | undefined
             try {
@@ -1558,7 +1570,9 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
               } catch (error) {
                 // A MOV may play in Safari but not be decodable in Firefox. Retry from
                 // the normalized MP4 rather than sending a video without a thumbnail.
-                thumbnailSource = await remuxPromise
+                const remuxed = await remuxPromise
+                if (remuxed === thumbnailSource) throw error
+                thumbnailSource = remuxed
                 frame = await getFrame(thumbnailSource, 0)
               }
               const { thumb, width, height, duration } = frame
@@ -1568,6 +1582,8 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
               updateAttachment({ metadata, thumbnailState: 'ready' })
               dispatch(setUpdateMessageAttachmentAC(thumb, frame.frameBlobUrl))
               setVideoIsReadyToSend(tid)
+              // The pending row can show now; the upload still waits for the remux below.
+              completeAttachmentPreview(tid, { metadata, videoPreviewBlob: frame.blob })
             } catch (error) {
               log.warn('Unable to generate video thumbnail:', error)
             }
@@ -1668,7 +1684,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
               name: `${uuidv4()}.mp3`,
               data: recordedFile.file,
               tid,
-              upload: true,
+              upload: false,
               size: recordedFile.file.size,
               attachmentUrl: recordedFile.objectUrl,
               metadata: JSON.stringify({ tmb: recordedFile.thumb, dur: recordedFile.dur }),
@@ -1680,7 +1696,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
           parentMessage: messageForReply || null
         }
         const sendAttachmentsAsSeparateMessage = getSendAttachmentsAsSeparateMessages()
-        dispatch(sendMessageAC(messageToSend, id, connectionStatus, connectionStatus, sendAttachmentsAsSeparateMessage))
+        dispatch(sendMessageAC(messageToSend, id, connectionStatus, sendAttachmentsAsSeparateMessage))
       }
 
       reader.onerror = (e: any) => {
@@ -3517,7 +3533,6 @@ const LinkPreviewTitle = styled.div<{ color: string }>`
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-family: Inter;
   font-weight: 500;
   font-size: 13px;
   line-height: 16px;

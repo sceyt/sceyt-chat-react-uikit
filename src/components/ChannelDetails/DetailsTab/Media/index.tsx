@@ -18,6 +18,7 @@ import { connectionStatusSelector } from '../../../../store/user/selector'
 import { CONNECTION_STATUS } from '../../../../store/user/constants'
 import { getVideoAttachmentCacheKeys } from '../../../../helpers/videoPreview'
 import { getMediaDownloadSnapshot, requestMediaDownload } from '../../../../helpers/mediaDownloadCoordinator'
+import { attachmentDecryption } from '../../../../helpers/attachmentEncryption'
 import { IAttachment, IChannel } from '../../../../types'
 // Components
 import Attachment from '../../../Attachment'
@@ -37,11 +38,13 @@ const startMediaVideoDownload = (file: IAttachment) => {
 
   const { originalVideo } = getVideoAttachmentCacheKeys(file.url, file.metadata)
   return requestMediaDownload({
+    attachment: file,
     key: `original-video:${file.url}`,
     url: file.url,
     cacheKey: originalVideo,
     kind: 'original-video',
-    size: Number(file.size) || 0
+    size: Number(file.size) || 0,
+    ...attachmentDecryption(file)
   })
 }
 
