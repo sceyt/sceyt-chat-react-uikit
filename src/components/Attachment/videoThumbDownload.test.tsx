@@ -29,7 +29,7 @@ import {
   FileDownloadRequest,
   FileTransferCallback,
   FileTransferResult
-} from '../../fileTransfer/types'
+} from '../../types/fileTransfer/types'
 
 type DownloadMock = jest.Mock<Promise<FileTransferResult<Blob>>, [FileDownloadRequest, FileTransferCallback]>
 

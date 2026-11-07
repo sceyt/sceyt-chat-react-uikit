@@ -1,7 +1,7 @@
 import { attachmentTransferRouter, downloadOperationId, uploadOperationId } from './attachmentTransferRouter'
 import { FileEncryptionInfo } from './encryption/types'
 import { fileTransfer } from './sceytChatUIKitFileTransfer'
-import { FileTransferResult, FileTransferProvider, FileUploadType } from './types'
+import { FileTransferResult, FileTransferProvider, FileUploadType } from '../types/fileTransfer/types'
 
 const ALG = 'tink-aes256-gcm-hkdf-64k+commit-v1'
 const KEYS = 'AYCBgoOEhYaHiImKi4yNjo8'

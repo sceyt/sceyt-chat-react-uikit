@@ -219,6 +219,7 @@
   "resolutions": {
     "lodash": "^4.18.1",
     "**/babel-plugin-styled-components/picomatch": "^2.3.2",
-    "shell-quote": "^1.8.4"
+    "shell-quote": "^1.8.4",
+    "underscore": "^1.13.8"
   }
 }

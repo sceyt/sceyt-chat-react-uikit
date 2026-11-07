@@ -7,7 +7,7 @@ import { downloadVideoThumb } from '../../helpers/videoPreview'
 import { getAttachmentUrlFromCache } from '../../helpers/attachmentsCache'
 import { createMessageListStore, renderWithSceytProvider } from '../../testUtils/messageListHarness'
 import { fileTransfer } from '../../fileTransfer/sceytChatUIKitFileTransfer'
-import { FileTransferResult, FileTransferProvider } from '../../fileTransfer/types'
+import { FileTransferResult, FileTransferProvider } from '../../types/fileTransfer/types'
 
 jest.mock('../../hooks', () => {
   const { THEME_COLORS } = require('../../UIHelper/constants')

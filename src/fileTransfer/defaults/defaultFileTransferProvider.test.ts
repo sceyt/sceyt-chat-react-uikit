@@ -2,7 +2,7 @@ import { setClient } from '../../common/client'
 import { ChatSdkEncryptionSession, ChatSdkFileEncryption } from '../encryption/chatSdkFileEncryption'
 import { FileDecryptionSession, FileEncryption, FileEncryptionInfo } from '../encryption/types'
 import { fileTransfer } from '../sceytChatUIKitFileTransfer'
-import { FileUploadType } from '../types'
+import { FileUploadType } from '../../types/fileTransfer/types'
 import { DefaultFileTransferProvider } from './defaultFileTransferProvider'
 
 const ALG = 'tink-aes256-gcm-hkdf-64k+commit-v1'

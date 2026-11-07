@@ -3,7 +3,7 @@ import { registerBlobUrl } from './attachmentBlobUrls'
 import { withAttachmentEncryption } from './attachmentEncryption'
 import { downloadVideoThumb } from './videoPreview'
 import { fileTransfer } from '../fileTransfer/sceytChatUIKitFileTransfer'
-import { FileTransferResult } from '../fileTransfer/types'
+import { FileTransferResult } from '../types/fileTransfer/types'
 import {
   fakeEncrypted,
   fakeEncryptionInfo,

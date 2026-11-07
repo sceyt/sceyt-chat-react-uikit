@@ -23,7 +23,7 @@ import { releaseAllBlobUrls } from '../../helpers/attachmentBlobUrls'
 import * as imagePreparation from '../../helpers/resizeImage'
 import { setSendAttachmentsAsSeparateMessages } from '../../helpers/sendAttachments'
 import { fileTransfer } from '../../fileTransfer/sceytChatUIKitFileTransfer'
-import { FileTransferProvider } from '../../fileTransfer/types'
+import { FileTransferProvider } from '../../types/fileTransfer/types'
 
 jest.mock('../../helpers/messagesHalper', () => {
   const drafts: Record<string, any> = {}

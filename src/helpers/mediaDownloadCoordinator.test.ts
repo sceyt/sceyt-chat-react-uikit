@@ -8,7 +8,7 @@ import {
 import { setClient } from '../common/client'
 import { getAttachmentUrlFromCache, setAttachmentToCache } from './attachmentsCache'
 import { fileTransfer } from '../fileTransfer/sceytChatUIKitFileTransfer'
-import { FileDownloadRequest, FileTransferCallback, FileTransferResult } from '../fileTransfer/types'
+import { FileDownloadRequest, FileTransferCallback, FileTransferResult } from '../types/fileTransfer/types'
 import {
   fakeEncrypted,
   fakeEncryptionInfo,

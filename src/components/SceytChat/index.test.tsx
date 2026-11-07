@@ -9,7 +9,7 @@ import { IUser } from '../../types'
 import { fileTransfer as uikitFileTransfer } from '../../fileTransfer/sceytChatUIKitFileTransfer'
 import { DefaultFileTransferProvider } from '../../fileTransfer/defaults/defaultFileTransferProvider'
 import { ChatSdkFileEncryption } from '../../fileTransfer/encryption/chatSdkFileEncryption'
-import { FileTransferProvider } from '../../fileTransfer/types'
+import { FileTransferProvider } from '../../types/fileTransfer/types'
 import { FileEncryption } from '../../fileTransfer/encryption/types'
 
 jest.mock('../../helpers/messagesIdb', () => ({

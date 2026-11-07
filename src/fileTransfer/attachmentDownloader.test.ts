@@ -1,6 +1,6 @@
 import { cancelDownloadRequest, getAttachmentDownloader } from './attachmentDownloader'
 import { fileTransfer } from './sceytChatUIKitFileTransfer'
-import { FileDownloadRequest, FileTransferCallback, FileTransferResult } from './types'
+import { FileDownloadRequest, FileTransferCallback, FileTransferResult } from '../types/fileTransfer/types'
 import { fakeEncryptionInfo } from '../testUtils/fakeAttachmentFiles'
 
 const attachment: any = { id: 'id-1', tid: 'tid-1', name: 'photo.png', size: 200 }

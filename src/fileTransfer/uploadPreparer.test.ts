@@ -1,6 +1,6 @@
 import { deletePendingAttachment } from '../helpers/messagesHalper'
 import { fileTransfer } from './sceytChatUIKitFileTransfer'
-import { FileTransferProvider, FileUploadType } from './types'
+import { FileTransferProvider, FileUploadType } from '../types/fileTransfer/types'
 import { prepareAttachmentUpload } from './uploadPreparer'
 
 const metadata = { szw: 640, szh: 480, tmb: 'thumb' }

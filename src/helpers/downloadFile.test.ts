@@ -2,7 +2,7 @@ import FileSaver from 'file-saver'
 import { cancelDownloadFile, downloadFile } from './index'
 import { fileTransfer } from '../fileTransfer/sceytChatUIKitFileTransfer'
 import { readDecryptedFile } from '../fileTransfer/defaults/defaultFileTransferProvider'
-import { FileDownloadRequest, FileTransferResult } from '../fileTransfer/types'
+import { FileDownloadRequest, FileTransferResult } from '../types/fileTransfer/types'
 import {
   fakeEncrypted,
   fakeEncryption,

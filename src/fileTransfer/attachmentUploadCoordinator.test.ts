@@ -9,7 +9,7 @@ import {
   uploadAttachment
 } from './attachmentUploadCoordinator'
 import { fileTransfer } from './sceytChatUIKitFileTransfer'
-import { FileTransferCallback, FileTransferResult, FileTransferProvider, FileUploadRequest } from './types'
+import { FileTransferCallback, FileTransferResult, FileTransferProvider, FileUploadRequest } from '../types/fileTransfer/types'
 
 // A transport whose calls the test ends by hand.
 const manualTransport = (overrides: Partial<FileTransferProvider> = {}) => {

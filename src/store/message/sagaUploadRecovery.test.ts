@@ -46,7 +46,7 @@ import {
   FileUploadRequest,
   FileUploadResult,
   FileUploadType
-} from '../../fileTransfer/types'
+} from '../../types/fileTransfer/types'
 import { FileEncryptionInfo } from '../../fileTransfer/encryption/types'
 import { IAttachment } from '../../types'
 import { handleUploadAttachments, __messageSagaTestables, __resetMessageSagaTestState } from './saga'
