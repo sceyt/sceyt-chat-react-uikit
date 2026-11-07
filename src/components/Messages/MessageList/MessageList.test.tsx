@@ -479,7 +479,8 @@ describe('MessageList', () => {
           expect(attachment.type).toBe(files[index].type)
           expect(attachment.attachmentType).toBe(attachmentType)
         })
-        expect(dataTransfer.clearData).toHaveBeenCalledTimes(1)
+        // The dropped data is only read: Firefox makes it read-only and throws on clearData.
+        expect(dataTransfer.clearData).not.toHaveBeenCalled()
         expect(read).not.toHaveBeenCalled()
         await act(async () => unmount())
       } finally {

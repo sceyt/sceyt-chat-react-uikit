@@ -3,8 +3,9 @@ import { Provider } from 'react-redux'
 import log from 'loglevel'
 import store from '../../store'
 import SceytChat from '../SceytChat'
-import { IAttachment, IChannel, IContact, ICustomAvatarColors, IMember, IMessage, IUser } from '../../types'
+import { IChannel, IContact, ICustomAvatarColors, IMember, IMessage, IUser } from '../../types'
 import { SceytReduxContext } from 'store/context'
+import { IFileTransfer } from '../../fileTransfer/sceytChatUIKitFileTransfer'
 
 import {
   InviteLinkOptions,
@@ -15,39 +16,6 @@ import {
   setCustomLoadMembersFunctions,
   setShowOwnMessageForward
 } from '../../helpers/channelHalper'
-export interface IProgress {
-  loaded: number
-  total: number
-}
-
-export interface IUploadTask {
-  // eslint-disable-next-line no-unused-vars
-  updateLocalFileLocation?: (newPath: String) => void
-  // eslint-disable-next-line no-unused-vars
-  progress: (progress: IProgress) => void
-  // eslint-disable-next-line no-unused-vars
-  failure: (error: Error) => void
-  // eslint-disable-next-line no-unused-vars
-  success: ({ uri, blob }: { uri: string; blob: Blob }) => void
-  cancel: () => void
-  stop: () => void
-  resume: () => void
-}
-
-export interface ICustomUploader {
-  // eslint-disable-next-line no-unused-vars
-  upload: (attachment: IAttachment, uploadTask: IUploadTask, messageType: string | null | undefined) => void
-  // eslint-disable-next-line no-unused-vars
-  download: (
-    uri: string,
-    download: boolean,
-    progressCallback: (progress: any) => void,
-    messageType: string | null | undefined
-  ) => Promise<any>
-  // eslint-disable-next-line no-unused-vars
-  cancelRequest: (requestPromise: any) => void
-}
-
 export type ThemeColors =
   | 'accent'
   | 'avatarBrand1'
@@ -108,7 +76,8 @@ export interface IChatClientProps {
   showNotifications?: boolean
   children?: JSX.Element | JSX.Element[]
   logoSrc?: string
-  CustomUploader?: ICustomUploader
+  /** How attachment files are uploaded, downloaded and encrypted. */
+  fileTransfer?: IFileTransfer
   channelTypeFilter?: string[]
   membersDisplayTextByChannelTypesMap?: {
     [key: string]: string
@@ -157,7 +126,7 @@ const SceytChatContainer = ({
   defaultRolesByChannelTypesMap,
   channelTypeFilter,
   logoSrc,
-  CustomUploader,
+  fileTransfer,
   showNotifications = true,
   hideUserPresence,
   openChatOnUserInteraction,
@@ -229,7 +198,7 @@ const SceytChatContainer = ({
         children={children}
         showOnlyContactUsers={showOnlyContactUsers}
         logoSrc={logoSrc}
-        CustomUploader={CustomUploader}
+        fileTransfer={fileTransfer}
         handleNewMessages={handleNewMessages}
         sendAttachmentsAsSeparateMessages={sendAttachmentsAsSeparateMessages}
         membersDisplayTextByChannelTypesMap={membersDisplayTextByChannelTypesMap}

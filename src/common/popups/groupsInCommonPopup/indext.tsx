@@ -276,7 +276,6 @@ const ChannelTitle = styled.div<{ color: string }>`
   font-size: 15px;
   font-weight: 500;
   line-height: 20px;
-  font-family: Inter;
   letter-spacing: -0.2px;
   color: ${(props) => props.color};
   margin-bottom: 4px;

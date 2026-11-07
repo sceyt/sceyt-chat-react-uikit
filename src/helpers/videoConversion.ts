@@ -2,7 +2,7 @@
 // evaluated at module load; the runtime import stays dynamic inside remuxToMp4.
 import type { FFmpeg } from '@ffmpeg/ffmpeg'
 import log from 'loglevel'
-import { inspectVideoBlob, isFirefox, isQuickTimeContainer } from './videoContainer'
+import { canPlayQuickTime, inspectVideoBlob, isFirefox, isQuickTimeContainer } from './videoContainer'
 
 const dbg = (...args: any[]) => console.log('[VIDEO_FIRST_FRAME]', ...args)
 
@@ -116,18 +116,19 @@ export const remuxVideoFileForUpload = async (file: File): Promise<File> => {
 }
 
 /**
- * Display-time normalization for already-uploaded files: in Firefox, remux
- * downloaded QuickTime blobs to MP4 so both playback and frame extraction
- * work. Other browsers demux QuickTime natively, so the blob is returned
- * unchanged there. Always returns a usable blob (the original on failure).
+ * Display-time normalization for already-uploaded files: a downloaded
+ * QuickTime blob that this browser does not play (Firefox before 157) is
+ * remuxed to MP4 so both playback and frame extraction work. Other blobs are
+ * returned unchanged. Always returns a usable blob (the original on failure).
  */
 export const ensurePlayableVideoBlob = async (blob: Blob): Promise<Blob> => {
   try {
+    // Other browsers play QuickTime; skip reading the file there.
     if (!isFirefox()) {
       return blob
     }
     const info = await inspectVideoBlob(blob)
-    if (!isQuickTimeContainer(info)) {
+    if (!isQuickTimeContainer(info) || (await canPlayQuickTime(blob))) {
       return blob
     }
     const remuxed = await remuxToMp4(blob)

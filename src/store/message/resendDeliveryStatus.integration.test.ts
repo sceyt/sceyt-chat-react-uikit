@@ -4,7 +4,9 @@ import { setClient } from '../../common/client'
 import { attachmentTypes, LOADING_STATE, MESSAGE_DELIVERY_STATUS, MESSAGE_STATUS } from '../../helpers/constants'
 import * as messagesHalper from '../../helpers/messagesHalper'
 import { addMessageToMap, clearMessagesMap, getMessagesFromMap } from '../../helpers/messagesHalper'
-import { setCustomUploader } from '../../helpers/customUploader'
+import { fileTransfer } from '../../fileTransfer/sceytChatUIKitFileTransfer'
+import { resetAttachmentUploadsForTests } from '../../fileTransfer/attachmentUploadCoordinator'
+import { FileTransferResult } from '../../fileTransfer/types'
 import { destroyChannelsMap, getChannelFromMap, setActiveChannelId, setChannelInMap } from '../../helpers/channelHalper'
 import { FakeMessageServer } from '../../testUtils/fakeMessageServer'
 import { createMessageListStore } from '../../testUtils/messageListHarness'
@@ -92,7 +94,8 @@ describe('WAAF-3290: delivery status after sending or retrying a text', () => {
     jest.clearAllTimers()
     jest.useRealTimers()
     jest.restoreAllMocks()
-    setCustomUploader(null)
+    fileTransfer.configure()
+    resetAttachmentUploadsForTests()
     clearMessagesMap()
     destroyChannelsMap()
     __resetMessageSagaTestState()
@@ -106,11 +109,12 @@ describe('WAAF-3290: delivery status after sending or retrying a text', () => {
       }
     }
     if (kind === 'attachment') {
-      setCustomUploader({
-        upload: (_attachment: unknown, uploadTask: any) =>
-          uploadTask.success({ uri: 'https://cdn.example/notes.txt', blob: null }),
-        download: jest.fn()
-      })
+      // The app's transport stores the file at once.
+      fileTransfer.provider = {
+        upload: () => Promise.resolve(FileTransferResult.success({ url: 'https://cdn.example/notes.txt' })),
+        download: () => Promise.resolve(FileTransferResult.failure(new Error('Downloads are not used in these tests'))),
+        cancel: () => undefined
+      }
       const message = {
         body,
         bodyAttributes: [],

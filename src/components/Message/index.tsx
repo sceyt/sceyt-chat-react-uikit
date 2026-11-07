@@ -845,6 +845,7 @@ const Message = ({
     [dispatch]
   )
 
+  if (message.id === '878047851874275328') console.log(message)
   const margins = useMemo(() => {
     let spacingBottom = ''
     let spacingTop = ''

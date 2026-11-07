@@ -652,10 +652,17 @@ const messageSlice = createSlice({
       }>
     ) => {
       const { uploaded, total, attachmentId } = action.payload
+      const shown = state.attachmentsUploadingProgress[attachmentId]
+      // The progress never goes back for the same file: an upload sent again
+      // from the start (after a lost connection, or with an uploader that cannot
+      // resume) is held at what was shown until it passes it.
+      if (shown && shown.total === total && uploaded < shown.uploaded) {
+        return
+      }
       const progress = uploaded / total
       const updateData = { uploaded, total, progress }
       state.attachmentsUploadingProgress[attachmentId] = {
-        ...state.attachmentsUploadingProgress[attachmentId],
+        ...shown,
         ...updateData
       }
     },

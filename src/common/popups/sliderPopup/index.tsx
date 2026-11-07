@@ -56,6 +56,7 @@ import ConfirmPopup from '../delete'
 import { IAttachmentProperties } from '../../../components/Message/Message.types'
 import log from 'loglevel'
 import { requestMediaDownload } from '../../../helpers/mediaDownloadCoordinator'
+import { attachmentDecryption } from '../../../helpers/attachmentEncryption'
 import { useMediaDownload } from '../../../hooks/basic/useMediaDownload'
 
 interface IProps {
@@ -463,12 +464,14 @@ const SliderPopup: React.FC<IProps> = ({
                 )
               }
               requestMediaDownload({
+                attachment: currentFile,
                 key: `${kind}:${currentFileUrl}`,
                 url: currentFileUrl,
                 cacheKey: attachmentKey,
                 kind,
                 messageType,
-                size: Number(currentFileSize) || 0
+                size: Number(currentFileSize) || 0,
+                ...attachmentDecryption(currentFile)
               })
                 .then(({ objectUrl }) => {
                   if (cancelled) return

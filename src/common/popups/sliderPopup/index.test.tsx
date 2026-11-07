@@ -152,6 +152,20 @@ describe('SliderPopup cached media', () => {
     expect(mockRequestMediaDownload).not.toHaveBeenCalled()
   })
 
+  it('downloads an uncached file with the message ID of its attachment', async () => {
+    mockRequestMediaDownload.mockResolvedValue({ objectUrl: 'blob:downloaded-video', blob: new Blob(['video']) })
+    renderSlider()
+    await flushEffects()
+
+    expect(mockRequestMediaDownload).toHaveBeenCalledWith(
+      expect.objectContaining({
+        url: selectedVideo.url,
+        kind: 'original-video',
+        attachment: expect.objectContaining({ messageId: 'message-1' })
+      })
+    )
+  })
+
   it('uses a retained session blob URL without waiting for Cache Storage', () => {
     mockGetRegisteredBlobUrl.mockReturnValue('blob:retained-video')
     renderSlider()
