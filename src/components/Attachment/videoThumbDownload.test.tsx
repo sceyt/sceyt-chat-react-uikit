@@ -4,11 +4,15 @@ import { Provider } from 'react-redux'
 import { SceytReduxContext } from '../../store/context'
 import { act, fireEvent, screen } from '@testing-library/react'
 import Attachment from './index'
-import { attachmentTypes } from '../../helpers/constants'
+import { attachmentTypes, UPLOAD_STATE } from '../../helpers/constants'
 import { getAttachmentUrlFromCache, setAttachmentToCache } from '../../helpers/attachmentsCache'
 import { CONNECTION_STATUS } from '../../store/user/constants'
 import { setConnectionStatusAC } from '../../store/user/actions'
-import { pauseAttachmentUploadingAC } from '../../store/message/actions'
+import {
+  pauseAttachmentUploadingAC,
+  updateAttachmentUploadingProgressAC,
+  updateAttachmentUploadingStateAC
+} from '../../store/message/actions'
 import { createMessageListStore, renderWithSceytProvider } from '../../testUtils/messageListHarness'
 import {
   cancelMediaDownload,
@@ -1169,6 +1173,63 @@ describe('the upload stop and resume control', () => {
     // Let the render's cache lookups settle, then drop the download they started.
     await flushAttachmentEffects()
     resetMediaDownloadCoordinatorForTests()
+  })
+
+  const smallImage = {
+    ...videoAttachment,
+    id: 'small-image-id',
+    tid: 'small-image-tid',
+    type: attachmentTypes.image,
+    url: 'blob:small-image',
+    attachmentUrl: 'blob:small-image',
+    metadata: JSON.stringify({ szw: 320, szh: 240 }),
+    size: 140 * 1024
+  }
+
+  it.each([0, smallImage.size])(
+    'shows the image upload indicator before the first progress event (size %s)',
+    (size) => {
+      renderMediaAttachment(
+        { ...smallImage, size },
+        {
+          attachmentsUploadingState: { [smallImage.tid]: UPLOAD_STATE.UPLOADING }
+        }
+      )
+
+      expect(screen.getByRole('button', { name: 'Stop upload' })).toBeVisible()
+      expect(screen.getByTestId('circular-progress')).toBeInTheDocument()
+    }
+  )
+
+  it('keeps the image upload indicator at 100% until the upload succeeds', () => {
+    const { store } = renderMediaAttachment(smallImage, {
+      attachmentsUploadingState: { [smallImage.tid]: UPLOAD_STATE.UPLOADING }
+    })
+
+    // A small upload may report all bytes in its first browser progress event.
+    act(() => {
+      store.dispatch(updateAttachmentUploadingProgressAC(smallImage.size, smallImage.size, smallImage.tid))
+    })
+    expect(screen.getByTestId('circular-progress')).toHaveAttribute('data-value', '100')
+    expect(screen.getByRole('button', { name: 'Stop upload' })).toBeVisible()
+
+    // All bytes being sent does not mean S3/backend confirmation has finished.
+    act(() => {
+      store.dispatch(updateAttachmentUploadingStateAC(UPLOAD_STATE.SUCCESS, smallImage.tid))
+    })
+    expect(screen.queryByTestId('circular-progress')).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Stop upload' })).not.toBeInTheDocument()
+  })
+
+  it('keeps the resume control available for an image paused after its final progress event', () => {
+    renderMediaAttachment(smallImage, {
+      attachmentsUploadingState: { [smallImage.tid]: UPLOAD_STATE.PAUSED },
+      attachmentsUploadingProgress: {
+        [smallImage.tid]: { uploaded: smallImage.size, total: smallImage.size, progress: 1 }
+      }
+    })
+
+    expect(screen.getByRole('button', { name: 'Resume upload' })).toBeVisible()
   })
 
   it('the stop control shown while a video is prepared pauses it, not resumes it', async () => {

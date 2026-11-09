@@ -1055,91 +1055,89 @@ const Attachment = ({
               withPrefix={withPrefix}
               borderColor={borderColor}
             >
-              {!isPreview &&
-                (isInUploadingState || isImageDownloading) &&
-                (isImageDownloading || (imageSizeProgress && imageSizeProgress.loaded < imageSizeProgress.total)) && (
-                  <UploadPercent
-                    isRepliedMessage={isRepliedMessage}
-                    isDetailsView={isDetailsView}
-                    backgroundColor={overlayBackground2}
-                  >
-                    {isInUploadingState ? (
-                      <CancelResumeWrapper onClick={handlePauseResumeUpload} aria-label={pauseResumeUploadLabel}>
-                        {attachmentCompilationState[attachment.tid!] === UPLOAD_STATE.UPLOADING ? (
-                          <CancelIcon />
-                        ) : (
-                          <UploadIcon />
-                        )}
+              {!isPreview && (isInUploadingState || isImageDownloading) && (
+                <UploadPercent
+                  isRepliedMessage={isRepliedMessage}
+                  isDetailsView={isDetailsView}
+                  backgroundColor={overlayBackground2}
+                >
+                  {isInUploadingState ? (
+                    <CancelResumeWrapper onClick={handlePauseResumeUpload} aria-label={pauseResumeUploadLabel}>
+                      {attachmentCompilationState[attachment.tid!] === UPLOAD_STATE.UPLOADING ? (
+                        <CancelIcon />
+                      ) : (
+                        <UploadIcon />
+                      )}
+                    </CancelResumeWrapper>
+                  ) : (
+                    !isCached && (
+                      <CancelResumeWrapper
+                        aria-label='Cancel image download'
+                        onClick={(e: React.MouseEvent) => {
+                          e.stopPropagation()
+                          if (sharedOriginalImageDownload.state === 'loading' && originalImageDownloadKey) {
+                            setDownloadIsCancelled(true)
+                            setIsOriginalImageRestarting(false)
+                            cancelMediaDownload(originalImageDownloadKey)
+                          } else {
+                            handlePauseResumeDownload(e.nativeEvent)
+                          }
+                        }}
+                      >
+                        {shouldShowImageDownloadRetry ? <DownloadIcon /> : <CancelIcon />}
                       </CancelResumeWrapper>
-                    ) : (
-                      !isCached && (
-                        <CancelResumeWrapper
-                          aria-label='Cancel image download'
-                          onClick={(e: React.MouseEvent) => {
-                            e.stopPropagation()
-                            if (sharedOriginalImageDownload.state === 'loading' && originalImageDownloadKey) {
-                              setDownloadIsCancelled(true)
-                              setIsOriginalImageRestarting(false)
-                              cancelMediaDownload(originalImageDownloadKey)
-                            } else {
-                              handlePauseResumeDownload(e.nativeEvent)
+                    )
+                  )}
+
+                  {(isImageDownloading || attachmentCompilationState[attachment.tid!] === UPLOAD_STATE.UPLOADING) && (
+                    <React.Fragment>
+                      <ProgressWrapper>
+                        <CircularProgressbar
+                          minValue={0}
+                          maxValue={100}
+                          value={imageProgress}
+                          backgroundPadding={3}
+                          background={true}
+                          text=''
+                          styles={{
+                            background: {
+                              fill: `${overlayBackground2}66`
+                            },
+                            path: {
+                              // Path color
+                              stroke: textOnPrimary,
+                              // Whether to use rounded or flat corners on the ends - can use 'butt' or 'round'
+                              strokeLinecap: 'butt',
+                              strokeWidth: '4px',
+                              // Customize transition animation
+                              transition: 'stroke-dashoffset 0.5s ease 0s',
+                              // Rotate the path
+                              transform: 'rotate(0turn)',
+                              transformOrigin: 'center center'
                             }
+                            // How long animation takes to go from one percentage to another, in seconds
+                            // pathTransitionDuration: 0.5,
+
+                            // Can specify path transition in more detail, or remove it entirely
+                            // pathTransition: 'none',
+
+                            // Colors
+                            // pathColor: '#fff',
+                            // textColor: '#f88',
+                            // trailColor: 'transparent'
                           }}
-                        >
-                          {shouldShowImageDownloadRetry ? <DownloadIcon /> : <CancelIcon />}
-                        </CancelResumeWrapper>
-                      )
-                    )}
+                        />
+                      </ProgressWrapper>
 
-                    {(isImageDownloading || attachmentCompilationState[attachment.tid!] === UPLOAD_STATE.UPLOADING) && (
-                      <React.Fragment>
-                        <ProgressWrapper>
-                          <CircularProgressbar
-                            minValue={0}
-                            maxValue={100}
-                            value={imageProgress}
-                            backgroundPadding={3}
-                            background={true}
-                            text=''
-                            styles={{
-                              background: {
-                                fill: `${overlayBackground2}66`
-                              },
-                              path: {
-                                // Path color
-                                stroke: textOnPrimary,
-                                // Whether to use rounded or flat corners on the ends - can use 'butt' or 'round'
-                                strokeLinecap: 'butt',
-                                strokeWidth: '4px',
-                                // Customize transition animation
-                                transition: 'stroke-dashoffset 0.5s ease 0s',
-                                // Rotate the path
-                                transform: 'rotate(0turn)',
-                                transformOrigin: 'center center'
-                              }
-                              // How long animation takes to go from one percentage to another, in seconds
-                              // pathTransitionDuration: 0.5,
-
-                              // Can specify path transition in more detail, or remove it entirely
-                              // pathTransition: 'none',
-
-                              // Colors
-                              // pathColor: '#fff',
-                              // textColor: '#f88',
-                              // trailColor: 'transparent'
-                            }}
-                          />
-                        </ProgressWrapper>
-
-                        {imageSizeProgress && (
-                          <SizeProgress color={textOnPrimary}>
-                            {bytesToSize(imageSizeProgress.loaded, 1)} / {bytesToSize(imageSizeProgress.total, 1)}
-                          </SizeProgress>
-                        )}
-                      </React.Fragment>
-                    )}
-                  </UploadPercent>
-                )}
+                      {imageSizeProgress && (
+                        <SizeProgress color={textOnPrimary}>
+                          {bytesToSize(imageSizeProgress.loaded, 1)} / {bytesToSize(imageSizeProgress.total, 1)}
+                        </SizeProgress>
+                      )}
+                    </React.Fragment>
+                  )}
+                </UploadPercent>
+              )}
             </UploadProgress>
           ) : null}
           {shouldShowImageDownloadRetry && !isPreview && !isRepliedMessage && (
