@@ -1264,7 +1264,7 @@ export default React.memo(Message, (prev, next) => {
 
 const FailedMessageIcon = styled.div<{ rtl?: boolean }>`
   position: absolute;
-  top: -6px;
+  bottom: 0;
   left: ${(props: any) => !props.rtl && '-24px'};
   right: ${(props) => props.rtl && '-24px'};
   width: 20px;

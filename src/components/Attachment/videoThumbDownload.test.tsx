@@ -4,16 +4,17 @@ import { Provider } from 'react-redux'
 import { SceytReduxContext } from '../../store/context'
 import { act, fireEvent, screen } from '@testing-library/react'
 import Attachment from './index'
-import { attachmentTypes, UPLOAD_STATE } from '../../helpers/constants'
+import { attachmentTypes, MESSAGE_STATUS, UPLOAD_STATE } from '../../helpers/constants'
 import { getAttachmentUrlFromCache, setAttachmentToCache } from '../../helpers/attachmentsCache'
 import { CONNECTION_STATUS } from '../../store/user/constants'
 import { setConnectionStatusAC } from '../../store/user/actions'
 import {
   pauseAttachmentUploadingAC,
+  resendMessageAC,
   updateAttachmentUploadingProgressAC,
   updateAttachmentUploadingStateAC
 } from '../../store/message/actions'
-import { createMessageListStore, renderWithSceytProvider } from '../../testUtils/messageListHarness'
+import { createMessageListStore, makePendingMessage, renderWithSceytProvider } from '../../testUtils/messageListHarness'
 import {
   cancelMediaDownload,
   requestMediaDownload,
@@ -27,6 +28,12 @@ import {
   readBlobText
 } from '../../testUtils/fakeAttachmentFiles'
 import { fileTransfer } from '../../fileTransfer/sceytChatUIKitFileTransfer'
+import {
+  addMessageToMap,
+  clearMessagesMap,
+  deletePendingAttachment,
+  setPendingAttachment
+} from '../../helpers/messagesHalper'
 import { DefaultFileTransferProvider } from '../../fileTransfer/defaults/defaultFileTransferProvider'
 import {
   AttachmentTransferContext,
@@ -110,7 +117,9 @@ jest.mock('react-circular-progressbar', () => ({
 
 jest.mock('../VideoPreview', () => ({
   __esModule: true,
-  default: ({ src }: { src?: string }) => <div data-testid='video-preview' data-src={src || ''} />
+  default: ({ src, uploading }: { src?: string; uploading?: boolean }) => (
+    <div data-testid='video-preview' data-src={src || ''} data-uploading={!!uploading} />
+  )
 }))
 
 jest.mock('../AudioPlayer', () => ({
@@ -1243,6 +1252,113 @@ describe('the upload stop and resume control', () => {
 
     expect(dispatch).toHaveBeenCalledWith(pauseAttachmentUploadingAC('video-attachment-tid'))
   })
+
+  describe.each([attachmentTypes.video, attachmentTypes.image, attachmentTypes.file])(
+    'failed %s uploads (WAAF-3669)',
+    (type) => {
+      const attachment = {
+        ...videoAttachment,
+        type,
+        id: '',
+        tid: `failed-${type}-tid`,
+        messageId: '',
+        name: `pending-${type}`,
+        url: `blob:pending-${type}`,
+        attachmentUrl: `blob:pending-${type}`,
+        metadata: type === attachmentTypes.file ? '{}' : JSON.stringify({ szw: 1280, szh: 720 })
+      }
+      const getTile = (container: HTMLElement) =>
+        type === attachmentTypes.video
+          ? screen.getByTestId('video-preview')
+          : type === attachmentTypes.image
+            ? container.querySelector('img')!
+            : screen.getByText(attachment.name)
+
+      afterEach(() => {
+        deletePendingAttachment(attachment.tid)
+        clearMessagesMap()
+      })
+
+      it('replaces the stop control with upload retry when the upload fails', () => {
+        const openMedia = jest.fn()
+        const { store, container } = renderAttachment(
+          { attachmentsUploadingState: { [attachment.tid]: UPLOAD_STATE.UPLOADING } },
+          { attachment, handleMediaItemClick: openMedia }
+        )
+        expect(screen.getByRole('button', { name: 'Stop upload' })).toBeVisible()
+
+        act(() => {
+          store.dispatch(updateAttachmentUploadingStateAC(UPLOAD_STATE.FAIL, attachment.tid))
+        })
+        expect(screen.getByRole('button', { name: 'Retry upload' })).toBeVisible()
+        expect(screen.queryByRole('button', { name: 'Stop upload' })).not.toBeInTheDocument()
+        expect(screen.queryByRole('button', { name: 'Download file' })).not.toBeInTheDocument()
+        expect(screen.queryByTestId('circular-progress')).not.toBeInTheDocument()
+        if (type === attachmentTypes.video) {
+          expect(screen.getByTestId('video-preview')).toHaveAttribute('data-uploading', 'true')
+        }
+
+        fireEvent.click(getTile(container))
+        expect(openMedia).not.toHaveBeenCalled()
+      })
+
+      it('retries through the same message resend flow as the failed-send icon', () => {
+        const message = makePendingMessage({
+          tid: 'pending-media-message',
+          channelId: 'media-channel',
+          state: MESSAGE_STATUS.FAILED,
+          attachments: [attachment]
+        })
+        addMessageToMap(message.channelId, message)
+        setPendingAttachment(attachment.tid, { channelId: message.channelId, messageTid: message.tid })
+        const store = createMessageListStore({
+          UserReducer: { connectionStatus: CONNECTION_STATUS.CONNECTED },
+          MessageReducer: { attachmentsUploadingState: { [attachment.tid]: UPLOAD_STATE.FAIL } }
+        })
+        const dispatch = jest.spyOn(store, 'dispatch')
+        const openMedia = jest.fn()
+        renderWithSceytProvider(
+          <Attachment attachment={attachment} backgroundColor='#ffffff' handleMediaItemClick={openMedia} />,
+          { store }
+        )
+
+        fireEvent.click(screen.getByRole('button', { name: 'Retry upload' }))
+
+        expect(dispatch).toHaveBeenCalledTimes(1)
+        expect(dispatch).toHaveBeenCalledWith(resendMessageAC(message, message.channelId, CONNECTION_STATUS.CONNECTED))
+        expect(openMedia).not.toHaveBeenCalled()
+      })
+
+      it('restores normal controls as the failed upload retries and succeeds', () => {
+        const openMedia = jest.fn()
+        const { store, container } = renderAttachment(
+          { attachmentsUploadingState: { [attachment.tid]: UPLOAD_STATE.FAIL } },
+          { attachment, handleMediaItemClick: openMedia }
+        )
+        expect(screen.getByRole('button', { name: 'Retry upload' })).toBeVisible()
+
+        act(() => {
+          store.dispatch(updateAttachmentUploadingStateAC(UPLOAD_STATE.UPLOADING, attachment.tid))
+        })
+        expect(screen.queryByRole('button', { name: 'Retry upload' })).not.toBeInTheDocument()
+        expect(screen.getByRole('button', { name: 'Stop upload' })).toBeVisible()
+
+        act(() => {
+          store.dispatch(updateAttachmentUploadingStateAC(UPLOAD_STATE.SUCCESS, attachment.tid))
+        })
+        expect(screen.queryByRole('button', { name: 'Stop upload' })).not.toBeInTheDocument()
+        if (type === attachmentTypes.file) {
+          expect(screen.getByLabelText('Download file')).toBeInTheDocument()
+        } else {
+          if (type === attachmentTypes.video) {
+            expect(screen.getByTestId('video-preview')).toHaveAttribute('data-uploading', 'false')
+          }
+          fireEvent.click(getTile(container))
+          expect(openMedia).toHaveBeenCalledWith(attachment)
+        }
+      })
+    }
+  )
 
   describe('the upload progress of a video sent again (after a lost connection)', () => {
     // The first render, before any effect runs: what the message shows the moment it is drawn.

@@ -9,6 +9,7 @@ import { themeSelector } from '../../store/theme/selector'
 import {
   pauseAttachmentUploadingAC,
   resumeAttachmentUploadingAC,
+  resendMessageAC,
   setUpdateMessageAttachmentAC,
   updateAttachmentUploadingStateAC,
   updateMessageAC
@@ -44,7 +45,7 @@ import {
 } from '../../helpers/attachmentsCache'
 import { registerBlobUrl } from '../../helpers/attachmentBlobUrls'
 import { base64ToDataURL } from '../../helpers/resizeImage'
-import { getPendingAttachment, updateMessageOnMap } from '../../helpers/messagesHalper'
+import { getMessageFromMap, getPendingAttachment, updateMessageOnMap } from '../../helpers/messagesHalper'
 import { CONNECTION_STATUS } from '../../store/user/constants'
 import { IAttachment } from '../../types'
 import ViewOnceVoiceModal from '../../common/popups/viewOnceMedia/ViewOnceVoiceModal'
@@ -253,6 +254,8 @@ const Attachment = ({
     (attachmentCompilationState[attachment.tid!] === UPLOAD_STATE.PREPARING ||
       attachmentCompilationState[attachment.tid!] === UPLOAD_STATE.UPLOADING ||
       attachmentCompilationState[attachment.tid!] === UPLOAD_STATE.PAUSED)
+  const isUploadFailed = attachmentCompilationState[attachment.tid!] === UPLOAD_STATE.FAIL
+  const hasUploadControls = Boolean(isInUploadingState || isUploadFailed)
   const isPreparingVideo = attachmentCompilationState[attachment.tid!] === UPLOAD_STATE.PREPARING
   // A video prepared for its first send has no progress yet; one sent again keeps what was uploaded.
   const hidesVideoProgress = isPreparingVideo && !storedUploadProgress
@@ -266,6 +269,7 @@ const Attachment = ({
   const shouldShowVideoDownloadRetry =
     !isSharedOriginalVideoDownloading &&
     !isOriginalVideoRestarting &&
+    !isUploadFailed &&
     // Regular video attachments are coordinated globally. Do not let a stale
     // local cancellation flag in one tile mask the shared loading state in
     // another tile after a second (or later) retry. The local fallback only
@@ -276,7 +280,7 @@ const Attachment = ({
   const isVideoDownloading = downloadingFile || isSharedOriginalVideoDownloading
   const isVideoDownloadActive = isVideoDownloading || isOriginalVideoRestarting
   const shouldRenderVideoDownloadProgress = Boolean(
-    !isRepliedMessage && !isPreview && (isInUploadingState || isVideoDownloadActive)
+    !isRepliedMessage && !isPreview && (hasUploadControls || isVideoDownloadActive)
   )
   const videoProgress = isSharedOriginalVideoDownloading ? sharedOriginalVideoDownload.progress || 3 : progress
   const videoSizeProgress = isSharedOriginalVideoDownloading
@@ -297,6 +301,7 @@ const Attachment = ({
   const isSharedOriginalImageCancelled = sharedOriginalImageDownload.state === 'cancelled'
   const shouldShowImageDownloadRetry =
     !isOriginalImageRestarting &&
+    !hasUploadControls &&
     (isSharedOriginalImageCancelled || (downloadIsCancelled && sharedOriginalImageDownload.state !== 'loading'))
   const imageProgress =
     sharedOriginalImageDownload.state === 'loading' ? sharedOriginalImageDownload.progress || 3 : progress
@@ -357,14 +362,28 @@ const Attachment = ({
   // Named after what a click does (see handlePauseResumeUpload).
   const pauseResumeUploadLabel = downloadingFile
     ? 'Cancel file download'
-    : attachmentCompilationState[attachment.tid!] === UPLOAD_STATE.UPLOADING ||
-        attachmentCompilationState[attachment.tid!] === UPLOAD_STATE.PREPARING
-      ? 'Stop upload'
-      : 'Resume upload'
+    : isUploadFailed
+      ? 'Retry upload'
+      : attachmentCompilationState[attachment.tid!] === UPLOAD_STATE.UPLOADING ||
+          attachmentCompilationState[attachment.tid!] === UPLOAD_STATE.PREPARING
+        ? 'Stop upload'
+        : 'Resume upload'
   const handlePauseResumeUpload = (e: Event) => {
     e.stopPropagation()
     if (downloadingFile) {
       handleStopStartDownloadFile(attachment)
+    } else if (isUploadFailed) {
+      // A failed transfer is no longer paused in the coordinator. Retry its
+      // message, preserving the same path used by the failed-send icon.
+      const pending = getPendingAttachment(attachment.tid!)
+      const messageChannelId = channelId || pending?.channelId
+      const messageId = pending?.messageTid || attachment.messageId
+      const message = messageChannelId && messageId ? getMessageFromMap(messageChannelId, messageId) : null
+      if (message && messageChannelId) {
+        dispatch(resendMessageAC(message, messageChannelId, connectionStatus))
+      } else {
+        log.warn('Cannot retry attachment upload: its pending message is unavailable')
+      }
     } else {
       if (attachmentCompilationState[attachment.tid!]) {
         // A video being prepared already shows the stop control.
@@ -987,7 +1006,7 @@ const Attachment = ({
           draggable={false}
           onClick={() =>
             handleMediaItemClick &&
-            !isInUploadingState &&
+            !hasUploadControls &&
             !isImageDownloading &&
             !shouldShowImageDownloadRetry &&
             handleMediaItemClick(attachment)
@@ -1039,7 +1058,7 @@ const Attachment = ({
           )}
           {!isPreview &&
           !isRepliedMessage &&
-          (isInUploadingState ||
+          (hasUploadControls ||
             isImageDownloading ||
             !(attachmentUrlFromMap || attachment.attachmentUrl || attachmentUrl || attachmentThumb)) ? (
             <UploadProgress
@@ -1055,13 +1074,13 @@ const Attachment = ({
               withPrefix={withPrefix}
               borderColor={borderColor}
             >
-              {!isPreview && (isInUploadingState || isImageDownloading) && (
+              {!isPreview && (hasUploadControls || isImageDownloading) && (
                 <UploadPercent
                   isRepliedMessage={isRepliedMessage}
                   isDetailsView={isDetailsView}
                   backgroundColor={overlayBackground2}
                 >
-                  {isInUploadingState ? (
+                  {hasUploadControls ? (
                     <CancelResumeWrapper onClick={handlePauseResumeUpload} aria-label={pauseResumeUploadLabel}>
                       {attachmentCompilationState[attachment.tid!] === UPLOAD_STATE.UPLOADING ? (
                         <CancelIcon />
@@ -1183,10 +1202,7 @@ const Attachment = ({
                 !isVideoDownloadActive &&
                 !shouldShowVideoDownloadRetry &&
                 !isInUploadingState &&
-                (attachmentCompilationState[attachment.tid!]
-                  ? attachmentCompilationState[attachment.tid!] !== UPLOAD_STATE.FAIL ||
-                    attachmentCompilationState[attachment.tid!] !== UPLOAD_STATE.UPLOADING
-                  : true) &&
+                !isUploadFailed &&
                 handleMediaItemClick(attachment)
               }
               isDetailsView={isDetailsView}
@@ -1209,7 +1225,7 @@ const Attachment = ({
                     isDetailsView={isDetailsView}
                     backgroundColor={overlayBackground2}
                   >
-                    {isInUploadingState ? (
+                    {hasUploadControls ? (
                       <CancelResumeWrapper onClick={handlePauseResumeUpload} aria-label={pauseResumeUploadLabel}>
                         {attachmentCompilationState[attachment.tid!] === UPLOAD_STATE.UPLOADING || isPreparingVideo ? (
                           <CancelIcon />
@@ -1308,7 +1324,7 @@ const Attachment = ({
                 messageType={messageType}
                 src={attachmentUrlFromMap || attachment.attachmentUrl || attachmentUrl}
                 isCachedFile={isCached}
-                uploading={Boolean(isInUploadingState)}
+                uploading={hasUploadControls}
                 borderRadius={isRepliedMessage ? '4px' : borderRadius}
                 isRepliedMessage={isRepliedMessage}
                 isDetailsView={isDetailsView}
@@ -1365,10 +1381,7 @@ const Attachment = ({
         <AttachmentFile
           draggable={false}
           isPreview={isPreview}
-          isUploading={
-            attachmentCompilationState[attachment.tid!] === UPLOAD_STATE.UPLOADING ||
-            attachmentCompilationState[attachment.tid!] === UPLOAD_STATE.PAUSED
-          }
+          isUploading={hasUploadControls}
           borderRadius={isRepliedMessage ? '50%' : borderRadius}
           backgroundColor={backgroundColor && backgroundColor !== 'inherit' ? backgroundColor : overlayBackground2}
           isRepliedMessage={isRepliedMessage}
@@ -1407,9 +1420,7 @@ const Attachment = ({
               ) : isPreview && attachment.attachmentUrl ? (
                 <FileThumbnail src={attachment.attachmentUrl || attachmentUrl} />
               ) : (
-                attachmentCompilationState[attachment.tid!] !== UPLOAD_STATE.UPLOADING &&
-                attachmentCompilationState[attachment.tid!] !== UPLOAD_STATE.PAUSED &&
-                (selectedFileAttachmentsIcon || <FileIcon />)
+                !hasUploadControls && (selectedFileAttachmentsIcon || <FileIcon />)
               )}
             </AttachmentIconCont>
           )}
@@ -1418,7 +1429,7 @@ const Attachment = ({
               attachmentCompilationState[attachment.tid!] !== UPLOAD_STATE.PAUSED &&
               (selectedFileAttachmentsIcon || <FileIcon />)}
           </AttachmentIconCont> */}
-          {!isRepliedMessage && !isPreview && (
+          {!isRepliedMessage && !isPreview && !hasUploadControls && (
             <DownloadFile
               role='button'
               aria-label={fileDownloadFailed ? 'Download failed, retry' : 'Download file'}
@@ -1434,7 +1445,7 @@ const Attachment = ({
             </DownloadFile>
           )}
 
-          {!isRepliedMessage && !isPreview && (isInUploadingState || downloadingFile) ? (
+          {!isRepliedMessage && !isPreview && (hasUploadControls || downloadingFile) ? (
             <UploadProgress fileAttachment isDetailsView={isDetailsView} borderColor={borderColor}>
               <UploadPercent
                 fileAttachment
@@ -1442,12 +1453,12 @@ const Attachment = ({
                 isDetailsView={isDetailsView}
                 backgroundColor={overlayBackground2}
               >
-                {(isInUploadingState || downloadingFile) && (
+                {(hasUploadControls || downloadingFile) && (
                   <CancelResumeWrapper onClick={handlePauseResumeUpload} aria-label={pauseResumeUploadLabel}>
                     {attachmentCompilationState[attachment.tid!] === UPLOAD_STATE.UPLOADING || downloadingFile ? (
                       <CancelIcon />
                     ) : (
-                      isInUploadingState && <UploadIcon />
+                      hasUploadControls && <UploadIcon />
                     )}
                   </CancelResumeWrapper>
                 )}
