@@ -435,7 +435,7 @@ export async function getVideoFirstFrame(
   }
 }
 
-/** Generates the compact JPEG uploaded as attachment metadata.video_thumb. */
+/** Generates the compact JPEG uploaded as attachment metadata.pvw. */
 export const getVideoPreviewFrame = (videoSrc: string | Blob) =>
   getVideoFirstFrame(videoSrc, VIDEO_PREVIEW_MAX_DIMENSION, VIDEO_PREVIEW_MAX_DIMENSION, VIDEO_PREVIEW_JPEG_QUALITY, {
     applyDevicePixelRatio: false,

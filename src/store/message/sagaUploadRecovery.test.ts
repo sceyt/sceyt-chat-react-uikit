@@ -1615,7 +1615,7 @@ describe('attachment upload recovery', () => {
     expect(uploadOrder).toEqual(['preview', 'video'])
     expect(channel.createAttachmentBuilder).toHaveBeenCalledWith('https://cdn.example/clip.mp4', attachmentTypes.video)
     expect((channel as any).__attachmentBuilder.setMetadata).toHaveBeenCalledWith(
-      expect.stringContaining('"video_thumb":"https://cdn.example/clip-preview.jpg"')
+      expect.stringContaining('"pvw":"https://cdn.example/clip-preview.jpg"')
     )
   })
 
@@ -1721,7 +1721,7 @@ describe('attachment upload recovery', () => {
     )
     expect(await readBlobText(uploadCalls[0].file)).toBe('compose-preview')
     expect((channel as any).__attachmentBuilder.setMetadata).toHaveBeenCalledWith(
-      expect.stringContaining('"video_thumb":"https://cdn.example/compose-preview.jpg"')
+      expect.stringContaining('"pvw":"https://cdn.example/compose-preview.jpg"')
     )
   })
 
@@ -1761,7 +1761,7 @@ describe('attachment upload recovery', () => {
       szw: 1280,
       szh: 720,
       dur: 12,
-      video_thumb: 'https://cdn.example/new-thumb.jpg'
+      pvw: 'https://cdn.example/new-thumb.jpg'
     })
     expect(metadata.previewImage).toBeUndefined()
   })
@@ -1828,7 +1828,7 @@ describe('attachment upload recovery', () => {
       expect.objectContaining({
         attachments: [
           expect.objectContaining({
-            metadata: expect.stringContaining('"video_thumb":"https://cdn.example/uploaded-1"')
+            metadata: expect.stringContaining('"pvw":"https://cdn.example/uploaded-1"')
           })
         ]
       })
@@ -1983,7 +1983,7 @@ describe('attachment upload recovery', () => {
       attachmentTypes.video
     ])
     expect(mockGetVideoPreviewFrame).toHaveBeenCalledTimes(1)
-    expect(JSON.parse(sent.metadata)).toMatchObject({ video_thumb: 'https://cdn.example/clip-preview.jpg' })
+    expect(JSON.parse(sent.metadata)).toMatchObject({ pvw: 'https://cdn.example/clip-preview.jpg' })
   })
 
   describe('with encryptUploads and a transport of the app', () => {
@@ -2065,7 +2065,7 @@ describe('attachment upload recovery', () => {
       const [sentVideo, sentPreview] = sent
       // The video has its own enc and names its preview by URL.
       expect(JSON.parse(sentVideo.metadata)).toEqual({
-        video_thumb: 'https://cdn.example/clip-preview.jpg',
+        pvw: 'https://cdn.example/clip-preview.jpg',
         'sceyt.enc': fakeEncryption('key-2')
       })
       // The preview is a preview attachment with its own enc.
@@ -2115,7 +2115,7 @@ describe('attachment upload recovery', () => {
       expect(JSON.parse(sent.metadata)).toEqual({ szw: 10, szh: 20, 'app.enc': 'keys-slot-1' })
     })
 
-    it("the provider's prepareUpload: a video's preview is a preview attachment of its own, named by its video_thumb", async () => {
+    it("the provider's prepareUpload: a video's preview is a preview attachment of its own, named by its pvw", async () => {
       const channel = makeUploaderChannel('channel-prepared-video')
       const video = new File(['video-bytes'], 'clip.mp4', { type: 'video/mp4' })
       const photo = makeLiveFile()
@@ -2164,7 +2164,7 @@ describe('attachment upload recovery', () => {
         szh: 720,
         tmb: 'hash',
         dur: 12,
-        video_thumb: 'https://cdn.example/prepared-video-tid-thumbnail',
+        pvw: 'https://cdn.example/prepared-video-tid-thumbnail',
         'app.enc': 'keys-prepared-video-tid'
       })
       // The preview is a preview attachment with its own entry, the video's dimensions and hash.
@@ -2234,8 +2234,8 @@ describe('attachment upload recovery', () => {
         'second-video-tid-thumbnail'
       ])
       // Each video names its own preview, so receivers pair them whatever order the server returns.
-      expect(JSON.parse(sent[0].metadata).video_thumb).toBe('https://cdn.example/first-video-tid-thumbnail')
-      expect(JSON.parse(sent[1].metadata).video_thumb).toBe('https://cdn.example/second-video-tid-thumbnail')
+      expect(JSON.parse(sent[0].metadata).pvw).toBe('https://cdn.example/first-video-tid-thumbnail')
+      expect(JSON.parse(sent[1].metadata).pvw).toBe('https://cdn.example/second-video-tid-thumbnail')
     })
 
     it('a failed prepareUpload of the provider fails the message, uploading nothing', async () => {
@@ -2474,7 +2474,7 @@ describe('attachment upload recovery', () => {
       expect(sent).toMatchObject({ url: 'https://cdn.example/clip.mp4', upload: false })
       // The video has its own enc and names its preview by URL.
       expect(JSON.parse(sent.metadata)).toEqual({
-        video_thumb: 'https://cdn.example/video-preview.jpg',
+        pvw: 'https://cdn.example/video-preview.jpg',
         'sceyt.enc': fakeEncryption('key-2')
       })
       // The preview is a preview attachment with its own enc.

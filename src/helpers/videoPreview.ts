@@ -18,12 +18,12 @@ export const parseAttachmentMetadata = (metadata: any): Record<string, any> => {
 export const withVideoThumb = (metadata: any, videoThumb: string) => {
   const parsedMetadata = { ...parseAttachmentMetadata(metadata) }
   delete parsedMetadata.previewImage
-  return JSON.stringify({ ...parsedMetadata, video_thumb: videoThumb })
+  return JSON.stringify({ ...parsedMetadata, pvw: videoThumb })
 }
 
 export const getVideoThumb = (metadata: any): string | undefined => {
   const parsedMetadata = parseAttachmentMetadata(metadata)
-  const videoThumb = parsedMetadata.video_thumb
+  const videoThumb = parsedMetadata.pvw
   if (typeof videoThumb === 'string' && videoThumb.trim().length > 0) {
     return videoThumb.trim()
   }
@@ -38,7 +38,7 @@ export const shouldExtractVideoFirstFrame = (metadata: any) => !getVideoThumb(me
 
 /**
  * A message's attachments as they are shown: its preview attachments (a video's preview
- * image sent as an attachment of its own) are not shown. A video whose video_thumb is a
+ * image sent as an attachment of its own) are not shown. A video whose pvw is a
  * preview attachment's URL gets that attachment as `videoPreviewAttachment`, whose own key
  * opens it; the order of the attachments does not matter.
  */
@@ -90,7 +90,7 @@ export const downloadVideoThumb = async (
     // second cache lookup before the downloader has produced the thumbnail.
     skipCacheLookup: true,
     // An encrypted video's preview is a preview attachment of its own, opened with its own key;
-    // a plain video_thumb is not encrypted.
+    // a plain pvw is not encrypted.
     encryption: previewAttachment ? getAttachmentEncryption(previewAttachment.metadata) : undefined,
     contentType: 'image/jpeg'
   })

@@ -97,7 +97,7 @@ describe('downloadVideoThumb', () => {
     const encryptedVideo = {
       ...video,
       size: 5000,
-      metadata: withAttachmentEncryption('{"video_thumb":"https://cdn/preview.jpg"}', fakeEncryptionInfo('key-1')),
+      metadata: withAttachmentEncryption('{"pvw":"https://cdn/preview.jpg"}', fakeEncryptionInfo('key-1')),
       videoPreviewAttachment: previewAttachment
     }
     const fetchMock = jest

@@ -144,7 +144,7 @@ const videoAttachment = {
   messageId: 'message-id',
   name: 'video.mp4',
   type: attachmentTypes.video,
-  metadata: JSON.stringify({ szw: 1280, szh: 720, dur: 17, video_thumb: 'https://cdn/video-thumb.jpg' }),
+  metadata: JSON.stringify({ szw: 1280, szh: 720, dur: 17, pvw: 'https://cdn/video-thumb.jpg' }),
   url: 'https://cdn/video.mp4',
   size: 8,
   createdAt: new Date(),

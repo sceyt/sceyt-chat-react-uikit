@@ -3076,7 +3076,7 @@ describe('message saga message-list flows', () => {
             szh: 720,
             dur: 17,
             tmb: 'first-frame-hash',
-            video_thumb: 'https://cdn.example.com/forwarded-video-thumb.jpg'
+            pvw: 'https://cdn.example.com/forwarded-video-thumb.jpg'
           }
         } as any
       ]
@@ -3113,7 +3113,7 @@ describe('message saga message-list flows', () => {
         szh: 720,
         dur: 17,
         tmb: 'first-frame-hash',
-        video_thumb: 'https://cdn.example.com/forwarded-video-thumb.jpg'
+        pvw: 'https://cdn.example.com/forwarded-video-thumb.jpg'
       })
     )
     expect(builder.setAttachments).toHaveBeenCalledWith([
@@ -3124,7 +3124,7 @@ describe('message saga message-list flows', () => {
           szh: 720,
           dur: 17,
           tmb: 'first-frame-hash',
-          video_thumb: 'https://cdn.example.com/forwarded-video-thumb.jpg'
+          pvw: 'https://cdn.example.com/forwarded-video-thumb.jpg'
         })
       })
     ])
@@ -3142,7 +3142,7 @@ describe('message saga message-list flows', () => {
         attachments: [
           expect.objectContaining({
             metadata: expect.objectContaining({
-              video_thumb: 'https://cdn.example.com/forwarded-video-thumb.jpg',
+              pvw: 'https://cdn.example.com/forwarded-video-thumb.jpg',
               szw: 1280,
               szh: 720,
               dur: 17,

@@ -53,12 +53,12 @@ const flushPreviewEffects = async () => {
   })
 }
 
-describe('VideoPreview video_thumb rendering', () => {
+describe('VideoPreview pvw rendering', () => {
   beforeEach(() => {
     jest.clearAllMocks()
   })
 
-  it('shows the downloaded video_thumb immediately and never extracts a frame from the original video', async () => {
+  it('shows the downloaded pvw immediately and never extracts a frame from the original video', async () => {
     mockDownloadVideoThumb.mockResolvedValue('blob:downloaded-video-thumb')
     const file = {
       id: 'video-id',
@@ -67,7 +67,7 @@ describe('VideoPreview video_thumb rendering', () => {
       name: 'video.mp4',
       type: attachmentTypes.video,
       url: 'https://cdn/video.mp4',
-      metadata: JSON.stringify({ szw: 1280, szh: 720, dur: 17, video_thumb: 'https://cdn/video-thumb.jpg' }),
+      metadata: JSON.stringify({ szw: 1280, szh: 720, dur: 17, pvw: 'https://cdn/video-thumb.jpg' }),
       attachmentUrl: '',
       size: 100,
       createdAt: new Date(),
@@ -96,7 +96,7 @@ describe('VideoPreview video_thumb rendering', () => {
       'https://cdn/video-thumb.jpg',
       expect.objectContaining({
         messageId: 'message-id',
-        metadata: expect.stringContaining('"video_thumb":"https://cdn/video-thumb.jpg"')
+        metadata: expect.stringContaining('"pvw":"https://cdn/video-thumb.jpg"')
       }),
       undefined
     )
@@ -109,7 +109,7 @@ describe('VideoPreview video_thumb rendering', () => {
     expect(container.querySelector('img')).toHaveAttribute('src', 'blob:downloaded-video-thumb')
   })
 
-  it('cross-fades from the inline thumbnail to video_thumb only after the remote preview has loaded', async () => {
+  it('cross-fades from the inline thumbnail to pvw only after the remote preview has loaded', async () => {
     let resolvePreview: ((value: string) => void) | undefined
     mockDownloadVideoThumb.mockImplementation(
       () =>
@@ -129,7 +129,7 @@ describe('VideoPreview video_thumb rendering', () => {
         szh: 720,
         dur: 17,
         tmb: 'a'.repeat(80),
-        video_thumb: 'https://cdn/cross-fade-video-thumb.jpg'
+        pvw: 'https://cdn/cross-fade-video-thumb.jpg'
       }),
       attachmentUrl: '',
       size: 100,
@@ -172,7 +172,7 @@ describe('VideoPreview video_thumb rendering', () => {
     )
   })
 
-  it('keeps the inline thumbnail when video_thumb download fails', async () => {
+  it('keeps the inline thumbnail when pvw download fails', async () => {
     const errorSpy = jest.spyOn(console, 'error').mockImplementation(() => undefined)
     mockDownloadVideoThumb.mockRejectedValue(new Error('preview unavailable'))
     const file = {
@@ -187,7 +187,7 @@ describe('VideoPreview video_thumb rendering', () => {
         szh: 720,
         dur: 17,
         tmb: 'b'.repeat(80),
-        video_thumb: 'https://cdn/preview-failure-thumb.jpg'
+        pvw: 'https://cdn/preview-failure-thumb.jpg'
       }),
       attachmentUrl: '',
       size: 100,
@@ -268,7 +268,7 @@ describe('VideoPreview video_thumb rendering', () => {
       name: 'no-preview.mp4',
       type: attachmentTypes.video,
       url: 'https://cdn/no-preview.mp4',
-      // No video_thumb / previewImage / inline tmb is supplied by the server.
+      // No pvw / previewImage / inline tmb is supplied by the server.
       metadata: JSON.stringify({ szw: 1280, szh: 720, dur: 17 }),
       attachmentUrl: '',
       size: 100,
@@ -413,7 +413,7 @@ describe('VideoPreview video_thumb rendering', () => {
   })
 })
 
-describe('VideoPreview video_thumb with a custom transport', () => {
+describe('VideoPreview pvw with a custom transport', () => {
   // A forwarded video is rendered before the send is confirmed: the SDK gives
   // the pending attachment an empty message ID.
   const pendingFile = {
@@ -423,7 +423,7 @@ describe('VideoPreview video_thumb with a custom transport', () => {
     name: 'video.mp4',
     type: attachmentTypes.video,
     url: 'https://cdn/video.mp4',
-    metadata: JSON.stringify({ szw: 1280, szh: 720, dur: 17, video_thumb: 'https://cdn/video-thumb.jpg' }),
+    metadata: JSON.stringify({ szw: 1280, szh: 720, dur: 17, pvw: 'https://cdn/video-thumb.jpg' }),
     attachmentUrl: '',
     size: 100,
     createdAt: new Date()
@@ -483,7 +483,7 @@ describe('VideoPreview video_thumb with a custom transport', () => {
       'https://cdn/video-thumb.jpg',
       expect.objectContaining({
         messageId: '9223372036854775807',
-        metadata: expect.stringContaining('"video_thumb":"https://cdn/video-thumb.jpg"')
+        metadata: expect.stringContaining('"pvw":"https://cdn/video-thumb.jpg"')
       }),
       undefined
     )

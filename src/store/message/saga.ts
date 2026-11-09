@@ -391,7 +391,7 @@ const prepareAndUploadVideoPreview = async (attachment: IAttachment): Promise<IA
 // An encrypted video's preview image (encryptUploads, or a provider with prepareUpload) is an
 // attachment of its own in the same message, of type preview, with its own key (its own
 // "sceyt.enc", or the provider's own entry), prepared and uploaded like any file. The video points to it by its
-// URL (video_thumb).
+// URL (pvw).
 const uploadVideoPreviewAttachment = async (video: IAttachment, channel: IChannel): Promise<IAttachment> => {
   const tid = `${video.tid || 'video'}-thumbnail`
   // A preview an earlier send of this message uploaded goes with the video again.
@@ -661,7 +661,7 @@ const getReconnectChannelSignature = (channel: Partial<IChannel> | null | undefi
 export const handleUploadAttachments = async (attachments: IAttachment[], message: IMessage, channel: IChannel) => {
   // Videos' preview images sent as attachments of their own: after the message's own
   // attachments, which keep their places (the sent message's are matched by place), in the
-  // order of their videos. Receivers pair them by URL (the video's video_thumb).
+  // order of their videos. Receivers pair them by URL (the video's pvw).
   const previewAttachments: (IAttachment | undefined)[] = []
   const sent = await Promise.all(
     attachments.map(async (attachment, index) => {
@@ -692,7 +692,7 @@ export const handleUploadAttachments = async (attachments: IAttachment[], messag
           markUploadNotStarted(attachment.tid!)
         }
         // An encrypted video's preview goes as a separate attachment (a forwarded video's
-        // preview is forwarded with it); a plain video's is its video_thumb.
+        // preview is forwarded with it); a plain video's is its pvw.
         if (!fileTransfer.encryptUploads && !fileTransfer.provider.prepareUpload) {
           attachment = await prepareAndUploadVideoPreview(attachment)
         } else if (!attachment.cachedUrl) {
@@ -1721,7 +1721,7 @@ function* sendMessage(action: IAction): any {
                   (pendingAttachment: IAttachment) => pendingAttachment.tid === attachment.tid
                 )
 
-                // Preserve local metadata (especially video_thumb) when the server
+                // Preserve local metadata (especially pvw) when the server
                 // response has not yet echoed it back.
                 if (localAttachment && attachment.type !== attachmentTypes.voice) {
                   const merged: IAttachment = {
@@ -2060,7 +2060,7 @@ function* forwardMessage(action: IAction): any {
         // Attachment metadata is normalized to an object after a message is
         // rendered locally, while the SDK builder expects its wire format.
         // Forwarding an object directly loses video metadata such as
-        // video_thumb, szw, szh, dur and tmb.
+        // pvw, szw, szh, dur and tmb.
         attachments = attachments.map((attachment: IAttachment) => {
           const attachmentBuilder = channel!.createAttachmentBuilder(attachment.url, attachment.type)
           const metadata = JSON.stringify(parseAttachmentMetadata(attachment.metadata))

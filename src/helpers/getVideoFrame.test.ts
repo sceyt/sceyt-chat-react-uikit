@@ -367,7 +367,7 @@ describe('getVideoFirstFrame', () => {
     expect(capturedCanvases[0].height).toBe(540)
   })
 
-  it('creates a compact, aspect-ratio-preserving JPEG for video_thumb independent of devicePixelRatio', async () => {
+  it('creates a compact, aspect-ratio-preserving JPEG for pvw independent of devicePixelRatio', async () => {
     setDevicePixelRatio(2)
     const videoBlob = new Blob(['fake-video-bytes'], { type: 'video/mp4' })
 
