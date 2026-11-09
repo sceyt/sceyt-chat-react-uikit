@@ -40,9 +40,7 @@ describe('video thumbnail metadata', () => {
   })
 
   it('keeps the thumbnail and playable video in separate browser-cache entries', () => {
-    expect(
-      getVideoAttachmentCacheKeys('https://cdn/video.mp4', '{"pvw":"https://cdn/video-thumb.jpg"}')
-    ).toEqual({
+    expect(getVideoAttachmentCacheKeys('https://cdn/video.mp4', '{"pvw":"https://cdn/video-thumb.jpg"}')).toEqual({
       videoThumb: 'https://cdn/video-thumb.jpg',
       originalVideo: 'https://cdn/video.mp4_original_video_url'
     })

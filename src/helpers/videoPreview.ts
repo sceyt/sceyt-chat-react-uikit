@@ -67,7 +67,7 @@ export const getVideoAttachmentCacheKeys = (videoUrl: string, metadata: any) => 
 /**
  * Downloads a video preview through the same transport and Cache Storage path
  * as attachments. The returned object URL is safe to use as an img source.
- * `video` is the video attachment: its metadata holds the preview's key when it is encrypted.
+ * Encrypted previews use their own preview attachment's metadata, never the video's key.
  */
 export const downloadVideoThumb = async (
   videoThumb: string,
@@ -79,9 +79,23 @@ export const downloadVideoThumb = async (
 
   // A preview sent as an attachment of its own is opened with its own key.
   const previewAttachment = video.videoPreviewAttachment?.url === videoThumb ? video.videoPreviewAttachment : undefined
+  // A bare pvw reference has no metadata or size of its own. Preserve the
+  // message context for authorization without giving a provider the video's key.
+  const previewFile = previewAttachment || {
+    ...video,
+    type: attachmentTypes.preview,
+    name: 'preview.jpg',
+    url: videoThumb,
+    attachmentUrl: videoThumb,
+    metadata: '{}',
+    size: 0,
+    data: undefined,
+    cachedUrl: undefined,
+    videoPreviewAttachment: undefined
+  }
   const { objectUrl } = await requestMediaDownload({
     key: `video-thumbnail:${videoThumb}`,
-    attachment: previewAttachment || video,
+    attachment: previewFile,
     url: videoThumb,
     cacheKey: videoThumb,
     kind: 'video-thumbnail',

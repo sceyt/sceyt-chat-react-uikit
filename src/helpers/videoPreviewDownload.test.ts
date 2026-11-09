@@ -3,7 +3,7 @@ import { registerBlobUrl } from './attachmentBlobUrls'
 import { withAttachmentEncryption } from './attachmentEncryption'
 import { downloadVideoThumb } from './videoPreview'
 import { fileTransfer } from '../fileTransfer/sceytChatUIKitFileTransfer'
-import { FileTransferResult } from '../types/fileTransfer/types'
+import { FileDownloadRequest, FileTransferResult } from '../types/fileTransfer/types'
 import {
   fakeEncrypted,
   fakeEncryptionInfo,
@@ -21,12 +21,16 @@ jest.mock('./attachmentBlobUrls', () => ({ registerBlobUrl: jest.fn() }))
 const mockGetAttachmentUrlFromCache = getAttachmentUrlFromCache as jest.Mock
 const mockSetAttachmentToCache = setAttachmentToCache as jest.Mock
 const mockRegisterBlobUrl = registerBlobUrl as jest.Mock
-// The video the preview belongs to: the transport gets it as the request's attachment.
+// The parent supplies the message identity; preview downloads carry their own file metadata.
 const video = { url: 'https://cdn/clip.mp4', messageId: 'message-id', metadata: '{}' } as any
 
 /** Sets a custom transport (fileTransfer.provider) that returns `result`. */
 const useTransport = (result: FileTransferResult<Blob>) => {
-  const transport = { upload: jest.fn(), download: jest.fn(async () => result), cancel: jest.fn() }
+  const transport = {
+    upload: jest.fn(),
+    download: jest.fn(async (_request: FileDownloadRequest) => result),
+    cancel: jest.fn()
+  }
   fileTransfer.provider = transport
   return transport
 }
@@ -51,10 +55,52 @@ describe('downloadVideoThumb', () => {
 
     const [request] = transport.download.mock.calls[0] as any[]
     expect(request).toMatchObject({ url: 'https://cdn/preview.jpg', mimeType: 'image/jpeg' })
-    expect(request.context.attachment === video).toBe(true)
+    expect(request.context.attachment).toMatchObject({
+      messageId: video.messageId,
+      url: 'https://cdn/preview.jpg',
+      type: 'preview',
+      metadata: '{}',
+      size: 0
+    })
     expect(request.encryptionInfo).toBeUndefined()
     expect(mockSetAttachmentToCache).toHaveBeenCalledWith('https://cdn/preview.jpg', expect.any(Response))
   })
+
+  it.each(['serialized', 'object'])(
+    'a pvw without a preview attachment never inherits the video key (%s metadata)',
+    async (format) => {
+      const previewUrl = `https://cdn/ios-preview-${format}.jpg`
+      const metadata = { pvw: previewUrl, 'waafi.enc': 'parent-video-key', 'sceyt.enc': 'parent-sdk-key' }
+      const parent = {
+        ...video,
+        type: 'video',
+        size: 4280459,
+        metadata: format === 'serialized' ? JSON.stringify(metadata) : metadata
+      }
+      const preview = new Blob(['plain iOS preview'], { type: 'image/jpeg' })
+      const transport = useTransport(FileTransferResult.success(preview))
+      transport.download.mockImplementation(async (request) =>
+        request.metadata?.['waafi.enc']
+          ? FileTransferResult.failure(Object.assign(new Error('Key commitment mismatch'), { type: 'Authentication' }))
+          : FileTransferResult.success(preview)
+      )
+
+      await expect(downloadVideoThumb(previewUrl, parent)).resolves.toBe('blob:preview')
+
+      const [request] = transport.download.mock.calls[0] as any[]
+      expect(request.metadata).toEqual({})
+      expect(request.encryptionInfo).toBeUndefined()
+      expect(request.plaintextSize).toBeUndefined()
+      expect(request.context.attachment).toMatchObject({
+        messageId: video.messageId,
+        type: 'preview',
+        url: previewUrl,
+        size: 0,
+        metadata: '{}'
+      })
+      expect(parent.metadata).toEqual(format === 'serialized' ? JSON.stringify(metadata) : metadata)
+    }
+  )
 
   it('a preview sent as a preview attachment of its own is downloaded as that attachment (its own key)', async () => {
     const transport = useTransport(FileTransferResult.success(new Blob(['preview'], { type: 'image/jpeg' })))

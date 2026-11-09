@@ -1,5 +1,5 @@
 import styled, { css, keyframes } from 'styled-components'
-import React, { memo, useEffect, useMemo, useRef } from 'react'
+import React, { memo, useEffect, useMemo, useRef, useState } from 'react'
 import { ReactComponent as PlayIcon } from '../../assets/svg/playVideo.svg'
 import { ReactComponent as VideoPlayerPlay } from '../../assets/svg/videoPlayerPlay.svg'
 import { ReactComponent as VideoCamIcon } from '../../assets/svg/video-call.svg'
@@ -76,6 +76,8 @@ const VideoPreview = memo(
       )
     })
     const videoThumb = useMemo(() => getVideoThumb(file.metadata), [file.metadata])
+    const [failedPreview, setFailedPreview] = useState<string>()
+    const previewFailed = Boolean(videoThumb && failedPreview === videoThumb)
     const downloadedPreviewImage = useSelector((store: any) => {
       if (!videoThumb) return undefined
       return store.MessageReducer.attachmentUpdatedMap[getAttachmentURLWithVersion(videoThumb)]
@@ -112,7 +114,16 @@ const VideoPreview = memo(
       previousSource: previousPreviewSource,
       pendingSource,
       markPreferredSourceLoaded
-    } = useProgressiveMediaSource(downloadedPreviewImage || attachmentVideoFirstFrame, fallbackPreviewSource)
+    } = useProgressiveMediaSource(
+      (!previewFailed && downloadedPreviewImage) || attachmentVideoFirstFrame,
+      fallbackPreviewSource
+    )
+
+    const handlePreviewError = (event: React.SyntheticEvent<HTMLImageElement>) => {
+      if (videoThumb && event.currentTarget.getAttribute('src') === downloadedPreviewImage) {
+        setFailedPreview(videoThumb)
+      }
+    }
 
     const isExtractingRef = useRef(false)
     const hasExtractionFailedRef = useRef(false)
@@ -138,8 +149,8 @@ const VideoPreview = memo(
           }
         })
         .catch((error) => {
-          // Keep the existing thumbnail/placeholder visible. Do not download the
-          // video merely to recover a failed preview-image request.
+          if (cancelled) return
+          setFailedPreview(videoThumb)
           console.error('Error downloading video preview image:', error)
         })
 
@@ -149,8 +160,9 @@ const VideoPreview = memo(
     }, [videoThumb, downloadedPreviewImage, dispatch, messageType, file.messageId, file.metadata])
 
     useEffect(() => {
+      // The parent supplies the playable original, including decryption when needed.
       const videoSource = src
-      const canExtractFirstFrame = shouldExtractVideoFirstFrame(file.metadata)
+      const canExtractFirstFrame = shouldExtractVideoFirstFrame(file.metadata) || previewFailed
 
       if (previousVideoSourceRef.current !== videoSource) {
         previousVideoSourceRef.current = videoSource
@@ -244,6 +256,7 @@ const VideoPreview = memo(
       file.url,
       src,
       videoThumb,
+      previewFailed,
       dispatch,
       attachmentVideoFirstFrame,
       isPreview,
@@ -262,6 +275,7 @@ const VideoPreview = memo(
         <UploadInProgress
           isRepliedMessage={isRepliedMessage}
           src={previousPreviewSource || displayedPreviewSource}
+          onError={handlePreviewError}
           width={parseInt(width)}
           height={parseInt(height)}
           withBorder={!isPreview && !isDetailsView}
@@ -279,6 +293,7 @@ const VideoPreview = memo(
             key={displayedPreviewSource}
             $fadeIn
             src={displayedPreviewSource}
+            onError={handlePreviewError}
             isRepliedMessage={isRepliedMessage}
             width={parseInt(width)}
             height={parseInt(height)}
@@ -291,7 +306,14 @@ const VideoPreview = memo(
           />
         )}
         {pendingSource && (
-          <img aria-hidden alt='' src={pendingSource} style={{ display: 'none' }} onLoad={markPreferredSourceLoaded} />
+          <img
+            aria-hidden
+            alt=''
+            src={pendingSource}
+            style={{ display: 'none' }}
+            onLoad={markPreferredSourceLoaded}
+            onError={handlePreviewError}
+          />
         )}
         {onlyVideoImage && (
           <VideoIcon bg={overlayBackground2}>

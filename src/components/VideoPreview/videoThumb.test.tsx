@@ -55,7 +55,12 @@ const flushPreviewEffects = async () => {
 
 describe('VideoPreview pvw rendering', () => {
   beforeEach(() => {
+    jest.useFakeTimers()
     jest.clearAllMocks()
+  })
+
+  afterEach(() => {
+    jest.useRealTimers()
   })
 
   it('shows the downloaded pvw immediately and never extracts a frame from the original video', async () => {
@@ -172,9 +177,13 @@ describe('VideoPreview pvw rendering', () => {
     )
   })
 
-  it('keeps the inline thumbnail when pvw download fails', async () => {
+  it('replaces the inline thumbnail with the video first frame when pvw download fails', async () => {
     const errorSpy = jest.spyOn(console, 'error').mockImplementation(() => undefined)
     mockDownloadVideoThumb.mockRejectedValue(new Error('preview unavailable'))
+    mockGetVideoFirstFrame.mockResolvedValue({
+      frameBlobUrl: 'blob:preview-failure-first-frame',
+      blob: new Blob(['frame'], { type: 'image/jpeg' })
+    })
     const file = {
       id: 'video-preview-failure-id',
       tid: 'video-preview-failure-tid',
@@ -203,7 +212,7 @@ describe('VideoPreview pvw rendering', () => {
         width='420px'
         height='240px'
         file={file as any}
-        src='https://cdn/preview-failure-video.mp4'
+        src='blob:decrypted-preview-failure-video'
         backgroundColor='#ffffff'
         downloading={false}
       />,
@@ -213,9 +222,74 @@ describe('VideoPreview pvw rendering', () => {
     await flushPreviewEffects()
 
     expect(container.querySelector('img')).toHaveAttribute('src', `data:image/jpeg;base64,${'b'.repeat(80)}`)
-    expect(mockGetVideoFirstFrame).not.toHaveBeenCalled()
+    expect(mockGetVideoFirstFrame).toHaveBeenCalledWith(
+      'blob:decrypted-preview-failure-video',
+      expect.any(Number),
+      expect.any(Number)
+    )
+    const frame = container.querySelector('img[src="blob:preview-failure-first-frame"]')
+    expect(frame).toBeInTheDocument()
+    fireEvent.load(frame!)
+    act(() => {
+      jest.advanceTimersByTime(180)
+    })
+    expect(container.querySelector('img')).toHaveAttribute('src', 'blob:preview-failure-first-frame')
+    expect(container.querySelector('img')).toBeVisible()
     errorSpy.mockRestore()
   })
+
+  it.each(['download', 'image decode', 'displayed image'])(
+    'uses the downloaded video first frame after a preview %s failure',
+    async (failure) => {
+      const errorSpy = jest.spyOn(console, 'error').mockImplementation(() => undefined)
+      mockDownloadVideoThumb.mockImplementation(() =>
+        failure === 'download'
+          ? Promise.reject(new Error('preview unavailable'))
+          : Promise.resolve('blob:invalid-preview')
+      )
+      mockGetVideoFirstFrame.mockResolvedValue({
+        frameBlobUrl: `blob:fallback-frame-${failure}`,
+        blob: new Blob(['frame'], { type: 'image/jpeg' })
+      })
+      const file = {
+        id: `fallback-${failure}`,
+        messageId: 'message-id',
+        name: 'video.mp4',
+        type: attachmentTypes.video,
+        url: `https://cdn/fallback-${failure}.mp4`,
+        metadata: JSON.stringify({ pvw: `https://cdn/fallback-${failure}.jpg` }),
+        size: 100,
+        createdAt: new Date()
+      }
+      const renderPreview = (src: string) => (
+        <VideoPreview width='420px' height='240px' file={file} src={src} backgroundColor='#ffffff' downloading={!src} />
+      )
+      const { container, rerender } = renderWithSceytProvider(renderPreview(''), { store: createMessageListStore() })
+      await flushPreviewEffects()
+      if (failure !== 'download') {
+        if (failure === 'displayed image') {
+          fireEvent.load(container.querySelector('img[src="blob:invalid-preview"]')!)
+        }
+        fireEvent.error(container.querySelector('img[src="blob:invalid-preview"]')!)
+        await flushPreviewEffects()
+      }
+      expect(mockGetVideoFirstFrame).not.toHaveBeenCalled()
+
+      rerender(renderPreview('blob:decrypted-fallback-video'))
+      await flushPreviewEffects()
+      expect(mockGetVideoFirstFrame).toHaveBeenCalledTimes(1)
+      expect(mockGetVideoFirstFrame).toHaveBeenCalledWith(
+        'blob:decrypted-fallback-video',
+        expect.any(Number),
+        expect.any(Number)
+      )
+      const frame = container.querySelector(`img[src="blob:fallback-frame-${failure}"]`)
+      expect(frame).toBeInTheDocument()
+      fireEvent.load(frame!)
+      expect(container.querySelector('img')).toHaveAttribute('src', `blob:fallback-frame-${failure}`)
+      errorSpy.mockRestore()
+    }
+  )
 
   it('does not start a competing frame extraction while the compose preparation owns the preview', async () => {
     const file = {
