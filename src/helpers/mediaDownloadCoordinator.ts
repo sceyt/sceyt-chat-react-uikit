@@ -182,7 +182,12 @@ export const requestMediaDownload = (request: MediaDownloadRequest): Promise<Med
   }
   jobVersions.set(request.key, job.version)
   jobs.set(request.key, job)
-  setJobSnapshot(request.key, job, job.snapshot)
+  // A cached file is not downloaded, so it never shows as loading: e.g. a video's
+  // tiles remounting (switching chats) would flash the download progress. A new
+  // try after a cancel or a failure shows it at once.
+  const previousState = getMediaDownloadSnapshot(request.key).state
+  const showsLoadingAtOnce = request.skipCacheLookup || previousState === 'cancelled' || previousState === 'failed'
+  if (showsLoadingAtOnce) setJobSnapshot(request.key, job, job.snapshot)
 
   const promise = Promise.resolve()
     .then(async () => {
@@ -192,6 +197,7 @@ export const requestMediaDownload = (request: MediaDownloadRequest): Promise<Med
         : await getCachedMediaResult(request.cacheKey).catch(() => undefined)
       throwIfCancelled(job)
       if (cachedResult) return cachedResult
+      if (!showsLoadingAtOnce) setJobSnapshot(request.key, job, job.snapshot)
       return download(request, job)
     })
     .then((result) => {

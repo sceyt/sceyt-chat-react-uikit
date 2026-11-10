@@ -303,6 +303,55 @@ describe('mediaDownloadCoordinator', () => {
     expect(transport.download).not.toHaveBeenCalled()
   })
 
+  it('a cached video asked for again (its tiles remount when switching chats) never shows as loading', async () => {
+    const transport = useTransport()
+    mockGetAttachmentUrlFromCache.mockResolvedValue('blob:cached-video')
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: true,
+      blob: async () => new Blob(['cached-video'], { type: 'video/mp4' })
+    }) as any
+    const key = 'original-video:https://cdn/cached.mp4'
+    const states: string[] = []
+    subscribeToMediaDownload(key, () => states.push(getMediaDownloadSnapshot(key).state))
+
+    const request = requestMediaDownload({
+      key,
+      attachment: attachmentOf('https://cdn/cached.mp4'),
+      url: 'https://cdn/cached.mp4',
+      cacheKey: 'https://cdn/cached.mp4_original_video_url',
+      kind: 'original-video',
+      size: 100
+    })
+    expect(getMediaDownloadSnapshot(key).state).toBe('idle')
+    await request
+
+    expect(states).toEqual(['completed'])
+    expect(transport.download).not.toHaveBeenCalled()
+  })
+
+  it('a video not in the cache shows as loading once its download starts', async () => {
+    const { finish } = usePendingTransport()
+    const key = 'original-video:https://cdn/new.mp4'
+    const states: string[] = []
+    subscribeToMediaDownload(key, () => states.push(getMediaDownloadSnapshot(key).state))
+
+    const request = requestMediaDownload({
+      key,
+      attachment: attachmentOf('https://cdn/new.mp4'),
+      url: 'https://cdn/new.mp4',
+      cacheKey: 'https://cdn/new.mp4_original_video_url',
+      kind: 'original-video',
+      size: 100
+    })
+    await flushCoordinator()
+    expect(getMediaDownloadSnapshot(key)).toMatchObject({ state: 'loading', loaded: 0, total: 100 })
+
+    finish(FileTransferResult.success(new Blob(['video'], { type: 'video/mp4' })))
+    await request
+    expect(states[0]).toBe('loading')
+    expect(states[states.length - 1]).toBe('completed')
+  })
+
   it('keeps an explicit cancellation when it happens during the cache lookup', async () => {
     let resolveCacheLookup: ((value: string | false) => void) | undefined
     mockGetAttachmentUrlFromCache.mockImplementation(
