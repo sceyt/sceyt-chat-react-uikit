@@ -1766,6 +1766,30 @@ describe('attachment upload recovery', () => {
     expect(metadata.previewImage).toBeUndefined()
   })
 
+  it('a view-once video is sent without a preview image', async () => {
+    const channel = makeUploaderChannel('channel-view-once-video')
+    const video = new File(['video-bytes'], 'clip.mp4', { type: 'video/mp4' })
+    mockGetVideoFirstFrame.mockResolvedValue({ blob: new Blob(['preview'], { type: 'image/jpeg' }) })
+    uploadBehavior = (call) => call.succeed('https://cdn.example/clip.mp4')
+    const attachment = {
+      tid: 'view-once-video-tid',
+      type: attachmentTypes.video,
+      name: 'clip.mp4',
+      size: video.size,
+      url: video,
+      data: video,
+      metadata: '{"tmb":"thumb","szw":1280,"szh":720,"dur":12}',
+      upload: false
+    } as any
+
+    const sent = await handleUploadAttachments([attachment], { type: 'view_once', viewOnce: true } as any, channel)
+
+    expect(mockGetVideoPreviewFrame).not.toHaveBeenCalled()
+    expect(uploadCalls.map((call) => call.attachment.type)).toEqual([attachmentTypes.video])
+    expect(sent.map((sentAttachment: IAttachment) => sentAttachment.tid)).toEqual(['view-once-video-tid'])
+    expect(JSON.parse(sent[0].metadata).pvw).toBeUndefined()
+  })
+
   it('sends the video only after its preview URL is embedded in the attachment payload', async () => {
     const currentUser = makeUser({ id: 'current-user' })
     const channel = makeUploaderChannel('channel-video-preview-send')
@@ -2113,6 +2137,29 @@ describe('attachment upload recovery', () => {
       expect(uploadCalls[0].request.metadata).toEqual({ szw: 10, szh: 20, 'app.enc': 'keys-slot-1' })
       // The provider owns the encryption: its entry is in the metadata, and no "sceyt.enc" is written.
       expect(JSON.parse(sent.metadata)).toEqual({ szw: 10, szh: 20, 'app.enc': 'keys-slot-1' })
+    })
+
+    it('a view-once encrypted video is sent without a preview attachment', async () => {
+      const channel = makeUploaderChannel('channel-view-once-encrypted-video')
+      const video = new File(['video-bytes'], 'clip.mp4', { type: 'video/mp4' })
+      mockGetVideoFirstFrame.mockResolvedValue({ blob: new Blob(['preview-bytes'], { type: 'image/jpeg' }) })
+      const attachment = {
+        tid: 'view-once-encrypted-video-tid',
+        type: attachmentTypes.video,
+        name: 'clip.mp4',
+        size: video.size,
+        url: video,
+        data: video,
+        metadata: JSON.stringify({ szw: 1280, szh: 720, tmb: 'hash', dur: 12 }),
+        upload: false
+      } as any
+
+      const sent = await handleUploadAttachments([attachment], { type: 'view_once', viewOnce: true } as any, channel)
+
+      expect(mockGetVideoPreviewFrame).not.toHaveBeenCalled()
+      expect(uploadCalls.map((call) => call.attachment.tid)).toEqual(['view-once-encrypted-video-tid'])
+      expect(sent.map((sentAttachment: IAttachment) => sentAttachment.tid)).toEqual(['view-once-encrypted-video-tid'])
+      expect(JSON.parse(sent[0].metadata).pvw).toBeUndefined()
     })
 
     it("the provider's prepareUpload: a video's preview is a preview attachment of its own, named by its pvw", async () => {

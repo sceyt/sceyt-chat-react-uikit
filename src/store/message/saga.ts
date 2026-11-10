@@ -692,8 +692,11 @@ export const handleUploadAttachments = async (attachments: IAttachment[], messag
           markUploadNotStarted(attachment.tid!)
         }
         // An encrypted video's preview goes as a separate attachment (a forwarded video's
-        // preview is forwarded with it); a plain video's is its pvw.
-        if (!fileTransfer.encryptUploads && !fileTransfer.provider.prepareUpload) {
+        // preview is forwarded with it); a plain video's is its pvw. A view-once video
+        // is sent without a preview image.
+        if (message.viewOnce) {
+          // No preview: only the video's own file is uploaded.
+        } else if (!fileTransfer.encryptUploads && !fileTransfer.provider.prepareUpload) {
           attachment = await prepareAndUploadVideoPreview(attachment)
         } else if (!attachment.cachedUrl) {
           const preview = await uploadVideoPreviewAttachment(attachment, channel)
