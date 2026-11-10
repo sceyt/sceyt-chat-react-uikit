@@ -1,4 +1,4 @@
-import { runSaga, Task } from 'redux-saga'
+import { runSaga, stdChannel, Task } from 'redux-saga'
 import log from 'loglevel'
 import { getClient, setClient } from '../../common/client'
 import {
@@ -24,6 +24,7 @@ import {
 } from '../../testUtils/messageFixtures'
 import {
   deleteMessageAC,
+  pauseAttachmentUploadingAC,
   resendMessageAC,
   sendMessageAC,
   updateAttachmentUploadingProgressAC,
@@ -36,6 +37,7 @@ import {
   markUploadNotStarted,
   pauseUpload,
   resetAttachmentUploadsForTests,
+  resumeUpload,
   uploadAttachment
 } from '../../fileTransfer/attachmentUploadCoordinator'
 import { fileTransfer } from '../../fileTransfer/sceytChatUIKitFileTransfer'
@@ -1107,6 +1109,163 @@ describe('attachment upload recovery', () => {
           getMessageFromMap(channel.id, 'channel-resend-sent-meanwhile-msg-2')
       ).toEqual(expect.objectContaining({ id: 'srv-msg-2', state: MESSAGE_STATUS.UNMODIFIED }))
     })
+  })
+
+  it('a paused upload does not hold back the next messages: they upload and are sent, and it is sent once resumed', async () => {
+    const currentUser = makeUser({ id: 'current-user' })
+    const channel = makeUploaderChannel('channel-paused-no-wait')
+    const messageBuilder: any = channel.createMessageBuilder()
+    messageBuilder.create
+      .mockImplementationOnce(() => makePendingMessage({ channelId: channel.id, tid: 'paused-msg-1' }))
+      .mockImplementationOnce(() => makePendingMessage({ channelId: channel.id, tid: 'paused-msg-2' }))
+    const uploads: UploadCall[] = []
+    uploadBehavior = (call) => {
+      uploads.push(call)
+    }
+    channel.sendMessage = jest.fn((sent: any) =>
+      Promise.resolve({ ...makeServerResponse(sent.tid, sent.attachments[0].tid, currentUser), id: `srv-${sent.tid}` })
+    )
+    setActiveChannelId(channel.id)
+    setChannelInMap(channel)
+    const file = (tid: string, name: string) => ({
+      tid: trackedTid(tid),
+      type: attachmentTypes.file,
+      name,
+      size: 3,
+      data: new File(['abc'], name, { type: 'application/pdf' }),
+      metadata: '{}',
+      upload: false
+    })
+    const sentTids = () => (channel.sendMessage as jest.Mock).mock.calls.map(([sent]) => sent.tid)
+    const until = async (done: () => boolean) => {
+      for (let attempt = 0; attempt < 400 && !done(); attempt++) await Promise.resolve()
+    }
+    // Actions the saga puts reach its takes, as in the store.
+    const actions = stdChannel()
+
+    const run = runSaga(
+      { channel: actions, dispatch: (output: any) => actions.put(output), getState: () => mockStoreState },
+      __messageSagaTestables.sendMessage,
+      sendMessageAC(
+        {
+          body: 'two files',
+          bodyAttributes: [],
+          attachments: [file('paused-file-1', 'first.pdf'), file('paused-file-2', 'second.pdf')],
+          mentionedUsers: [],
+          type: 'text',
+          metadata: {},
+          parentMessage: null,
+          repliedInThread: false
+        },
+        channel.id,
+        CONNECTION_STATUS.CONNECTED,
+        true
+      )
+    )
+    runningTasks.push(run)
+    await until(() => uploads.length === 1)
+
+    // The user pauses the first upload (what pauseAttachmentUploading does).
+    expect(pauseUpload('paused-file-1')).toBe(true)
+    actions.put(updateAttachmentUploadingStateAC(UPLOAD_STATE.PAUSED, 'paused-file-1'))
+    await until(() => uploads.length === 2)
+
+    // The second one uploads now, and its message is sent.
+    expect(uploads.map((call) => call.attachment.tid)).toEqual(['paused-file-1', 'paused-file-2'])
+    uploads[1].succeed('https://cdn.example/paused-file-2')
+    await run.toPromise()
+    expect(sentTids()).toEqual(['paused-msg-2'])
+
+    // Resumed, the first one uploads again and is sent after it.
+    expect(resumeUpload('paused-file-1')).toBe(true)
+    await until(() => uploads.length === 3)
+    uploads[2].succeed('https://cdn.example/paused-file-1')
+    await until(() => sentTids().length === 2)
+    expect(sentTids()).toEqual(['paused-msg-2', 'paused-msg-1'])
+    expect(getPendingMessagesFromMap(channel.id)).toHaveLength(0)
+  })
+
+  it("after the first upload is stopped, the second one's stop button stops it", async () => {
+    const currentUser = makeUser({ id: 'current-user' })
+    const channel = makeUploaderChannel('channel-stop-second')
+    const messageBuilder: any = channel.createMessageBuilder()
+    messageBuilder.create
+      .mockImplementationOnce(() => makePendingMessage({ channelId: channel.id, tid: 'stop-msg-1' }))
+      .mockImplementationOnce(() => makePendingMessage({ channelId: channel.id, tid: 'stop-msg-2' }))
+    const uploads: UploadCall[] = []
+    uploadBehavior = (call) => {
+      uploads.push(call)
+    }
+    channel.sendMessage = jest.fn((sent: any) =>
+      Promise.resolve({ ...makeServerResponse(sent.tid, sent.attachments[0].tid, currentUser), id: `srv-${sent.tid}` })
+    )
+    setActiveChannelId(channel.id)
+    setChannelInMap(channel)
+    const file = (tid: string, name: string) => ({
+      tid: trackedTid(tid),
+      type: attachmentTypes.file,
+      name,
+      size: 3,
+      data: new File(['abc'], name, { type: 'application/pdf' }),
+      metadata: '{}',
+      upload: false
+    })
+    const until = async (done: () => boolean) => {
+      for (let attempt = 0; attempt < 400 && !done(); attempt++) await Promise.resolve()
+    }
+    const actions = stdChannel()
+    const dispatched: any[] = []
+    const io = {
+      channel: actions,
+      dispatch: (output: any) => {
+        dispatched.push(output)
+        actions.put(output)
+      },
+      getState: () => mockStoreState
+    }
+    // What the upload's stop button does.
+    const stop = (tid: string) =>
+      runSaga(io, __messageSagaTestables.pauseAttachmentUploading, pauseAttachmentUploadingAC(tid)).toPromise()
+
+    const run = runSaga(
+      io,
+      __messageSagaTestables.sendMessage,
+      sendMessageAC(
+        {
+          body: 'two files',
+          bodyAttributes: [],
+          attachments: [file('stop-file-1', 'first.pdf'), file('stop-file-2', 'second.pdf')],
+          mentionedUsers: [],
+          type: 'text',
+          metadata: {},
+          parentMessage: null,
+          repliedInThread: false
+        },
+        channel.id,
+        CONNECTION_STATUS.CONNECTED,
+        true
+      )
+    )
+    runningTasks.push(run)
+    await until(() => uploads.length === 1)
+    await stop('stop-file-1')
+    await until(() => uploads.length === 2)
+
+    await stop('stop-file-2')
+    await run.toPromise()
+
+    expect(dispatched).toEqual(
+      expect.arrayContaining([
+        updateAttachmentUploadingStateAC(UPLOAD_STATE.PAUSED, 'stop-file-1'),
+        updateAttachmentUploadingStateAC(UPLOAD_STATE.PAUSED, 'stop-file-2')
+      ])
+    )
+    // Both transfers stopped, and neither message was sent.
+    expect(uploads.map((call) => [call.attachment.tid, call.request.signal.aborted])).toEqual([
+      ['stop-file-1', true],
+      ['stop-file-2', true]
+    ])
+    expect(channel.sendMessage).not.toHaveBeenCalled()
   })
 
   it('when a lost connection fails a message, the next ones wait for it: they are sent after it, in order', async () => {

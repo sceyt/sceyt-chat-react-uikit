@@ -211,7 +211,7 @@ import { setWaitToSendPendingMessagesAC } from 'store/user/actions'
 import { setConnectionStatus } from 'store/user/reducers'
 import { createAttachmentUnavailableError, isResendableError } from 'helpers/error'
 import { calculateRenderedImageWidth } from 'helpers'
-import { PendingMessageMutation } from './reducers'
+import { PendingMessageMutation, uploadAttachmentCompilation } from './reducers'
 import {
   clearAttachmentPreparation,
   waitForAttachmentPreparation,
@@ -647,6 +647,12 @@ const getReconnectChannelSnapshot = (channelId: string): IChannel | null => {
 
   return null
 }
+
+// The user paused the upload of one of `tids` (their attachments).
+const isUploadPausedAction = (action: any, tids: string[]) =>
+  uploadAttachmentCompilation.match(action) &&
+  action.payload.attachmentUploadingState === UPLOAD_STATE.PAUSED &&
+  tids.includes(action.payload.attachmentId)
 
 const getReconnectChannelSignature = (channel: Partial<IChannel> | null | undefined) =>
   [
@@ -1406,7 +1412,7 @@ function* sendMessage(action: IAction): any {
     // client.upload) and sends the message with the file URLs.
 
     if (message.attachments && message.attachments.length) {
-      let linkAttachment = null
+      let linkAttachment: IAttachment | null | undefined = null
       const attachmentsToSend: any = []
       const messagesToSend: IMessage[] = []
 
@@ -1613,7 +1619,9 @@ function* sendMessage(action: IAction): any {
       // sends them after it, in order (trying them now would upload them while it
       // is sent again, and send them before it).
       let waitsForFailed: unknown = null
-      for (let i = 0; i < messagesToSend.length; i++) {
+      // One message: its files uploaded, then the message sent. An error fails it (a
+      // reconnect may send it again); a delete stops it.
+      const sendMessageAt = function* (i: number): any {
         const messageAttachment = messagesToSend[i].attachments
         let messageToSend = messagesToSend[i]
 
@@ -1628,7 +1636,7 @@ function* sendMessage(action: IAction): any {
 
         try {
           if (messageToSend.tid && isPendingMessageDeleted(channel.id, messageToSend.tid)) {
-            continue
+            return
           }
 
           if (waitsForFailed) {
@@ -1648,7 +1656,7 @@ function* sendMessage(action: IAction): any {
 
           if (connectionState === CONNECTION_STATUS.CONNECTED) {
             if (messageToSend.tid && isPendingMessageDeleted(channel.id, messageToSend.tid)) {
-              continue
+              return
             }
             updateMessageOnMap(channel.id, {
               messageId: messageToSend.tid!,
@@ -1657,17 +1665,17 @@ function* sendMessage(action: IAction): any {
             yield put(updateMessageAC(messageToSend.tid!, { attachments: pendingAttachments }))
             const messageCopy = JSON.parse(JSON.stringify(messagesToSend[i]))
             if (messageToSend.tid && isPendingMessageDeleted(channel.id, messageToSend.tid)) {
-              continue
+              return
             }
             // Preparation and custom uploading are asynchronous. A delete can
             // happen while either is in progress, so do not fall through to
             // `channel.sendMessage` after either operation completes.
             if (messageToSend.tid && isPendingMessageDeleted(channel.id, messageToSend.tid)) {
-              continue
+              return
             }
             const attachmentsToSend = yield call(handleUploadAttachments, messageAttachment || [], messageCopy, channel)
             if (messageToSend.tid && isPendingMessageDeleted(channel.id, messageToSend.tid)) {
-              continue
+              return
             }
             let linkAttachmentToSend: IAttachment | null = null
             if (i === 0 && linkAttachment) {
@@ -1694,7 +1702,7 @@ function* sendMessage(action: IAction): any {
                   log.warn('Unable to retract a deleted pending message:', deleteError)
                 }
               }
-              continue
+              return
             }
             if (messageToSend.tid) {
               autoResendAttempts.delete(messageToSend.tid)
@@ -1810,7 +1818,7 @@ function* sendMessage(action: IAction): any {
           // A delete intentionally cancels the pending transfer. Do not turn
           // that cancellation into a failed bubble or schedule a retry.
           if (messageToSend.tid && isPendingMessageDeleted(channel.id, messageToSend.tid)) {
-            continue
+            return
           }
           const isErrorResendable = isResendableError(e?.type)
           if (isErrorResendable) {
@@ -1837,6 +1845,24 @@ function* sendMessage(action: IAction): any {
           if (sentTid) {
             messagesBeingSent.delete(beingSentKey(channel.id, sentTid))
           }
+        }
+      }
+      for (let i = 0; i < messagesToSend.length; i++) {
+        const tids = (messagesToSend[i].attachments || [])
+          .map((attachment: IAttachment) => attachment.tid)
+          .filter((tid?: string): tid is string => !!tid)
+        const task = yield spawn(sendMessageAt, i)
+        // A paused upload no longer holds back the messages after it: they go now, and
+        // it is sent once resumed (after them).
+        const { paused } = yield race({
+          sent: call(() => task.toPromise()),
+          paused: take((pauseAction: any) => isUploadPausedAction(pauseAction, tids))
+        })
+        const sentTid = messagesToSend[i].tid
+        if (paused && sentTid) {
+          // Still being sent: its own task releases it when it is sent, fails or is deleted.
+          const key = beingSentKey(channel.id, sentTid)
+          beingSent.splice(beingSent.indexOf(key), 1)
         }
       }
       if (
