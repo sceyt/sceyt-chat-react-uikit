@@ -1,5 +1,4 @@
 import { IAttachment } from '../types'
-import { FileEncryptionMetadata } from './encryption/fileEncryptionMetadata'
 import { FileEncryptionInfo } from './encryption/types'
 import { fileTransfer } from './sceytChatUIKitFileTransfer'
 import { TransferExecutor } from './transferExecutor'
@@ -113,11 +112,5 @@ export const attachmentTransferRouter = {
       }
       return execution.executeTransport(() => provider.download(request, callback))
     })
-  },
-
-  /** `metadata` with the upload's encryption as its `sceyt.enc`, or without it. */
-  applyUploadResult(metadata: unknown, result: FileUploadResult): string | undefined {
-    if (!result.encryptionInfo) return FileEncryptionMetadata.remove(metadata)
-    return FileEncryptionMetadata.write(metadata, FileEncryptionMetadata.fromEncryptionInfo(result.encryptionInfo))
   }
 }

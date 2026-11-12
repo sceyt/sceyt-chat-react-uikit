@@ -175,22 +175,4 @@ describe('attachmentTransferRouter', () => {
       expect('plaintextSize' in request).toBe(false)
     })
   })
-
-  describe('applyUploadResult', () => {
-    it("writes the upload's keys string as enc and keeps the other metadata", () => {
-      const metadata = JSON.parse(
-        attachmentTransferRouter.applyUploadResult({ szw: 10 }, { url: 'u', encryptionInfo: info })!
-      )
-
-      expect(metadata).toEqual({ szw: 10, 'sceyt.enc': KEYS })
-    })
-
-    it('a plain upload removes enc', () => {
-      const before = { szw: 10, 'sceyt.enc': 'old-keys' }
-
-      const metadata = JSON.parse(attachmentTransferRouter.applyUploadResult(before, { url: 'u' })!)
-
-      expect(metadata).toEqual({ szw: 10 })
-    })
-  })
 })

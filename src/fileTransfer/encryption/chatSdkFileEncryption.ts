@@ -128,7 +128,10 @@ export class ChatSdkFileEncryption implements FileEncryption {
         type: 'InvalidArgument'
       })
     }
-    // Storage planning for the fixed algorithm; cryptography and key handling stay in the SDK.
+    // The SDK's (sceyt-chat after 1.7.2-beta.11 has AttachmentCipher.storedSizeOf); with an older SDK,
+    // the same arithmetic of format v1.
+    const storedSizeOf = getClient()?.AttachmentCipher?.storedSizeOf
+    if (typeof storedSizeOf === 'function') return storedSizeOf(plaintextSize)
     const segments = plaintextSize <= 65480 ? 1 : 1 + Math.ceil((plaintextSize - 65480) / 65520)
     return 72 + plaintextSize + 16 * segments
   }

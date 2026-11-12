@@ -1027,6 +1027,29 @@ describe('attachment upload recovery', () => {
       expect(getPendingMessagesFromMap(second.channel.id)).toHaveLength(0)
     })
 
+    it('a message that fails again on an error other than a lost connection does not hold back the ones after it', async () => {
+      const { channel } = setupPendingFiles('channel-resend-server-error')
+      const uploaded: string[] = []
+      uploadBehavior = (call) => {
+        uploaded.push(call.attachment.tid!)
+        // An error with no type (e.g. a provider's expired upload URLs): worth trying again, not a lost connection.
+        if (call.attachment.tid === 'channel-resend-server-error-file-1')
+          call.fail(new Error('The upload URLs expired'))
+        else call.succeed(`https://cdn.example/${call.attachment.tid}`)
+      }
+
+      await resendPending().toPromise()
+
+      expect(uploaded).toEqual(['channel-resend-server-error-file-1', 'channel-resend-server-error-file-2'])
+      expect((channel.sendMessage as jest.Mock).mock.calls.map(([sent]) => sent.tid)).toEqual([
+        'channel-resend-server-error-msg-2'
+      ])
+      // Still pending, for the next try.
+      expect(getPendingMessagesFromMap(channel.id).map((message) => message.tid)).toEqual([
+        'channel-resend-server-error-msg-1'
+      ])
+    })
+
     it('a message deleted while it is sent again does not hold back the ones after it', async () => {
       const { channel, pending, uploads } = setupPendingFiles('channel-resend-deleted')
       uploadBehavior = (call) => {
@@ -1327,6 +1350,60 @@ describe('attachment upload recovery', () => {
       'wait-msg-2'
     ])
     expect(getPendingMessagesFromMap(channel.id)).toHaveLength(0)
+  })
+
+  it('a message that fails on an error other than a lost connection does not make the next ones of its send wait', async () => {
+    const currentUser = makeUser({ id: 'current-user' })
+    const channel = makeUploaderChannel('channel-server-error-no-wait')
+    const messageBuilder: any = channel.createMessageBuilder()
+    messageBuilder.create
+      .mockImplementationOnce(() => makePendingMessage({ channelId: channel.id, tid: 'server-error-msg-1' }))
+      .mockImplementationOnce(() => makePendingMessage({ channelId: channel.id, tid: 'server-error-msg-2' }))
+    const uploads: string[] = []
+    // The first file fails on an error with no type (not a lost connection); the second goes through.
+    uploadBehavior = (call) => {
+      uploads.push(call.attachment.tid!)
+      if (uploads.length === 1) call.fail(new Error('The upload URLs expired'))
+      else call.succeed(`https://cdn.example/${call.attachment.tid}`)
+    }
+    channel.sendMessage = jest.fn((sent: any) =>
+      Promise.resolve({ ...makeServerResponse(sent.tid, sent.attachments[0].tid, currentUser), id: `srv-${sent.tid}` })
+    )
+    setActiveChannelId(channel.id)
+    setChannelInMap(channel)
+    const file = (tid: string, name: string) => ({
+      tid: trackedTid(tid),
+      type: attachmentTypes.file,
+      name,
+      size: 3,
+      data: new File(['abc'], name, { type: 'application/pdf' }),
+      metadata: '{}',
+      upload: false
+    })
+
+    await runSaga(
+      { dispatch: () => undefined, getState: () => mockStoreState },
+      __messageSagaTestables.sendMessage,
+      sendMessageAC(
+        {
+          body: 'two files',
+          bodyAttributes: [],
+          attachments: [file('server-error-file-1', 'first.pdf'), file('server-error-file-2', 'second.pdf')],
+          mentionedUsers: [],
+          type: 'text',
+          metadata: {},
+          parentMessage: null,
+          repliedInThread: false
+        },
+        channel.id,
+        CONNECTION_STATUS.CONNECTED,
+        true
+      )
+    ).toPromise()
+
+    expect(uploads).toEqual(['server-error-file-1', 'server-error-file-2'])
+    expect((channel.sendMessage as jest.Mock).mock.calls.map(([sent]) => sent.tid)).toEqual(['server-error-msg-2'])
+    expect(getPendingMessagesFromMap(channel.id).map((message) => message.tid)).toEqual(['server-error-msg-1'])
   })
 
   it('a message that can never be sent (too large) does not make the next ones of its send wait: they go at once', async () => {

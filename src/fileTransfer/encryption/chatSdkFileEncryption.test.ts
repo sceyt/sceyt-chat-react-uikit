@@ -110,6 +110,13 @@ describe('ChatSdkFileEncryption native cipher adapter', () => {
     expect(encryption.ciphertextSize(0)).toBe(88)
     expect(encryption.ciphertextSize(10000000)).toBe(10002520)
   })
+  it("plans storage size with the SDK's AttachmentCipher.storedSizeOf when the SDK has it", () => {
+    const storedSizeOf = jest.fn((size: number) => size + 1000)
+    setClient({ AttachmentCipher: { storedSizeOf } })
+
+    expect(new ChatSdkFileEncryption().ciphertextSize(5)).toBe(1005)
+    expect(storedSizeOf).toHaveBeenCalledWith(5)
+  })
   it.each([-1, 0.5, Number.MAX_SAFE_INTEGER + 1])('rejects an invalid storage planning size %s', (size) => {
     expect(() => new ChatSdkFileEncryption().ciphertextSize(size)).toThrow(
       expect.objectContaining({ type: 'InvalidArgument' })

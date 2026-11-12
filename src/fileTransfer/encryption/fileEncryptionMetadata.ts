@@ -64,10 +64,12 @@ export class FileEncryptionMetadata {
     return JSON.stringify(json)
   }
 
-  /** `metadata` without "sceyt.enc" (unchanged when it has none). */
+  /** `metadata` without "sceyt.enc" (unchanged when it has none), as a string. */
   static remove(metadata: unknown): string | undefined {
     const json = parse(metadata)
-    if (!json || !(FIELD in json)) return typeof metadata === 'string' ? metadata : undefined
+    // Without "sceyt.enc", a string stays as it is and an object keeps every key.
+    if (!json || !(FIELD in json))
+      return typeof metadata === 'string' ? metadata : json ? JSON.stringify(json) : undefined
     delete json[FIELD]
     return Object.keys(json).length ? JSON.stringify(json) : undefined
   }

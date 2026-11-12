@@ -70,6 +70,40 @@ describe('attachment uploads', () => {
     expect(upload.value).toEqual({ url: 'https://cdn.example/a' })
   })
 
+  it('a second upload of an attachment while it runs joins it: one transport upload, the same result and progress', async () => {
+    const { transport, calls } = manualTransport()
+    const firstProgress = jest.fn()
+    const secondProgress = jest.fn()
+
+    const first = track(uploadAttachment(attachment('tid-1'), source(), firstProgress))
+    await flush()
+    const second = track(uploadAttachment(attachment('tid-1'), source(), secondProgress))
+    await flush()
+    calls[0].callback.onProgress(40)
+    calls[0].finish(FileTransferResult.success({ url: 'https://cdn.example/a' }))
+    await flush()
+
+    expect(transport.upload).toHaveBeenCalledTimes(1)
+    expect(first.value).toEqual({ url: 'https://cdn.example/a' })
+    expect(second.value).toEqual({ url: 'https://cdn.example/a' })
+    expect(firstProgress).toHaveBeenCalledWith(40)
+    expect(secondProgress).toHaveBeenCalledWith(40)
+  })
+
+  it('after an upload settles, the next one for the attachment is a new upload', async () => {
+    const { transport, calls } = manualTransport()
+
+    const first = track(uploadAttachment(attachment('tid-1'), source(), jest.fn()))
+    await flush()
+    calls[0].finish(FileTransferResult.failure(new Error('refused')))
+    await flush()
+    uploadAttachment(attachment('tid-1'), source(), jest.fn())
+    await flush()
+
+    expect(first.error).toEqual(new Error('refused'))
+    expect(transport.upload).toHaveBeenCalledTimes(2)
+  })
+
   it('a failed upload rejects with the transport error, and its controls are gone', async () => {
     const { calls } = manualTransport()
     const refused = new Error('too large')

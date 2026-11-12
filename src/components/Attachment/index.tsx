@@ -1,6 +1,6 @@
 import styled, { css, keyframes } from 'styled-components'
 import React, { useEffect, useMemo, useRef, useState } from 'react'
-import { useSelector, useDispatch } from 'store/hooks'
+import { useSelector, useDispatch, useStore } from 'store/hooks'
 import { CircularProgressbar } from 'react-circular-progressbar'
 // Store
 import { attachmentCompilationStateSelector, attachmentsUploadProgressSelector } from '../../store/message/selector'
@@ -146,6 +146,7 @@ const Attachment = ({
 
   const dispatch = useDispatch()
   const attachmentCompilationState = useSelector(attachmentCompilationStateSelector) || {}
+  const store = useStore()
   const attachmentsUploadProgress = useSelector(attachmentsUploadProgressSelector) || {}
   const connectionStatus = useSelector(connectionStatusSelector)
   const theme = useSelector(themeSelector)
@@ -172,7 +173,8 @@ const Attachment = ({
   const attachmentKey = `${channelId || 'unknown-channel'}:${attachmentIdentity}:${attachment.url || ''}`
   const currentAttachmentKeyRef = useRef(attachmentKey)
   currentAttachmentKeyRef.current = attachmentKey
-  const [failTimeout, setFailTimeout]: any = useState()
+  // The timer that fails an upload which made no progress after a reconnect.
+  const failTimeoutRef = useRef<ReturnType<typeof setTimeout>>()
   // The upload progress stored for this attachment: kept (and never going back)
   // across a failed send and the next one, so the message shows it from its first render.
   const storedUploadProgress = attachmentsUploadProgress[attachment.tid || attachment.id || '']
@@ -464,83 +466,93 @@ const Attachment = ({
   }
 
   const handleDownloadFile = async () => {
-    if (!attachment.attachmentUrl) {
-      setDownloadingFile(true)
-    }
-    const urlPromise = downloader(
-      attachment.url,
-      true,
-      (progress) => {
-        const loadedRes = progress.loaded && progress.loaded / progress.total
-        const uploadPercent = loadedRes && loadedRes * 100
-        setSizeProgress({ loaded: progress.loaded || 0, total: progress.total || 0 })
-        setProgress(uploadPercent)
-      },
-      messageType
-    )
-    setDownloadFilePromise(attachment.id!, urlPromise)
-    const result = await urlPromise
-    // In Firefox, QuickTime .mov blobs must be remuxed to standard MP4 before
-    // they can be played or have frames extracted; other browsers (and
-    // non-QuickTime files) get the blob back unchanged.
-    const body = attachment.type === attachmentTypes.video ? await ensurePlayableVideoBlob(result.Body) : result.Body
-    const url = URL.createObjectURL(body)
-    setSizeProgress(undefined)
-    let downloadingUrl = url
-    if (attachment.type === attachmentTypes.image) {
-      const compressedUrl = await compressAndCacheImage(url, attachment.url, renderWidth, renderHeight)
-      if (compressedUrl) {
-        registerBlobUrl(getAttachmentURLWithVersion(attachment.url), compressedUrl)
-        downloadingUrl = compressedUrl
+    fileDownloadCancelledRef.current = false
+    try {
+      if (!attachment.attachmentUrl) {
+        setDownloadingFile(true)
       }
-      setAttachmentToCache(
-        attachment.url + '_original_image_url',
-        new Response(result.Body, {
-          headers: { 'Content-Type': 'image/jpeg' }
-        })
+      const urlPromise = downloader(
+        attachment.url,
+        true,
+        (progress) => {
+          const loadedRes = progress.loaded && progress.loaded / progress.total
+          const uploadPercent = loadedRes && loadedRes * 100
+          setSizeProgress({ loaded: progress.loaded || 0, total: progress.total || 0 })
+          setProgress(uploadPercent)
+        },
+        messageType
       )
-      dispatch(setUpdateMessageAttachmentAC(attachment.url + '_original_image_url', url))
-    } else {
-      if (attachment.type === attachmentTypes.video) {
-        if (shouldExtractVideoFirstFrame(attachment.metadata)) {
-          // Pass the raw Blob (result.Body), not the object URL string.
-          // getVideoFirstFrame needs the actual Blob so it can inspect and
-          // correct a bad/unsupported MIME type (e.g. "video/quicktime;
-          // charset=utf-8" from S3) before creating its own internal object
-          // URL. Once an object URL string is created from a mistyped blob,
-          // Firefox has already locked in the bad type and there's no way
-          // to fix it from the string alone.
-          const frameResult = await getVideoFirstFrame(body, renderWidth, renderHeight)
-          if (frameResult) {
-            const { frameBlobUrl, blob } = frameResult
-            const response = new Response(blob, {
-              headers: { 'Content-Type': 'image/jpeg' }
-            })
-            const key = attachment.url
-            await setAttachmentToCache(key, response)
-            dispatch(setUpdateMessageAttachmentAC(key, frameBlobUrl))
-          }
+      setDownloadFilePromise(attachment.id!, urlPromise)
+      const result = await urlPromise
+      // In Firefox, QuickTime .mov blobs must be remuxed to standard MP4 before
+      // they can be played or have frames extracted; other browsers (and
+      // non-QuickTime files) get the blob back unchanged.
+      const body = attachment.type === attachmentTypes.video ? await ensurePlayableVideoBlob(result.Body) : result.Body
+      const url = URL.createObjectURL(body)
+      setSizeProgress(undefined)
+      let downloadingUrl = url
+      if (attachment.type === attachmentTypes.image) {
+        const compressedUrl = await compressAndCacheImage(url, attachment.url, renderWidth, renderHeight)
+        if (compressedUrl) {
+          registerBlobUrl(getAttachmentURLWithVersion(attachment.url), compressedUrl)
+          downloadingUrl = compressedUrl
         }
         setAttachmentToCache(
-          attachment.url + `_original_video_url`,
-          new Response(body, {
-            headers: { 'Content-Type': body.type || 'application/octet-stream' }
-          })
-        )
-        dispatch(setUpdateMessageAttachmentAC(attachment.url + `_original_video_url`, url))
-      } else {
-        setAttachmentToCache(
-          attachment.url,
+          attachment.url + '_original_image_url',
           new Response(result.Body, {
-            headers: { 'Content-Type': attachment.type || 'application/octet-stream' }
+            headers: { 'Content-Type': 'image/jpeg' }
           })
         )
-        dispatch(setUpdateMessageAttachmentAC(attachment.url, url))
+        dispatch(setUpdateMessageAttachmentAC(attachment.url + '_original_image_url', url))
+      } else {
+        if (attachment.type === attachmentTypes.video) {
+          if (shouldExtractVideoFirstFrame(attachment.metadata)) {
+            // Pass the raw Blob (result.Body), not the object URL string.
+            // getVideoFirstFrame needs the actual Blob so it can inspect and
+            // correct a bad/unsupported MIME type (e.g. "video/quicktime;
+            // charset=utf-8" from S3) before creating its own internal object
+            // URL. Once an object URL string is created from a mistyped blob,
+            // Firefox has already locked in the bad type and there's no way
+            // to fix it from the string alone.
+            const frameResult = await getVideoFirstFrame(body, renderWidth, renderHeight)
+            if (frameResult) {
+              const { frameBlobUrl, blob } = frameResult
+              const response = new Response(blob, {
+                headers: { 'Content-Type': 'image/jpeg' }
+              })
+              const key = attachment.url
+              await setAttachmentToCache(key, response)
+              dispatch(setUpdateMessageAttachmentAC(key, frameBlobUrl))
+            }
+          }
+          setAttachmentToCache(
+            attachment.url + `_original_video_url`,
+            new Response(body, {
+              headers: { 'Content-Type': body.type || 'application/octet-stream' }
+            })
+          )
+          dispatch(setUpdateMessageAttachmentAC(attachment.url + `_original_video_url`, url))
+        } else {
+          setAttachmentToCache(
+            attachment.url,
+            new Response(result.Body, {
+              headers: { 'Content-Type': attachment.type || 'application/octet-stream' }
+            })
+          )
+          dispatch(setUpdateMessageAttachmentAC(attachment.url, url))
+        }
+      }
+      setIsCached(true)
+      setDownloadingFile(false)
+      setAttachmentUrl(downloadingUrl)
+    } catch (error) {
+      setSizeProgress(undefined)
+      // A cancel ends it too; only a real failure shows the retry control, and is logged.
+      handleCompleteDownload(attachment.id || '', true)
+      if (!fileDownloadCancelledRef.current && !isMediaDownloadCancellation(error)) {
+        log.error('Error downloading attachment:', error)
       }
     }
-    setIsCached(true)
-    setDownloadingFile(false)
-    setAttachmentUrl(downloadingUrl)
   }
 
   useEffect(() => {
@@ -939,31 +951,31 @@ const Attachment = ({
 
   useDidUpdate(() => {
     if (connectionStatus === CONNECTION_STATUS.CONNECTED && isInUploadingState) {
-      setFailTimeout(
-        setTimeout(() => {
-          const pendingAttachment = getPendingAttachment(attachment.tid!)
-          dispatch(updateAttachmentUploadingStateAC(UPLOAD_STATE.FAIL, attachment.tid))
+      clearTimeout(failTimeoutRef.current)
+      failTimeoutRef.current = setTimeout(() => {
+        failTimeoutRef.current = undefined
+        // An upload that ended meanwhile (e.g. its message was sent) is not failed.
+        const uploadState = attachmentCompilationStateSelector(store.getState())?.[attachment.tid!]
+        if (![UPLOAD_STATE.PREPARING, UPLOAD_STATE.UPLOADING, UPLOAD_STATE.PAUSED].includes(uploadState)) return
+        const pendingAttachment = getPendingAttachment(attachment.tid!)
+        dispatch(updateAttachmentUploadingStateAC(UPLOAD_STATE.FAIL, attachment.tid))
 
-          if (pendingAttachment && pendingAttachment.messageTid && pendingAttachment.channelId) {
-            updateMessageOnMap(pendingAttachment.channelId, {
-              messageId: pendingAttachment.messageTid,
-              params: { state: MESSAGE_STATUS.FAILED }
-            })
-            dispatch(updateMessageAC(pendingAttachment.messageTid, { state: MESSAGE_STATUS.FAILED }))
-          }
-          // }
-        }, 20000)
-      )
+        if (pendingAttachment && pendingAttachment.messageTid && pendingAttachment.channelId) {
+          updateMessageOnMap(pendingAttachment.channelId, {
+            messageId: pendingAttachment.messageTid,
+            params: { state: MESSAGE_STATUS.FAILED }
+          })
+          dispatch(updateMessageAC(pendingAttachment.messageTid, { state: MESSAGE_STATUS.FAILED }))
+        }
+      }, 20000)
     }
-    return () => clearTimeout(failTimeout)
+    return () => clearTimeout(failTimeoutRef.current)
   }, [connectionStatus])
   useEffect(() => {
     const attachmentIndex = attachment.tid || attachment.id
     if (attachmentIndex && attachmentsUploadProgress[attachmentIndex]) {
-      if (failTimeout) {
-        clearTimeout(failTimeout)
-        setFailTimeout()
-      }
+      clearTimeout(failTimeoutRef.current)
+      failTimeoutRef.current = undefined
       const uploadProgress = attachmentsUploadProgress[attachmentIndex]
       const uploadPercent =
         uploadProgress.progress && uploadProgress.progress * 100 > 3 ? uploadProgress.progress * 100 : 3

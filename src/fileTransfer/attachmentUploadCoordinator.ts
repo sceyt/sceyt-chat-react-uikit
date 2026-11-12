@@ -32,6 +32,8 @@ interface Upload {
   resolve: (result: FileUploadResult) => void
   // eslint-disable-next-line no-unused-vars
   reject: (error: Error) => void
+  /** What its senders wait for: a second call for the attachment joins it. */
+  promise?: Promise<FileUploadResult>
 }
 
 const uploads = new Map<string, Upload>()
@@ -87,7 +89,8 @@ export const isUploadPausedBeforeStart = (attachmentTid: string) => !!notStarted
 /**
  * Uploads one attachment's file with `fileTransfer.provider`. `onProgress` gets the percent
  * sent. It settles once the file is stored or the upload fails; a cancelled upload rejects
- * with an AbortError.
+ * with an AbortError. One writer per attachment: a call while its upload runs joins it (the
+ * same result and progress), so a resuming provider never has two uploads of one file.
  */
 export const uploadAttachment = (
   attachment: IAttachment,
@@ -95,9 +98,19 @@ export const uploadAttachment = (
   // eslint-disable-next-line no-unused-vars
   onProgress: (percent: number) => void
 ): Promise<FileUploadResult> => {
+  const tid = attachment.tid!
+  const running = uploads.get(tid)
+  if (running?.promise) {
+    const shown = running.onProgress
+    running.onProgress = (percent) => {
+      shown(percent)
+      onProgress(percent)
+    }
+    return running.promise
+  }
+  let upload!: Upload
   const uploaded = new Promise<FileUploadResult>((resolve, reject) => {
-    const tid = attachment.tid!
-    const upload: Upload = {
+    upload = {
       attachment,
       source,
       paused: isUploadPausedBeforeStart(tid),
@@ -106,11 +119,12 @@ export const uploadAttachment = (
       resolve,
       reject
     }
-    notStartedUploads.delete(tid)
-    uploads.set(tid, upload)
-    // A pause pressed before the start: nothing is sent until resume.
-    if (!upload.paused) start(upload)
   })
+  upload.promise = uploaded
+  notStartedUploads.delete(tid)
+  uploads.set(tid, upload)
+  // A pause pressed before the start: nothing is sent until resume.
+  if (!upload.paused) start(upload)
   // An upload cancelled after its sender stopped waiting (a deleted message) is not an unhandled error.
   uploaded.catch(() => undefined)
   return uploaded

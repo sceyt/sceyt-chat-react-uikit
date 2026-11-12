@@ -337,6 +337,63 @@ describe('DefaultFileTransferProvider', () => {
     })
   })
 
+  describe('with a chat client older than sceyt-chat 1.7.2-beta.11 (no client.upload or client.download)', () => {
+    const originalFetch = global.fetch
+    let oldClient: any
+    const download = () => ({
+      operationId: 'download:tid-1',
+      url: 'https://cdn.example/file',
+      mimeType: 'image/png',
+      signal: new AbortController().signal
+    })
+
+    beforeEach(() => {
+      oldClient = {
+        uploadFile: jest.fn(async ({ progress }: { data: Blob; progress: (percent: number) => void }) => {
+          progress(40)
+          progress(100)
+          return 'https://cdn.example/old-upload'
+        })
+      }
+      setClient(oldClient)
+      global.fetch = jest.fn(async () => ({ ok: true, status: 200, blob: async () => new Blob(['stored']) })) as any
+    })
+
+    afterEach(() => {
+      global.fetch = originalFetch
+    })
+
+    it('a plain file goes with its uploadFile, with its progress in percent', async () => {
+      const progress: number[] = []
+      const plain = request()
+
+      const result = await transport.upload(plain, { onProgress: (percent) => progress.push(percent) })
+
+      expect(result).toEqual({ type: 'success', result: { url: 'https://cdn.example/old-upload' } })
+      expect(oldClient.uploadFile.mock.calls[0][0].data === plain.sourceFile).toBe(true)
+      expect(progress).toEqual([40, 100])
+    })
+
+    it('a plain file comes with a fetch of its URL, with its type', async () => {
+      const plain = download()
+
+      const result = await transport.download(plain, { onProgress: jest.fn() })
+
+      expect(global.fetch).toHaveBeenCalledWith('https://cdn.example/file', { signal: plain.signal })
+      const file = (result as any).result as Blob
+      expect(file.type).toBe('image/png')
+      expect(await readText(file)).toBe('stored')
+    })
+
+    it('a download the server refuses is a failure', async () => {
+      global.fetch = jest.fn(async () => ({ ok: false, status: 404 })) as any
+
+      const result = await transport.download(download(), { onProgress: jest.fn() })
+
+      expect(result).toEqual({ type: 'failure', error: expect.objectContaining({ code: 404 }) })
+    })
+  })
+
   it('has no native pause: the UIKit stops and restarts an attempt', () => {
     expect(transport.pause()).toBe(false)
     expect(transport.resume()).toBe(false)

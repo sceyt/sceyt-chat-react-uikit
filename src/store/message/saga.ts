@@ -1,4 +1,6 @@
 import { put, call, delay, spawn, takeLatest, takeEvery, take, race } from 'redux-saga/effects'
+import type { SagaIterator } from 'redux-saga'
+import type { Action } from 'redux'
 import { v4 as uuidv4 } from 'uuid'
 import { shouldSkipMessageContentUpdate } from '../../helpers/messageContentUpdate'
 import { hasRemoteReceipt } from '../../helpers/remoteReceiptProvenance'
@@ -231,6 +233,9 @@ const autoResendsInFlight = new Set<string>()
 // back, and sending them again would upload their files a second time.
 const messagesBeingSent = new Set<string>()
 const beingSentKey = (channelId: string, tid: string) => `${channelId}:${tid}`
+// Messages (by beingSentKey) whose last send failed on an error worth trying again that was not
+// a lost connection (e.g. a server error): still pending, they do not hold back the later ones.
+const failedNotOnLostConnection = new Set<string>()
 const loadMoreMessagesInFlight = new Set<string>()
 const prefetchInFlight = new Set<string>()
 const queuedPrefetchRequests = new Map<string, { fromMessageId: string; pages: number }>()
@@ -648,8 +653,21 @@ const getReconnectChannelSnapshot = (channelId: string): IChannel | null => {
   return null
 }
 
+// A send that failed because the connection was lost (the browser offline, the chat not
+// connected, or a request that never got an answer), not a refusal or a broken file: the
+// messages after it wait for it, so they are not sent before it.
+const isLostConnectionError = (error: unknown) => {
+  const { code, name, isAxiosError, response } = (error || {}) as {
+    code?: unknown
+    name?: unknown
+    isAxiosError?: unknown
+    response?: unknown
+  }
+  return isConnectionLost() || code === 'NetworkingError' || name === 'TypeError' || (!!isAxiosError && !response)
+}
+
 // The user paused the upload of one of `tids` (their attachments).
-const isUploadPausedAction = (action: any, tids: string[]) =>
+const isUploadPausedAction = (action: Action, tids: string[]) =>
   uploadAttachmentCompilation.match(action) &&
   action.payload.attachmentUploadingState === UPLOAD_STATE.PAUSED &&
   tids.includes(action.payload.attachmentId)
@@ -1621,9 +1639,11 @@ function* sendMessage(action: IAction): any {
       let waitsForFailed: unknown = null
       // One message: its files uploaded, then the message sent. An error fails it (a
       // reconnect may send it again); a delete stops it.
-      const sendMessageAt = function* (i: number): any {
+      const sendMessageAt = function* (i: number): SagaIterator<void> {
         const messageAttachment = messagesToSend[i].attachments
         let messageToSend = messagesToSend[i]
+        // This attempt's own failure decides whether it holds back the later messages.
+        if (messageToSend.tid) failedNotOnLostConnection.delete(beingSentKey(channel.id, messageToSend.tid))
 
         if (action.type === RESEND_MESSAGE) {
           // Clear the failed state while re-uploading so the UI shows uploading progress
@@ -1821,8 +1841,11 @@ function* sendMessage(action: IAction): any {
             return
           }
           const isErrorResendable = isResendableError(e?.type)
-          if (isErrorResendable) {
+          // Only a lost connection holds back the next messages; another failure fails this one alone.
+          if (isErrorResendable && isLostConnectionError(e)) {
             waitsForFailed = waitsForFailed || e
+          } else if (isErrorResendable && messageToSend.tid) {
+            failedNotOnLostConnection.add(beingSentKey(channel.id, messageToSend.tid))
           }
           if (channel?.id && messageToSend?.tid) {
             log.error('Error on uploading attachment', messageToSend.tid, e)
@@ -1856,7 +1879,7 @@ function* sendMessage(action: IAction): any {
         // it is sent once resumed (after them).
         const { paused } = yield race({
           sent: call(() => task.toPromise()),
-          paused: take((pauseAction: any) => isUploadPausedAction(pauseAction, tids))
+          paused: take((pauseAction: Action) => isUploadPausedAction(pauseAction, tids))
         })
         const sentTid = messagesToSend[i].tid
         if (paused && sentTid) {
@@ -2406,7 +2429,7 @@ function* editMessage(action: IAction): any {
 // on asks it to go round once more instead.
 let pendingMessagesRun: { again: boolean; connectionState: string } | null = null
 
-const sendPendingMessages = function* (connectionState: string): any {
+const sendPendingMessages = function* (connectionState: string): SagaIterator<void> {
   if (pendingMessagesRun) {
     pendingMessagesRun.again = true
     pendingMessagesRun.connectionState = connectionState
@@ -2481,10 +2504,12 @@ const sendPendingMessagesInOrder = function* (connectionState: string) {
           autoResendsInFlight.delete(resendInFlightKey)
         }
       }
-      // Still pending: it failed again on a lost connection (a message that cannot be sent
-      // is no longer pending). The later messages of this chat wait, or they would arrive
-      // before it; the next round (the reconnect) starts again from this one.
-      if (getPendingMessagesFromMap(channelId).some((pending) => pending.tid === msg.tid)) {
+      // Still pending: it failed again on a lost connection (a message that cannot be sent is
+      // no longer pending). The later messages of this chat wait, or they would arrive before
+      // it; the next round (the reconnect) starts again from this one. One that failed for
+      // another reason (e.g. a server error) does not hold them back.
+      const failedOtherwise = !!msg.tid && failedNotOnLostConnection.has(beingSentKey(channelId, msg.tid))
+      if (!failedOtherwise && getPendingMessagesFromMap(channelId).some((pending) => pending.tid === msg.tid)) {
         break
       }
     }
@@ -5264,6 +5289,7 @@ export const __messageSagaTestables = {
 }
 
 export const __resetMessageSagaTestState = () => {
+  failedNotOnLostConnection.clear()
   loadMoreMessagesInFlight.clear()
   prefetchInFlight.clear()
   queuedPrefetchRequests.clear()

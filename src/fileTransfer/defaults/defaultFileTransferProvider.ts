@@ -41,6 +41,44 @@ const readWhole = async (
   return done
 }
 
+interface TransferOptions {
+  signal: AbortSignal
+  type?: string
+  // eslint-disable-next-line no-unused-vars
+  progress: (loaded: number, total?: number) => void
+}
+
+// A chat client older than sceyt-chat 1.7.2-beta.11 has no client.upload or client.download:
+// files then go with its uploadFile and come back with a plain fetch, as before.
+interface ChatFilesClient {
+  // eslint-disable-next-line no-unused-vars
+  upload?: (file: Blob, options: TransferOptions) => Promise<{ url: string }>
+  // eslint-disable-next-line no-unused-vars
+  uploadFile?: (file: { data: Blob; progress: (percent: number) => void }) => Promise<string>
+  // eslint-disable-next-line no-unused-vars
+  download?: (url: string, options: TransferOptions) => Promise<Blob>
+}
+
+const uploadWithClient = async (file: Blob, options: TransferOptions): Promise<{ url: string }> => {
+  const client: ChatFilesClient = getClient()
+  if (typeof client.upload === 'function') return client.upload(file, options)
+  if (typeof client.uploadFile !== 'function') throw new Error('The chat client cannot upload files')
+  if (options.signal.aborted) throw Object.assign(new Error('The upload was stopped'), { name: 'AbortError' })
+  const url = await client.uploadFile({ data: file, progress: (percent) => options.progress(percent, 100) })
+  return { url }
+}
+
+const downloadWithClient = async (url: string, options: TransferOptions): Promise<Blob> => {
+  const client: ChatFilesClient = getClient()
+  if (typeof client.download === 'function') return client.download(url, options)
+  const response = await fetch(url, { signal: options.signal })
+  if (!response.ok)
+    throw Object.assign(new Error(`The file could not be downloaded (${response.status})`), { code: response.status })
+  const blob = await response.blob()
+  options.progress(blob.size, blob.size)
+  return options.type && blob.type !== options.type ? new Blob([blob], { type: options.type }) : blob
+}
+
 /** The verified plaintext of `session` as a Blob of `type`, read range by range. */
 export const readDecryptedFile = (
   session: FileDecryptionSession,
@@ -68,7 +106,7 @@ export class DefaultFileTransferProvider implements FileTransferProvider {
     }
     if (request.type === FileUploadType.PLAIN) {
       try {
-        const { url } = await client.upload(request.sourceFile, options)
+        const { url } = await uploadWithClient(request.sourceFile, options)
         return FileTransferResult.success({ url })
       } catch (error) {
         return FileTransferResult.failure(asError(error))
@@ -94,7 +132,7 @@ export class DefaultFileTransferProvider implements FileTransferProvider {
       )
       if (request.signal.aborted) return FileTransferResult.interrupted(new Error('The upload was stopped'))
       const file = new File([stored], request.fileName || 'file', { type: 'application/octet-stream' })
-      const { url } = await client.upload(file, options)
+      const { url } = await uploadWithClient(file, options)
       return FileTransferResult.success({ url, encryptionInfo: session.encryptionInfo })
     } catch (error) {
       return FileTransferResult.failure(asError(error))
@@ -129,7 +167,7 @@ export class DefaultFileTransferProvider implements FileTransferProvider {
     const share = encrypted ? DOWNLOAD_SHARE : 100
     let stored: Blob
     try {
-      stored = await getClient().download(request.url, {
+      stored = await downloadWithClient(request.url, {
         type: encrypted ? '' : request.mimeType || '',
         signal: request.signal,
         progress: (loaded: number, total?: number) => callback.onProgress(percentOf(loaded, total) * (share / 100))

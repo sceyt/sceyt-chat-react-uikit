@@ -58,6 +58,11 @@ describe('FileEncryptionMetadata', () => {
     expect(FileEncryptionMetadata.remove('{"szw":1}')).toBe('{"szw":1}')
   })
 
+  it('keeps every key of object metadata that has no `enc`', () => {
+    const metadata = { szw: 10, szh: 20, tmb: 'hash', pvw: 'https://cdn.example/preview.jpg' }
+    expect(JSON.parse(FileEncryptionMetadata.remove(metadata)!)).toEqual(metadata)
+  })
+
   it('key-bearing models leave the key out of their diagnostic string', () => {
     const envelope = FileEncryptionMetadata.fromEncryptionInfo(fakeEncryptionInfo('key-1'))
     expect(String(envelope)).not.toContain('key-1')
