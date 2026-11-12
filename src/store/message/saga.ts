@@ -193,6 +193,7 @@ import { getSendAttachmentsAsSeparateMessages, isConnectionLost } from '../../he
 import {
   isUploadNotStarted,
   isUploadPausedBeforeStart,
+  isUploadPreparing,
   markUploadNotStarted,
   pauseUpload,
   resumeUpload,
@@ -710,10 +711,10 @@ export const handleUploadAttachments = async (attachments: IAttachment[], messag
       }
       const fileType = attachment.url?.type?.split('/')[0]
       if (attachment.type === attachmentTypes.video) {
-        if (!attachment.cachedUrl) {
+        if (!attachment.cachedUrl && !isUploadNotStarted(attachment.tid!)) {
           // The stop control shows while the preview uploads; a pause pressed
           // then is kept and applied when the video upload starts.
-          markUploadNotStarted(attachment.tid!)
+          markUploadNotStarted(attachment.tid!, true)
         }
         // An encrypted video's preview goes as a separate attachment (a forwarded video's
         // preview is forwarded with it); a plain video's is its pvw. A view-once video
@@ -1532,6 +1533,10 @@ function* sendMessage(action: IAction): any {
             attachmentsToSend.push(messageAttachment)
           }
           if (!messageAttachment.cachedUrl) {
+            // Its stop control shows from now on, while it waits for the messages before it too.
+            if (messageAttachment.tid) {
+              markUploadNotStarted(messageAttachment.tid, messageAttachment.type === attachmentTypes.video)
+            }
             yield put(
               updateAttachmentUploadingStateAC(
                 messageAttachment.type === attachmentTypes.video ? UPLOAD_STATE.PREPARING : UPLOAD_STATE.UPLOADING,
@@ -1874,13 +1879,17 @@ function* sendMessage(action: IAction): any {
         const tids = (messagesToSend[i].attachments || [])
           .map((attachment: IAttachment) => attachment.tid)
           .filter((tid?: string): tid is string => !!tid)
+        // Paused while it waited for the messages before it.
+        const pausedBeforeStart = tids.some((tid: string) => isUploadPausedBeforeStart(tid))
         const task = yield spawn(sendMessageAt, i)
         // A paused upload no longer holds back the messages after it: they go now, and
         // it is sent once resumed (after them).
-        const { paused } = yield race({
-          sent: call(() => task.toPromise()),
-          paused: take((pauseAction: Action) => isUploadPausedAction(pauseAction, tids))
-        })
+        const { paused } = pausedBeforeStart
+          ? { paused: true }
+          : yield race({
+              sent: call(() => task.toPromise()),
+              paused: take((pauseAction: Action) => isUploadPausedAction(pauseAction, tids))
+            })
         const sentTid = messagesToSend[i].tid
         if (paused && sentTid) {
           // Still being sent: its own task releases it when it is sent, fails or is deleted.
@@ -4652,7 +4661,7 @@ function* resumeAttachmentUploading(action: any) {
     const { attachmentId } = action.payload
     log.info('resume for attachment ... ', attachmentId)
     // Checked first: resuming starts nothing yet, the video's preview is still uploading.
-    const preparing = isUploadNotStarted(attachmentId)
+    const preparing = isUploadPreparing(attachmentId)
     const isResumed = resumeUpload(attachmentId)
     if (isResumed) {
       yield put(

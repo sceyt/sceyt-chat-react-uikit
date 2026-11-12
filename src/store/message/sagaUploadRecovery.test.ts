@@ -25,6 +25,7 @@ import {
 import {
   deleteMessageAC,
   pauseAttachmentUploadingAC,
+  resumeAttachmentUploadingAC,
   resendMessageAC,
   sendMessageAC,
   updateAttachmentUploadingProgressAC,
@@ -1291,6 +1292,102 @@ describe('attachment upload recovery', () => {
     expect(channel.sendMessage).not.toHaveBeenCalled()
   })
 
+  it('one click stops an upload still waiting for the messages before it; the ones after it do not wait for it', async () => {
+    const currentUser = makeUser({ id: 'current-user' })
+    const channel = makeUploaderChannel('channel-stop-waiting')
+    const messageBuilder: any = channel.createMessageBuilder()
+    messageBuilder.create
+      .mockImplementationOnce(() => makePendingMessage({ channelId: channel.id, tid: 'waiting-msg-1' }))
+      .mockImplementationOnce(() => makePendingMessage({ channelId: channel.id, tid: 'waiting-msg-2' }))
+      .mockImplementationOnce(() => makePendingMessage({ channelId: channel.id, tid: 'waiting-msg-3' }))
+    const uploads: UploadCall[] = []
+    uploadBehavior = (call) => {
+      uploads.push(call)
+    }
+    channel.sendMessage = jest.fn((sent: any) =>
+      Promise.resolve({ ...makeServerResponse(sent.tid, sent.attachments[0].tid, currentUser), id: `srv-${sent.tid}` })
+    )
+    setActiveChannelId(channel.id)
+    setChannelInMap(channel)
+    const file = (tid: string, name: string) => ({
+      tid: trackedTid(tid),
+      type: attachmentTypes.file,
+      name,
+      size: 3,
+      data: new File(['abc'], name, { type: 'application/pdf' }),
+      metadata: '{}',
+      upload: false
+    })
+    const sentTids = () => (channel.sendMessage as jest.Mock).mock.calls.map(([sent]) => sent.tid)
+    const uploadedTids = () => uploads.map((call) => call.attachment.tid)
+    const until = async (done: () => boolean) => {
+      for (let attempt = 0; attempt < 400 && !done(); attempt++) await Promise.resolve()
+    }
+    const actions = stdChannel()
+    const dispatched: any[] = []
+    const io = {
+      channel: actions,
+      dispatch: (output: any) => {
+        dispatched.push(output)
+        actions.put(output)
+      },
+      getState: () => mockStoreState
+    }
+    // What the upload's stop and resume buttons do.
+    const stop = (tid: string) =>
+      runSaga(io, __messageSagaTestables.pauseAttachmentUploading, pauseAttachmentUploadingAC(tid)).toPromise()
+    const resume = (tid: string) =>
+      runSaga(io, __messageSagaTestables.resumeAttachmentUploading, resumeAttachmentUploadingAC(tid)).toPromise()
+
+    const run = runSaga(
+      io,
+      __messageSagaTestables.sendMessage,
+      sendMessageAC(
+        {
+          body: 'three files',
+          bodyAttributes: [],
+          attachments: [
+            file('waiting-file-1', 'first.pdf'),
+            file('waiting-file-2', 'second.pdf'),
+            file('waiting-file-3', 'third.pdf')
+          ],
+          mentionedUsers: [],
+          type: 'text',
+          metadata: {},
+          parentMessage: null,
+          repliedInThread: false
+        },
+        channel.id,
+        CONNECTION_STATUS.CONNECTED,
+        true
+      )
+    )
+    runningTasks.push(run)
+    await until(() => uploads.length === 1)
+
+    // The second file's stop button, pressed once while the first one uploads.
+    await stop('waiting-file-2')
+    expect(dispatched).toContainEqual(updateAttachmentUploadingStateAC(UPLOAD_STATE.PAUSED, 'waiting-file-2'))
+
+    // The first one is sent; the third one goes next, and the second one is not uploaded.
+    uploads[0].succeed('https://cdn.example/waiting-file-1')
+    await until(() => uploads.length === 2)
+    uploads[1].succeed('https://cdn.example/waiting-file-3')
+    await run.toPromise()
+    expect(uploadedTids()).toEqual(['waiting-file-1', 'waiting-file-3'])
+    expect(sentTids()).toEqual(['waiting-msg-1', 'waiting-msg-3'])
+
+    // Resumed, it uploads (shown as uploading, not preparing) and is sent after them.
+    await resume('waiting-file-2')
+    expect(dispatched).toContainEqual(updateAttachmentUploadingStateAC(UPLOAD_STATE.UPLOADING, 'waiting-file-2'))
+    await until(() => uploads.length === 3)
+    expect(uploadedTids()[2]).toBe('waiting-file-2')
+    uploads[2].succeed('https://cdn.example/waiting-file-2')
+    await until(() => sentTids().length === 3)
+    expect(sentTids()).toEqual(['waiting-msg-1', 'waiting-msg-3', 'waiting-msg-2'])
+    expect(getPendingMessagesFromMap(channel.id)).toHaveLength(0)
+  })
+
   it('when a lost connection fails a message, the next ones wait for it: they are sent after it, in order', async () => {
     const currentUser = makeUser({ id: 'current-user' })
     const channel = makeUploaderChannel('channel-wait-for-failed')
@@ -1914,7 +2011,8 @@ describe('attachment upload recovery', () => {
   })
 
   it('a resume pressed while the video preview still uploads shows it as preparing again', () => {
-    markUploadNotStarted('video-resume-tid')
+    // A video: its preview uploads first.
+    markUploadNotStarted('video-resume-tid', true)
     pauseUpload('video-resume-tid')
     const dispatched: any[] = []
 

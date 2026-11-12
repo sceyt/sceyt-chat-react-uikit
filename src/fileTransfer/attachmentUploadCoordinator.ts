@@ -37,9 +37,10 @@ interface Upload {
 }
 
 const uploads = new Map<string, Upload>()
-// Uploads that show a stop control before they start (a video while its preview
-// is uploaded): a pause pressed meanwhile is kept here and applied when it starts.
-const notStartedUploads = new Map<string, { paused: boolean }>()
+// Uploads that show a stop control before they start (an attachment whose message waits
+// for the messages before it, or a video while its preview is uploaded): a pause pressed
+// meanwhile is kept here and applied when it starts.
+const notStartedUploads = new Map<string, { paused: boolean; preparing: boolean }>()
 
 const start = (upload: Upload) => {
   const executor = attachmentTransferRouter.upload(upload.attachment, upload.source)
@@ -78,11 +79,14 @@ const stopAttempt = (upload: Upload) => {
   attempt.executor.stop()
 }
 
-export const markUploadNotStarted = (attachmentTid: string) => {
-  notStartedUploads.set(attachmentTid, { paused: false })
+/** `preparing`: a video whose preview is uploaded first; a resume shows it as preparing. */
+export const markUploadNotStarted = (attachmentTid: string, preparing = false) => {
+  notStartedUploads.set(attachmentTid, { paused: false, preparing })
 }
 
 export const isUploadNotStarted = (attachmentTid: string) => notStartedUploads.has(attachmentTid)
+
+export const isUploadPreparing = (attachmentTid: string) => !!notStartedUploads.get(attachmentTid)?.preparing
 
 export const isUploadPausedBeforeStart = (attachmentTid: string) => !!notStartedUploads.get(attachmentTid)?.paused
 
@@ -143,8 +147,9 @@ export const pauseUpload = (attachmentTid: string) => {
     }
     return true
   }
-  if (notStartedUploads.has(attachmentTid)) {
-    notStartedUploads.set(attachmentTid, { paused: true })
+  const notStarted = notStartedUploads.get(attachmentTid)
+  if (notStarted) {
+    notStarted.paused = true
     return true
   }
   log.info('Unknown uploading task')
@@ -168,8 +173,9 @@ export const resumeUpload = (attachmentTid: string) => {
     if (!upload.attempt || upload.attempt.stopped) start(upload)
     return true
   }
-  if (notStartedUploads.has(attachmentTid)) {
-    notStartedUploads.set(attachmentTid, { paused: false })
+  const notStarted = notStartedUploads.get(attachmentTid)
+  if (notStarted) {
+    notStarted.paused = false
     return true
   }
   log.info('Unknown uploading task')
