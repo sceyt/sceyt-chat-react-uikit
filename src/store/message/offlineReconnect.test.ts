@@ -329,7 +329,7 @@ describe('offline / reconnect: sending messages', () => {
     setClient({
       user: { id: 'current-user' },
       Channel: { create: jest.fn() },
-      uploadFile: jest.fn(async () => 'https://cdn.example/clip-preview.jpg')
+      upload: jest.fn(async (file: File) => ({ url: `https://cdn.example/${file.name}`, size: file.size }))
     })
     sdk.sendMessage = jest.fn(async (message: any) =>
       makeMessage({
@@ -343,7 +343,14 @@ describe('offline / reconnect: sending messages', () => {
         attachments: message.attachments
       })
     )
-    await reconnect()
+    // The uikit shows the sent video from a local object URL, which jsdom lacks.
+    const originalCreateObjectURL = URL.createObjectURL
+    Object.defineProperty(URL, 'createObjectURL', { configurable: true, value: jest.fn(() => 'blob:sent-video') })
+    try {
+      await reconnect()
+    } finally {
+      Object.defineProperty(URL, 'createObjectURL', { configurable: true, value: originalCreateObjectURL })
+    }
 
     expect(sdk.sendMessage).toHaveBeenCalledTimes(1)
     const sent = sdk.sendMessage.mock.calls[0][0]

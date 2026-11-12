@@ -1,5 +1,8 @@
-import { getCustomDownloader, getCustomUploader } from './customUploader'
-import { readResponseBlobWithProgress } from './getVideoFrame'
+import { IAttachment } from '../types'
+import { isUnopenableAttachmentError } from './attachmentEncryption'
+import { attachmentTransferRouter } from '../fileTransfer/attachmentTransferRouter'
+import { FileEncryptionInfo } from '../fileTransfer/encryption/types'
+import { TransferExecutor } from '../fileTransfer/transferExecutor'
 import { getAttachmentURLWithVersion, getAttachmentUrlFromCache, setAttachmentToCache } from './attachmentsCache'
 import { registerBlobUrl } from './attachmentBlobUrls'
 import { ensurePlayableVideoBlob } from './videoConversion'
@@ -8,20 +11,21 @@ export type MediaDownloadKind = 'original-image' | 'original-video' | 'video-thu
 
 export interface MediaDownloadRequest {
   key: string
+  /** The attachment the file belongs to: the transport gets it. */
+  attachment: IAttachment
   url: string
   cacheKey: string
   cacheKeys?: string[]
   kind: MediaDownloadKind
   messageType?: string | null
   size?: number
-  downloader?: (
-    url: string,
-    download: boolean,
-    progress: (progress: any) => void,
-    messageType?: string | null
-  ) => Promise<any>
-  customDownload?: boolean
   skipCacheLookup?: boolean
+  /** What opens the file when it is encrypted: the download is decrypted before it is cached or shown. */
+  encryption?: FileEncryptionInfo
+  /** Type of the decrypted file (encrypted objects are stored as application/octet-stream). */
+  contentType?: string
+  /** The user asked to try again: a file that could not be opened before is downloaded again. */
+  retry?: boolean
 }
 
 export interface MediaDownloadSnapshot {
@@ -40,8 +44,7 @@ interface MediaDownloadJob {
   version: number
   snapshot: MediaDownloadSnapshot
   promise: Promise<MediaDownloadResult>
-  abortController?: AbortController
-  customRequest?: Promise<any>
+  transfer?: TransferExecutor<Blob>
   cacheKeys: Set<string>
   cancelled?: boolean
 }
@@ -51,6 +54,10 @@ const jobs = new Map<string, MediaDownloadJob>()
 const snapshots = new Map<string, MediaDownloadSnapshot>()
 const listeners = new Map<string, Set<() => void>>()
 const jobVersions = new Map<string, number>()
+// Files that downloaded but could not be opened (decryption failed): the same
+// bytes and key fail every time, so a remount or reconnect does not download
+// them again. Only a retry the user asks for does.
+const unopenable = new Map<string, { fileKey?: string; error: unknown }>()
 
 const notify = (key: string) => {
   listeners.get(key)?.forEach((listener) => listener())
@@ -68,21 +75,6 @@ const setJobSnapshot = (key: string, job: MediaDownloadJob, snapshot: MediaDownl
   // Its late progress/failure must not replace the retry's current state.
   if (jobVersions.get(key) !== job.version) return
   setSnapshot(key, snapshot)
-}
-
-const normalizeProgress = (progress: any, fallbackTotal: number = 0) => {
-  const loaded = progress?.loaded ?? progress?.uploaded ?? 0
-  const reportedTotal = progress?.total ?? 0
-  // Message attachment size is the authoritative server-side file size. Some
-  // custom downloaders report an intermediate/proxy response length instead,
-  // which made large files appear much smaller in the UI.
-  const total = Math.max(reportedTotal || 0, fallbackTotal || 0)
-  const fraction = total > 0 ? loaded / total : progress?.progress || 0
-  return {
-    loaded,
-    total,
-    progress: Math.max(0, Math.min(100, fraction * 100))
-  }
 }
 
 const makeObjectUrl = async (
@@ -113,63 +105,37 @@ const makeObjectUrl = async (
 }
 
 const download = async (request: MediaDownloadRequest, job: MediaDownloadJob): Promise<MediaDownloadResult> => {
-  const reportProgress = (progress: any) => {
-    // URL-returning custom downloaders may first emit a synthetic 1 B / 1 B
-    // completion while resolving the actual media URL. Do not surface that
-    // transport marker as attachment progress; the following media request
-    // reports the real bytes.
-    const rawLoaded = progress?.loaded ?? progress?.uploaded ?? 0
-    const rawTotal = progress?.total ?? 0
-    if (rawLoaded <= 1 && rawTotal <= 1) {
-      return
+  // Message attachment size is the authoritative server-side file size; a file of
+  // unknown size (a video's preview image) is counted out of 100.
+  const total = Number(request.size) || 100
+  // The transport (fileTransfer.provider); an encrypted file comes back from it
+  // decrypted, checked against the attachment's size (a preview image has none).
+  // One transport operation per job: a video and its preview are separate ones.
+  const transfer = attachmentTransferRouter.download(
+    request.attachment,
+    {
+      url: request.url,
+      mimeType: request.contentType,
+      encryptionInfo: request.encryption,
+      plaintextSize: request.kind === 'video-thumbnail' ? undefined : request.attachment.size
+    },
+    request.key
+  )
+  job.transfer = transfer
+  const result = await transfer.execute({
+    onProgress: (percent) => {
+      // A cancelled transfer that is still running must not turn the shared state back to loading.
+      if (job.cancelled) return
+      setJobSnapshot(request.key, job, {
+        state: 'loading',
+        loaded: (total * percent) / 100,
+        total,
+        progress: Math.max(0, Math.min(100, percent))
+      })
     }
-    const normalized = normalizeProgress(progress, request.size)
-    setJobSnapshot(request.key, job, { state: 'loading', ...normalized })
-  }
-  const customDownloader = request.downloader || getCustomDownloader()
-
-  if (customDownloader) {
-    // Shared media needs a Blob to cache and to publish one reusable object
-    // URL. Custom uploader implementations (including AWS-based uploaders)
-    // use `download: true` for that full-download path; `false` only returns
-    // a short-lived URL which the coordinator would have to fetch again.
-    const requestBlob = request.customDownload ?? true
-    const customRequest = customDownloader(request.url, requestBlob, reportProgress, request.messageType)
-    job.customRequest = customRequest
-    const result = await customRequest
-    const body = result?.Body || result
-    if (body instanceof Blob) {
-      reportProgress({ loaded: body.size, total: body.size })
-      return makeObjectUrl(request, body, job.cacheKeys)
-    }
-    if (body instanceof ArrayBuffer || ArrayBuffer.isView(body)) {
-      const blob = new Blob([body], { type: 'application/octet-stream' })
-      reportProgress({ loaded: blob.size, total: blob.size })
-      return makeObjectUrl(request, blob, job.cacheKeys)
-    }
-    if (typeof body !== 'string') {
-      throw new Error('Media downloader returned an unsupported result')
-    }
-
-    // Some custom downloaders return a local/remote URL rather than a Blob.
-    // Fetch it once here so all subscribers still share the same blob result.
-    job.abortController = new AbortController()
-    const response = await fetch(body, { signal: job.abortController.signal })
-    if (!response.ok) {
-      throw new Error(`Unable to read downloaded media (${response.status})`)
-    }
-    const blob = await readResponseBlobWithProgress(response, reportProgress, request.size || 0)
-    return makeObjectUrl(request, blob, job.cacheKeys)
-  }
-
-  job.abortController = new AbortController()
-  const response = await fetch(request.url, { signal: job.abortController.signal })
-  if (!response.ok) {
-    const label = request.kind === 'video-thumbnail' ? 'Unable to download video preview' : 'Unable to download media'
-    throw new Error(`${label} (${response.status})`)
-  }
-  const blob = await readResponseBlobWithProgress(response, reportProgress, request.size || 0)
-  return makeObjectUrl(request, blob, job.cacheKeys)
+  })
+  if (result.type !== 'success') throw result.error
+  return makeObjectUrl(request, result.result, job.cacheKeys)
 }
 
 const getCachedMediaResult = async (cacheKey: string): Promise<MediaDownloadResult | undefined> => {
@@ -199,6 +165,15 @@ export const requestMediaDownload = (request: MediaDownloadRequest): Promise<Med
     return active.promise
   }
 
+  const failure = unopenable.get(request.key)
+  if (failure && failure.fileKey === request.encryption?.encodedKeys && !request.retry) {
+    if (getMediaDownloadSnapshot(request.key).state !== 'failed') {
+      setSnapshot(request.key, { state: 'failed', loaded: 0, total: 0, progress: 0 })
+    }
+    return Promise.reject(failure.error)
+  }
+  unopenable.delete(request.key)
+
   const job: MediaDownloadJob = {
     version: (jobVersions.get(request.key) || 0) + 1,
     snapshot: { state: 'loading', loaded: 0, total: request.size || 0, progress: 0 },
@@ -207,7 +182,12 @@ export const requestMediaDownload = (request: MediaDownloadRequest): Promise<Med
   }
   jobVersions.set(request.key, job.version)
   jobs.set(request.key, job)
-  setJobSnapshot(request.key, job, job.snapshot)
+  // A cached file is not downloaded, so it never shows as loading: e.g. a video's
+  // tiles remounting (switching chats) would flash the download progress. A new
+  // try after a cancel or a failure shows it at once.
+  const previousState = getMediaDownloadSnapshot(request.key).state
+  const showsLoadingAtOnce = request.skipCacheLookup || previousState === 'cancelled' || previousState === 'failed'
+  if (showsLoadingAtOnce) setJobSnapshot(request.key, job, job.snapshot)
 
   const promise = Promise.resolve()
     .then(async () => {
@@ -217,6 +197,7 @@ export const requestMediaDownload = (request: MediaDownloadRequest): Promise<Med
         : await getCachedMediaResult(request.cacheKey).catch(() => undefined)
       throwIfCancelled(job)
       if (cachedResult) return cachedResult
+      if (!showsLoadingAtOnce) setJobSnapshot(request.key, job, job.snapshot)
       return download(request, job)
     })
     .then((result) => {
@@ -238,6 +219,9 @@ export const requestMediaDownload = (request: MediaDownloadRequest): Promise<Med
       // after its AbortController fires. The local cancellation intent is the
       // authoritative signal, so its UI state must remain cancelled.
       const cancelled = job.cancelled || error?.name === 'AbortError'
+      if (!cancelled && isUnopenableAttachmentError(error)) {
+        unopenable.set(request.key, { fileKey: request.encryption?.encodedKeys, error })
+      }
       setJobSnapshot(request.key, job, {
         state: cancelled ? 'cancelled' : 'failed',
         loaded: 0,
@@ -269,8 +253,7 @@ export const cancelMediaDownload = (key: string) => {
   // slow native or custom downloader to reject.
   jobs.delete(key)
   setSnapshot(key, { state: 'cancelled', loaded: 0, total: 0, progress: 0 })
-  if (job.abortController) job.abortController.abort()
-  if (job.customRequest) getCustomUploader()?.cancelRequest(job.customRequest)
+  job.transfer?.discard()
 }
 
 export const getMediaDownloadSnapshot = (key?: string): MediaDownloadSnapshot =>
@@ -291,4 +274,5 @@ export const resetMediaDownloadCoordinatorForTests = () => {
   snapshots.clear()
   listeners.clear()
   jobVersions.clear()
+  unopenable.clear()
 }

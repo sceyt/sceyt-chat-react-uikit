@@ -171,6 +171,14 @@ const createClient = (query: ReturnType<typeof createMessageQuery>, updatedChann
   getChannel: jest.fn(() => resolveWithMockServerDelay(updatedChannel || null))
 })
 
+// The file of a sent photo, and a chat client that uploads it (client.upload), as the uikit does before sending.
+const photoFile = new File(['photo-bytes'], 'photo.png', { type: 'image/png' })
+const uploadingClient = () => ({
+  user: { id: 'current-user' },
+  Channel: { create: jest.fn() },
+  upload: jest.fn(async (file: Blob) => ({ url: 'https://cdn.example/photo.png', size: file.size }))
+})
+
 const runMessageSaga = async (saga: any, ...args: any[]) => {
   const dispatched: any[] = []
 
@@ -2742,7 +2750,7 @@ describe('message saga message-list flows', () => {
           type: attachmentTypes.image,
           name: 'photo.png',
           size: 128,
-          data: 'blob://photo',
+          data: photoFile,
           metadata: '{}',
           upload: false
         } as any
@@ -2776,7 +2784,7 @@ describe('message saga message-list flows', () => {
         size: 128,
         metadata: '{}',
         upload: false,
-        data: 'blob://photo'
+        data: photoFile
       }))
     }
     const builder = {
@@ -2806,10 +2814,7 @@ describe('message saga message-list flows', () => {
     addMessageToMap(channel.id, makeMessage({ id: '710', channelId: channel.id, body: 'cached-710' }))
     addMessageToMap(channel.id, channel.lastMessage)
     setActiveSegment(channel.id, '709', '711')
-    setClient({
-      user: { id: 'current-user' },
-      Channel: { create: jest.fn() }
-    })
+    setClient(uploadingClient())
 
     const inputMessage = {
       body: 'photo connected',
@@ -2820,7 +2825,7 @@ describe('message saga message-list flows', () => {
           type: attachmentTypes.image,
           name: 'photo.png',
           size: 128,
-          data: 'blob://photo',
+          data: photoFile,
           metadata: '{}',
           upload: false
         }
@@ -3071,7 +3076,7 @@ describe('message saga message-list flows', () => {
             szh: 720,
             dur: 17,
             tmb: 'first-frame-hash',
-            video_thumb: 'https://cdn.example.com/forwarded-video-thumb.jpg'
+            pvw: 'https://cdn.example.com/forwarded-video-thumb.jpg'
           }
         } as any
       ]
@@ -3108,7 +3113,7 @@ describe('message saga message-list flows', () => {
         szh: 720,
         dur: 17,
         tmb: 'first-frame-hash',
-        video_thumb: 'https://cdn.example.com/forwarded-video-thumb.jpg'
+        pvw: 'https://cdn.example.com/forwarded-video-thumb.jpg'
       })
     )
     expect(builder.setAttachments).toHaveBeenCalledWith([
@@ -3119,7 +3124,7 @@ describe('message saga message-list flows', () => {
           szh: 720,
           dur: 17,
           tmb: 'first-frame-hash',
-          video_thumb: 'https://cdn.example.com/forwarded-video-thumb.jpg'
+          pvw: 'https://cdn.example.com/forwarded-video-thumb.jpg'
         })
       })
     ])
@@ -3137,7 +3142,7 @@ describe('message saga message-list flows', () => {
         attachments: [
           expect.objectContaining({
             metadata: expect.objectContaining({
-              video_thumb: 'https://cdn.example.com/forwarded-video-thumb.jpg',
+              pvw: 'https://cdn.example.com/forwarded-video-thumb.jpg',
               szw: 1280,
               szh: 720,
               dur: 17,
@@ -4556,7 +4561,7 @@ describe('message saga message-list flows', () => {
           type: attachmentTypes.image,
           name: 'photo.png',
           size: 128,
-          data: 'blob://photo',
+          data: photoFile,
           metadata: '{}',
           upload: false
         } as any
@@ -4639,7 +4644,7 @@ describe('message saga message-list flows', () => {
         size: 128,
         metadata: '{}',
         upload: false,
-        data: 'blob://photo'
+        data: photoFile
       }))
     }
 
@@ -4675,10 +4680,7 @@ describe('message saga message-list flows', () => {
     addMessageToMap(channelId, textPending)
     addMessageToMap(channelId, attachmentPending)
     addMessageToMap(channelId, latestForwardPending)
-    setClient({
-      user: { id: 'current-user' },
-      Channel: { create: jest.fn() }
-    })
+    setClient(uploadingClient())
 
     const dispatched: any[] = []
     const task = runSaga(

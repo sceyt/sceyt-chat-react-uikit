@@ -15,6 +15,8 @@ import MessageReducer, {
   requestPinnedMessagesListClose,
   addSelectedMessage,
   setMessageListGap,
+  updateUploadProgress,
+  removeUploadProgress,
   OG_METADATA_MAX
 } from './reducers'
 import { addReactionToMessageAC, deleteReactionFromMessageAC } from './actions'
@@ -1037,5 +1039,43 @@ describe('message list gap', () => {
     )
 
     expect(state.messageListGap).toEqual(gap)
+  })
+})
+
+describe('attachment upload progress', () => {
+  const MB = 1024 * 1024
+  const progressOf = (state: any, attachmentId: string) => state.attachmentsUploadingProgress[attachmentId]
+  const after = (...actions: any[]) => actions.reduce(MessageReducer, MessageReducer(undefined, { type: '@@INIT' }))
+
+  it('never goes back: an upload sent again from the start is held at what was shown until it passes it', () => {
+    const state = after(
+      updateUploadProgress({ attachmentId: 'video', uploaded: 4 * MB, total: 10 * MB }),
+      // The message was sent again: its upload reports from the start.
+      updateUploadProgress({ attachmentId: 'video', uploaded: 1 * MB, total: 10 * MB })
+    )
+    expect(progressOf(state, 'video')).toEqual({ uploaded: 4 * MB, total: 10 * MB, progress: 0.4 })
+
+    const passed = MessageReducer(
+      state,
+      updateUploadProgress({ attachmentId: 'video', uploaded: 5 * MB, total: 10 * MB })
+    )
+    expect(progressOf(passed, 'video')).toEqual({ uploaded: 5 * MB, total: 10 * MB, progress: 0.5 })
+  })
+
+  it('starts again for a file of another size', () => {
+    const state = after(
+      updateUploadProgress({ attachmentId: 'video', uploaded: 4 * MB, total: 10 * MB }),
+      updateUploadProgress({ attachmentId: 'video', uploaded: 1 * MB, total: 8 * MB })
+    )
+    expect(progressOf(state, 'video')).toEqual({ uploaded: 1 * MB, total: 8 * MB, progress: 0.125 })
+  })
+
+  it('starts from 0 once it was removed (the upload ended)', () => {
+    const state = after(
+      updateUploadProgress({ attachmentId: 'video', uploaded: 4 * MB, total: 10 * MB }),
+      removeUploadProgress({ attachmentId: 'video' }),
+      updateUploadProgress({ attachmentId: 'video', uploaded: 1 * MB, total: 10 * MB })
+    )
+    expect(progressOf(state, 'video')).toEqual({ uploaded: 1 * MB, total: 10 * MB, progress: 0.1 })
   })
 })

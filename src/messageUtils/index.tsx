@@ -12,6 +12,7 @@ import { getClient } from '../common/client'
 import { StyledText } from '../UIHelper'
 import { combineMessageAttributes, makeUsername } from '../helpers/message'
 import log from 'loglevel'
+import { withVideoPreviews } from '../helpers/videoPreview'
 
 const StatusText = styled.span<{ color: string; fontSize?: string }>`
   color: ${(props) => props.color};
@@ -397,4 +398,4 @@ const MessageTextFormat = ({
   }
 }
 
-export { MessageStatusIcon, MessageTextFormat, extractUrlMatches }
+export { MessageStatusIcon, MessageTextFormat, extractUrlMatches, withVideoPreviews }

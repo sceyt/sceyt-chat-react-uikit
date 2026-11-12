@@ -56,7 +56,8 @@ import {
   requestPermissionOnUserInteraction
 } from '../../helpers/notifications'
 import { IChannel, IContactsMap } from '../../types'
-import { setCustomUploader, setSendAttachmentsAsSeparateMessages } from '../../helpers/customUploader'
+import { setSendAttachmentsAsSeparateMessages } from '../../helpers/sendAttachments'
+import { fileTransfer as uikitFileTransfer } from '../../fileTransfer/sceytChatUIKitFileTransfer'
 import { IChatClientProps } from '../ChatContainer'
 import { defaultTheme, THEME_COLORS } from '../../UIHelper/constants'
 import { setHideUserPresence } from '../../helpers/userHelper'
@@ -82,7 +83,7 @@ const SceytChat = ({
   children,
   showOnlyContactUsers,
   logoSrc,
-  CustomUploader,
+  fileTransfer,
   handleNewMessages,
   sendAttachmentsAsSeparateMessages = true,
   membersDisplayTextByChannelTypesMap,
@@ -226,10 +227,16 @@ const SceytChat = ({
     }
   }
 
+  // Without a provider or encryption, the default one (the chat client's) is used.
+  // A change applies to the transfers that start after it.
+  const provider = fileTransfer?.provider
+  const encryptUploads = fileTransfer?.encryptUploads
+  const encryption = fileTransfer?.encryption
   useEffect(() => {
-    if (CustomUploader) {
-      setCustomUploader(CustomUploader)
-    }
+    uikitFileTransfer.configure({ provider, encryptUploads, encryption })
+  }, [provider, encryptUploads, encryption])
+
+  useEffect(() => {
     if (membersDisplayTextByChannelTypesMap) {
       setChannelTypesMemberDisplayTextMap(membersDisplayTextByChannelTypesMap)
     }

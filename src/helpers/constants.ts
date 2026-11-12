@@ -90,7 +90,9 @@ export const attachmentTypes = {
   audio: 'audio',
   file: 'file',
   link: 'link',
-  voice: 'voice'
+  voice: 'voice',
+  // A video's preview image, sent as an attachment of its own in the video's message.
+  preview: 'preview'
 }
 export const channelDetailsTabs = {
   member: 'Members',

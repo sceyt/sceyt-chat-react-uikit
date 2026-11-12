@@ -1,5 +1,6 @@
 import React from 'react'
-import { render, screen } from '@testing-library/react'
+import { fireEvent, render, screen } from '@testing-library/react'
+import { navigateToMessage } from '../../helpers/messageListNavigator'
 import PinnedMessagesList from './PinnedMessagesList'
 
 const mockPins = [
@@ -55,12 +56,25 @@ describe('PinnedMessagesList', () => {
   it('hides the navigation button while one or more pinned messages are selected', () => {
     renderPinnedList(true)
 
-    expect(screen.queryByRole('button', { name: 'Go to message in conversation' })).not.toBeInTheDocument()
+    expect(screen.queryByLabelText('Go to message in conversation')).not.toBeInTheDocument()
   })
 
   it('shows the navigation button when selection mode is inactive', () => {
     renderPinnedList(false)
 
-    expect(screen.getByRole('button', { name: 'Go to message in conversation' })).toBeInTheDocument()
+    // getByRole checks computed styles, which jsdom 16 cannot evaluate for this
+    // row's :focus-within selector. Keep the accessible name and native role checked.
+    const navigationButton = screen.getByLabelText('Go to message in conversation')
+    expect(navigationButton).toBeInTheDocument()
+    expect(navigationButton.tagName).toBe('BUTTON')
+    expect(navigationButton).toHaveAttribute('type', 'button')
+  })
+
+  it('navigates to the pinned message when its navigation button is clicked', () => {
+    renderPinnedList(false)
+
+    fireEvent.click(screen.getByLabelText('Go to message in conversation'))
+
+    expect(navigateToMessage).toHaveBeenCalledWith('message-1')
   })
 })

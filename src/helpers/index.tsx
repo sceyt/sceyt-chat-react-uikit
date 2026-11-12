@@ -1,8 +1,8 @@
 import { IAttachment, IContact, IUser } from '../types'
 import FileSaver from 'file-saver'
 import moment from 'moment'
-import { getCustomDownloader, getCustomUploader } from './customUploader'
-import { readResponseBlobWithProgress } from './getVideoFrame'
+import { cancelDownloadRequest, getAttachmentDownloader } from '../fileTransfer/attachmentDownloader'
+import { getAttachmentEncryption, getTypeFromFileName } from './attachmentEncryption'
 import log from 'loglevel'
 
 // eslint-disable-next-line
@@ -54,64 +54,27 @@ export const downloadFile = async (
   messageType?: string | null | undefined
 ) => {
   try {
-    const customDownloader = getCustomDownloader()
-    let response
-    if (customDownloader) {
-      const urlPromise = customDownloader(
-        attachment.url,
-        download,
-        (progress) => {
-          if (progressCallback) {
-            progressCallback(progress)
-          }
-        },
-        messageType
-      )
-      filesPromisesOnDownload[attachment.id!] = urlPromise
-      const result = await urlPromise
-      /* response = await fetch(result)
-      const data = await response.blob()
-      if (done) {
-        delete filesPromisesOnDownload[attachment.id!]
-        done(attachment.id || '')
-      } */
-      FileSaver.saveAs(result.Body, attachment.name)
-      if (done) {
-        done(attachment.id || '')
-      }
-      delete filesPromisesOnDownload[attachment.id!]
-      /* urlPromise.then(async (url) => {
-        response = await fetch(url)
-        const data = await response.blob()
-        if (done) {
-          delete filesPromisesOnDownload[attachment.id!]
-          done(attachment.id || '')
-        }
-        FileSaver.saveAs(data, attachment.name)
-      }) */
-      /*  customDownloader(attachment.url, (progress) => {
+    const encryption = getAttachmentEncryption(attachment.metadata)
+    const type = getTypeFromFileName(attachment.name)
+    // Downloads through fileTransfer.provider; an encrypted file comes back decrypted.
+    const downloader = getAttachmentDownloader(attachment, encryption, type)
+    const request = downloader(
+      attachment.url,
+      download,
+      (progress) => {
         if (progressCallback) {
           progressCallback(progress)
         }
-      }).then(async (url) => {
-        response = await fetch(url)
-        const data = await response.blob()
-        if (done) {
-          done(attachment.id || '')
-        }
-        FileSaver.saveAs(data, attachment.name)
-      }) */
-    } else {
-      response = await fetch(attachment.url)
-      if (!response.ok) {
-        throw new Error(`Unable to download attachment (${response.status})`)
-      }
-      const data = await readResponseBlobWithProgress(response, progressCallback, attachment.size || 0)
-      if (done) {
-        done(attachment.id || '')
-      }
-      FileSaver.saveAs(data, attachment.name)
+      },
+      messageType
+    )
+    filesPromisesOnDownload[attachment.id!] = request
+    const result = await request
+    FileSaver.saveAs(result.Body, attachment.name)
+    if (done) {
+      done(attachment.id || '')
     }
+    delete filesPromisesOnDownload[attachment.id!]
   } catch (e) {
     log.error('error on download... ', e)
     if (done) {
@@ -123,10 +86,7 @@ export const downloadFile = async (
 export const cancelDownloadFile = (attachmentId: string) => {
   const promise = filesPromisesOnDownload[attachmentId]
   if (promise) {
-    const customUploader = getCustomUploader()
-    if (customUploader) {
-      customUploader.cancelRequest(promise)
-    }
+    cancelDownloadRequest(promise)
   }
 }
 

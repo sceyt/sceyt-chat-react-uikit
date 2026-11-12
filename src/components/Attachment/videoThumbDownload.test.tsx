@@ -1,17 +1,82 @@
 import React from 'react'
+import { renderToString } from 'react-dom/server'
+import { Provider } from 'react-redux'
+import { SceytReduxContext } from '../../store/context'
 import { act, fireEvent, screen } from '@testing-library/react'
 import Attachment from './index'
-import { attachmentTypes } from '../../helpers/constants'
+import { attachmentTypes, MESSAGE_STATUS, UPLOAD_STATE } from '../../helpers/constants'
 import { getAttachmentUrlFromCache, setAttachmentToCache } from '../../helpers/attachmentsCache'
 import { CONNECTION_STATUS } from '../../store/user/constants'
-import { createMessageListStore, renderWithSceytProvider } from '../../testUtils/messageListHarness'
+import { setConnectionStatusAC } from '../../store/user/actions'
+import {
+  pauseAttachmentUploadingAC,
+  resendMessageAC,
+  updateAttachmentUploadingProgressAC,
+  updateAttachmentUploadingStateAC
+} from '../../store/message/actions'
+import { createMessageListStore, makePendingMessage, renderWithSceytProvider } from '../../testUtils/messageListHarness'
 import {
   cancelMediaDownload,
   requestMediaDownload,
   resetMediaDownloadCoordinatorForTests
 } from '../../helpers/mediaDownloadCoordinator'
+import {
+  fakeEncrypted,
+  fakeEncryption,
+  fakeEncryptionInfo,
+  installFakeFilesClient,
+  readBlobText
+} from '../../testUtils/fakeAttachmentFiles'
+import { fileTransfer } from '../../fileTransfer/sceytChatUIKitFileTransfer'
+import {
+  addMessageToMap,
+  clearMessagesMap,
+  deletePendingAttachment,
+  setPendingAttachment
+} from '../../helpers/messagesHalper'
+import { DefaultFileTransferProvider } from '../../fileTransfer/defaults/defaultFileTransferProvider'
+import {
+  AttachmentTransferContext,
+  FileDownloadRequest,
+  FileTransferCallback,
+  FileTransferResult
+} from '../../types/fileTransfer/types'
 
-let mockCustomUploader: any
+type DownloadMock = jest.Mock<Promise<FileTransferResult<Blob>>, [FileDownloadRequest, FileTransferCallback]>
+
+// A download that stays open until the test settles it.
+const openDownload = (): DownloadMock => jest.fn(() => new Promise<FileTransferResult<Blob>>(() => undefined))
+
+// Sets a custom transport (fileTransfer.provider) whose downloads are `download`.
+const setCustomTransport = (download: DownloadMock = openDownload()) => {
+  const transport = { upload: jest.fn(), download, cancel: jest.fn() }
+  fileTransfer.provider = transport
+  return transport
+}
+
+// The built-in transport (the chat client over the test's fetch), recording what it is asked for.
+const setRecordingDefaultTransport = () => {
+  const builtIn = new DefaultFileTransferProvider()
+  return setCustomTransport(jest.fn((request, callback) => builtIn.download(request, callback)))
+}
+
+// What a transport was asked for, as plain values: the attachment
+// holds a File, and a failing diff of a File runs the test worker out of memory.
+const asked = ([request]: [FileDownloadRequest, ...any[]]) => [
+  (request.context as AttachmentTransferContext | undefined)?.attachment?.messageId,
+  request.url
+]
+const askedFor = (url: string) => ['message-id', url]
+let mockCompressAndCacheImage: ((...args: any[]) => Promise<any>) | undefined
+
+jest.mock('../../helpers/getVideoFrame', () => {
+  const actual = jest.requireActual('../../helpers/getVideoFrame')
+  return {
+    ...actual,
+    compressAndCacheImage: (...args: any[]) =>
+      mockCompressAndCacheImage ? mockCompressAndCacheImage(...args) : actual.compressAndCacheImage(...args)
+  }
+})
 
 jest.mock('../../hooks', () => {
   const { THEME_COLORS } = require('../../UIHelper/constants')
@@ -52,7 +117,9 @@ jest.mock('react-circular-progressbar', () => ({
 
 jest.mock('../VideoPreview', () => ({
   __esModule: true,
-  default: ({ src }: { src?: string }) => <div data-testid='video-preview' data-src={src || ''} />
+  default: ({ src, uploading }: { src?: string; uploading?: boolean }) => (
+    <div data-testid='video-preview' data-src={src || ''} data-uploading={!!uploading} />
+  )
 }))
 
 jest.mock('../AudioPlayer', () => ({
@@ -71,9 +138,10 @@ jest.mock('../../helpers/attachmentsCache', () => ({
   setAttachmentToCache: jest.fn()
 }))
 
-jest.mock('../../helpers/customUploader', () => ({
-  getCustomDownloader: () => mockCustomUploader?.download,
-  getCustomUploader: () => mockCustomUploader
+const mockSaveAs = jest.fn()
+jest.mock('file-saver', () => ({
+  __esModule: true,
+  default: { saveAs: (...args: any[]) => mockSaveAs(...args) }
 }))
 
 jest.mock('../../helpers/videoConversion', () => ({
@@ -89,7 +157,7 @@ const videoAttachment = {
   messageId: 'message-id',
   name: 'video.mp4',
   type: attachmentTypes.video,
-  metadata: JSON.stringify({ szw: 1280, szh: 720, dur: 17, video_thumb: 'https://cdn/video-thumb.jpg' }),
+  metadata: JSON.stringify({ szw: 1280, szh: 720, dur: 17, pvw: 'https://cdn/video-thumb.jpg' }),
   url: 'https://cdn/video.mp4',
   size: 8,
   createdAt: new Date(),
@@ -127,6 +195,11 @@ const renderMediaAttachment = (attachment: any, messageState: Record<string, any
     }
   )
 
+// Every test starts with the built-in transport.
+afterEach(() => {
+  fileTransfer.configure()
+})
+
 const flushAttachmentEffects = async () => {
   await act(async () => {
     await Promise.resolve()
@@ -141,8 +214,9 @@ describe('video attachment preview and download states', () => {
   beforeEach(() => {
     jest.clearAllMocks()
     resetMediaDownloadCoordinatorForTests()
-    mockCustomUploader = undefined
     mockSetAttachmentToCache.mockResolvedValue(undefined)
+    // The built-in transport downloads with the SDK (client.download), over the test's fetch.
+    installFakeFilesClient()
   })
 
   afterEach(() => {
@@ -209,6 +283,7 @@ describe('video attachment preview and download states', () => {
     const resourceKey = 'original-video:https://cdn/video.mp4'
     const first = requestMediaDownload({
       key: resourceKey,
+      attachment: videoAttachment as any,
       url: videoAttachment.url,
       cacheKey: `${videoAttachment.url}_original_video_url`,
       kind: 'original-video'
@@ -393,20 +468,18 @@ describe('video attachment preview and download states', () => {
     expect(global.fetch).toHaveBeenCalledTimes(2)
   })
 
-  it('keeps both views in progress on every retry when a custom downloader reports generic cancellation errors', async () => {
+  it('keeps both views in progress on every retry when a custom transport reports generic cancellation errors', async () => {
     mockGetAttachmentUrlFromCache.mockResolvedValue(false)
-    const pendingRequests: Array<{ reject: (error: Error) => void }> = []
-    const download = jest.fn(
-      () =>
-        new Promise((_resolve, reject) => {
-          pendingRequests.push({ reject })
+    // A stopped request ends as an ordinary failure, not an AbortError.
+    const download: DownloadMock = jest.fn(
+      (request: FileDownloadRequest) =>
+        new Promise<FileTransferResult<Blob>>((resolve) => {
+          request.signal.addEventListener('abort', () =>
+            resolve(FileTransferResult.failure(new Error('DOWNLOAD_CANCELLED')))
+          )
         })
     )
-    const cancelRequest = jest.fn((request) => {
-      const requestIndex = download.mock.results.findIndex((result) => result.value === request)
-      pendingRequests[requestIndex]?.reject(new Error('DOWNLOAD_CANCELLED'))
-    })
-    mockCustomUploader = { download, cancelRequest }
+    const { cancel } = setCustomTransport(download)
 
     renderWithSceytProvider(
       <React.Fragment>
@@ -437,7 +510,8 @@ describe('video attachment preview and download states', () => {
     }
 
     expect(download).toHaveBeenCalledTimes(3)
-    expect(cancelRequest).toHaveBeenCalledTimes(2)
+    expect(cancel).toHaveBeenCalledTimes(2)
+    expect(cancel).toHaveBeenCalledWith('download:original-video:https://cdn/video.mp4')
   })
 
   it('does not download a default-uploaded video when its sender source is already registered', async () => {
@@ -502,14 +576,14 @@ describe('video attachment preview and download states', () => {
     let resolveDownload: ((blob: Blob) => void) | undefined
     let cachedOriginalVideo: string | false = false
     const originalVideoCacheKey = `${videoAttachment.url}_original_video_url`
-    mockCustomUploader = {
-      download: jest.fn(
+    const { download } = setCustomTransport(
+      jest.fn(
         () =>
-          new Promise<Blob>((resolve) => {
-            resolveDownload = resolve
+          new Promise<FileTransferResult<Blob>>((resolve) => {
+            resolveDownload = (blob) => resolve(FileTransferResult.success(blob))
           })
       )
-    }
+    )
     mockGetAttachmentUrlFromCache.mockImplementation((cacheKey: string) =>
       Promise.resolve(cacheKey === originalVideoCacheKey ? cachedOriginalVideo : false)
     )
@@ -530,7 +604,7 @@ describe('video attachment preview and download states', () => {
       { store }
     )
     await flushAttachmentEffects()
-    expect(mockCustomUploader.download).toHaveBeenCalledTimes(1)
+    expect(download).toHaveBeenCalledTimes(1)
 
     // A prop update replaces the effect while its shared request is active.
     // The original callback must not be the only path that publishes the blob.
@@ -736,5 +810,649 @@ describe('video attachment preview and download states', () => {
     })
 
     expect(global.fetch).toHaveBeenCalledTimes(2)
+  })
+})
+
+describe('custom transport receives the message ID', () => {
+  const imageAttachment = {
+    ...videoAttachment,
+    id: 'image-attachment-id',
+    tid: 'image-attachment-tid',
+    type: attachmentTypes.image,
+    url: 'https://cdn/image.jpg',
+    attachmentUrl: '',
+    metadata: JSON.stringify({ szw: 1280, szh: 720, tmb: 'a'.repeat(80) })
+  }
+  let download: DownloadMock
+
+  beforeEach(() => {
+    jest.clearAllMocks()
+    resetMediaDownloadCoordinatorForTests()
+    mockSetAttachmentToCache.mockResolvedValue(undefined)
+    download = setCustomTransport().download
+  })
+
+  it('original image', async () => {
+    mockGetAttachmentUrlFromCache.mockResolvedValue(false)
+
+    renderMediaAttachment(imageAttachment)
+    await flushAttachmentEffects()
+
+    expect(download.mock.calls.map(asked)).toContainEqual(askedFor('https://cdn/image.jpg'))
+  })
+
+  it('original video', async () => {
+    mockGetAttachmentUrlFromCache.mockResolvedValueOnce('blob:cached-thumb').mockResolvedValueOnce(false)
+
+    renderAttachment()
+    await flushAttachmentEffects()
+
+    expect(download.mock.calls.map(asked)).toContainEqual(askedFor('https://cdn/video.mp4'))
+  })
+
+  it('voice message', async () => {
+    mockGetAttachmentUrlFromCache.mockResolvedValue(false)
+
+    renderMediaAttachment({ ...imageAttachment, type: attachmentTypes.voice, url: 'https://cdn/voice.mp3' })
+    await flushAttachmentEffects()
+
+    expect(download.mock.calls.map(asked)).toContainEqual(askedFor('https://cdn/voice.mp3'))
+  })
+
+  it('retrying a cancelled image download sends the message ID', async () => {
+    mockGetAttachmentUrlFromCache.mockResolvedValue(false)
+
+    renderMediaAttachment(imageAttachment)
+    await flushAttachmentEffects()
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel image download' }))
+    await flushAttachmentEffects()
+    fireEvent.click(screen.getByRole('button', { name: 'Download image' }))
+    await flushAttachmentEffects()
+
+    expect(download).toHaveBeenCalledTimes(2)
+    download.mock.calls.forEach((call) => {
+      expect(asked(call)).toEqual(askedFor('https://cdn/image.jpg'))
+    })
+  })
+
+  it('resuming from the cancel control downloads the file through the transport, never a bare URL', async () => {
+    const originalCreateObjectURL = URL.createObjectURL
+    URL.createObjectURL = jest.fn(() => 'blob:image')
+    // Hold compression open so the retry stays in its restarting state after
+    // the bytes arrive; the cancel control then toggles cancel/resume locally.
+    mockCompressAndCacheImage = () => new Promise(() => undefined)
+    mockGetAttachmentUrlFromCache.mockResolvedValue(false)
+    try {
+      renderMediaAttachment(imageAttachment)
+      await flushAttachmentEffects()
+      fireEvent.click(screen.getByRole('button', { name: 'Cancel image download' }))
+      await flushAttachmentEffects()
+      download.mockResolvedValueOnce(FileTransferResult.success(new Blob(['image'], { type: 'image/jpeg' })))
+      fireEvent.click(screen.getByRole('button', { name: 'Download image' }))
+      await flushAttachmentEffects()
+      await flushAttachmentEffects()
+      fireEvent.click(screen.getByRole('button', { name: 'Cancel image download' }))
+      await flushAttachmentEffects()
+      fireEvent.click(screen.getByRole('button', { name: 'Cancel image download' }))
+      await flushAttachmentEffects()
+
+      expect(download).toHaveBeenCalledTimes(3)
+      expect(asked(download.mock.calls[2])).toEqual(askedFor('https://cdn/image.jpg'))
+    } finally {
+      mockCompressAndCacheImage = undefined
+      URL.createObjectURL = originalCreateObjectURL
+    }
+  })
+
+  it('direct download after a failed cache lookup', async () => {
+    mockGetAttachmentUrlFromCache.mockRejectedValue(new Error('cache unavailable'))
+
+    renderMediaAttachment(imageAttachment)
+    await flushAttachmentEffects()
+
+    expect(download.mock.calls.map(asked)).toContainEqual(askedFor('https://cdn/image.jpg'))
+  })
+})
+
+describe('a failed download is not shown as downloaded', () => {
+  const fileAttachment = {
+    ...videoAttachment,
+    id: 'file-attachment-id',
+    tid: 'file-attachment-tid',
+    name: 'report.pdf',
+    type: attachmentTypes.file,
+    url: 'https://cdn/report.pdf',
+    metadata: ''
+  }
+  const forbidden = () =>
+    FileTransferResult.failure<Blob>(Object.assign(new Error('DOWNLOAD_FORBIDDEN'), { status: 403 }))
+  const originalFetch = global.fetch
+  let transport: ReturnType<typeof setCustomTransport>
+  let download: DownloadMock
+
+  beforeEach(() => {
+    jest.clearAllMocks()
+    resetMediaDownloadCoordinatorForTests()
+    mockSetAttachmentToCache.mockResolvedValue(undefined)
+    transport = setCustomTransport()
+    download = transport.download
+  })
+
+  afterEach(() => {
+    global.fetch = originalFetch
+  })
+
+  it('a failed video download shows the Download control, which retries it', async () => {
+    mockGetAttachmentUrlFromCache.mockResolvedValueOnce('blob:cached-thumb').mockResolvedValue(false)
+    download.mockResolvedValueOnce(forbidden())
+
+    renderAttachment()
+    await flushAttachmentEffects()
+    await flushAttachmentEffects()
+
+    fireEvent.click(screen.getByLabelText('Download video'))
+    await flushAttachmentEffects()
+
+    expect(download).toHaveBeenCalledTimes(2)
+    expect(asked(download.mock.calls[1])).toEqual(askedFor('https://cdn/video.mp4'))
+    expect(screen.queryByLabelText('Download video')).not.toBeInTheDocument()
+  })
+
+  it('a video that fails to decrypt is not downloaded again when it is shown again, only when the user retries', async () => {
+    installFakeFilesClient()
+    mockGetAttachmentUrlFromCache.mockImplementation(async (key: string) =>
+      key.includes('video-thumb') ? 'blob:cached-thumb' : false
+    )
+    // The built-in transport decrypts the stored file, encrypted with another key.
+    const { download } = setRecordingDefaultTransport()
+    global.fetch = jest.fn(async () => ({ ok: true, blob: async () => fakeEncrypted('another-key', 'movie') })) as any
+    const encryptedVideo = {
+      ...videoAttachment,
+      metadata: JSON.stringify({
+        ...JSON.parse(videoAttachment.metadata),
+        'sceyt.enc': fakeEncryption('key-9')
+      })
+    }
+    const videoDownloads = () =>
+      download.mock.calls.filter(([request]) => request.url === 'https://cdn/video.mp4').length
+
+    const first = renderAttachment({}, { attachment: encryptedVideo })
+    for (let i = 0; i < 5; i += 1) await flushAttachmentEffects()
+    expect(videoDownloads()).toBe(1)
+    first.unmount()
+
+    renderAttachment({}, { attachment: encryptedVideo })
+    for (let i = 0; i < 5; i += 1) await flushAttachmentEffects()
+    expect(videoDownloads()).toBe(1)
+
+    fireEvent.click(screen.getByLabelText('Download video'))
+    for (let i = 0; i < 5; i += 1) await flushAttachmentEffects()
+    expect(videoDownloads()).toBe(2)
+  })
+
+  it('a retry after a failed video download shows its progress', async () => {
+    mockGetAttachmentUrlFromCache.mockResolvedValueOnce('blob:cached-thumb').mockResolvedValue(false)
+    let reportProgress: (percent: number) => void = () => undefined
+    download.mockResolvedValueOnce(forbidden()).mockImplementationOnce((_request, callback) => {
+      reportProgress = callback.onProgress
+      return new Promise(() => undefined)
+    })
+
+    renderAttachment()
+    await flushAttachmentEffects()
+    await flushAttachmentEffects()
+    fireEvent.click(screen.getByLabelText('Download video'))
+    await flushAttachmentEffects()
+    act(() => reportProgress(50))
+    await flushAttachmentEffects()
+
+    expect(screen.getByTestId('video-download-progress')).toBeInTheDocument()
+    expect(screen.getByTestId('circular-progress')).toHaveAttribute('data-value', '50')
+  })
+
+  it('a failed file download stays visible as failed, and retrying it downloads the file', async () => {
+    let finishRetry: (result: FileTransferResult<Blob>) => void = () => undefined
+    download.mockResolvedValueOnce(forbidden()).mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          finishRetry = resolve
+        })
+    )
+
+    renderMediaAttachment(fileAttachment)
+    await flushAttachmentEffects()
+    expect(screen.getByLabelText('Download file')).not.toBeVisible()
+
+    fireEvent.click(screen.getByLabelText('Download file'))
+    await flushAttachmentEffects()
+
+    const retry = screen.getByLabelText('Download failed, retry')
+    expect(retry).toBeVisible()
+    expect(mockSaveAs).not.toHaveBeenCalled()
+
+    fireEvent.click(retry)
+    await flushAttachmentEffects()
+    // While the retry runs it is an ordinary download again, not a failed one.
+    expect(screen.queryByLabelText('Download failed, retry')).not.toBeInTheDocument()
+
+    await act(async () => finishRetry(FileTransferResult.success(new Blob(['pdf']))))
+    await flushAttachmentEffects()
+
+    expect(download).toHaveBeenCalledTimes(2)
+    expect(mockSaveAs).toHaveBeenCalledWith(expect.any(Blob), 'report.pdf')
+    expect(screen.getByLabelText('Download file')).not.toBeVisible()
+  })
+
+  it('a file download the user cancels is not shown as failed', async () => {
+    const cancelled = Object.assign(new Error('DOWNLOAD_CANCELLED'), { name: 'Error' })
+    let settleDownload: (result: FileTransferResult<Blob>) => void = () => undefined
+    download.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          settleDownload = resolve
+        })
+    )
+    // The transport ends the cancelled request as an ordinary failure.
+    transport.cancel.mockImplementation(() => settleDownload(FileTransferResult.failure(cancelled)))
+
+    renderMediaAttachment(fileAttachment)
+    await flushAttachmentEffects()
+    fireEvent.click(screen.getByLabelText('Download file'))
+    await flushAttachmentEffects()
+    fireEvent.click(screen.getByLabelText('Download file'))
+    await flushAttachmentEffects()
+
+    expect(transport.cancel).toHaveBeenCalledTimes(1)
+    expect(transport.cancel).toHaveBeenCalledWith('download:file-attachment-tid')
+    expect(screen.queryByLabelText('Download failed, retry')).not.toBeInTheDocument()
+  })
+})
+
+describe('a failed video or image download starts again when the chat reconnects', () => {
+  const imageAttachment = {
+    ...videoAttachment,
+    id: 'reconnect-image-id',
+    tid: 'reconnect-image-tid',
+    type: attachmentTypes.image,
+    url: 'https://cdn/reconnect-image.jpg',
+    attachmentUrl: '',
+    metadata: JSON.stringify({ szw: 1280, szh: 720, tmb: 'a'.repeat(80) })
+  }
+  const networkError = () => FileTransferResult.interrupted<Blob>(new TypeError('Failed to fetch'))
+  let download: DownloadMock
+
+  const reconnect = async (store: any) => {
+    act(() => {
+      store.dispatch(setConnectionStatusAC(CONNECTION_STATUS.CONNECTING))
+    })
+    await flushAttachmentEffects()
+    act(() => {
+      store.dispatch(setConnectionStatusAC(CONNECTION_STATUS.CONNECTED))
+    })
+    await flushAttachmentEffects()
+    await flushAttachmentEffects()
+  }
+
+  beforeEach(() => {
+    jest.clearAllMocks()
+    resetMediaDownloadCoordinatorForTests()
+    mockSetAttachmentToCache.mockResolvedValue(undefined)
+    download = setCustomTransport().download
+  })
+
+  afterEach(() => {
+    mockCompressAndCacheImage = undefined
+  })
+
+  it('a video download that failed on the network starts again after the reconnect', async () => {
+    mockGetAttachmentUrlFromCache.mockResolvedValueOnce('blob:cached-thumb').mockResolvedValue(false)
+    download.mockResolvedValueOnce(networkError())
+
+    const { store } = renderAttachment()
+    await flushAttachmentEffects()
+    await flushAttachmentEffects()
+    expect(download).toHaveBeenCalledTimes(1)
+
+    await reconnect(store)
+
+    expect(download).toHaveBeenCalledTimes(2)
+    expect(asked(download.mock.calls[1])).toEqual(askedFor('https://cdn/video.mp4'))
+    expect(screen.queryByLabelText('Download video')).not.toBeInTheDocument()
+  })
+
+  it('an image download that failed on the network starts again after the reconnect', async () => {
+    mockGetAttachmentUrlFromCache.mockResolvedValue(false)
+    download.mockResolvedValueOnce(networkError())
+
+    const { store } = renderMediaAttachment(imageAttachment)
+    await flushAttachmentEffects()
+    await flushAttachmentEffects()
+    expect(download).toHaveBeenCalledTimes(1)
+
+    await reconnect(store)
+
+    expect(download).toHaveBeenCalledTimes(2)
+    expect(download.mock.calls[1][0].url).toBe('https://cdn/reconnect-image.jpg')
+  })
+
+  it('without a reconnect a failed download waits for the user, so a rejection is not repeated', async () => {
+    mockGetAttachmentUrlFromCache.mockResolvedValueOnce('blob:cached-thumb').mockResolvedValue(false)
+    download.mockResolvedValue(
+      FileTransferResult.failure(Object.assign(new Error('DOWNLOAD_FORBIDDEN'), { status: 403 }))
+    )
+
+    const { store } = renderAttachment()
+    await flushAttachmentEffects()
+    await flushAttachmentEffects()
+    // Another status change that is not a reconnect.
+    act(() => {
+      store.dispatch(setConnectionStatusAC(CONNECTION_STATUS.CONNECTED))
+    })
+    for (let i = 0; i < 5; i += 1) await flushAttachmentEffects()
+
+    expect(download).toHaveBeenCalledTimes(1)
+    expect(screen.getByLabelText('Download video')).toBeInTheDocument()
+  })
+
+  it('a reconnect does not restart a download the user cancelled, or one still running', async () => {
+    mockGetAttachmentUrlFromCache.mockResolvedValueOnce('blob:cached-thumb').mockResolvedValue(false)
+
+    const { store } = renderAttachment()
+    await flushAttachmentEffects()
+    await flushAttachmentEffects()
+    await reconnect(store)
+    expect(download).toHaveBeenCalledTimes(1)
+
+    cancelMediaDownload('original-video:https://cdn/video.mp4')
+    await flushAttachmentEffects()
+    await reconnect(store)
+
+    expect(download).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('the upload stop and resume control', () => {
+  beforeEach(() => {
+    jest.clearAllMocks()
+    resetMediaDownloadCoordinatorForTests()
+    mockGetAttachmentUrlFromCache.mockResolvedValue(false)
+  })
+
+  afterEach(async () => {
+    // Let the render's cache lookups settle, then drop the download they started.
+    await flushAttachmentEffects()
+    resetMediaDownloadCoordinatorForTests()
+  })
+
+  const smallImage = {
+    ...videoAttachment,
+    id: 'small-image-id',
+    tid: 'small-image-tid',
+    type: attachmentTypes.image,
+    url: 'blob:small-image',
+    attachmentUrl: 'blob:small-image',
+    metadata: JSON.stringify({ szw: 320, szh: 240 }),
+    size: 140 * 1024
+  }
+
+  it.each([0, smallImage.size])(
+    'shows the image upload indicator before the first progress event (size %s)',
+    (size) => {
+      renderMediaAttachment(
+        { ...smallImage, size },
+        {
+          attachmentsUploadingState: { [smallImage.tid]: UPLOAD_STATE.UPLOADING }
+        }
+      )
+
+      expect(screen.getByRole('button', { name: 'Stop upload' })).toBeVisible()
+      expect(screen.getByTestId('circular-progress')).toBeInTheDocument()
+    }
+  )
+
+  it('keeps the image upload indicator at 100% until the upload succeeds', () => {
+    const { store } = renderMediaAttachment(smallImage, {
+      attachmentsUploadingState: { [smallImage.tid]: UPLOAD_STATE.UPLOADING }
+    })
+
+    // A small upload may report all bytes in its first browser progress event.
+    act(() => {
+      store.dispatch(updateAttachmentUploadingProgressAC(smallImage.size, smallImage.size, smallImage.tid))
+    })
+    expect(screen.getByTestId('circular-progress')).toHaveAttribute('data-value', '100')
+    expect(screen.getByRole('button', { name: 'Stop upload' })).toBeVisible()
+
+    // All bytes being sent does not mean S3/backend confirmation has finished.
+    act(() => {
+      store.dispatch(updateAttachmentUploadingStateAC(UPLOAD_STATE.SUCCESS, smallImage.tid))
+    })
+    expect(screen.queryByTestId('circular-progress')).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Stop upload' })).not.toBeInTheDocument()
+  })
+
+  it('keeps the resume control available for an image paused after its final progress event', () => {
+    renderMediaAttachment(smallImage, {
+      attachmentsUploadingState: { [smallImage.tid]: UPLOAD_STATE.PAUSED },
+      attachmentsUploadingProgress: {
+        [smallImage.tid]: { uploaded: smallImage.size, total: smallImage.size, progress: 1 }
+      }
+    })
+
+    expect(screen.getByRole('button', { name: 'Resume upload' })).toBeVisible()
+  })
+
+  it('the stop control shown while a video is prepared pauses it, not resumes it', async () => {
+    const { store } = renderAttachment({
+      attachmentsUploadingState: { 'video-attachment-tid': 'preparing' }
+    })
+    const dispatch = jest.spyOn(store, 'dispatch')
+    await flushAttachmentEffects()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Stop upload' }))
+
+    expect(dispatch).toHaveBeenCalledWith(pauseAttachmentUploadingAC('video-attachment-tid'))
+  })
+
+  describe.each([attachmentTypes.video, attachmentTypes.image, attachmentTypes.file])(
+    'failed %s uploads (WAAF-3669)',
+    (type) => {
+      const attachment = {
+        ...videoAttachment,
+        type,
+        id: '',
+        tid: `failed-${type}-tid`,
+        messageId: '',
+        name: `pending-${type}`,
+        url: `blob:pending-${type}`,
+        attachmentUrl: `blob:pending-${type}`,
+        metadata: type === attachmentTypes.file ? '{}' : JSON.stringify({ szw: 1280, szh: 720 })
+      }
+      const getTile = (container: HTMLElement) =>
+        type === attachmentTypes.video
+          ? screen.getByTestId('video-preview')
+          : type === attachmentTypes.image
+            ? container.querySelector('img')!
+            : screen.getByText(attachment.name)
+
+      afterEach(() => {
+        deletePendingAttachment(attachment.tid)
+        clearMessagesMap()
+      })
+
+      it('replaces the stop control with upload retry when the upload fails', () => {
+        const openMedia = jest.fn()
+        const { store, container } = renderAttachment(
+          { attachmentsUploadingState: { [attachment.tid]: UPLOAD_STATE.UPLOADING } },
+          { attachment, handleMediaItemClick: openMedia }
+        )
+        expect(screen.getByRole('button', { name: 'Stop upload' })).toBeVisible()
+
+        act(() => {
+          store.dispatch(updateAttachmentUploadingStateAC(UPLOAD_STATE.FAIL, attachment.tid))
+        })
+        expect(screen.getByRole('button', { name: 'Retry upload' })).toBeVisible()
+        expect(screen.queryByRole('button', { name: 'Stop upload' })).not.toBeInTheDocument()
+        expect(screen.queryByRole('button', { name: 'Download file' })).not.toBeInTheDocument()
+        expect(screen.queryByTestId('circular-progress')).not.toBeInTheDocument()
+        if (type === attachmentTypes.video) {
+          expect(screen.getByTestId('video-preview')).toHaveAttribute('data-uploading', 'true')
+        }
+
+        fireEvent.click(getTile(container))
+        expect(openMedia).not.toHaveBeenCalled()
+      })
+
+      it('retries through the same message resend flow as the failed-send icon', () => {
+        const message = makePendingMessage({
+          tid: 'pending-media-message',
+          channelId: 'media-channel',
+          state: MESSAGE_STATUS.FAILED,
+          attachments: [attachment]
+        })
+        addMessageToMap(message.channelId, message)
+        setPendingAttachment(attachment.tid, { channelId: message.channelId, messageTid: message.tid })
+        const store = createMessageListStore({
+          UserReducer: { connectionStatus: CONNECTION_STATUS.CONNECTED },
+          MessageReducer: { attachmentsUploadingState: { [attachment.tid]: UPLOAD_STATE.FAIL } }
+        })
+        const dispatch = jest.spyOn(store, 'dispatch')
+        const openMedia = jest.fn()
+        renderWithSceytProvider(
+          <Attachment attachment={attachment} backgroundColor='#ffffff' handleMediaItemClick={openMedia} />,
+          { store }
+        )
+
+        fireEvent.click(screen.getByRole('button', { name: 'Retry upload' }))
+
+        expect(dispatch).toHaveBeenCalledTimes(1)
+        expect(dispatch).toHaveBeenCalledWith(resendMessageAC(message, message.channelId, CONNECTION_STATUS.CONNECTED))
+        expect(openMedia).not.toHaveBeenCalled()
+      })
+
+      it('restores normal controls as the failed upload retries and succeeds', () => {
+        const openMedia = jest.fn()
+        const { store, container } = renderAttachment(
+          { attachmentsUploadingState: { [attachment.tid]: UPLOAD_STATE.FAIL } },
+          { attachment, handleMediaItemClick: openMedia }
+        )
+        expect(screen.getByRole('button', { name: 'Retry upload' })).toBeVisible()
+
+        act(() => {
+          store.dispatch(updateAttachmentUploadingStateAC(UPLOAD_STATE.UPLOADING, attachment.tid))
+        })
+        expect(screen.queryByRole('button', { name: 'Retry upload' })).not.toBeInTheDocument()
+        expect(screen.getByRole('button', { name: 'Stop upload' })).toBeVisible()
+
+        act(() => {
+          store.dispatch(updateAttachmentUploadingStateAC(UPLOAD_STATE.SUCCESS, attachment.tid))
+        })
+        expect(screen.queryByRole('button', { name: 'Stop upload' })).not.toBeInTheDocument()
+        if (type === attachmentTypes.file) {
+          expect(screen.getByLabelText('Download file')).toBeInTheDocument()
+        } else {
+          if (type === attachmentTypes.video) {
+            expect(screen.getByTestId('video-preview')).toHaveAttribute('data-uploading', 'false')
+          }
+          fireEvent.click(getTile(container))
+          expect(openMedia).toHaveBeenCalledWith(attachment)
+        }
+      })
+    }
+  )
+
+  describe('the upload progress of a video sent again (after a lost connection)', () => {
+    // The first render, before any effect runs: what the message shows the moment it is drawn.
+    const firstRender = (messageState: Record<string, any>) =>
+      renderToString(
+        <Provider
+          context={SceytReduxContext}
+          store={createMessageListStore({
+            UserReducer: { connectionStatus: CONNECTION_STATUS.CONNECTED },
+            MessageReducer: messageState
+          })}
+        >
+          <Attachment attachment={videoAttachment as any} backgroundColor='#ffffff' videoAttachmentMaxWidth={420} />
+        </Provider>
+      )
+    const stored = { 'video-attachment-tid': { uploaded: 4_000_000, total: 10_000_000, progress: 0.4 } }
+
+    it('shows what was uploaded, not 0, when the message is drawn again', () => {
+      const html = firstRender({
+        attachmentsUploadingState: { 'video-attachment-tid': 'uploading' },
+        attachmentsUploadingProgress: stored
+      })
+
+      expect(html).toContain('4 MB')
+      expect(html).not.toContain('0 Bytes')
+    })
+
+    it('shows what was uploaded, not 0, while the video is prepared again', () => {
+      const html = firstRender({
+        attachmentsUploadingState: { 'video-attachment-tid': 'preparing' },
+        attachmentsUploadingProgress: stored
+      })
+
+      expect(html).toContain('4 MB')
+      expect(html).not.toContain('0 Bytes')
+    })
+
+    it('a video prepared for the first time shows no progress yet', () => {
+      const html = firstRender({ attachmentsUploadingState: { 'video-attachment-tid': 'preparing' } })
+
+      expect(html).toContain('0 Bytes')
+    })
+  })
+
+  it('the upload control is named after what a click does', async () => {
+    const uploading = renderAttachment({ attachmentsUploadingState: { 'video-attachment-tid': 'uploading' } })
+    await flushAttachmentEffects()
+    expect(screen.getByRole('button', { name: 'Stop upload' })).toBeTruthy()
+    uploading.unmount()
+
+    renderAttachment({ attachmentsUploadingState: { 'video-attachment-tid': 'paused' } })
+    await flushAttachmentEffects()
+    expect(screen.getByRole('button', { name: 'Resume upload' })).toBeTruthy()
+  })
+
+  it('shows an encrypted video only after decrypting it with the key in its metadata', async () => {
+    installFakeFilesClient()
+    mockGetAttachmentUrlFromCache.mockResolvedValue(false)
+    // The built-in transport downloads the stored (encrypted) file and decrypts it.
+    const { download } = setRecordingDefaultTransport()
+    const originalFetch = global.fetch
+    global.fetch = jest.fn(async () => ({ ok: true, blob: async () => fakeEncrypted('key-9', 'movie') })) as any
+    const shown: Blob[] = []
+    const originalCreateObjectURL = URL.createObjectURL
+    URL.createObjectURL = jest.fn((blob: Blob) => {
+      shown.push(blob)
+      return 'blob:decrypted-video'
+    })
+    const encryptedVideo = {
+      ...videoAttachment,
+      // The size in the message: the decrypted file must have it.
+      size: 'movie'.length,
+      metadata: JSON.stringify({
+        ...JSON.parse(videoAttachment.metadata),
+        'sceyt.enc': fakeEncryption('key-9')
+      })
+    }
+    try {
+      renderAttachment({}, { attachment: encryptedVideo })
+      for (let i = 0; i < 10 && !shown.length; i++) {
+        await flushAttachmentEffects()
+      }
+
+      const videoRequest = download.mock.calls.find(([request]) => request.url === 'https://cdn/video.mp4')
+      expect(videoRequest && asked(videoRequest)).toEqual(askedFor('https://cdn/video.mp4'))
+      // The key and attachment id in the video's metadata, and its trusted size.
+      expect(videoRequest![0].encryptionInfo).toEqual(fakeEncryptionInfo('key-9'))
+      expect(videoRequest![0].plaintextSize).toBe('movie'.length)
+      expect(shown).toHaveLength(1)
+      expect(shown[0].type).toBe('video/mp4')
+      expect(await readBlobText(shown[0])).toBe('movie')
+    } finally {
+      URL.createObjectURL = originalCreateObjectURL
+      global.fetch = originalFetch
+    }
   })
 })
