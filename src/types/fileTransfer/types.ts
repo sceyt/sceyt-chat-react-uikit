@@ -23,6 +23,8 @@ export interface FileTransferContext {}
 export interface AttachmentTransferContext extends FileTransferContext {
   attachment: IAttachment
   isSharedUpload: boolean
+  /** A download's: the type of the attachment's message (an app may store its own types' files elsewhere). */
+  messageType?: string | null
 }
 
 export enum FileUploadType {

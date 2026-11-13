@@ -935,6 +935,8 @@ export const UploadProgress = styled.div<{
   zIndex?: number
   borderColor: string
   isPreview?: boolean
+  // Fills the box behind its icon (backgroundColor colors only the border).
+  fillColor?: string
 }>`
   position: ${(props) => !props.positionStatic && 'absolute'};
   top: ${(props) => (props.fileAttachment ? '8px' : '0')};
@@ -949,6 +951,7 @@ export const UploadProgress = styled.div<{
   background-clip: border-area;
   background-size: cover;
   background-position: center;
+  ${(props) => props.fillColor && `background: ${props.fillColor};`}
   border-radius: ${(props) =>
     props.fileAttachment ? '8px' : props.borderRadius ? props.borderRadius : props.isRepliedMessage ? '4px' : '8px'};
   z-index: ${(props) => props.zIndex || 5};

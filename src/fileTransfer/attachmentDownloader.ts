@@ -34,12 +34,13 @@ export const getAttachmentDownloader =
     type: string = '',
     plaintextSize: number | string | undefined = attachment.size
   ): AttachmentDownloader =>
-  (url, _asFile, progress) => {
+  (url, _asFile, progress, messageType) => {
     const executor = attachmentTransferRouter.download(attachment, {
       url,
       mimeType: type,
       encryptionInfo,
-      plaintextSize
+      plaintextSize,
+      messageType
     })
     // Percent to bytes of the file; a file of unknown size is counted out of 100.
     const total = Number(plaintextSize) || 100

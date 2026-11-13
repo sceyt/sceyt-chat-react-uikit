@@ -73,6 +73,7 @@ import JoinGroupPopup from 'common/popups/inviteLink/JoinGroupPopup'
 import { CONNECTION_STATUS } from 'store/user/constants'
 import ActionRestrictedPopup from 'common/popups/actionRestrictedPopup'
 import UnavailableInviteKeyPopup from 'common/popups/unavailableInviteKeyPopup'
+import FileTransferFailedPopup from 'common/popups/fileTransferFailed'
 import { cleanupOldAttachmentCache } from '../../helpers/attachmentsCache'
 
 const SceytChat = ({
@@ -425,6 +426,7 @@ const SceytChat = ({
             />
           )}
           {!channelInviteKeyAvailable && <UnavailableInviteKeyPopup />}
+          <FileTransferFailedPopup />
         </ChatContainer>
       ) : (
         ''

@@ -9,7 +9,7 @@ import { ReactComponent as ForwardIcon } from '../../../assets/svg/forward.svg'
 import { ReactComponent as ViewOnceIcon } from '../../../assets/svg/view-once.svg'
 import { ReactComponent as ViewOnceIconOpen } from '../../../assets/svg/view-once-open.svg'
 // Helpers
-import { calculateRenderedImageWidth } from 'helpers'
+import { calculateRenderedImageWidth, getMediaSize } from 'helpers'
 import { isJSON } from 'helpers/message'
 import { withVideoPreviews } from 'helpers/videoPreview'
 import { getClient } from 'common/client'
@@ -653,12 +653,10 @@ const MessageBody = ({
       attachmentWidth={
         withAttachments
           ? mediaAttachment
-            ? (attachmentMetas &&
-                getSendAttachmentsAsSeparateMessages() &&
-                attachmentMetas.szw &&
+            ? (getSendAttachmentsAsSeparateMessages() &&
                 calculateRenderedImageWidth(
-                  attachmentMetas.szw,
-                  attachmentMetas.szh,
+                  getMediaSize(attachmentMetas).szw,
+                  getMediaSize(attachmentMetas).szh,
 
                   mediaAttachment.type === attachmentTypes.image ? imageAttachmentMaxWidth : videoAttachmentMaxWidth,
                   mediaAttachment.type === attachmentTypes.image ? imageAttachmentMaxHeight : videoAttachmentMaxHeight

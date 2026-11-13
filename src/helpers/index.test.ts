@@ -10,7 +10,9 @@ import {
   formatDisappearingMessageTime,
   detectOS,
   detectBrowser,
-  calculateRenderedImageWidth
+  calculateRenderedImageWidth,
+  DEFAULT_MEDIA_SIZE,
+  getMediaSize
 } from './index'
 
 describe('bytesToSize (index.tsx)', () => {
@@ -360,5 +362,18 @@ describe('calculateRenderedImageWidth', () => {
     expect(width).toBeLessThanOrEqual(200)
     // Note: The function adds +2 to height for padding, so 202 is expected
     expect(height).toBeLessThanOrEqual(202)
+  })
+})
+
+describe('getMediaSize', () => {
+  it('is the size the metadata gives', () => {
+    expect(getMediaSize({ szw: 1280, szh: 720 })).toEqual({ szw: 1280, szh: 720 })
+    expect(getMediaSize({ szw: '640', szh: '480' })).toEqual({ szw: 640, szh: 480 })
+  })
+
+  it('is the default size when the metadata has none (a message a server sent)', () => {
+    expect(getMediaSize({})).toEqual(DEFAULT_MEDIA_SIZE)
+    expect(getMediaSize(undefined)).toEqual(DEFAULT_MEDIA_SIZE)
+    expect(getMediaSize({ szw: 1280 })).toEqual(DEFAULT_MEDIA_SIZE)
   })
 })

@@ -471,7 +471,9 @@ const SliderPopup: React.FC<IProps> = ({
                 kind,
                 messageType,
                 size: Number(currentFileSize) || 0,
-                ...attachmentDecryption(currentFile)
+                ...attachmentDecryption(currentFile),
+                // The user opened it: a failure shows the "Download failed" popup.
+                showsFailure: true
               })
                 .then(({ objectUrl }) => {
                   if (cancelled) return

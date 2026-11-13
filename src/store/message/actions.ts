@@ -114,9 +114,10 @@ import {
   setUnreadMessageId,
   setMessageListGap,
   setStableUnreadAnchor,
+  setFileTransferFailedPopup,
   PendingMessageMutation
 } from './reducers'
-import type { MessageListGap } from './reducers'
+import type { FileTransferFailedPopup, MessageListGap } from './reducers'
 import { PendingPollAction } from 'helpers/messagesHalper'
 import { ATTACHMENT_VERSION } from 'helpers/attachmentsCache'
 import { registerBlobUrl } from 'helpers/attachmentBlobUrls'
@@ -825,6 +826,11 @@ export function setMessageListGapAC(gap: MessageListGap | null) {
 
 export function setStableUnreadAnchorAC(channelId: string, messageId: string) {
   return setStableUnreadAnchor({ channelId, messageId })
+}
+
+/** Shows the "Download failed" or "Upload failed" popup; `null` closes it. */
+export function setFileTransferFailedPopupAC(popup: FileTransferFailedPopup | null) {
+  return setFileTransferFailedPopup({ popup })
 }
 
 export function loadOGMetadataForLinkAC(messages: IMessage[]) {

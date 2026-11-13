@@ -51,6 +51,8 @@ export interface IDownloadSource {
    */
   encryptionInfo?: FileEncryptionInfo
   plaintextSize?: number | string
+  /** The type of the attachment's message, given to the provider (AttachmentTransferContext). */
+  messageType?: string | null
 }
 
 /**
@@ -102,7 +104,11 @@ export const attachmentTransferRouter = {
       const request: FileDownloadRequest = {
         operationId,
         url: source.url,
-        context: { attachment, isSharedUpload: false } as AttachmentTransferContext,
+        context: {
+          attachment,
+          isSharedUpload: false,
+          ...(source.messageType ? { messageType: source.messageType } : {})
+        } as AttachmentTransferContext,
         metadata: metadataOf(attachment.metadata),
         mimeType: source.mimeType,
         ...(source.encryptionInfo

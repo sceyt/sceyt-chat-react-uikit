@@ -3,6 +3,11 @@ import FileSaver from 'file-saver'
 import moment from 'moment'
 import { cancelDownloadRequest, getAttachmentDownloader } from '../fileTransfer/attachmentDownloader'
 import { getAttachmentEncryption, getTypeFromFileName } from './attachmentEncryption'
+import {
+  createConnectionLostDownloadError,
+  isNetworkOffline,
+  showFileTransferFailedPopup
+} from './fileTransferFailedPopup'
 import log from 'loglevel'
 
 // eslint-disable-next-line
@@ -40,6 +45,8 @@ export const systemMessageUserName = (userId: string, contact?: IContact, mentio
 }
 
 const filesPromisesOnDownload: { [key: string]: any } = {}
+// Downloads the user cancelled: their failure is the cancel's, not shown.
+const cancelledFileDownloads = new WeakSet<Promise<any>>()
 
 export const setDownloadFilePromise = (attachmentId: string, promise: any) => {
   filesPromisesOnDownload[attachmentId] = promise
@@ -53,12 +60,15 @@ export const downloadFile = async (
   progressCallback?: (progress: { loaded: number; total: number }) => void,
   messageType?: string | null | undefined
 ) => {
+  let request: Promise<any> | undefined
   try {
+    // With the browser offline the file is not tried: the user is told at once.
+    if (isNetworkOffline()) throw createConnectionLostDownloadError()
     const encryption = getAttachmentEncryption(attachment.metadata)
     const type = getTypeFromFileName(attachment.name)
     // Downloads through fileTransfer.provider; an encrypted file comes back decrypted.
     const downloader = getAttachmentDownloader(attachment, encryption, type)
-    const request = downloader(
+    request = downloader(
       attachment.url,
       download,
       (progress) => {
@@ -77,6 +87,8 @@ export const downloadFile = async (
     delete filesPromisesOnDownload[attachment.id!]
   } catch (e) {
     log.error('error on download... ', e)
+    if (filesPromisesOnDownload[attachment.id!] === request) delete filesPromisesOnDownload[attachment.id!]
+    if (!(request && cancelledFileDownloads.delete(request))) showFileTransferFailedPopup('download')
     if (done) {
       done(attachment.id || '', true)
     }
@@ -86,9 +98,17 @@ export const downloadFile = async (
 export const cancelDownloadFile = (attachmentId: string) => {
   const promise = filesPromisesOnDownload[attachmentId]
   if (promise) {
+    cancelledFileDownloads.add(promise)
     cancelDownloadRequest(promise)
   }
 }
+
+// An image or video whose metadata has no size (e.g. one a server sent) shows at this size.
+export const DEFAULT_MEDIA_SIZE = { szw: 400, szh: 400 }
+
+/** The image's or video's size from its parsed metadata: `szw` and `szh`, or DEFAULT_MEDIA_SIZE. */
+export const getMediaSize = (metadata: any): { szw: number; szh: number } =>
+  metadata?.szw && metadata?.szh ? { szw: Number(metadata.szw), szh: Number(metadata.szh) } : DEFAULT_MEDIA_SIZE
 
 export const calculateRenderedImageWidth = (width: number, height: number, maxWidth?: number, maxHeight?: number) => {
   const maxWdt = maxWidth || 400

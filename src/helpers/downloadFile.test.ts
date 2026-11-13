@@ -1,6 +1,8 @@
 import FileSaver from 'file-saver'
 import { cancelDownloadFile, downloadFile } from './index'
+import { showFileTransferFailedPopup } from './fileTransferFailedPopup'
 import { fileTransfer } from '../fileTransfer/sceytChatUIKitFileTransfer'
+import { setClient } from '../common/client'
 import { readDecryptedFile } from '../fileTransfer/defaults/defaultFileTransferProvider'
 import { FileDownloadRequest, FileTransferResult } from '../types/fileTransfer/types'
 import {
@@ -16,7 +18,15 @@ jest.mock('file-saver', () => ({
   default: { saveAs: jest.fn() }
 }))
 
+jest.mock('./fileTransferFailedPopup', () => ({
+  showFileTransferFailedPopup: jest.fn(),
+  createConnectionLostDownloadError: () =>
+    Object.assign(new Error('The connection is lost'), { name: 'ConnectionLost' }),
+  isNetworkOffline: () => navigator.onLine === false
+}))
+
 const mockSaveAs = FileSaver.saveAs as jest.Mock
+const mockShowPopup = showFileTransferFailedPopup as jest.Mock
 
 /** Sets a custom transport (fileTransfer.provider) whose download is `download`. */
 const useTransport = (
@@ -118,7 +128,78 @@ describe('downloadFile with a custom transport', () => {
     })
     expect((request.context as any).attachment === attachment).toBe(true)
     expect((request.context as any).attachment.messageId).toBe('9223372036854775807')
+    expect((request.context as any).messageType).toBe('text')
     expect(mockSaveAs).toHaveBeenCalledWith(expect.any(Blob), 'file.pdf')
+  })
+
+  describe('the "Download failed" popup', () => {
+    const attachment = { id: 'gone-id', url: 'https://cdn/gone.pdf', name: 'gone.pdf' } as any
+
+    afterEach(() => {
+      jest.restoreAllMocks()
+    })
+
+    it('a file that is unavailable shows it; nothing is saved and the download ends as failed', async () => {
+      useTransport(async () =>
+        FileTransferResult.failure(Object.assign(new Error('Download failed with status 404'), { status: 404 }))
+      )
+      const done = jest.fn()
+
+      await downloadFile(attachment, true, done)
+
+      expect(mockShowPopup).toHaveBeenCalledTimes(1)
+      expect(mockShowPopup).toHaveBeenCalledWith('download')
+      expect(mockSaveAs).not.toHaveBeenCalled()
+      expect(done).toHaveBeenCalledWith('gone-id', true)
+    })
+
+    it('a download the user cancels does not show it', async () => {
+      useTransport(
+        (request) =>
+          new Promise((resolve) =>
+            request.signal.addEventListener('abort', () =>
+              resolve(FileTransferResult.interrupted(new Error('DOWNLOAD_CANCELLED')))
+            )
+          )
+      )
+      const done = jest.fn()
+
+      const download = downloadFile(attachment, true, done)
+      cancelDownloadFile('gone-id')
+      await download
+
+      expect(done).toHaveBeenCalledWith('gone-id', true)
+      expect(mockShowPopup).not.toHaveBeenCalled()
+    })
+
+    it('while the chat reconnects (the browser online) the file is downloaded and saved, with no popup', async () => {
+      setClient({ connectionState: 'Reconnecting' })
+      useTransport(async () => FileTransferResult.success(new Blob(['file'])))
+      const done = jest.fn()
+
+      try {
+        await downloadFile(attachment, true, done)
+      } finally {
+        setClient(undefined)
+      }
+
+      expect(mockSaveAs).toHaveBeenCalledWith(expect.any(Blob), 'gone.pdf')
+      expect(done).toHaveBeenCalledWith('gone-id')
+      expect(mockShowPopup).not.toHaveBeenCalled()
+    })
+
+    it('with the connection lost the file is not downloaded, and it shows at once', async () => {
+      jest.spyOn(navigator, 'onLine', 'get').mockReturnValue(false)
+      const transport = useTransport(async () => FileTransferResult.success(new Blob(['file'])))
+      const done = jest.fn()
+
+      await downloadFile(attachment, true, done)
+
+      expect(transport.download).not.toHaveBeenCalled()
+      expect(mockShowPopup).toHaveBeenCalledWith('download')
+      expect(mockSaveAs).not.toHaveBeenCalled()
+      expect(done).toHaveBeenCalledWith('gone-id', true)
+    })
   })
 })
 

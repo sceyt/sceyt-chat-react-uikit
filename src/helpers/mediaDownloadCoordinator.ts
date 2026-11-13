@@ -6,6 +6,11 @@ import { TransferExecutor } from '../fileTransfer/transferExecutor'
 import { getAttachmentURLWithVersion, getAttachmentUrlFromCache, setAttachmentToCache } from './attachmentsCache'
 import { registerBlobUrl } from './attachmentBlobUrls'
 import { ensurePlayableVideoBlob } from './videoConversion'
+import {
+  createConnectionLostDownloadError,
+  isNetworkOffline,
+  showFileTransferFailedPopup
+} from './fileTransferFailedPopup'
 
 export type MediaDownloadKind = 'original-image' | 'original-video' | 'video-thumbnail' | 'voice' | 'file'
 
@@ -26,6 +31,11 @@ export interface MediaDownloadRequest {
   contentType?: string
   /** The user asked to try again: a file that could not be opened before is downloaded again. */
   retry?: boolean
+  /**
+   * The user started it (a tap): a failure shows the "Download failed" popup, and with the
+   * browser offline it fails at once. A download started by itself only shows as failed.
+   */
+  showsFailure?: boolean
 }
 
 export interface MediaDownloadSnapshot {
@@ -47,6 +57,8 @@ interface MediaDownloadJob {
   transfer?: TransferExecutor<Blob>
   cacheKeys: Set<string>
   cancelled?: boolean
+  // A request of the user's joined it: its failure shows the popup.
+  showsFailure?: boolean
 }
 
 const idleSnapshot: MediaDownloadSnapshot = { state: 'idle', loaded: 0, total: 0, progress: 0 }
@@ -117,7 +129,8 @@ const download = async (request: MediaDownloadRequest, job: MediaDownloadJob): P
       url: request.url,
       mimeType: request.contentType,
       encryptionInfo: request.encryption,
-      plaintextSize: request.kind === 'video-thumbnail' ? undefined : request.attachment.size
+      plaintextSize: request.kind === 'video-thumbnail' ? undefined : request.attachment.size,
+      messageType: request.messageType
     },
     request.key
   )
@@ -160,6 +173,7 @@ const throwIfCancelled = (job: MediaDownloadJob) => {
 export const requestMediaDownload = (request: MediaDownloadRequest): Promise<MediaDownloadResult> => {
   const active = jobs.get(request.key)
   if (active) {
+    if (request.showsFailure) active.showsFailure = true
     active.cacheKeys.add(request.cacheKey)
     request.cacheKeys?.forEach((cacheKey) => active.cacheKeys.add(cacheKey))
     return active.promise
@@ -170,6 +184,7 @@ export const requestMediaDownload = (request: MediaDownloadRequest): Promise<Med
     if (getMediaDownloadSnapshot(request.key).state !== 'failed') {
       setSnapshot(request.key, { state: 'failed', loaded: 0, total: 0, progress: 0 })
     }
+    if (request.showsFailure) showFileTransferFailedPopup('download')
     return Promise.reject(failure.error)
   }
   unopenable.delete(request.key)
@@ -178,7 +193,8 @@ export const requestMediaDownload = (request: MediaDownloadRequest): Promise<Med
     version: (jobVersions.get(request.key) || 0) + 1,
     snapshot: { state: 'loading', loaded: 0, total: request.size || 0, progress: 0 },
     promise: undefined as any,
-    cacheKeys: new Set([request.cacheKey, ...(request.cacheKeys || [])])
+    cacheKeys: new Set([request.cacheKey, ...(request.cacheKeys || [])]),
+    showsFailure: request.showsFailure
   }
   jobVersions.set(request.key, job.version)
   jobs.set(request.key, job)
@@ -197,6 +213,8 @@ export const requestMediaDownload = (request: MediaDownloadRequest): Promise<Med
         : await getCachedMediaResult(request.cacheKey).catch(() => undefined)
       throwIfCancelled(job)
       if (cachedResult) return cachedResult
+      // A tap with the browser offline is not tried: the download would wait or fail later.
+      if (request.showsFailure && isNetworkOffline()) throw createConnectionLostDownloadError()
       if (!showsLoadingAtOnce) setJobSnapshot(request.key, job, job.snapshot)
       return download(request, job)
     })
@@ -228,6 +246,7 @@ export const requestMediaDownload = (request: MediaDownloadRequest): Promise<Med
         total: 0,
         progress: 0
       })
+      if (!cancelled && job.showsFailure) showFileTransferFailedPopup('download')
       throw error
     })
     .finally(() => {

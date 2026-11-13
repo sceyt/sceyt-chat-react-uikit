@@ -10,6 +10,7 @@ import {
   pauseAttachmentUploadingAC,
   resumeAttachmentUploadingAC,
   resendMessageAC,
+  setFileTransferFailedPopupAC,
   setUpdateMessageAttachmentAC,
   updateAttachmentUploadingStateAC,
   updateMessageAC
@@ -28,6 +29,7 @@ import { ReactComponent as DownloadIcon } from '../../assets/svg/download.svg'
 import {
   bytesToSize,
   calculateRenderedImageWidth,
+  getMediaSize,
   cancelDownloadFile,
   downloadFile,
   formatLargeText,
@@ -59,6 +61,7 @@ import { compressAndCacheImage, getVideoFirstFrame } from 'helpers/getVideoFrame
 import { ensurePlayableVideoBlob } from 'helpers/videoConversion'
 import { getVideoAttachmentCacheKeys, getVideoThumb, shouldExtractVideoFirstFrame } from 'helpers/videoPreview'
 import { cancelMediaDownload, requestMediaDownload } from '../../helpers/mediaDownloadCoordinator'
+import { isNetworkOffline } from '../../helpers/fileTransferFailedPopup'
 
 interface AttachmentPops {
   attachment: IAttachment
@@ -141,7 +144,9 @@ const Attachment = ({
     [THEME_COLORS.BORDER]: borderColor,
     [THEME_COLORS.BACKGROUND]: background,
     [THEME_COLORS.INCOMING_MESSAGE_BACKGROUND]: incomingMessageBackground,
-    [THEME_COLORS.OUTGOING_MESSAGE_BACKGROUND]: outgoingMessageBackground
+    [THEME_COLORS.OUTGOING_MESSAGE_BACKGROUND]: outgoingMessageBackground,
+    [THEME_COLORS.INCOMING_MESSAGE_BACKGROUND_X]: incomingMessageBackgroundX,
+    [THEME_COLORS.OUTGOING_MESSAGE_BACKGROUND_X]: outgoingMessageBackgroundX
   } = useColor()
 
   const dispatch = useDispatch()
@@ -229,17 +234,10 @@ const Attachment = ({
     return videoThumb ? store.MessageReducer.attachmentUpdatedMap[getAttachmentURLWithVersion(videoThumb)] : undefined
   })
 
-  const hasRequiredMediaMetadata = useMemo(() => {
-    if (!(attachment.type === attachmentTypes.image || attachment.type === attachmentTypes.video)) {
-      return true
-    }
-
-    return Boolean(attachmentMetadata?.szw && attachmentMetadata?.szh)
-  }, [attachment.type, attachmentMetadata])
-
   const [renderWidth, renderHeight] = useMemo(() => {
-    let attachmentData = null
-    attachmentData = attachmentMetadata
+    const isMedia = attachment.type === attachmentTypes.image || attachment.type === attachmentTypes.video
+    // An image or video without its size in the metadata shows at the default size.
+    const attachmentData = isMedia ? getMediaSize(attachmentMetadata) : attachmentMetadata
 
     return attachmentData && attachmentData.szw && attachmentData.szh
       ? calculateRenderedImageWidth(
@@ -249,7 +247,7 @@ const Attachment = ({
           attachment.type === attachmentTypes.image ? imageAttachmentMaxHeight || 400 : videoAttachmentMaxHeight
         )
       : []
-  }, [attachmentMetadata])
+  }, [attachment.type, attachmentMetadata])
 
   const isInUploadingState =
     attachmentCompilationState[attachment.tid!] &&
@@ -301,10 +299,20 @@ const Attachment = ({
   const isImageDownloading =
     downloadingFile || sharedOriginalImageDownload.state === 'loading' || isOriginalImageRestarting
   const isSharedOriginalImageCancelled = sharedOriginalImageDownload.state === 'cancelled'
+  // A failed download offers Download too, as a video's does: a tap tries it again.
+  const isSharedOriginalImageFailed = sharedOriginalImageDownload.state === 'failed'
+  // An image that failed to show fills its box with its message's second background.
+  const failedImageFill = isSharedOriginalImageFailed
+    ? incoming
+      ? incomingMessageBackgroundX
+      : outgoingMessageBackgroundX
+    : undefined
   const shouldShowImageDownloadRetry =
     !isOriginalImageRestarting &&
     !hasUploadControls &&
-    (isSharedOriginalImageCancelled || (downloadIsCancelled && sharedOriginalImageDownload.state !== 'loading'))
+    (isSharedOriginalImageCancelled ||
+      isSharedOriginalImageFailed ||
+      (downloadIsCancelled && sharedOriginalImageDownload.state !== 'loading'))
   const imageProgress =
     sharedOriginalImageDownload.state === 'loading' ? sharedOriginalImageDownload.progress || 3 : progress
   const imageSizeProgress =
@@ -374,6 +382,12 @@ const Attachment = ({
     e.stopPropagation()
     if (downloadingFile) {
       handleStopStartDownloadFile(attachment)
+    } else if (
+      isNetworkOffline() &&
+      (isUploadFailed || attachmentCompilationState[attachment.tid!] === UPLOAD_STATE.PAUSED)
+    ) {
+      // An upload asked for with the browser offline cannot run: the user is told, and it stays as it is.
+      dispatch(setFileTransferFailedPopupAC('upload'))
     } else if (isUploadFailed) {
       // A failed transfer is no longer paused in the coordinator. Retry its
       // message, preserving the same path used by the failed-send icon.
@@ -551,6 +565,7 @@ const Attachment = ({
       handleCompleteDownload(attachment.id || '', true)
       if (!fileDownloadCancelledRef.current && !isMediaDownloadCancellation(error)) {
         log.error('Error downloading attachment:', error)
+        dispatch(setFileTransferFailedPopupAC('download'))
       }
     }
   }
@@ -717,7 +732,9 @@ const Attachment = ({
       messageType,
       size: Number(attachment.size) || 0,
       ...attachmentDecryption(attachment),
-      retry
+      retry,
+      // The user's tap (not a restart on reconnect): a failure shows the "Download failed" popup.
+      showsFailure: retry
     })
       .then(({ objectUrl }) => {
         if (videoDownloadRequest !== videoDownloadRequestRef.current) return
@@ -758,7 +775,9 @@ const Attachment = ({
       messageType,
       size: Number(attachment.size) || 0,
       ...attachmentDecryption(attachment),
-      retry
+      retry,
+      // The user's tap (not a restart on reconnect): a failure shows the "Download failed" popup.
+      showsFailure: retry
     })
       .then(async ({ objectUrl }) => {
         if (imageDownloadRequest !== imageDownloadRequestRef.current) return
@@ -984,10 +1003,6 @@ const Attachment = ({
     }
   }, [attachmentsUploadProgress])
 
-  if (!hasRequiredMediaMetadata) {
-    return <React.Fragment></React.Fragment>
-  }
-
   return (
     <React.Fragment>
       {viewOnce && attachment.type === attachmentTypes.voice && (
@@ -1033,25 +1048,29 @@ const Attachment = ({
           height={!isPreview && !isRepliedMessage && !isDetailsView ? renderHeight : undefined}
           backgroundColor={incoming ? incomingMessageBackground : outgoingMessageBackground}
         >
-          <AttachmentImg
-            draggable={false}
-            borderRadius={borderRadius}
-            imageMinWidth={imageMinWidth}
-            isPreview={isPreview}
-            isRepliedMessage={isRepliedMessage}
-            withBorder={!isPreview && !isDetailsView}
-            src={previousImageSource || displayedImageSource}
-            fitTheContainer
-            imageMaxHeight={
-              `${renderHeight || 400}px`
-              // attachmentMetadata && (attachmentMetadata.szh > 400 ? '400px' : `${attachmentMetadata.szh}px`)
-            }
-            isDetailsView={isDetailsView}
-            borderColor={incoming ? incomingMessageBackground : outgoingMessageBackground}
-            fetchpriority='high'
-            loading='lazy'
-            decoding='async'
-          />
+          {/* Nothing to show yet (no thumbnail, the file still downloading): an image without a
+              source would show as a broken image. */}
+          {(previousImageSource || displayedImageSource) && (
+            <AttachmentImg
+              draggable={false}
+              borderRadius={borderRadius}
+              imageMinWidth={imageMinWidth}
+              isPreview={isPreview}
+              isRepliedMessage={isRepliedMessage}
+              withBorder={!isPreview && !isDetailsView}
+              src={previousImageSource || displayedImageSource}
+              fitTheContainer
+              imageMaxHeight={
+                `${renderHeight || 400}px`
+                // attachmentMetadata && (attachmentMetadata.szh > 400 ? '400px' : `${attachmentMetadata.szh}px`)
+              }
+              isDetailsView={isDetailsView}
+              borderColor={incoming ? incomingMessageBackground : outgoingMessageBackground}
+              fetchpriority='high'
+              loading='lazy'
+              decoding='async'
+            />
+          )}
           {previousImageSource && displayedImageSource && (
             <AttachmentImg
               key={displayedImageSource}
@@ -1081,6 +1100,7 @@ const Attachment = ({
               withBorder={!isPreview && !isDetailsView}
               borderRadius={borderRadius}
               backgroundColor={backgroundColor && backgroundColor !== 'inherit' ? backgroundColor : overlayBackground2}
+              fillColor={failedImageFill}
               isDetailsView={isDetailsView}
               imageMinWidth={imageMinWidth}
               withPrefix={withPrefix}
@@ -1180,6 +1200,7 @@ const Attachment = ({
               withBorder={!isPreview && !isDetailsView}
               borderRadius={borderRadius}
               backgroundColor={backgroundColor && backgroundColor !== 'inherit' ? backgroundColor : overlayBackground2}
+              fillColor={failedImageFill}
               isDetailsView={isDetailsView}
               imageMinWidth={imageMinWidth}
               withPrefix={withPrefix}

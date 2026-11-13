@@ -28,6 +28,7 @@ import {
   resumeAttachmentUploadingAC,
   resendMessageAC,
   sendMessageAC,
+  setFileTransferFailedPopupAC,
   updateAttachmentUploadingProgressAC,
   updateAttachmentUploadingStateAC,
   updateMessageAC
@@ -493,6 +494,42 @@ describe('attachment upload recovery', () => {
     expect(getPendingMessagesFromMap(channel.id)[0]).toEqual(
       expect.objectContaining({ tid: 'network-error-msg-tid', state: MESSAGE_STATUS.FAILED })
     )
+    // It waits to be sent again: the user is not told it failed.
+    expect(dispatched).not.toContainEqual(setFileTransferFailedPopupAC('upload'))
+  })
+
+  it('a refused upload fails its message with no "Upload failed" popup (only a tap on its upload icon shows it)', async () => {
+    const currentUser = makeUser({ id: 'current-user' })
+    const channel = makeUploaderChannel('channel-upload-refused')
+    uploadBehavior = (call) => call.fail(Object.assign(new Error('Upload failed with status 400'), { status: 400 }))
+    const pendingMessage = makePendingMessage({
+      channelId: channel.id,
+      tid: 'upload-refused-msg-tid',
+      body: 'refused attachment',
+      user: currentUser,
+      attachments: [makeAttachment('upload-refused-file-tid', makeLiveFile())]
+    })
+    setActiveChannelId(channel.id)
+    setChannelInMap(channel)
+    addMessageToMap(channel.id, pendingMessage)
+
+    const dispatched = await runMessageSaga(__messageSagaTestables.sendMessage, {
+      type: RESEND_MESSAGE,
+      payload: {
+        message: pendingMessage,
+        connectionState: CONNECTION_STATUS.CONNECTED,
+        channelId: channel.id,
+        sendAttachmentsAsSeparateMessage: false
+      }
+    })
+
+    expect(dispatched).toEqual(
+      expect.arrayContaining([
+        updateAttachmentUploadingStateAC(UPLOAD_STATE.FAIL, 'upload-refused-file-tid'),
+        updateMessageAC('upload-refused-msg-tid', { state: MESSAGE_STATUS.FAILED })
+      ])
+    )
+    expect(dispatched).not.toContainEqual(setFileTransferFailedPopupAC('upload'))
   })
 
   it('does not start an upload for a pending attachment deleted before its send work resumes', async () => {

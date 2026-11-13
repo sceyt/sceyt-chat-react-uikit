@@ -64,6 +64,8 @@ export type MessageListGap = {
   beforeMessageId: string
 }
 
+export type FileTransferFailedPopup = 'download' | 'upload'
+
 export interface IMessageStore {
   loadingPrevMessagesState: number | null
   loadingNextMessagesState: number | null
@@ -135,6 +137,8 @@ export interface IMessageStore {
   }
   visibleMessagesMap: VisibleMessagesMap
   messageListGap: MessageListGap | null
+  // The "Download failed" / "Upload failed" popup shown, if any.
+  fileTransferFailedPopup: FileTransferFailedPopup | null
 }
 
 const initialState: IMessageStore = {
@@ -195,7 +199,8 @@ const initialState: IMessageStore = {
     messageId: ''
   },
   visibleMessagesMap: {},
-  messageListGap: null
+  messageListGap: null,
+  fileTransferFailedPopup: null
 }
 
 const isPendingMessage = (message: IMessage) => !message.id && !!message.tid
@@ -1064,6 +1069,9 @@ const messageSlice = createSlice({
     },
     setStableUnreadAnchor: (state, action: PayloadAction<{ channelId: string; messageId: string }>) => {
       state.stableUnreadAnchor = action.payload
+    },
+    setFileTransferFailedPopup: (state, action: PayloadAction<{ popup: FileTransferFailedPopup | null }>) => {
+      state.fileTransferFailedPopup = action.payload.popup
     }
   },
   extraReducers: (builder) => {
@@ -1149,7 +1157,8 @@ export const {
   removePendingMessageMutation,
   setUnreadMessageId,
   setStableUnreadAnchor,
-  setMessageListGap
+  setMessageListGap,
+  setFileTransferFailedPopup
 } = messageSlice.actions
 
 // Export reducer

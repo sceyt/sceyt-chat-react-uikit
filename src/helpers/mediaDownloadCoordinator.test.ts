@@ -7,6 +7,7 @@ import {
 } from './mediaDownloadCoordinator'
 import { setClient } from '../common/client'
 import { getAttachmentUrlFromCache, setAttachmentToCache } from './attachmentsCache'
+import { showFileTransferFailedPopup } from './fileTransferFailedPopup'
 import { fileTransfer } from '../fileTransfer/sceytChatUIKitFileTransfer'
 import { FileDownloadRequest, FileTransferCallback, FileTransferResult } from '../types/fileTransfer/types'
 import {
@@ -28,6 +29,13 @@ jest.mock('./attachmentBlobUrls', () => ({
 
 jest.mock('./videoConversion', () => ({
   ensurePlayableVideoBlob: async (blob: Blob) => blob
+}))
+
+jest.mock('./fileTransferFailedPopup', () => ({
+  showFileTransferFailedPopup: jest.fn(),
+  createConnectionLostDownloadError: () =>
+    Object.assign(new Error('The connection is lost'), { name: 'ConnectionLost' }),
+  isNetworkOffline: () => navigator.onLine === false
 }))
 
 type TransportDownload = (
@@ -207,6 +215,21 @@ describe('mediaDownloadCoordinator', () => {
     })
 
     expect((transport.download.mock.calls[0][0].context as any).attachment.messageId).toBe('9223372036854775807')
+  })
+
+  it("gives the transport its message's type (an app may store its own types' files elsewhere)", async () => {
+    const transport = useTransport()
+
+    await requestMediaDownload({
+      key: 'original-video:post-video-key',
+      attachment: attachmentOf('post-video-key'),
+      url: 'post-video-key',
+      cacheKey: 'post-video-key',
+      kind: 'original-video',
+      messageType: 'video_post'
+    })
+
+    expect(transport.download.mock.calls[0][0].context).toMatchObject({ messageType: 'video_post' })
   })
 
   it('asks the transport for a video preview with its video as the attachment', async () => {
@@ -729,5 +752,117 @@ describe('mediaDownloadCoordinator', () => {
     progress(60)
 
     expect(getMediaDownloadSnapshot(key)).toMatchObject({ state: 'cancelled' })
+  })
+
+  describe('the "Download failed" popup', () => {
+    const mockShowPopup = showFileTransferFailedPopup as jest.Mock
+    const fileRequest = (extra: Record<string, unknown> = {}) => ({
+      key: 'file:https://cdn/gone.pdf',
+      attachment: attachmentOf('https://cdn/gone.pdf'),
+      url: 'https://cdn/gone.pdf',
+      cacheKey: 'https://cdn/gone.pdf',
+      kind: 'file' as const,
+      ...extra
+    })
+    const notFound = () => Object.assign(new Error('Download failed with status 404'), { status: 404 })
+
+    afterEach(() => {
+      jest.restoreAllMocks()
+    })
+
+    it('a download the user started that fails shows it, and the file is not marked downloaded', async () => {
+      useTransport(async () => FileTransferResult.failure(notFound()))
+
+      await expect(requestMediaDownload(fileRequest({ showsFailure: true }))).rejects.toThrow('status 404')
+
+      expect(mockShowPopup).toHaveBeenCalledTimes(1)
+      expect(mockShowPopup).toHaveBeenCalledWith('download')
+      expect(getMediaDownloadSnapshot('file:https://cdn/gone.pdf')).toMatchObject({ state: 'failed' })
+      expect(setAttachmentToCache).not.toHaveBeenCalled()
+    })
+
+    it('a download started by itself (a chat scrolled into view) that fails only shows as failed', async () => {
+      useTransport(async () => FileTransferResult.failure(notFound()))
+
+      await expect(requestMediaDownload(fileRequest())).rejects.toThrow('status 404')
+
+      expect(getMediaDownloadSnapshot('file:https://cdn/gone.pdf')).toMatchObject({ state: 'failed' })
+      expect(mockShowPopup).not.toHaveBeenCalled()
+    })
+
+    it('a tap while the download started by itself still runs shows it when the download fails', async () => {
+      const { finish } = usePendingTransport()
+      const started = requestMediaDownload(fileRequest())
+      started.catch(() => undefined)
+      await flushCoordinator()
+
+      const tapped = requestMediaDownload(fileRequest({ showsFailure: true }))
+      finish(FileTransferResult.failure(notFound()))
+
+      await expect(tapped).rejects.toThrow('status 404')
+      expect(mockShowPopup).toHaveBeenCalledTimes(1)
+    })
+
+    it('a download the user cancels does not show it', async () => {
+      useTransport((request) => untilAborted(request))
+      const download = requestMediaDownload(fileRequest({ showsFailure: true }))
+      await flushCoordinator()
+
+      cancelMediaDownload('file:https://cdn/gone.pdf')
+
+      await expect(download).rejects.toMatchObject({ name: 'AbortError' })
+      expect(mockShowPopup).not.toHaveBeenCalled()
+    })
+
+    it('a file that could not be opened before, opened again, shows it without downloading it again', async () => {
+      const transport = useTransport(async () =>
+        FileTransferResult.failure(Object.assign(new Error('Decryption failed'), { type: 'Authentication' }))
+      )
+      await expect(requestMediaDownload(fileRequest())).rejects.toThrow('Decryption failed')
+
+      await expect(requestMediaDownload(fileRequest({ showsFailure: true }))).rejects.toThrow('Decryption failed')
+
+      expect(transport.download).toHaveBeenCalledTimes(1)
+      expect(mockShowPopup).toHaveBeenCalledTimes(1)
+    })
+
+    it('a tap with the connection lost fails at once: nothing is downloaded, and it shows', async () => {
+      jest.spyOn(navigator, 'onLine', 'get').mockReturnValue(false)
+      const transport = useTransport()
+
+      await expect(requestMediaDownload(fileRequest({ showsFailure: true }))).rejects.toMatchObject({
+        name: 'ConnectionLost'
+      })
+
+      expect(transport.download).not.toHaveBeenCalled()
+      expect(mockShowPopup).toHaveBeenCalledWith('download')
+      expect(getMediaDownloadSnapshot('file:https://cdn/gone.pdf')).toMatchObject({ state: 'failed' })
+    })
+
+    it('a tap while the chat reconnects (the browser online) downloads the file: a download needs no chat connection', async () => {
+      setClient({ ...installFakeFilesClient(), connectionState: 'Reconnecting' })
+      const transport = useTransport()
+
+      await expect(requestMediaDownload(fileRequest({ showsFailure: true }))).resolves.toMatchObject({
+        objectUrl: 'blob:shared-media'
+      })
+
+      expect(transport.download).toHaveBeenCalledTimes(1)
+      expect(mockShowPopup).not.toHaveBeenCalled()
+    })
+
+    it('a file in the browser cache tapped with the connection lost is shown, with no popup', async () => {
+      jest.spyOn(navigator, 'onLine', 'get').mockReturnValue(false)
+      const transport = useTransport()
+      mockGetAttachmentUrlFromCache.mockResolvedValue('blob:cached-file')
+      global.fetch = jest.fn().mockResolvedValue({ ok: true, blob: async () => new Blob(['cached']) }) as any
+
+      await expect(requestMediaDownload(fileRequest({ showsFailure: true }))).resolves.toMatchObject({
+        objectUrl: 'blob:cached-file'
+      })
+
+      expect(transport.download).not.toHaveBeenCalled()
+      expect(mockShowPopup).not.toHaveBeenCalled()
+    })
   })
 })

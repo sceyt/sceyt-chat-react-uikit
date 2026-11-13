@@ -95,14 +95,20 @@ jest.mock('../../hooks', () => {
       [THEME_COLORS.BORDER]: '#dddddd',
       [THEME_COLORS.BACKGROUND]: '#ffffff',
       [THEME_COLORS.INCOMING_MESSAGE_BACKGROUND]: '#f1f1f1',
-      [THEME_COLORS.OUTGOING_MESSAGE_BACKGROUND]: '#dcf8c6'
+      [THEME_COLORS.OUTGOING_MESSAGE_BACKGROUND]: '#dcf8c6',
+      [THEME_COLORS.INCOMING_MESSAGE_BACKGROUND_X]: '#e1e1e1',
+      [THEME_COLORS.OUTGOING_MESSAGE_BACKGROUND_X]: '#c5eab0'
     })
   }
 })
 
 jest.mock('../../UIHelper', () => ({
   AttachmentIconCont: ({ children }: any) => <div>{children}</div>,
-  UploadProgress: ({ children }: any) => <div data-testid='video-download-progress'>{children}</div>,
+  UploadProgress: ({ children, fillColor }: any) => (
+    <div data-testid='video-download-progress' data-fill={fillColor}>
+      {children}
+    </div>
+  ),
   UploadPercent: ({ children }: any) => <div>{children}</div>,
   CancelResumeWrapper: ({ children, onClick, ...props }: any) => (
     <button type='button' onClick={onClick} {...props}>
@@ -1066,6 +1072,90 @@ describe('a failed download is not shown as downloaded', () => {
     expect(transport.cancel).toHaveBeenCalledWith('download:file-attachment-tid')
     expect(screen.queryByLabelText('Download failed, retry')).not.toBeInTheDocument()
   })
+
+  it('an image whose metadata has no size (a message a server sent) shows, and its failed download offers Download', async () => {
+    mockGetAttachmentUrlFromCache.mockResolvedValue(false)
+    download.mockResolvedValue(forbidden())
+    const sizelessImage = {
+      ...videoAttachment,
+      id: 'sizeless-image-id',
+      tid: undefined,
+      name: 'Uk Poster',
+      type: attachmentTypes.image,
+      url: 'ott-msg-sizeless',
+      size: '0',
+      metadata: '{}',
+      upload: false,
+      data: undefined
+    }
+
+    renderMediaAttachment(sizelessImage)
+    await flushAttachmentEffects()
+    await flushAttachmentEffects()
+
+    expect(download).toHaveBeenCalledTimes(1)
+    expect(screen.getByLabelText('Download image')).toBeVisible()
+  })
+
+  it('an image without a thumbnail shows no broken image while its file downloads', async () => {
+    mockGetAttachmentUrlFromCache.mockResolvedValue(false)
+    const sizelessImage = {
+      ...videoAttachment,
+      id: 'downloading-image-id',
+      tid: undefined,
+      type: attachmentTypes.image,
+      url: 'ott-msg-downloading',
+      metadata: '{}',
+      upload: false,
+      data: undefined
+    }
+
+    const { container } = renderMediaAttachment(sizelessImage)
+    await flushAttachmentEffects()
+
+    expect(download).toHaveBeenCalledTimes(1)
+    // An image without a source would show as a broken image.
+    expect(container.querySelectorAll('img')).toHaveLength(0)
+  })
+
+  it.each([
+    [true, '#e1e1e1'],
+    [false, '#c5eab0']
+  ])(
+    'an image that failed to show (incoming: %s) fills its box with the message background X',
+    async (incoming, color) => {
+      mockGetAttachmentUrlFromCache.mockResolvedValue(false)
+      download.mockResolvedValue(forbidden())
+      const image = {
+        ...videoAttachment,
+        id: 'failed-image-id',
+        tid: undefined,
+        type: attachmentTypes.image,
+        url: 'https://cdn/failed-image.jpg',
+        metadata: JSON.stringify({ szw: 800, szh: 600 }),
+        upload: false,
+        data: undefined
+      }
+
+      renderWithSceytProvider(
+        <Attachment
+          attachment={image as any}
+          backgroundColor='#ffffff'
+          imageAttachmentMaxWidth={420}
+          incoming={incoming}
+        />,
+        {
+          store: createMessageListStore({ UserReducer: { connectionStatus: CONNECTION_STATUS.CONNECTED } })
+        }
+      )
+      await flushAttachmentEffects()
+      await flushAttachmentEffects()
+
+      expect(screen.getByLabelText('Download image')).toBeVisible()
+      const boxes = screen.getAllByTestId('video-download-progress')
+      expect(boxes.map((box) => box.getAttribute('data-fill'))).toEqual(boxes.map(() => color))
+    }
+  )
 })
 
 describe('a failed video or image download starts again when the chat reconnects', () => {
