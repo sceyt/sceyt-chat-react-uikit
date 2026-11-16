@@ -103,7 +103,7 @@ jest.mock('../../hooks', () => {
 })
 
 jest.mock('../../UIHelper', () => ({
-  AttachmentIconCont: ({ children }: any) => <div>{children}</div>,
+  AttachmentIconCont: ({ children }: any) => <div data-testid='file-icon'>{children}</div>,
   UploadProgress: ({ children, fillColor }: any) => (
     <div data-testid='video-download-progress' data-fill={fillColor}>
       {children}
@@ -1034,6 +1034,8 @@ describe('a failed download is not shown as downloaded', () => {
 
     const retry = screen.getByLabelText('Download failed, retry')
     expect(retry).toBeVisible()
+    // The retry control takes the file icon's place: one icon, not two side by side.
+    expect(screen.queryByTestId('file-icon')).not.toBeInTheDocument()
     expect(mockSaveAs).not.toHaveBeenCalled()
 
     fireEvent.click(retry)
@@ -1047,6 +1049,7 @@ describe('a failed download is not shown as downloaded', () => {
     expect(download).toHaveBeenCalledTimes(2)
     expect(mockSaveAs).toHaveBeenCalledWith(expect.any(Blob), 'report.pdf')
     expect(screen.getByLabelText('Download file')).not.toBeVisible()
+    expect(screen.getByTestId('file-icon')).toBeInTheDocument()
   })
 
   it('a file download the user cancels is not shown as failed', async () => {

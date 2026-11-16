@@ -234,6 +234,10 @@ const Attachment = ({
     return videoThumb ? store.MessageReducer.attachmentUpdatedMap[getAttachmentURLWithVersion(videoThumb)] : undefined
   })
 
+  // A failed file download shows its retry control until it is tried again, in the file icon's
+  // place (as on hover), not beside it.
+  const showsFileDownloadRetry = fileDownloadFailed && !downloadingFile
+
   const [renderWidth, renderHeight] = useMemo(() => {
     const isMedia = attachment.type === attachmentTypes.image || attachment.type === attachmentTypes.video
     // An image or video without its size in the metadata shows at the default size.
@@ -1432,7 +1436,7 @@ const Attachment = ({
               decoding='async'
               fetchpriority='high'
             />
-          ) : (
+          ) : showsFileDownloadRetry ? null : (
             // <FileThumbnail src={base64ToDataURL(attachmentMetadata.tmb)} />
             <AttachmentIconCont backgroundColor={accentColor} className='icon-warpper'>
               {previewFileType && previewFileType === attachmentTypes.video ? (
@@ -1467,7 +1471,7 @@ const Attachment = ({
               role='button'
               aria-label={fileDownloadFailed ? 'Download failed, retry' : 'Download file'}
               // Shown on hover only, except after a failed download.
-              visible={fileDownloadFailed && !downloadingFile}
+              visible={showsFileDownloadRetry}
               widthThumb={!!attachmentThumb}
               backgroundColor={attachmentThumb ? overlayBackground2 : accentColor}
               onClick={() => handleStopStartDownloadFile(attachment)}

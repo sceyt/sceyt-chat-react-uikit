@@ -3,6 +3,7 @@ import { checkArraysEqual } from '../index'
 import { attachmentTypes, MESSAGE_DELIVERY_STATUS, MESSAGE_STATUS } from '../constants'
 import { cancelUpload } from '../../fileTransfer/attachmentUploadCoordinator'
 import type { FileTransferEntries } from '../../types/fileTransfer/types'
+import type { FileEncryptionInfo } from '../../fileTransfer/encryption/types'
 import { releaseBlobUrls } from '../attachmentBlobUrls'
 import { clearVideoPreparation } from '../attachmentPreparation'
 import { handleVoteDetails } from '../message'
@@ -335,6 +336,9 @@ type PendingAttachment = {
   videoPreviewAttachment?: { url: string; name: string; size: number; metadata: string }
   // What the provider's prepareUpload returned for the attachment: the next attempt's metadata keeps it.
   preparedEntries?: FileTransferEntries
+  // The file, once stored: when only the message's send failed after it (e.g. the chat was
+  // disconnected), the next send uses it instead of uploading the file again.
+  uploadedFile?: { file: Blob; url: string; metadata: IAttachment['metadata']; encryption?: FileEncryptionInfo }
 }
 
 const pendingAttachments: { [key: string]: PendingAttachment } = {}

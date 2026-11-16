@@ -1053,13 +1053,28 @@ describe('attachment upload progress', () => {
       // The message was sent again: its upload reports from the start.
       updateUploadProgress({ attachmentId: 'video', uploaded: 1 * MB, total: 10 * MB })
     )
-    expect(progressOf(state, 'video')).toEqual({ uploaded: 4 * MB, total: 10 * MB, progress: 0.4 })
+    expect(progressOf(state, 'video')).toMatchObject({ uploaded: 4 * MB, total: 10 * MB, progress: 0.4 })
 
     const passed = MessageReducer(
       state,
       updateUploadProgress({ attachmentId: 'video', uploaded: 5 * MB, total: 10 * MB })
     )
     expect(progressOf(passed, 'video')).toEqual({ uploaded: 5 * MB, total: 10 * MB, progress: 0.5 })
+  })
+
+  it('while held, what the upload reports is kept (it goes on), and dropped once it passes what was shown', () => {
+    const held = after(
+      updateUploadProgress({ attachmentId: 'video', uploaded: 4 * MB, total: 10 * MB }),
+      updateUploadProgress({ attachmentId: 'video', uploaded: 1 * MB, total: 10 * MB }),
+      updateUploadProgress({ attachmentId: 'video', uploaded: 2 * MB, total: 10 * MB })
+    )
+    expect(progressOf(held, 'video')).toEqual({ uploaded: 4 * MB, total: 10 * MB, progress: 0.4, reported: 2 * MB })
+
+    const passed = MessageReducer(
+      held,
+      updateUploadProgress({ attachmentId: 'video', uploaded: 5 * MB, total: 10 * MB })
+    )
+    expect(progressOf(passed, 'video')).toStrictEqual({ uploaded: 5 * MB, total: 10 * MB, progress: 0.5 })
   })
 
   it('starts again for a file of another size', () => {

@@ -4,7 +4,7 @@ import Attachment from './index'
 import { attachmentTypes, UPLOAD_STATE } from '../../helpers/constants'
 import { CONNECTION_STATUS } from '../../store/user/constants'
 import { setConnectionStatusAC } from '../../store/user/actions'
-import { updateAttachmentUploadingStateAC } from '../../store/message/actions'
+import { updateAttachmentUploadingProgressAC, updateAttachmentUploadingStateAC } from '../../store/message/actions'
 import { createMessageListStore, renderWithSceytProvider } from '../../testUtils/messageListHarness'
 
 // The 20 s timer that fails an upload which made no progress after a reconnect.
@@ -55,10 +55,13 @@ const attachment = {
 }
 
 // An upload going on while the chat is disconnected; the chat then reconnects (which starts the timer).
-const renderReconnectedUpload = () => {
+const renderReconnectedUpload = (attachmentsUploadingProgress = {}) => {
   const store = createMessageListStore({
     UserReducer: { connectionStatus: CONNECTION_STATUS.DISCONNECTED },
-    MessageReducer: { attachmentsUploadingState: { [attachment.tid]: UPLOAD_STATE.UPLOADING } }
+    MessageReducer: {
+      attachmentsUploadingState: { [attachment.tid]: UPLOAD_STATE.UPLOADING },
+      attachmentsUploadingProgress
+    }
   })
   renderWithSceytProvider(<Attachment attachment={attachment as any} backgroundColor='#ffffff' />, { store })
   act(() => {
@@ -103,5 +106,23 @@ describe('the upload fail timer after a reconnect', () => {
 
     expect(uploadStateOf(store)).toBe(UPLOAD_STATE.FAIL)
     expect(screen.getByRole('button', { name: 'Retry upload' })).toBeVisible()
+  })
+
+  it('an upload going on below the progress shown before the outage (held there) is not shown as failed', () => {
+    const MB = 1024 * 1024
+    const store = renderReconnectedUpload({
+      [attachment.tid]: { uploaded: 4 * MB, total: 10 * MB, progress: 0.4 }
+    })
+
+    // Sent again from the stored parts on a slow network: for 30 s it reports less than the 4 MB shown.
+    for (let second = 5; second <= 30; second += 5) {
+      act(() => {
+        jest.advanceTimersByTime(5_000)
+        store.dispatch(updateAttachmentUploadingProgressAC(second * 0.1 * MB, 10 * MB, attachment.tid))
+      })
+    }
+
+    expect(uploadStateOf(store)).toBe(UPLOAD_STATE.UPLOADING)
+    expect(screen.queryByRole('button', { name: 'Retry upload' })).not.toBeInTheDocument()
   })
 })

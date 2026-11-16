@@ -532,6 +532,51 @@ describe('attachment upload recovery', () => {
     expect(dispatched).not.toContainEqual(setFileTransferFailedPopupAC('upload'))
   })
 
+  it('a file stored before its message failed to send (chat disconnected) is not uploaded again when it is sent again', async () => {
+    const currentUser = makeUser({ id: 'current-user' })
+    const channel = makeUploaderChannel('channel-stored-then-send-failed')
+    uploadBehavior = succeedUpload('https://cdn.example/stored-once')
+    channel.sendMessage = jest
+      .fn()
+      .mockRejectedValueOnce(networkingError())
+      .mockImplementationOnce((sent: any) =>
+        Promise.resolve(makeServerResponse(sent.tid, sent.attachments[0].tid, currentUser))
+      )
+    const pendingMessage = makePendingMessage({
+      channelId: channel.id,
+      tid: 'stored-msg-tid',
+      body: 'stored before the send failed',
+      user: currentUser,
+      attachments: [makeAttachment('stored-file-tid', makeLiveFile())]
+    })
+    setActiveChannelId(channel.id)
+    setChannelInMap(channel)
+    addMessageToMap(channel.id, pendingMessage)
+    const send = () =>
+      runMessageSaga(__messageSagaTestables.sendMessage, {
+        type: RESEND_MESSAGE,
+        payload: {
+          message: pendingMessage,
+          connectionState: CONNECTION_STATUS.CONNECTED,
+          channelId: channel.id,
+          sendAttachmentsAsSeparateMessage: false
+        }
+      })
+
+    await send()
+    expect(uploadCalls).toHaveLength(1)
+    expect(getPendingMessagesFromMap(channel.id).map((message) => message.tid)).toEqual(['stored-msg-tid'])
+
+    await send()
+
+    expect(uploadCalls).toHaveLength(1)
+    expect(channel.sendMessage).toHaveBeenCalledTimes(2)
+    expect((channel.sendMessage as jest.Mock).mock.calls[1][0].attachments[0].url).toBe(
+      'https://cdn.example/stored-once'
+    )
+    expect(getPendingMessagesFromMap(channel.id)).toEqual([])
+  })
+
   it('does not start an upload for a pending attachment deleted before its send work resumes', async () => {
     const currentUser = makeUser({ id: 'current-user' })
     const channel = makeUploaderChannel('channel-deleted-pending-attachment')
@@ -953,6 +998,39 @@ describe('attachment upload recovery', () => {
         CONNECTION_STATUS.CONNECTED
       )
     const settle = settleMicrotasks
+
+    it('a round asked for while one sends waits for the reconnect if the connection is lost meanwhile: nothing tried offline', async () => {
+      const { channel, uploads } = setupPendingFiles('channel-resend-offline')
+      const onLine = jest.spyOn(navigator, 'onLine', 'get').mockReturnValue(true)
+
+      const first = resendPending()
+      // Another round is asked for while the first sends (e.g. the chat list loads).
+      const second = resendPending()
+      await settle()
+      expect(uploads.map((upload) => upload.tid)).toEqual(['channel-resend-offline-file-1'])
+
+      // The network goes off, and the upload fails on it.
+      onLine.mockReturnValue(false)
+      uploads[0].call.fail(networkingError())
+      await first.toPromise()
+      await second.toPromise()
+      await settle()
+
+      // Nothing more was tried while offline: the message is still pending, the second one not started.
+      expect(uploads).toHaveLength(1)
+      expect(channel.sendMessage).not.toHaveBeenCalled()
+
+      // Back online, the reconnect's round sends both, in order.
+      onLine.mockReturnValue(true)
+      uploadBehavior = (call) => call.succeed(`https://cdn.example/${call.attachment.tid}`)
+      await resendPending().toPromise()
+
+      expect((channel.sendMessage as jest.Mock).mock.calls.map(([sent]) => sent.tid)).toEqual([
+        'channel-resend-offline-msg-1',
+        'channel-resend-offline-msg-2'
+      ])
+      onLine.mockRestore()
+    })
 
     it('are sent one at a time, in order, even when two resends start at once (reconnect, and the chat loading)', async () => {
       const { channel, uploads } = setupPendingFiles('channel-resend-in-order')

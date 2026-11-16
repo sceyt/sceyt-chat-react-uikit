@@ -753,21 +753,35 @@ export const handleUploadAttachments = async (attachments: IAttachment[], messag
         // The file as it was prepared when it was added to the message. The provider's step
         // (fileTransfer.provider.prepareUpload) merges its entries into the metadata first.
         const file = attachment.url as Blob
-        attachment = { ...attachment, metadata: await prepareAttachmentUpload(attachment, file) }
-        const uploaded = await uploadAttachment(
-          attachment,
-          {
-            file,
-            fileName: (file as File).name || attachment.name || 'file',
-            mimeType: file.type || null
-          },
-          handleUploadProgress
-        )
-        uploadedUri = uploaded.url
+        // Stored by an earlier send of this message whose send then failed: it goes as it is.
+        const stored = attachment.tid ? getPendingAttachment(attachment.tid)?.uploadedFile : undefined
+        if (stored && stored.file === file) {
+          attachment = { ...attachment, metadata: stored.metadata }
+          uploadedUri = stored.url
+          encryption = stored.encryption
+          store.dispatch(updateAttachmentUploadingProgressAC(file.size, file.size, attachment.tid))
+        } else {
+          attachment = { ...attachment, metadata: await prepareAttachmentUpload(attachment, file) }
+          const uploaded = await uploadAttachment(
+            attachment,
+            {
+              file,
+              fileName: (file as File).name || attachment.name || 'file',
+              mimeType: file.type || null
+            },
+            handleUploadProgress
+          )
+          uploadedUri = uploaded.url
+          // With the provider's prepareUpload the provider owns the encryption: its entry is in the
+          // metadata, and no "sceyt.enc" is written.
+          encryption = fileTransfer.provider.prepareUpload ? undefined : uploaded.encryptionInfo
+          if (attachment.tid) {
+            setPendingAttachment(attachment.tid, {
+              uploadedFile: { file, url: uploaded.url, metadata: attachment.metadata, encryption }
+            })
+          }
+        }
         uploadedBlob = file
-        // With the provider's prepareUpload the provider owns the encryption: its entry is in the
-        // metadata, and no "sceyt.enc" is written.
-        encryption = fileTransfer.provider.prepareUpload ? undefined : uploaded.encryptionInfo
         fileSize = file.size
       }
       if (!attachment.cachedUrl && fileType === 'image') {
@@ -2449,6 +2463,10 @@ const sendPendingMessages = function* (connectionState: string): SagaIterator<vo
   try {
     while (run.again) {
       run.again = false
+      // The connection was lost meanwhile (a round asked for while one was sending): the
+      // reconnect starts the next one. Tried now, a message would only fail again, and show
+      // as uploading while offline.
+      if (isConnectionLost()) break
       yield call(sendPendingMessagesInOrder, run.connectionState)
     }
   } finally {
@@ -2461,6 +2479,8 @@ const sendPendingMessagesInOrder = function* (connectionState: string) {
   const pendingMessagesMap = getAllPendingFromMap()
   for (const channelId in pendingMessagesMap) {
     for (const listed of pendingMessagesMap[channelId]) {
+      // The connection is lost: the rest wait for the reconnect, which sends them in order.
+      if (isConnectionLost()) return
       // The list was made when the run started: a message sent (or deleted) since is left out.
       const msg = getPendingMessagesFromMap(channelId).find((pending) => pending.tid === listed.tid)
       if (!msg) {
