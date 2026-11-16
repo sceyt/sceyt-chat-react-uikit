@@ -552,13 +552,13 @@ describe('MessageList', () => {
     await act(async () => view.unmount())
   })
 
-  it('offers both drop choices when Safari does not expose drag items', async () => {
+  it('offers only the file drop when Safari does not expose drag items', async () => {
     const store = buildStore()
     const view = renderMessageList(store)
     const file = new File(['pdf'], 'document.pdf', { type: 'application/pdf' })
     const dataTransfer = { types: ['Files'], files: [file], clearData: jest.fn() }
     fireDragEvent(view.container.querySelector('#scrollableDiv')!, 'dragenter', dataTransfer)
-    expect(screen.getByText('Drag & drop to send as media')).toBeVisible()
+    expect(screen.queryByText('Drag & drop to send as media')).toBeNull()
     fireDragEvent(screen.getByText('Drag & drop to send as file'), 'drop', dataTransfer)
     expect(store.getState().ChannelReducer.draggedAttachments[0].data).toBe(file)
     await act(async () => view.unmount())
