@@ -17,6 +17,7 @@ import { getShowOnlyContactUsers } from '../../../../helpers/contacts'
 import { THEME_COLORS } from '../../../../UIHelper/constants'
 import { IAttachment } from '../../../../types'
 import { requestMediaDownload } from '../../../../helpers/mediaDownloadCoordinator'
+import { attachmentDecryption } from '../../../../helpers/attachmentEncryption'
 import { getAttachmentUrlFromCache } from '../../../../helpers/attachmentsCache'
 
 interface IProps {
@@ -109,12 +110,14 @@ const VoiceItem = ({
           return undefined
         }
         return requestMediaDownload({
+          attachment: file,
           key: `voice:${file.url}`,
           url: file.url,
           cacheKey: file.url,
           kind: 'voice',
           messageType,
-          size: Number(file.size) || 0
+          size: Number(file.size) || 0,
+          ...attachmentDecryption(file)
         })
       })
       .then((result) => {

@@ -238,7 +238,6 @@ const OptionHeader = styled.div`
 const OptionTitle = styled.div<{ color: string }>`
   color: ${(p) => p.color};
   max-width: calc(100% - 60px);
-  font-family: Inter;
   font-weight: 500;
   font-size: 15px;
   line-height: 20px;

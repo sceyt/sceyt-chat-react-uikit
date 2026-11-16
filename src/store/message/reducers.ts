@@ -64,6 +64,8 @@ export type MessageListGap = {
   beforeMessageId: string
 }
 
+export type FileTransferFailedPopup = 'download' | 'upload'
+
 export interface IMessageStore {
   loadingPrevMessagesState: number | null
   loadingNextMessagesState: number | null
@@ -112,6 +114,8 @@ export interface IMessageStore {
       uploaded: number
       total: number
       progress: number
+      // Bytes last reported while the progress is held (below what was shown).
+      reported?: number
     }
   }
   playingAudioId: string | null
@@ -135,6 +139,8 @@ export interface IMessageStore {
   }
   visibleMessagesMap: VisibleMessagesMap
   messageListGap: MessageListGap | null
+  // The "Download failed" / "Upload failed" popup shown, if any.
+  fileTransferFailedPopup: FileTransferFailedPopup | null
 }
 
 const initialState: IMessageStore = {
@@ -195,7 +201,8 @@ const initialState: IMessageStore = {
     messageId: ''
   },
   visibleMessagesMap: {},
-  messageListGap: null
+  messageListGap: null,
+  fileTransferFailedPopup: null
 }
 
 const isPendingMessage = (message: IMessage) => !message.id && !!message.tid
@@ -652,12 +659,16 @@ const messageSlice = createSlice({
       }>
     ) => {
       const { uploaded, total, attachmentId } = action.payload
-      const progress = uploaded / total
-      const updateData = { uploaded, total, progress }
-      state.attachmentsUploadingProgress[attachmentId] = {
-        ...state.attachmentsUploadingProgress[attachmentId],
-        ...updateData
+      const shown = state.attachmentsUploadingProgress[attachmentId]
+      // The progress never goes back for the same file: an upload sent again
+      // from the start (after a lost connection, or with an uploader that cannot
+      // resume) is held at what was shown until it passes it. What it reports is
+      // still kept: the upload goes on, and is not failed for showing no progress.
+      if (shown && shown.total === total && uploaded < shown.uploaded) {
+        state.attachmentsUploadingProgress[attachmentId] = { ...shown, reported: uploaded }
+        return
       }
+      state.attachmentsUploadingProgress[attachmentId] = { uploaded, total, progress: uploaded / total }
     },
 
     removeUploadProgress: (state, action: PayloadAction<{ attachmentId: string }>) => {
@@ -1057,6 +1068,9 @@ const messageSlice = createSlice({
     },
     setStableUnreadAnchor: (state, action: PayloadAction<{ channelId: string; messageId: string }>) => {
       state.stableUnreadAnchor = action.payload
+    },
+    setFileTransferFailedPopup: (state, action: PayloadAction<{ popup: FileTransferFailedPopup | null }>) => {
+      state.fileTransferFailedPopup = action.payload.popup
     }
   },
   extraReducers: (builder) => {
@@ -1142,7 +1156,8 @@ export const {
   removePendingMessageMutation,
   setUnreadMessageId,
   setStableUnreadAnchor,
-  setMessageListGap
+  setMessageListGap,
+  setFileTransferFailedPopup
 } = messageSlice.actions
 
 // Export reducer

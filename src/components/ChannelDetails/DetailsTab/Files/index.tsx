@@ -204,6 +204,7 @@ const Files = ({
                       visible={!!downloadingFilesMap[file.id!]}
                       iconColor={accentColor}
                       onClick={() => handleDownloadFile(file)}
+                      aria-label='Download file'
                     >
                       {downloadingFilesMap[file.id!] ? (
                         <ProgressWrapper>

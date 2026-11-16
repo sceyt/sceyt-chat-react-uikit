@@ -6,6 +6,11 @@ import { APPLY_PRESENCE_USERS, presenceRegistry } from '../../helpers/presence/r
 import { resetUpdatedUserMapAC } from '../../store/user/actions'
 import { CONNECTION_STATUS } from '../../store/user/constants'
 import { IUser } from '../../types'
+import { fileTransfer as uikitFileTransfer } from '../../fileTransfer/sceytChatUIKitFileTransfer'
+import { DefaultFileTransferProvider } from '../../fileTransfer/defaults/defaultFileTransferProvider'
+import { ChatSdkFileEncryption } from '../../fileTransfer/encryption/chatSdkFileEncryption'
+import { FileTransferProvider } from '../../types/fileTransfer/types'
+import { FileEncryption } from '../../fileTransfer/encryption/types'
 
 jest.mock('../../helpers/messagesIdb', () => ({
   initMessagesIdbForUser: () => Promise.resolve(),
@@ -156,5 +161,86 @@ describe('SceytChat presence lifecycle', () => {
     await flushPromises()
     expect(getUsers).toHaveBeenCalledTimes(2)
     await unmountChat(unmount)
+  })
+})
+
+describe('SceytChat file transfer settings', () => {
+  const makeTransport = (): FileTransferProvider => ({ upload: jest.fn(), download: jest.fn(), cancel: jest.fn() })
+  const transport = makeTransport()
+  const encryption: FileEncryption = {
+    prepareEncryption: jest.fn(),
+    restoreEncryption: jest.fn(),
+    prepareDecryption: jest.fn()
+  }
+  const client = () =>
+    makeClient(
+      'user-1',
+      jest.fn(async () => [])
+    )
+
+  const renderWith = async (props: Record<string, any>) => {
+    const view = renderWithSceytProvider(<SceytChat client={client()} {...props} />, {
+      store: createMessageListStore()
+    })
+    await flushPromises()
+    return view
+  }
+
+  const expectDefaults = () => {
+    expect(uikitFileTransfer.provider).toBeInstanceOf(DefaultFileTransferProvider)
+    expect(uikitFileTransfer.hasCustomProvider).toBe(false)
+    expect(uikitFileTransfer.encryption).toBeInstanceOf(ChatSdkFileEncryption)
+    expect(uikitFileTransfer.encryptUploads).toBe(false)
+  }
+
+  afterEach(async () => {
+    uikitFileTransfer.configure()
+    presenceRegistry.dispose()
+  })
+
+  it('fileTransfer sets the provider, the encryption and whether uploads are encrypted', async () => {
+    const view = await renderWith({ fileTransfer: { provider: transport, encryption, encryptUploads: true } })
+
+    expect(uikitFileTransfer.provider).toBe(transport)
+    expect(uikitFileTransfer.hasCustomProvider).toBe(true)
+    expect(uikitFileTransfer.encryption).toBe(encryption)
+    expect(uikitFileTransfer.encryptUploads).toBe(true)
+    await unmountChat(view.unmount)
+  })
+
+  it('without fileTransfer, the defaults are used: the chat client transfers and encrypts, uploads are not encrypted', async () => {
+    uikitFileTransfer.provider = transport
+    uikitFileTransfer.encryption = encryption
+    uikitFileTransfer.encryptUploads = true
+    const view = await renderWith({})
+
+    expectDefaults()
+    await unmountChat(view.unmount)
+  })
+
+  it('a change of fileTransfer after the chat is shown is applied, and removing it goes back to the defaults', async () => {
+    const appTransport = makeTransport()
+    const chatClient = client()
+    const store = createMessageListStore()
+    const view = renderWithSceytProvider(<SceytChat client={chatClient} fileTransfer={{ provider: transport }} />, {
+      store
+    })
+    await flushPromises()
+    expect(uikitFileTransfer.provider).toBe(transport)
+    expect(uikitFileTransfer.encryption).toBeInstanceOf(ChatSdkFileEncryption)
+    expect(uikitFileTransfer.encryptUploads).toBe(false)
+
+    view.rerender(
+      <SceytChat client={chatClient} fileTransfer={{ provider: appTransport, encryption, encryptUploads: true }} />
+    )
+    await flushPromises()
+    expect(uikitFileTransfer.provider).toBe(appTransport)
+    expect(uikitFileTransfer.encryption).toBe(encryption)
+    expect(uikitFileTransfer.encryptUploads).toBe(true)
+
+    view.rerender(<SceytChat client={chatClient} />)
+    await flushPromises()
+    expectDefaults()
+    await unmountChat(view.unmount)
   })
 })

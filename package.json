@@ -68,6 +68,18 @@
       "lcov"
     ],
     "coverageThreshold": {
+      "./src/helpers/attachmentEncryption.ts": {
+        "lines": 100,
+        "branches": 100
+      },
+      "./src/fileTransfer/attachmentUploadCoordinator.ts": {
+        "lines": 95,
+        "branches": 85
+      },
+      "./src/helpers/mediaDownloadCoordinator.ts": {
+        "lines": 95,
+        "branches": 82
+      },
       "./src/store/message/saga.ts": {
         "lines": 64,
         "branches": 52
@@ -109,8 +121,8 @@
         "branches": 78
       },
       "./src/helpers/index.tsx": {
-        "lines": 49,
-        "branches": 46
+        "lines": 52,
+        "branches": 49
       },
       "./src/helpers/notifications.ts": {
         "lines": 95,
@@ -207,6 +219,7 @@
   "resolutions": {
     "lodash": "^4.18.1",
     "**/babel-plugin-styled-components/picomatch": "^2.3.2",
-    "shell-quote": "^1.8.4"
+    "shell-quote": "^1.8.4",
+    "underscore": "^1.13.8"
   }
 }

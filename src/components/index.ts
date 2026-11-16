@@ -1,4 +1,5 @@
 import SceytChat, { SceytChatUIKitTheme, ThemeMode } from './ChatContainer'
+import { IAttachment } from '../types'
 import ChannelList from './ChannelList'
 import Channel from './Channel'
 import Chat from './Chat'
@@ -66,8 +67,12 @@ export {
   IForwardMessageNote,
   IForwardPreviewMessage,
   CustomLoadErrorStateComponent,
-  ILoadErrorStateProps
+  ILoadErrorStateProps,
+  IAttachment
 }
+
+// File transfer (the `fileTransfer` prop): providers, the encryption module, and their defaults.
+export * from '../fileTransfer'
 
 declare global {
   interface Window {

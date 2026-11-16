@@ -422,7 +422,6 @@ const Copy = styled.div<{ textPrimary: string }>`
   gap: 2px;
   strong {
     color: ${({ textPrimary }) => textPrimary};
-    font-family: Inter;
     font-weight: 500;
     font-size: 13px;
     line-height: 16px;
@@ -434,7 +433,6 @@ const PinnedCopyPreview = styled.span<{ textPrimary: string }>`
   text-overflow: ellipsis;
   white-space: nowrap;
   color: ${({ textPrimary }) => textPrimary};
-  font-family: Inter;
   font-weight: 400;
   font-size: 13px;
   line-height: 16px;

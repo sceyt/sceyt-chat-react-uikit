@@ -1,5 +1,8 @@
 import { getAttachmentUrlFromCache } from './attachmentsCache'
 import { requestMediaDownload } from './mediaDownloadCoordinator'
+import { getAttachmentEncryption } from './attachmentEncryption'
+import { IAttachment } from '../types'
+import { attachmentTypes } from './constants'
 
 export const parseAttachmentMetadata = (metadata: any): Record<string, any> => {
   if (!metadata) return {}
@@ -15,12 +18,12 @@ export const parseAttachmentMetadata = (metadata: any): Record<string, any> => {
 export const withVideoThumb = (metadata: any, videoThumb: string) => {
   const parsedMetadata = { ...parseAttachmentMetadata(metadata) }
   delete parsedMetadata.previewImage
-  return JSON.stringify({ ...parsedMetadata, video_thumb: videoThumb })
+  return JSON.stringify({ ...parsedMetadata, pvw: videoThumb })
 }
 
 export const getVideoThumb = (metadata: any): string | undefined => {
   const parsedMetadata = parseAttachmentMetadata(metadata)
-  const videoThumb = parsedMetadata.video_thumb
+  const videoThumb = parsedMetadata.pvw
   if (typeof videoThumb === 'string' && videoThumb.trim().length > 0) {
     return videoThumb.trim()
   }
@@ -34,6 +37,25 @@ export const getVideoThumb = (metadata: any): string | undefined => {
 export const shouldExtractVideoFirstFrame = (metadata: any) => !getVideoThumb(metadata)
 
 /**
+ * A message's attachments as they are shown: its preview attachments (a video's preview
+ * image sent as an attachment of its own) are not shown. A video whose pvw is a
+ * preview attachment's URL gets that attachment as `videoPreviewAttachment`, whose own key
+ * opens it; the order of the attachments does not matter.
+ */
+export const withVideoPreviews = (attachments: IAttachment[] = []): IAttachment[] => {
+  const previews = attachments.filter((attachment) => attachment?.type === attachmentTypes.preview)
+  if (!previews.length) return attachments
+  return attachments
+    .filter((attachment) => attachment?.type !== attachmentTypes.preview)
+    .map((attachment) => {
+      if (attachment?.type !== attachmentTypes.video) return attachment
+      const videoThumb = getVideoThumb(attachment.metadata)
+      const preview = videoThumb ? previews.find((candidate) => candidate.url === videoThumb) : undefined
+      return preview ? { ...attachment, videoPreviewAttachment: preview } : attachment
+    })
+}
+
+/**
  * Preview and playable-video blobs intentionally use different cache entries.
  * A cached preview must never be mistaken for a downloaded video.
  */
@@ -43,28 +65,48 @@ export const getVideoAttachmentCacheKeys = (videoUrl: string, metadata: any) => 
 })
 
 /**
- * Downloads a video preview through the same downloader and Cache Storage path
+ * Downloads a video preview through the same transport and Cache Storage path
  * as attachments. The returned object URL is safe to use as an img source.
+ * Encrypted previews use their own preview attachment's metadata, never the video's key.
  */
 export const downloadVideoThumb = async (
   videoThumb: string,
-  downloader?: any,
+  video: IAttachment,
   messageType?: string | null
 ): Promise<string> => {
   const cachedUrl = await getAttachmentUrlFromCache(videoThumb).catch(() => false)
   if (typeof cachedUrl === 'string') return cachedUrl
 
+  // A preview sent as an attachment of its own is opened with its own key.
+  const previewAttachment = video.videoPreviewAttachment?.url === videoThumb ? video.videoPreviewAttachment : undefined
+  // A bare pvw reference has no metadata or size of its own. Preserve the
+  // message context for authorization without giving a provider the video's key.
+  const previewFile = previewAttachment || {
+    ...video,
+    type: attachmentTypes.preview,
+    name: 'preview.jpg',
+    url: videoThumb,
+    attachmentUrl: videoThumb,
+    metadata: '{}',
+    size: 0,
+    data: undefined,
+    cachedUrl: undefined,
+    videoPreviewAttachment: undefined
+  }
   const { objectUrl } = await requestMediaDownload({
     key: `video-thumbnail:${videoThumb}`,
+    attachment: previewFile,
     url: videoThumb,
     cacheKey: videoThumb,
     kind: 'video-thumbnail',
     messageType,
-    downloader,
-    customDownload: true,
     // This helper already checked the preview cache above. Avoid consuming a
     // second cache lookup before the downloader has produced the thumbnail.
-    skipCacheLookup: true
+    skipCacheLookup: true,
+    // An encrypted video's preview is a preview attachment of its own, opened with its own key;
+    // a plain pvw is not encrypted.
+    encryption: previewAttachment ? getAttachmentEncryption(previewAttachment.metadata) : undefined,
+    contentType: 'image/jpeg'
   })
   return objectUrl
 }

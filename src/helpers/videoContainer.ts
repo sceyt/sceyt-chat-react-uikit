@@ -96,3 +96,57 @@ export const inspectVideoBlob = async (blob: Blob): Promise<VideoContainerInfo> 
 }
 
 export const isFirefox = () => typeof navigator !== 'undefined' && /firefox/i.test(navigator.userAgent)
+
+// Firefox 157 and later play QuickTime (.mov) files; older versions stall at
+// HAVE_NOTHING without an error, so a file that has not loaded by the timeout
+// does not play. Once one QuickTime file has played, others are not checked.
+const QUICKTIME_PROBE_TIMEOUT_MS = 3000
+let quickTimePlays = false
+
+const loadsFirstFrame = (blob: Blob, timeoutMs: number): Promise<boolean> =>
+  new Promise((resolve) => {
+    const video = document.createElement('video')
+    // Firefox trusts the declared type of a blob: URL, and does not play video/quicktime.
+    const url = URL.createObjectURL(NATIVE_VIDEO_TYPES.has(blob.type) ? blob : new Blob([blob], { type: 'video/mp4' }))
+    let settled = false
+    const finish = (loaded: boolean) => {
+      if (settled) return
+      settled = true
+      clearTimeout(timer)
+      video.onloadeddata = null
+      video.onerror = null
+      video.removeAttribute('src')
+      if (video.parentNode) video.parentNode.removeChild(video)
+      URL.revokeObjectURL(url)
+      resolve(loaded)
+    }
+    const timer = setTimeout(() => finish(false), timeoutMs)
+    video.onloadeddata = () => finish(video.videoWidth > 0)
+    video.onerror = () => finish(false)
+    video.muted = true
+    video.preload = 'auto'
+    // In the viewport but not visible: Firefox can hold back loading a hidden element.
+    Object.assign(video.style, {
+      position: 'fixed',
+      bottom: '0',
+      left: '0',
+      width: '2px',
+      height: '2px',
+      opacity: '0',
+      pointerEvents: 'none',
+      zIndex: '-1'
+    })
+    document.body.appendChild(video)
+    video.src = url
+  })
+
+/** Whether this browser plays a QuickTime (.mov) file as it is; one it does not must be converted to MP4. */
+export const canPlayQuickTime = async (blob: Blob): Promise<boolean> => {
+  if (!isFirefox() || quickTimePlays) return true
+  quickTimePlays = await loadsFirstFrame(blob, QUICKTIME_PROBE_TIMEOUT_MS)
+  return quickTimePlays
+}
+
+export const resetQuickTimeSupportForTests = () => {
+  quickTimePlays = false
+}

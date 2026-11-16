@@ -9,6 +9,8 @@ import {
 } from './getVideoFrame'
 import { resizeImageWithPica } from './resizeImage'
 import { setAttachmentToCache } from './attachmentsCache'
+import * as videoContainer from './videoContainer'
+import * as videoConversion from './videoConversion'
 
 jest.mock('./resizeImage', () => ({
   resizeImageWithPica: jest.fn()
@@ -312,6 +314,38 @@ describe('getVideoFirstFrame', () => {
     expect(capturedCanvases[0].height).toBe(600)
   })
 
+  describe('a QuickTime video', () => {
+    beforeEach(() => {
+      jest
+        .spyOn(videoContainer, 'inspectVideoBlob')
+        .mockResolvedValue({ mimeType: 'video/mp4', isoBrand: 'qt  ', codecs: [] })
+    })
+
+    it('that the browser plays gives its frame without a conversion', async () => {
+      jest.spyOn(videoContainer, 'canPlayQuickTime').mockResolvedValue(true)
+      const remux = jest.spyOn(videoConversion, 'remuxToMp4')
+      const movie = new Blob(['quicktime'], { type: 'video/quicktime' })
+
+      const framePromise = getVideoFirstFrame(movie, 400, 300)
+      await waitUntil(() => typeof fakeVideo.onloadedmetadata === 'function')
+      fakeVideo.onloadedmetadata()
+      await waitUntil(() => typeof fakeVideo.onseeked === 'function')
+      fakeVideo.onseeked()
+      await waitForCapturedFrame()
+
+      await expect(framePromise).resolves.not.toBeNull()
+      expect(remux).not.toHaveBeenCalled()
+    })
+
+    it('that the browser does not play is converted to MP4 first', async () => {
+      jest.spyOn(videoContainer, 'canPlayQuickTime').mockResolvedValue(false)
+      const remux = jest.spyOn(videoConversion, 'remuxToMp4').mockResolvedValue(null)
+
+      await expect(getVideoFirstFrame(new Blob(['quicktime']), 400, 300)).resolves.toBeNull()
+      expect(remux).toHaveBeenCalledTimes(1)
+    })
+  })
+
   it('does not scale the frame size when no maxWidth/maxHeight is requested', async () => {
     setDevicePixelRatio(2)
     const videoBlob = new Blob(['fake-video-bytes'], { type: 'video/mp4' })
@@ -333,7 +367,7 @@ describe('getVideoFirstFrame', () => {
     expect(capturedCanvases[0].height).toBe(540)
   })
 
-  it('creates a compact, aspect-ratio-preserving JPEG for video_thumb independent of devicePixelRatio', async () => {
+  it('creates a compact, aspect-ratio-preserving JPEG for pvw independent of devicePixelRatio', async () => {
     setDevicePixelRatio(2)
     const videoBlob = new Blob(['fake-video-bytes'], { type: 'video/mp4' })
 

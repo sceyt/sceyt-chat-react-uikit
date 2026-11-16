@@ -51,6 +51,8 @@ export const pendingPollActionsSelector = (store: any) => store.MessageReducer.p
 export const unreadScrollToSelector = (store: any) => store.MessageReducer.unreadScrollTo
 export const unreadMessageIdSelector = (store: any) => store.MessageReducer.unreadMessageId
 export const stableUnreadAnchorSelector = (store: any) => store.MessageReducer.stableUnreadAnchor
+export const fileTransferFailedPopupSelector = (store: { MessageReducer: IMessageStore }) =>
+  store.MessageReducer.fileTransferFailedPopup
 
 export const messagesLoadFailedChannelIdSelector = (store: any): string | null =>
   store.MessageReducer.messagesLoadFailedChannelId || null

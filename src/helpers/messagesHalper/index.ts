@@ -1,7 +1,9 @@
 import { IAttachment, IMarker, IMessage, IPollVote, IReaction } from '../../types'
 import { checkArraysEqual } from '../index'
 import { attachmentTypes, MESSAGE_DELIVERY_STATUS, MESSAGE_STATUS } from '../constants'
-import { cancelUpload, getCustomUploader } from '../customUploader'
+import { cancelUpload } from '../../fileTransfer/attachmentUploadCoordinator'
+import type { FileTransferEntries } from '../../types/fileTransfer/types'
+import type { FileEncryptionInfo } from '../../fileTransfer/encryption/types'
 import { releaseBlobUrls } from '../attachmentBlobUrls'
 import { clearVideoPreparation } from '../attachmentPreparation'
 import { handleVoteDetails } from '../message'
@@ -327,6 +329,16 @@ type PendingAttachment = {
   file?: File
   messageTid?: string
   channelId?: string
+  // A video's preview image, once uploaded: a later send of the message (after its
+  // video upload failed) uses it instead of uploading another one.
+  videoPreview?: { url: string }
+  // An encrypted video's preview image sent as its own attachment, once uploaded.
+  videoPreviewAttachment?: { url: string; name: string; size: number; metadata: string }
+  // What the provider's prepareUpload returned for the attachment: the next attempt's metadata keeps it.
+  preparedEntries?: FileTransferEntries
+  // The file, once stored: when only the message's send failed after it (e.g. the chat was
+  // disconnected), the next send uses it instead of uploading the file again.
+  uploadedFile?: { file: Blob; url: string; metadata: IAttachment['metadata']; encryption?: FileEncryptionInfo }
 }
 
 const pendingAttachments: { [key: string]: PendingAttachment } = {}
@@ -1497,11 +1509,8 @@ export const deletePendingMessage = (channelId: string, message: IMessage) => {
     markPendingMessageDeleted(channelId, messageTid)
   }
   if (message.attachments && message.attachments.length) {
-    const customUploader = getCustomUploader()
     message.attachments.forEach((att: IAttachment) => {
-      if (customUploader) {
-        cancelUpload(att.tid!)
-      }
+      cancelUpload(att.tid!)
       deletePendingAttachment(att.tid!)
       clearVideoPreparation(att.tid!)
       releaseBlobUrls([`compose_${att.tid}`])

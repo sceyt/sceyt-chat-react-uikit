@@ -56,7 +56,8 @@ import {
   requestPermissionOnUserInteraction
 } from '../../helpers/notifications'
 import { IChannel, IContactsMap } from '../../types'
-import { setCustomUploader, setSendAttachmentsAsSeparateMessages } from '../../helpers/customUploader'
+import { setSendAttachmentsAsSeparateMessages } from '../../helpers/sendAttachments'
+import { fileTransfer as uikitFileTransfer } from '../../fileTransfer/sceytChatUIKitFileTransfer'
 import { IChatClientProps } from '../ChatContainer'
 import { defaultTheme, THEME_COLORS } from '../../UIHelper/constants'
 import { setHideUserPresence } from '../../helpers/userHelper'
@@ -72,6 +73,7 @@ import JoinGroupPopup from 'common/popups/inviteLink/JoinGroupPopup'
 import { CONNECTION_STATUS } from 'store/user/constants'
 import ActionRestrictedPopup from 'common/popups/actionRestrictedPopup'
 import UnavailableInviteKeyPopup from 'common/popups/unavailableInviteKeyPopup'
+import FileTransferFailedPopup from 'common/popups/fileTransferFailed'
 import { cleanupOldAttachmentCache } from '../../helpers/attachmentsCache'
 
 const SceytChat = ({
@@ -82,7 +84,7 @@ const SceytChat = ({
   children,
   showOnlyContactUsers,
   logoSrc,
-  CustomUploader,
+  fileTransfer,
   handleNewMessages,
   sendAttachmentsAsSeparateMessages = true,
   membersDisplayTextByChannelTypesMap,
@@ -226,10 +228,16 @@ const SceytChat = ({
     }
   }
 
+  // Without a provider or encryption, the default one (the chat client's) is used.
+  // A change applies to the transfers that start after it.
+  const provider = fileTransfer?.provider
+  const encryptUploads = fileTransfer?.encryptUploads
+  const encryption = fileTransfer?.encryption
   useEffect(() => {
-    if (CustomUploader) {
-      setCustomUploader(CustomUploader)
-    }
+    uikitFileTransfer.configure({ provider, encryptUploads, encryption })
+  }, [provider, encryptUploads, encryption])
+
+  useEffect(() => {
     if (membersDisplayTextByChannelTypesMap) {
       setChannelTypesMemberDisplayTextMap(membersDisplayTextByChannelTypesMap)
     }
@@ -418,6 +426,7 @@ const SceytChat = ({
             />
           )}
           {!channelInviteKeyAvailable && <UnavailableInviteKeyPopup />}
+          <FileTransferFailedPopup />
         </ChatContainer>
       ) : (
         ''

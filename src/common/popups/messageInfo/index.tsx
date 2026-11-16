@@ -870,7 +870,6 @@ const P2PStatusRow = styled.div`
 
 const P2PStatusLabel = styled.div<{ color: string }>`
   color: ${(p) => p.color};
-  font-family: Inter;
   font-weight: 500;
   font-size: 15px;
   line-height: 18px;
@@ -880,7 +879,6 @@ const P2PStatusLabel = styled.div<{ color: string }>`
 const P2PStatusDate = styled.div<{ color: string }>`
   color: ${(p) => p.color};
   min-width: max-content;
-  font-family: Inter;
   font-weight: 400;
   font-size: 13px;
   line-height: 16px;
