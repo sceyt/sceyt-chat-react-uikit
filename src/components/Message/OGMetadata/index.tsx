@@ -76,7 +76,25 @@ export const isDescriptionOnlySymbol = (description: string | undefined): boolea
   return !!trimmed && !/[a-zA-Z0-9]/.test(trimmed)
 }
 
-const MIN_IMAGE_SIZE = 200
+// A link preview image narrower than this is shown small, next to the text.
+const SMALL_IMAGE_WIDTH = 200
+
+// The size of a link preview's big image box for an image of `imageWidth` x `imageHeight`
+// in a preview `maxSize` wide: the same as the mobile apps (Android's
+// calculateScaleWidthHeight), so a preview has the same shape on every platform.
+export const calculateLinkPreviewImageSize = (maxSize: number, imageWidth: number, imageHeight: number) => {
+  const minSize = Math.floor(maxSize / 3)
+  const coefficient = imageWidth / imageHeight
+  if (Number.isNaN(coefficient) || coefficient === 1) {
+    return { width: maxSize, height: maxSize }
+  }
+  if (imageWidth > imageHeight) {
+    return { width: maxSize, height: Math.max(Math.trunc(maxSize / coefficient), minSize) }
+  }
+  // A narrow portrait image gets a 20% taller box.
+  const boxHeight = Math.trunc(maxSize * coefficient) / maxSize <= 0.8 ? Math.trunc(maxSize * 1.2) : maxSize
+  return { width: Math.max(Math.trunc(boxHeight * coefficient), minSize), height: boxHeight }
+}
 
 const OGMetadata = ({
   attachments,
@@ -88,7 +106,7 @@ const OGMetadata = ({
   ogShowFavicon = true,
   order = { image: 1, title: 2, description: 3, link: 4 },
   maxWidth = 400,
-  maxHeight = 240,
+  maxHeight,
   ogContainerBorderRadius,
   ogContainerPadding,
   ogContainerClassName,
@@ -195,27 +213,29 @@ const OGMetadata = ({
     )
   }, [state, metadata])
 
-  const calculatedImageHeight = useMemo(() => {
-    if (!metadata?.imageWidth || !metadata?.imageHeight) {
-      return 0
-    }
-    let maxSize = maxWidth
-    if (metadata?.imageWidth < MIN_IMAGE_SIZE || metadata?.imageHeight < MIN_IMAGE_SIZE) {
-      maxSize = 52
-    }
-    return Math.floor(metadata?.imageHeight / (metadata?.imageWidth / maxSize))
-  }, [metadata?.imageWidth, metadata?.imageHeight, maxWidth])
+  // The image's size: saved with the link, or measured once it loads (the mobile apps
+  // measure it too). Without a size the image is not shown.
+  const [measuredSize, setMeasuredSize] = useState<{ width: number; height: number } | null>(null)
+  useEffect(() => {
+    setMeasuredSize(null)
+  }, [metadata?.og?.image?.[0]?.url])
+  const imageWidth = Number(metadata?.imageWidth) || measuredSize?.width || 0
+  const imageHeight = Number(metadata?.imageHeight) || measuredSize?.height || 0
+  const imageSizeKnown = imageWidth > 0 && imageHeight > 0
+  const isSmallImage = imageSizeKnown && imageWidth < SMALL_IMAGE_WIDTH
+
+  const calculatedImageHeight = useMemo(
+    () =>
+      imageSizeKnown && !isSmallImage ? calculateLinkPreviewImageSize(maxWidth, imageWidth, imageHeight).height : 0,
+    [imageSizeKnown, isSmallImage, maxWidth, imageWidth, imageHeight]
+  )
 
   const hasImage = useMemo(
     () => metadata?.og?.image?.[0]?.url && (!imageLoadError || cachedImageSrc?.startsWith('blob:')),
     [metadata?.og?.image?.[0]?.url, imageLoadError, cachedImageSrc]
   )
   const faviconUrl = useMemo(() => {
-    if (
-      ogShowFavicon &&
-      hasImage &&
-      (metadata?.imageWidth < MIN_IMAGE_SIZE || metadata?.imageHeight < MIN_IMAGE_SIZE)
-    ) {
+    if (ogShowFavicon && hasImage && isSmallImage) {
       return cachedImageSrc || metadata?.og?.image?.[0]?.url
     }
 
@@ -229,15 +249,12 @@ const OGMetadata = ({
     hasImage,
     cachedImageSrc,
     cachedFaviconSrc,
-    faviconLoadError
+    faviconLoadError,
+    isSmallImage
   ])
   const resolvedOrder = useMemo(() => order || { image: 1, title: 2, description: 3, link: 4 }, [order])
 
-  const MIN_IMAGE_HEIGHT = 180
-
-  const showImage = useMemo(() => {
-    return hasImage && calculatedImageHeight >= MIN_IMAGE_HEIGHT
-  }, [hasImage, calculatedImageHeight])
+  const showImage = hasImage && imageSizeKnown && !isSmallImage
 
   const elements = useMemo(
     () =>
@@ -252,7 +269,7 @@ const OGMetadata = ({
                   containerWidth={maxWidth}
                   containerHeight={calculatedImageHeight}
                   maxWidth={maxWidth}
-                  maxHeight={maxHeight || calculatedImageHeight}
+                  maxHeight={maxHeight}
                 >
                   <Img
                     src={cachedImageSrc}
@@ -331,7 +348,7 @@ const OGMetadata = ({
 
   const content = useMemo(
     () =>
-      hasImage && metadata?.imageWidth > MIN_IMAGE_SIZE && metadata?.imageHeight > MIN_IMAGE_SIZE ? (
+      showImage ? (
         <OGText margin={ogContainerShowBackground}>
           {elements.map((el) => (
             <React.Fragment key={el.key}>{el.render}</React.Fragment>
@@ -343,6 +360,8 @@ const OGMetadata = ({
           <FaviconContainer aria-hidden='true'>
             <FaviconImg
               src={faviconUrl}
+              // A small image is shown whole, as on the mobile apps; a favicon fills its box.
+              fit={hasImage && isSmallImage ? 'contain' : 'cover'}
               alt=''
               loading='lazy'
               decoding='async'
@@ -355,7 +374,7 @@ const OGMetadata = ({
       ) : (
         textContent
       ),
-    [hasImage, elements, ogContainerShowBackground, ogShowFavicon, faviconUrl, textContent]
+    [hasImage, isSmallImage, showImage, elements, ogContainerShowBackground, ogShowFavicon, faviconUrl, textContent]
   )
 
   const getChannel = useCallback(() => {
@@ -402,6 +421,19 @@ const OGMetadata = ({
             })}
     >
       {content}
+      {hasImage && !imageSizeKnown && (
+        // Measures an image whose size was not saved with the link.
+        <img
+          hidden
+          alt=''
+          src={cachedImageSrc}
+          onLoad={(event) => {
+            const { naturalWidth, naturalHeight } = event.currentTarget
+            if (naturalWidth && naturalHeight) setMeasuredSize({ width: naturalWidth, height: naturalHeight })
+          }}
+          onError={() => setImageLoadError(true)}
+        />
+      )}
     </OGMetadataContainer>
   )
 }
@@ -440,7 +472,7 @@ const ImageContainer = styled.div<{
   containerWidth: number
   containerHeight: number
   maxWidth: number
-  maxHeight: number
+  maxHeight?: number
 }>`
   width: 100%;
   height: ${({ containerHeight }) => (containerHeight ? `${containerHeight}px` : '0px')};
@@ -448,7 +480,7 @@ const ImageContainer = styled.div<{
   margin: 0 auto;
   border-radius: 8px 8px 0 0;
   overflow: hidden;
-  max-height: ${({ maxHeight }) => (maxHeight ? `${maxHeight}px` : '240px')};
+  max-height: ${({ maxHeight }) => (maxHeight ? `${maxHeight}px` : 'none')};
 `
 
 const OGText = styled.div<{ margin: boolean }>`
@@ -546,9 +578,9 @@ const FaviconContainer = styled.div`
   flex: 0 0 52px;
 `
 
-const FaviconImg = styled.img`
+const FaviconImg = styled.img<{ fit?: 'cover' | 'contain' }>`
   width: 100%;
   height: 100%;
-  object-fit: cover;
+  object-fit: ${(props) => props.fit || 'cover'};
   display: block;
 `
