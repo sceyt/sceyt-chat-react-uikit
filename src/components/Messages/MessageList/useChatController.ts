@@ -2601,7 +2601,9 @@ export function useChatController({
     const isLatestInView = latestVisibleMessages.find(
       (m) => m.sortKey === latestLocalRef || m.localRef === latestLocalRef
     )
-    const shouldShow = !isLatestInView || (!isViewingLatest && (pendingNewestCount > 0 || !!scrollToMentionedMessage))
+    // At the latest edge the newest message is on screen, even while its visibility report
+    // lags behind a send (a long text or a photo makes that take longer).
+    const shouldShow = !isViewingLatest && (!isLatestInView || pendingNewestCount > 0 || !!scrollToMentionedMessage)
     if (showScrollToNewMessageButton !== shouldShow) {
       dispatch(showScrollToNewMessageButtonAC(shouldShow))
     }

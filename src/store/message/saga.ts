@@ -3709,6 +3709,12 @@ function* loadDefaultMessages(action: IAction): any {
     const connectionState = store.getState().UserReducer.connectionStatus
 
     if (channel?.id && !channel?.isMockChannel) {
+      const cachedMessages = getLatestContiguousMessagesFromMap(channel.id, MESSAGES_MAX_PAGE_COUNT)
+      if (!cachedMessages?.length) {
+        // No cache: show the spinner before waiting on the server, or the empty list shows
+        // "No messages yet" until the query is built.
+        yield call(setMessageListLoading, 'both', LOADING_STATE.LOADING)
+      }
       const SceytChatClient = getClient()
       const messageQueryBuilder = new (SceytChatClient.MessageListQueryBuilder as any)(channel.id)
       messageQueryBuilder.limit(MESSAGES_MAX_LENGTH)
@@ -3716,7 +3722,6 @@ function* loadDefaultMessages(action: IAction): any {
       const messageQuery =
         connectionState === CONNECTION_STATUS.CONNECTED ? yield call(messageQueryBuilder.build) : null
       query.messageQuery = messageQuery
-      const cachedMessages = getLatestContiguousMessagesFromMap(channel.id, MESSAGES_MAX_PAGE_COUNT)
 
       if (cachedMessages && cachedMessages.length) {
         // Cache available — show it immediately without a loading state
@@ -3728,9 +3733,6 @@ function* loadDefaultMessages(action: IAction): any {
         })
         yield put(addMessagesAC(filteredPendingMessages, MESSAGE_LOAD_DIRECTION.NEXT))
         yield call(loadOGMetadataForLinkMessages, filteredPendingMessages, true)
-      } else {
-        // No cache — show loading spinner while we wait for the server
-        yield call(setMessageListLoading, 'both', LOADING_STATE.LOADING)
       }
 
       let result: { messages: IMessage[]; hasNext: boolean } = { messages: [], hasNext: false }
@@ -4555,6 +4557,8 @@ function* getMessageAttachments(action: IAction): any {
 
 function* loadMoreMessageAttachments(action: any) {
   const { limit, direction, forPopup, attachmentId } = action.payload
+  // The tab this page belongs to, taken before the request in case the tab changes meanwhile.
+  const cacheKey = forPopup ? null : activeDisplayedCacheKey
   try {
     let AttachmentQuery
     if (forPopup) {
@@ -4593,6 +4597,15 @@ function* loadMoreMessageAttachments(action: any) {
       yield put(setAttachmentsCompleteAC(hasNext))
       yield put(setAttachmentsLoadingStateAC(LOADING_STATE.LOADED, forPopup))
       yield put(addAttachmentsAC(attachments))
+      // A send, an incoming message or a reconnect rebuilds the shown list from the
+      // tab's cache, so the cache keeps every loaded page; otherwise the older pages
+      // vanish and the tab looks reloaded.
+      if (cacheKey) {
+        const cachedAttachments: IAttachment[] = store.getState().MessageReducer.tabAttachmentsCache?.[cacheKey] || []
+        const cachedIds = new Set(cachedAttachments.map((attachment) => attachment.id))
+        const newAttachments = (attachments as IAttachment[]).filter((attachment) => !cachedIds.has(attachment.id))
+        yield put(setCachedTabAttachmentsAC(cacheKey, [...cachedAttachments, ...newAttachments]))
+      }
     }
   } catch (e) {
     log.error('error in message attachment query', e)
