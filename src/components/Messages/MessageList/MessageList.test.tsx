@@ -1753,7 +1753,18 @@ describe('MessageList', () => {
       store.dispatch(setMessagesAC([confirmedMessage, pendingLatest]))
     })
 
-    renderMessageList(store)
+    const rendered = renderMessageList(store)
+    const scrollable = rendered.container.querySelector('#scrollableDiv') as HTMLDivElement
+
+    // Scrolled away from the latest edge: the newest (pending) message is not on screen.
+    act(() => {
+      setScrollMetrics(scrollable, {
+        scrollTop: toNativeScrollTop(140, 800, 240),
+        scrollHeight: 800,
+        clientHeight: 240
+      })
+      fireEvent.scroll(scrollable)
+    })
 
     expect(screen.getByTestId('scroll-to-bottom')).toHaveAttribute('data-show', '2')
   })

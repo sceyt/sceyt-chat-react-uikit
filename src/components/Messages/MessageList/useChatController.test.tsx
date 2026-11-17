@@ -5337,10 +5337,20 @@ describe('useChatController', () => {
     })
     const dispatch = jest.fn()
 
-    renderController({
+    const rendered = renderController({
       channel,
       messages: [confirmed, pendingLatest],
       dispatch
+    })
+
+    // Scrolled away from the latest edge: the newest (pending) message is not on screen.
+    act(() => {
+      setScrollMetrics(rendered.scrollable, {
+        scrollTop: toNativeScrollTop(140, 800, 240),
+        scrollHeight: 800,
+        clientHeight: 240
+      })
+      fireEvent.scroll(rendered.scrollable)
     })
 
     expect(dispatch).toHaveBeenCalledWith(showScrollToNewMessageButtonAC(true))
@@ -5351,6 +5361,25 @@ describe('useChatController', () => {
     await flushEffects()
 
     expect(dispatch).not.toHaveBeenCalledWith(showScrollToNewMessageButtonAC(false))
+  })
+
+  it('does not show the scroll-down button at the latest edge while the newest message is not yet reported visible', async () => {
+    // Just after a send (a long text or a photo takes longer) the newest message is on
+    // screen at the latest edge, but its visibility has not been reported yet.
+    const confirmed = makeMessage({ id: '520', channelId: 'channel-button-latest', body: 'confirmed-visible' })
+    const justSent = makePendingMessage({
+      channelId: 'channel-button-latest',
+      body: 'just-sent',
+      createdAt: new Date('2026-04-01T12:20:00.000Z')
+    })
+    const channel = makeChannel({ id: 'channel-button-latest', lastMessage: justSent })
+    const dispatch = jest.fn()
+
+    renderController({ channel, messages: [confirmed, justSent], dispatch })
+    await flushEffects()
+
+    expect(screen.getByTestId('is-viewing-latest')).toHaveTextContent('true')
+    expect(dispatch).not.toHaveBeenCalledWith(showScrollToNewMessageButtonAC(true))
   })
 
   it('keeps next-edge scrolling active through a deep-history roundtrip and recognizes the latest window again', async () => {
