@@ -56,6 +56,7 @@ import {
   setAttachmentsLoadingStateAC,
   deleteMessageFromListAC,
   editMessageAC,
+  fetchOGMetadataForLinkAC,
   forwardMessageAC,
   getReactionsAC,
   loadAroundMessageAC,
@@ -76,6 +77,7 @@ import {
   setMessagesHasNextAC,
   setMessagesHasPrevAC,
   setCachedTabAttachmentsAC,
+  setOGMetadataAC,
   setLoadingNextMessagesStateAC,
   setLoadingPrevMessagesStateAC,
   setPendingMessageMutationAC,
@@ -626,6 +628,67 @@ describe('message saga message-list flows', () => {
         })
       )
     )
+  })
+
+  it('a link preview does not load or keep an image on a local-network host', async () => {
+    // Loading it from the page makes the browser ask the user for local network access.
+    const url = 'http://172.16.1.227:3000/d/dashboard?from=now-6h'
+    const serverMetadata = {
+      url,
+      og: { title: 'Grafana', image: [], favicon: { url: 'http://172.16.1.227:3000/public/img/fav32.png' } }
+    }
+    setClient({
+      connectionState: CONNECTION_STATUS.CONNECTED,
+      MessageLinkOGQueryBuilder: class {
+        build() {
+          return Promise.resolve({ loadOGData: () => Promise.resolve(serverMetadata) })
+        }
+      }
+    } as any)
+
+    const dispatched: any[] = []
+    runSaga(
+      { dispatch: (action: any) => dispatched.push(action), getState: () => mockStoreState },
+      __messageSagaTestables.fetchOGMetadata,
+      fetchOGMetadataForLinkAC(url)
+    )
+    await flushAsyncWork()
+
+    expect(document.querySelector('img[src^="http://172.16.1.227"]')).toBeNull()
+    const stored = dispatched.find((action) => action.type === setOGMetadataAC(url, null).type)
+    expect(stored?.payload.metadata.og).toEqual(expect.objectContaining({ title: 'Grafana', favicon: undefined }))
+  })
+
+  it('an uncached chat is marked as loading before its message query is built', async () => {
+    // Opening a chat that is not cached: until the list is marked as loading it shows the
+    // "No messages yet" placeholder, so that must happen before the query build is awaited.
+    const channel = makeChannel({
+      id: 'channel-default-uncached',
+      lastMessage: makeMessage({ id: '702', channelId: 'channel-default-uncached', body: 'server-latest' })
+    })
+    let finishBuild: (query: ReturnType<typeof createMessageQuery>) => void = () => undefined
+    const client = createClient(createMessageQuery(), channel)
+    client.MessageListQueryBuilder = class extends client.MessageListQueryBuilder {
+      build = jest.fn(() => new Promise((resolve) => (finishBuild = resolve)))
+    } as any
+
+    mockStoreState.UserReducer.connectionStatus = CONNECTION_STATUS.CONNECTED
+    setActiveChannelId(channel.id)
+    setChannelInMap(channel)
+    setClient(client)
+
+    const dispatched: any[] = []
+    const task = runSaga(
+      { dispatch: (action: any) => dispatched.push(action), getState: () => mockStoreState },
+      __messageSagaTestables.loadDefaultMessages,
+      loadDefaultMessagesAC(channel)
+    )
+    await flushAsyncWork()
+
+    expect(dispatched).toEqual(expect.arrayContaining(bothDirectionLoadingActions(LOADING_STATE.LOADING)))
+
+    finishBuild(createMessageQuery())
+    await task.toPromise()
   })
 
   it('reloads around the visible anchor on reconnect when refreshed channel data is available', () => {
