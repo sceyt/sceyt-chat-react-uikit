@@ -56,6 +56,7 @@ import {
   setAttachmentsLoadingStateAC,
   deleteMessageFromListAC,
   editMessageAC,
+  fetchOGMetadataForLinkAC,
   forwardMessageAC,
   getReactionsAC,
   loadAroundMessageAC,
@@ -76,6 +77,7 @@ import {
   setMessagesHasNextAC,
   setMessagesHasPrevAC,
   setCachedTabAttachmentsAC,
+  setOGMetadataAC,
   setLoadingNextMessagesStateAC,
   setLoadingPrevMessagesStateAC,
   setPendingMessageMutationAC,
@@ -626,6 +628,35 @@ describe('message saga message-list flows', () => {
         })
       )
     )
+  })
+
+  it('a link preview does not load or keep an image on a local-network host', async () => {
+    // Loading it from the page makes the browser ask the user for local network access.
+    const url = 'http://172.16.1.227:3000/d/dashboard?from=now-6h'
+    const serverMetadata = {
+      url,
+      og: { title: 'Grafana', image: [], favicon: { url: 'http://172.16.1.227:3000/public/img/fav32.png' } }
+    }
+    setClient({
+      connectionState: CONNECTION_STATUS.CONNECTED,
+      MessageLinkOGQueryBuilder: class {
+        build() {
+          return Promise.resolve({ loadOGData: () => Promise.resolve(serverMetadata) })
+        }
+      }
+    } as any)
+
+    const dispatched: any[] = []
+    runSaga(
+      { dispatch: (action: any) => dispatched.push(action), getState: () => mockStoreState },
+      __messageSagaTestables.fetchOGMetadata,
+      fetchOGMetadataForLinkAC(url)
+    )
+    await flushAsyncWork()
+
+    expect(document.querySelector('img[src^="http://172.16.1.227"]')).toBeNull()
+    const stored = dispatched.find((action) => action.type === setOGMetadataAC(url, null).type)
+    expect(stored?.payload.metadata.og).toEqual(expect.objectContaining({ title: 'Grafana', favicon: undefined }))
   })
 
   it('an uncached chat is marked as loading before its message query is built', async () => {

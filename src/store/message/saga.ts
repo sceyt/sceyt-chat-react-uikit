@@ -206,6 +206,7 @@ import { setAttachmentToCache } from '../../helpers/attachmentsCache'
 import { releaseBlobUrls } from '../../helpers/attachmentBlobUrls'
 import store from '../index'
 import { canBeViewOnce, isJSON } from '../../helpers/message'
+import { publicUrlOrUndefined, withoutLocalNetworkImages } from '../../helpers/localNetworkUrl'
 import log from 'loglevel'
 import { isRetryableLoadError } from '../../helpers/error'
 import { getVideoFirstFrame, getVideoPreviewFrame } from 'helpers/getVideoFrame'
@@ -2783,8 +2784,8 @@ function* loadFromMetadata(firstAttachment: IAttachment) {
       og: {
         title: compactMeta.ttl || firstAttachment?.name,
         description: compactMeta.dsc,
-        image: compactMeta.iur ? [{ url: compactMeta.iur }] : undefined,
-        favicon: compactMeta.tur ? { url: compactMeta.tur } : undefined
+        image: publicUrlOrUndefined(compactMeta.iur) ? [{ url: compactMeta.iur }] : undefined,
+        favicon: publicUrlOrUndefined(compactMeta.tur) ? { url: compactMeta.tur } : undefined
       },
       imageWidth: compactMeta.szw,
       imageHeight: compactMeta.szh
@@ -2842,7 +2843,8 @@ function* fetchOGMetadata(action: IAction): any {
     try {
       const queryBuilder = new client.MessageLinkOGQueryBuilder(url)
       const query = yield call([queryBuilder, queryBuilder.build])
-      const metadata = yield call([query, query.loadOGData])
+      // Images on a local-network host are neither loaded nor shown (see localNetworkUrl).
+      const metadata = withoutLocalNetworkImages(yield call([query, query.loadOGData]))
 
       // Load image to get dimensions
       const imageUrl = metadata?.og?.image?.[0]?.url
@@ -5296,6 +5298,7 @@ function* loadMorePollVotes(action: IAction): any {
 }
 
 export const __messageSagaTestables = {
+  fetchOGMetadata,
   pauseAttachmentUploading,
   resumeAttachmentUploading,
   prefetchCachedChannelsAfterReconnect,

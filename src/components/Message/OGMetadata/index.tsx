@@ -9,6 +9,7 @@ import { getChannelByInviteKeyAC } from 'store/channel/actions'
 import { attachmentUpdatedMapSelector } from 'store/message/selector'
 import { getAttachmentURLWithVersion } from 'helpers/attachmentsCache'
 import { isJSON } from 'helpers/message'
+import { publicUrlOrUndefined } from 'helpers/localNetworkUrl'
 
 const loadFromMetadata = (firstAttachment: IAttachment | undefined) => {
   if (!firstAttachment) {
@@ -26,8 +27,9 @@ const loadFromMetadata = (firstAttachment: IAttachment | undefined) => {
       og: {
         title: compactMeta?.ttl || firstAttachment?.name,
         description: compactMeta?.dsc,
-        image: compactMeta?.iur ? [{ url: compactMeta?.iur }] : undefined,
-        favicon: compactMeta?.tur ? { url: compactMeta?.tur } : undefined
+        // Images on a local-network host are neither loaded nor shown (see localNetworkUrl).
+        image: publicUrlOrUndefined(compactMeta?.iur) ? [{ url: compactMeta?.iur }] : undefined,
+        favicon: publicUrlOrUndefined(compactMeta?.tur) ? { url: compactMeta?.tur } : undefined
       },
       imageWidth: compactMeta?.szw,
       imageHeight: compactMeta?.szh
