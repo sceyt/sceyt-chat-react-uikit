@@ -64,9 +64,13 @@ import { getClient } from 'common/client'
 
 // Constants
 const MESSAGE_ACTIONS_HOVER_DELAY = 450
-// The actions bar renders ~46px above the bubble; when the message top is
-// closer than this to the viewport top (chat header area) the bar would be
-// clipped, so it opens below the bubble instead.
+// The actions bar renders ~46px above the bubble; when there is less room than
+// that between the message top and the top of the message list (below the chat
+// header and any pinned-messages banner) the bar would be hidden, so it opens
+// below the bubble instead.
+const MESSAGE_ACTIONS_BAR_SPACE = 46
+// Outside a message list (e.g. the pinned messages list) the room is measured
+// from the top of the window, which the chat header occupies.
 const MESSAGE_ACTIONS_FLIP_THRESHOLD = 110
 const MAX_SELECTED_MESSAGES = 30
 const EMOJI_POPUP_THRESHOLD = 300
@@ -515,7 +519,12 @@ const Message = ({
           return
         }
         const msgTop = messageItemRef.current?.getBoundingClientRect().top ?? 0
-        setMessageActionsBelow(msgTop < MESSAGE_ACTIONS_FLIP_THRESHOLD)
+        const list = messageItemRef.current?.closest('#scrollableDiv')
+        setMessageActionsBelow(
+          list
+            ? msgTop - list.getBoundingClientRect().top < MESSAGE_ACTIONS_BAR_SPACE
+            : msgTop < MESSAGE_ACTIONS_FLIP_THRESHOLD
+        )
         setMessageActionsShow(true)
         dispatch(setMessageMenuOpenedAC(message.id || message.tid!))
       }, MESSAGE_ACTIONS_HOVER_DELAY)
