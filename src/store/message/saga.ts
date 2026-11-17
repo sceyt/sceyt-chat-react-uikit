@@ -206,6 +206,7 @@ import { setAttachmentToCache } from '../../helpers/attachmentsCache'
 import { releaseBlobUrls } from '../../helpers/attachmentBlobUrls'
 import store from '../index'
 import { canBeViewOnce, isJSON } from '../../helpers/message'
+import { publicUrlOrUndefined, withoutLocalNetworkImages } from '../../helpers/localNetworkUrl'
 import log from 'loglevel'
 import { isRetryableLoadError } from '../../helpers/error'
 import { getVideoFirstFrame, getVideoPreviewFrame } from 'helpers/getVideoFrame'
@@ -2783,8 +2784,8 @@ function* loadFromMetadata(firstAttachment: IAttachment) {
       og: {
         title: compactMeta.ttl || firstAttachment?.name,
         description: compactMeta.dsc,
-        image: compactMeta.iur ? [{ url: compactMeta.iur }] : undefined,
-        favicon: compactMeta.tur ? { url: compactMeta.tur } : undefined
+        image: publicUrlOrUndefined(compactMeta.iur) ? [{ url: compactMeta.iur }] : undefined,
+        favicon: publicUrlOrUndefined(compactMeta.tur) ? { url: compactMeta.tur } : undefined
       },
       imageWidth: compactMeta.szw,
       imageHeight: compactMeta.szh
@@ -2842,7 +2843,8 @@ function* fetchOGMetadata(action: IAction): any {
     try {
       const queryBuilder = new client.MessageLinkOGQueryBuilder(url)
       const query = yield call([queryBuilder, queryBuilder.build])
-      const metadata = yield call([query, query.loadOGData])
+      // Images on a local-network host are neither loaded nor shown (see localNetworkUrl).
+      const metadata = withoutLocalNetworkImages(yield call([query, query.loadOGData]))
 
       // Load image to get dimensions
       const imageUrl = metadata?.og?.image?.[0]?.url
@@ -3709,6 +3711,12 @@ function* loadDefaultMessages(action: IAction): any {
     const connectionState = store.getState().UserReducer.connectionStatus
 
     if (channel?.id && !channel?.isMockChannel) {
+      const cachedMessages = getLatestContiguousMessagesFromMap(channel.id, MESSAGES_MAX_PAGE_COUNT)
+      if (!cachedMessages?.length) {
+        // No cache: show the spinner before waiting on the server, or the empty list shows
+        // "No messages yet" until the query is built.
+        yield call(setMessageListLoading, 'both', LOADING_STATE.LOADING)
+      }
       const SceytChatClient = getClient()
       const messageQueryBuilder = new (SceytChatClient.MessageListQueryBuilder as any)(channel.id)
       messageQueryBuilder.limit(MESSAGES_MAX_LENGTH)
@@ -3716,7 +3724,6 @@ function* loadDefaultMessages(action: IAction): any {
       const messageQuery =
         connectionState === CONNECTION_STATUS.CONNECTED ? yield call(messageQueryBuilder.build) : null
       query.messageQuery = messageQuery
-      const cachedMessages = getLatestContiguousMessagesFromMap(channel.id, MESSAGES_MAX_PAGE_COUNT)
 
       if (cachedMessages && cachedMessages.length) {
         // Cache available — show it immediately without a loading state
@@ -3728,9 +3735,6 @@ function* loadDefaultMessages(action: IAction): any {
         })
         yield put(addMessagesAC(filteredPendingMessages, MESSAGE_LOAD_DIRECTION.NEXT))
         yield call(loadOGMetadataForLinkMessages, filteredPendingMessages, true)
-      } else {
-        // No cache — show loading spinner while we wait for the server
-        yield call(setMessageListLoading, 'both', LOADING_STATE.LOADING)
       }
 
       let result: { messages: IMessage[]; hasNext: boolean } = { messages: [], hasNext: false }
@@ -4555,6 +4559,8 @@ function* getMessageAttachments(action: IAction): any {
 
 function* loadMoreMessageAttachments(action: any) {
   const { limit, direction, forPopup, attachmentId } = action.payload
+  // The tab this page belongs to, taken before the request in case the tab changes meanwhile.
+  const cacheKey = forPopup ? null : activeDisplayedCacheKey
   try {
     let AttachmentQuery
     if (forPopup) {
@@ -4593,6 +4599,15 @@ function* loadMoreMessageAttachments(action: any) {
       yield put(setAttachmentsCompleteAC(hasNext))
       yield put(setAttachmentsLoadingStateAC(LOADING_STATE.LOADED, forPopup))
       yield put(addAttachmentsAC(attachments))
+      // A send, an incoming message or a reconnect rebuilds the shown list from the
+      // tab's cache, so the cache keeps every loaded page; otherwise the older pages
+      // vanish and the tab looks reloaded.
+      if (cacheKey) {
+        const cachedAttachments: IAttachment[] = store.getState().MessageReducer.tabAttachmentsCache?.[cacheKey] || []
+        const cachedIds = new Set(cachedAttachments.map((attachment) => attachment.id))
+        const newAttachments = (attachments as IAttachment[]).filter((attachment) => !cachedIds.has(attachment.id))
+        yield put(setCachedTabAttachmentsAC(cacheKey, [...cachedAttachments, ...newAttachments]))
+      }
     }
   } catch (e) {
     log.error('error in message attachment query', e)
@@ -5283,6 +5298,7 @@ function* loadMorePollVotes(action: IAction): any {
 }
 
 export const __messageSagaTestables = {
+  fetchOGMetadata,
   pauseAttachmentUploading,
   resumeAttachmentUploading,
   prefetchCachedChannelsAfterReconnect,
