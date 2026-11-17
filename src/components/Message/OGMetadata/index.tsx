@@ -138,11 +138,15 @@ const OGMetadata = ({
   }, [attachment])
 
   const [imageLoadError, setImageLoadError] = useState(false)
+  // A site may refuse to serve its images to other sites (Cross-Origin-Resource-Policy), so
+  // the browser cannot load them: the preview is then shown without them, never broken.
+  const [faviconLoadError, setFaviconLoadError] = useState(false)
   const { src: cachedImageSrc, onImageLoad } = useCachedOGImage(metadata?.og?.image?.[0]?.url)
   const { src: cachedFaviconSrc, onImageLoad: onFaviconLoad } = useCachedOGImage(metadata?.og?.favicon?.url)
 
   useEffect(() => {
     setImageLoadError(false)
+    setFaviconLoadError(false)
   }, [attachment?.url])
 
   useEffect(() => {
@@ -215,10 +219,18 @@ const OGMetadata = ({
       return cachedImageSrc || metadata?.og?.image?.[0]?.url
     }
 
-    return ogShowFavicon && !hasImage && metadata?.og?.favicon?.url
+    return ogShowFavicon && !hasImage && metadata?.og?.favicon?.url && !faviconLoadError
       ? cachedFaviconSrc || metadata?.og?.favicon?.url
       : ''
-  }, [metadata?.og?.favicon?.url, metadata?.faviconLoaded, ogShowFavicon, hasImage, cachedImageSrc, cachedFaviconSrc])
+  }, [
+    metadata?.og?.favicon?.url,
+    metadata?.faviconLoaded,
+    ogShowFavicon,
+    hasImage,
+    cachedImageSrc,
+    cachedFaviconSrc,
+    faviconLoadError
+  ])
   const resolvedOrder = useMemo(() => order || { image: 1, title: 2, description: 3, link: 4 }, [order])
 
   const MIN_IMAGE_HEIGHT = 180
@@ -329,7 +341,15 @@ const OGMetadata = ({
         <OGRow>
           <OGTextWrapper>{textContent}</OGTextWrapper>
           <FaviconContainer aria-hidden='true'>
-            <FaviconImg src={faviconUrl} alt='' loading='lazy' decoding='async' onLoad={onFaviconLoad} />
+            <FaviconImg
+              src={faviconUrl}
+              alt=''
+              loading='lazy'
+              decoding='async'
+              onLoad={onFaviconLoad}
+              // The small image shown as the icon, or the favicon itself, could not be loaded.
+              onError={() => (hasImage ? setImageLoadError(true) : setFaviconLoadError(true))}
+            />
           </FaviconContainer>
         </OGRow>
       ) : (
