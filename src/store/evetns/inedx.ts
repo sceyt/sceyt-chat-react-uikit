@@ -171,6 +171,20 @@ const getResolvedChannelLastMessage = (
   return storedChannel?.lastMessage?.id ? storedChannel.lastMessage : null
 }
 
+// A reply event carries the server's shared copy of its parent, which does not
+// know the current user deleted that parent "for me". The local copy does, so
+// once it is deleted the reply quotes it instead of bringing the content back.
+const withLocallyDeletedParent = (channelId: string, message: IMessage): IMessage => {
+  const parentId = message.parentMessage?.id
+  if (!parentId || message.parentMessage?.state === MESSAGE_STATUS.DELETE) return message
+  const localParent =
+    getMessageFromMap(channelId, parentId) ||
+    (channelId === getActiveChannelId()
+      ? (store.getState().MessageReducer.activeChannelMessages as IMessage[]).find((m) => m.id === parentId)
+      : null)
+  return localParent?.state === MESSAGE_STATUS.DELETE ? { ...message, parentMessage: localParent } : message
+}
+
 export function* handleChannelMessageEvent(args: { channel: IChannel; message: IMessage }, SceytChatClient: any): any {
   const { channel, message } = args
   log.info('channel MESSAGE ... id : ', message.id, ', channel.id: ', channel.id)
@@ -186,6 +200,7 @@ export function* handleChannelMessageEvent(args: { channel: IChannel; message: I
 
   channel.metadata = isJSON(channel.metadata) ? JSON.parse(channel.metadata) : channel.metadata
   const activeChannelId = getActiveChannelId()
+  const messageToStore = withLocallyDeletedParent(channel.id, message)
   const channelExists = checkChannelExists(channel.id)
   const channelForAdd = JSON.parse(JSON.stringify(channel))
   const storedChannel = getStoredChannel(channel.id)
@@ -259,7 +274,7 @@ export function* handleChannelMessageEvent(args: { channel: IChannel; message: I
           })
         )
       } else {
-        yield put(addMessagesAC([message], 'next'))
+        yield put(addMessagesAC([messageToStore], 'next'))
       }
       yield put(loadOGMetadataForLinkAC([message]))
       const tabIsActive = yield select(browserTabIsActiveSelector)
@@ -272,7 +287,7 @@ export function* handleChannelMessageEvent(args: { channel: IChannel; message: I
   }
 
   addMessageToMap(channel.id, {
-    ...message,
+    ...messageToStore,
     deliveryStatus: resolvedDeliveryStatus
   })
   const channelDataUpdate: Omit<Partial<IChannel>, 'lastReactedMessage'> & {
