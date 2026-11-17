@@ -451,18 +451,17 @@ describe('file-drop integration: MessageList, Redux and SendMessageInput', () =>
     ['installer.dmg', 'application/x-apple-diskimage'],
     ['report.pdf', 'application/pdf'],
     ['drawing.svg', 'image/svg+xml']
-  ])('rejects unsupported %s in the media target without losing the next valid drop', async (name, type) => {
+  ])('a Safari drag of unsupported %s offers only the file target and sends it as a file', async (name, type) => {
     const view = renderFileDropFlow({ allowedMediaExtensionsErrorMessage: 'Unsupported media format' })
-    await view.drop([new File(['file'], name, { type })], 'media', false)
-    expect(screen.getByText('Unsupported media format')).toBeVisible()
-    await view.send()
-    expect(view.outgoing()).toHaveLength(0)
-    expect(view.store.getState().ChannelReducer.draggedAttachments).toEqual([])
-    const valid = new File(['video'], 'next.mp4', { type: 'video/mp4' })
-    await view.drop([valid], 'media')
+    const file = new File(['file'], name, { type })
+    // Safari hides non-media files from `items` while dragging.
+    await view.drop([file], 'file', false)
+    expect(screen.queryByText('Drag & drop to send as media')).toBeNull()
+    expect(screen.queryByText('Unsupported media format')).toBeNull()
     await view.send()
     expect(view.outgoing()).toHaveLength(1)
-    expect(view.outgoing()[0].payload.message.attachments[0].data).toBe(valid)
+    expect(view.outgoing()[0].payload.message.attachments[0].data).toBe(file)
+    expect(view.outgoing()[0].payload.message.attachments[0].type).toBe(attachmentTypes.file)
     view.unmount()
   })
 
