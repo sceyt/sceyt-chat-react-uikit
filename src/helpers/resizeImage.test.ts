@@ -1,4 +1,4 @@
-import { planMediaImage } from './resizeImage'
+import { calculateSize, createImageThumbnail, planMediaImage } from './resizeImage'
 
 // Images sent as media go at most 1600 px on their long edge, as JPEG; a wide screenshot was cut
 // to 1280 px and a phone screenshot to 1080 px tall, which made their text unreadable.
@@ -30,5 +30,42 @@ describe('planMediaImage', () => {
 
   it('scales a large compact JPEG down', () => {
     expect(planMediaImage(4032, 3024, 'image/jpeg', 2 * 1024 * KB)).toEqual({ width: 1600, height: 1200, encode: true })
+  })
+})
+
+describe('image thumbnails', () => {
+  it('keeps a very thin image at least 1 px across (a 2×902 screenshot could not be sent)', () => {
+    expect(calculateSize(2, 902, 6, 6)).toEqual([1, 6])
+    expect(calculateSize(902, 2, 6, 6)).toEqual([6, 1])
+  })
+
+  it('fails, instead of never finishing, for an image the browser cannot read', async () => {
+    const OriginalImage = window.Image
+    const { createObjectURL, revokeObjectURL } = URL
+    class UnreadableImage {
+      onerror: (() => void) | null = null
+      onload: (() => void) | null = null
+      private url = ''
+      get src() {
+        return this.url
+      }
+
+      set src(url: string) {
+        this.url = url
+        setTimeout(() => this.onerror?.())
+      }
+    }
+    window.Image = UnreadableImage as any
+    URL.createObjectURL = () => 'blob:broken'
+    URL.revokeObjectURL = () => undefined
+    try {
+      await expect(
+        createImageThumbnail(new File(['not an image'], 'broken.png', { type: 'image/png' }))
+      ).rejects.toThrow('Cannot load image')
+    } finally {
+      window.Image = OriginalImage
+      URL.createObjectURL = createObjectURL
+      URL.revokeObjectURL = revokeObjectURL
+    }
   })
 })

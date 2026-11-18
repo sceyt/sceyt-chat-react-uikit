@@ -164,7 +164,9 @@ export function createImageThumbnail(
   maxWidth?: number,
   maxHeight?: number
 ): Promise<IAttachmentMeta> {
-  return new Promise((resolve) => {
+  // Rejects when the image cannot be read, so that the caller goes on without a thumbnail instead
+  // of waiting for it forever.
+  return new Promise((resolve, reject) => {
     // const resizedFiles: any[] = []
     // files.forEach((file: File, index) => {
     let blobURL: any
@@ -175,43 +177,47 @@ export function createImageThumbnail(
     img.src = blobURL || path || ''
     img.onerror = function () {
       URL.revokeObjectURL(this.src)
-      // Handle the failure properly
       log.info('Cannot load image')
+      reject(new Error('Cannot load image'))
     }
     img.onload = function () {
       if (blobURL) {
         // @ts-ignore
         URL.revokeObjectURL(this.src)
       }
-      const [newWidth, newHeight] = calculateSize(
-        img.width,
-        img.height,
-        maxWidth || THUMBNAIL_MAX_WIDTH,
-        maxHeight || THUMBNAIL_MAX_HEIGHT
-      )
-      const canvas = document.createElement('canvas')
-      canvas.width = newWidth
-      canvas.height = newHeight
-      const ctx = canvas.getContext('2d')
-      // @ts-ignore
-      ctx.drawImage(img, 0, 0, newWidth, newHeight)
+      try {
+        const [newWidth, newHeight] = calculateSize(
+          img.width,
+          img.height,
+          maxWidth || THUMBNAIL_MAX_WIDTH,
+          maxHeight || THUMBNAIL_MAX_HEIGHT
+        )
+        const canvas = document.createElement('canvas')
+        canvas.width = newWidth
+        canvas.height = newHeight
+        const ctx = canvas.getContext('2d')
+        // @ts-ignore
+        ctx.drawImage(img, 0, 0, newWidth, newHeight)
 
-      // @ts-ignore
-      const pixels = ctx.getImageData(0, 0, canvas.width, canvas.height)
-      const binaryThumbHash = rgbaToThumbHash(pixels.width, pixels.height, pixels.data)
+        // @ts-ignore
+        const pixels = ctx.getImageData(0, 0, canvas.width, canvas.height)
+        const binaryThumbHash = rgbaToThumbHash(pixels.width, pixels.height, pixels.data)
 
-      // ThumbHash to data URL
-      // Simulate setting the placeholder first, then the full image loading later on
+        // ThumbHash to data URL
+        // Simulate setting the placeholder first, then the full image loading later on
 
-      // log.info('binaryThumbHash. . . . . . ', binaryThumbHash)
-      const thumbHashToBase64 = binaryToBase64(binaryThumbHash)
-      resolve({
-        // thumbnail: base64String.replace('data:image/jpeg;base64,', ''),
-        thumbnail: thumbHashToBase64,
-        imageWidth: img.width,
-        imageHeight: img.height
-      })
-      // document.getElementById('root').append(canvas)
+        // log.info('binaryThumbHash. . . . . . ', binaryThumbHash)
+        const thumbHashToBase64 = binaryToBase64(binaryThumbHash)
+        resolve({
+          // thumbnail: base64String.replace('data:image/jpeg;base64,', ''),
+          thumbnail: thumbHashToBase64,
+          imageWidth: img.width,
+          imageHeight: img.height
+        })
+        // document.getElementById('root').append(canvas)
+      } catch (error) {
+        reject(error)
+      }
     }
     // })
   })
@@ -230,8 +236,12 @@ export function calculateSize(width: number, height: number, maxWidth: number, m
       height = maxHeight
     }
   }
+  // A very thin image (e.g. 2×902) would scale to 0 px across, and a 0 px canvas cannot be read.
   if (height < 1) {
     height = 1
+  }
+  if (width < 1) {
+    width = 1
   }
   return [width, height]
 }
