@@ -2026,10 +2026,16 @@ function* applyPresenceUsers(action: IAction): any {
   }
 }
 
+// An indicator sent before the client is connected makes the SDK close the connection it is
+// setting up, and the chat does not reconnect; typing and recording go on all the same, so
+// their indicators are not sent until the client is connected.
+const isConnected = () => store.getState().UserReducer.connectionStatus === CONNECTION_STATUS.CONNECTED
+
 function* sendTyping(action: IAction): any {
   const {
     payload: { state }
   } = action
+  if (!isConnected()) return
   const activeChannelId = yield call(getActiveChannelId)
   const channel = yield call(getChannelFromMap, activeChannelId)
 
@@ -2050,6 +2056,7 @@ function* sendRecording(action: IAction): any {
   const {
     payload: { state, channelId }
   } = action
+  if (!isConnected()) return
   const channel = yield call(getChannelFromMap, channelId)
 
   try {
@@ -2465,6 +2472,8 @@ export const __channelSagaTestables = {
   resendPendingChannelReads,
   getChannels,
   channelsLoadMore,
+  sendTyping,
+  sendRecording,
   setWaitForReadMarkerRetry: (waitFn: typeof waitForReadMarkerRetry) => {
     waitForReadMarkerRetry = waitFn
   },

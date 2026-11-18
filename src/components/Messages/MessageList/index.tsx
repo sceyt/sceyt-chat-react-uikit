@@ -700,9 +700,11 @@ const MessageList: React.FC<MessagesProps> = ({
 
     let filesType: string
 
-    // Safari doesn't provide items during dragenter - show both options
+    // While a drag is over the page Safari lists only image and video files in `items`;
+    // any other file (a PDF, a ZIP) is left out. No items means no media, so only
+    // "send as file" is offered.
     if (!e.dataTransfer.items || e.dataTransfer.items.length === 0) {
-      filesType = 'media'
+      filesType = 'file'
     } else {
       // Browser provides items (Chrome, Firefox) - detect type
       const fileList: DataTransferItem[] = Array.from(e.dataTransfer.items)
