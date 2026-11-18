@@ -357,3 +357,83 @@ export async function resizeImageWithPica(
     }
   }
 }
+
+// An image sent in a chat as media (not as a file) goes as WhatsApp sends one: at most this many
+// pixels on its long edge, landscape or portrait, re-encoded as JPEG.
+export const MEDIA_IMAGE_MAX_SIDE = 1600
+export const MEDIA_IMAGE_QUALITY = 0.8
+// A JPEG that already fits and takes at most this many bits per pixel is compressed enough: it goes
+// as it is, not compressed a second time (as Telegram does).
+const COMPACT_JPEG_BITS_PER_PIXEL = 4
+
+/** The size a media image is sent in, and whether it has to be encoded again (see prepareMediaImage). */
+export function planMediaImage(width: number, height: number, type: string, size: number) {
+  const scale = Math.min(1, MEDIA_IMAGE_MAX_SIDE / Math.max(width, height))
+  const isCompactJpeg = type === 'image/jpeg' && (size * 8) / (width * height) <= COMPACT_JPEG_BITS_PER_PIXEL
+  return {
+    width: Math.max(1, Math.round(width * scale)),
+    height: Math.max(1, Math.round(height * scale)),
+    encode: scale < 1 || !isCompactJpeg
+  }
+}
+
+const loadImage = (file: Blob) =>
+  new Promise<HTMLImageElement>((resolve, reject) => {
+    const url = URL.createObjectURL(file)
+    const img = new Image()
+    img.onload = () => {
+      URL.revokeObjectURL(url)
+      resolve(img)
+    }
+    img.onerror = () => {
+      URL.revokeObjectURL(url)
+      reject(new Error('Cannot load image'))
+    }
+    img.src = url
+  })
+
+const jpegName = (name: string) => `${name.replace(/\.[^./]*$/, '') || 'image'}.jpg`
+
+/**
+ * Prepares an image sent as media (see MEDIA_IMAGE_MAX_SIDE): scaled down with high-quality
+ * resampling (the text of a wide screenshot stays readable), encoded once as JPEG on white (a
+ * transparent PNG does not turn black). A compact JPEG that already fits goes as it is. If the
+ * image cannot be read or encoded, the original file goes, with width and height 0.
+ */
+export async function prepareMediaImage(file: File): Promise<{ file: File; width: number; height: number }> {
+  try {
+    const img = await loadImage(file)
+    const plan = planMediaImage(img.naturalWidth, img.naturalHeight, file.type, file.size)
+    if (!plan.encode) return { file, width: plan.width, height: plan.height }
+
+    const source = document.createElement('canvas')
+    source.width = img.naturalWidth
+    source.height = img.naturalHeight
+    const sourceContext = source.getContext('2d')!
+    sourceContext.fillStyle = '#ffffff'
+    sourceContext.fillRect(0, 0, source.width, source.height)
+    sourceContext.drawImage(img, 0, 0)
+
+    let output = source
+    if (plan.width !== source.width || plan.height !== source.height) {
+      output = document.createElement('canvas')
+      output.width = plan.width
+      output.height = plan.height
+      await pica.resize(source, output, { quality: 3, unsharpAmount: 80, unsharpRadius: 0.6, unsharpThreshold: 2 })
+    }
+
+    const blob = await new Promise<Blob | null>((resolve) =>
+      output.toBlob((result) => resolve(result), 'image/jpeg', MEDIA_IMAGE_QUALITY)
+    )
+    // canvas.toBlob may give null (for example with little memory): the original still goes.
+    if (!blob) return { file, width: 0, height: 0 }
+    return {
+      file: new File([blob], jpegName(file.name), { type: 'image/jpeg' }),
+      width: plan.width,
+      height: plan.height
+    }
+  } catch (error) {
+    log.warn('Unable to prepare a media image:', error)
+    return { file, width: 0, height: 0 }
+  }
+}
