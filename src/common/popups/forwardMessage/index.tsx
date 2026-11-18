@@ -25,6 +25,7 @@ import Attachment from '../../../components/Attachment'
 import { attachmentTypes, DEFAULT_CHANNEL_TYPE, LOADING_STATE, USER_PRESENCE_STATUS } from '../../../helpers/constants'
 import { userLastActiveDateFormat } from '../../../helpers'
 import { makeUsername, trimMessageBodyWithAttributes } from '../../../helpers/message'
+import { findMentionsInText } from '../../../helpers/mentions'
 import { getReplyLinkPreviewImage, shouldShowLinkPreviewErrorFallback } from '../../../helpers/replyPreview'
 import { contactsMapSelector } from '../../../store/user/selector'
 import { getShowOnlyContactUsers } from '../../../helpers/contacts'
@@ -326,6 +327,8 @@ function ForwardMessagePopup({
   const [highlightedMentionIndex, setHighlightedMentionIndex] = useState(0)
   const popupRef = useRef<HTMLDivElement>(null)
   const noteInputRef = useRef<HTMLTextAreaElement>(null)
+  // Whether the next note change is a paste: the pasted text's mentions are made mentions again.
+  const notePastedRef = useRef(false)
   const noteHighlightRef = useRef<HTMLDivElement>(null)
   const noteContainerRef = useRef<HTMLDivElement>(null)
   const [noteContainerHeight, setNoteContainerHeight] = useState(0)
@@ -491,7 +494,7 @@ function ForwardMessagePopup({
     return match ? { start: selectionStart - match[2].length - 1, value: match[2] } : null
   }
 
-  const reconcileNoteAttributes = (previousText: string, nextText: string) => {
+  const reconcileNoteAttributes = (previousText: string, nextText: string, pasted: boolean) => {
     let changeStart = 0
     while (changeStart < previousText.length && previousText[changeStart] === nextText[changeStart]) changeStart += 1
 
@@ -517,13 +520,44 @@ function ForwardMessagePopup({
       // An edit across a mention turns it back into plain text, matching the composer behavior.
       return attributes
     }, [])
+
+    // A pasted `@Full Name` of a member is a mention, as in the chat input (a cut mention pasted back
+    // too: a text box copies only its text).
+    const pastedMentions = pasted
+      ? findMentionsInText(
+          nextText,
+          mentionCandidates.map((member) => ({
+            pattern: `@${makeUsername(contactsMap[member.id], member, getFromContacts)}`,
+            member
+          }))
+        ).filter(
+          (mention) =>
+            mention.start >= changeStart &&
+            mention.end <= nextEnd &&
+            mention.pattern !== '@Deleted user' &&
+            !nextAttributes.some((a) => mention.start < a.offset + a.length && mention.end > a.offset)
+        )
+      : []
+    pastedMentions.forEach(({ start, end, member }) => {
+      nextAttributes.push({ type: 'mention', metadata: member.id, offset: start, length: end - start })
+    })
+    nextAttributes.sort((a, b) => a.offset - b.offset)
+
     setNoteAttributes(nextAttributes)
-    setNoteMentionedUsers((members) => members.filter((member) => nextAttributes.some((a) => a.metadata === member.id)))
+    setNoteMentionedUsers((members) => {
+      const kept = members.filter((member) => nextAttributes.some((a) => a.metadata === member.id))
+      const added = pastedMentions
+        .map(({ member }) => member)
+        .filter((member, index, all) => !kept.some((m) => m.id === member.id) && all.indexOf(member) === index)
+      return [...kept, ...added]
+    })
   }
 
   const handleNoteChange = (event: ChangeEvent<HTMLTextAreaElement>) => {
     const nextText = event.target.value.slice(0, maxNoteLength)
-    reconcileNoteAttributes(noteText, nextText)
+    const pasted = notePastedRef.current
+    notePastedRef.current = false
+    reconcileNoteAttributes(noteText, nextText, pasted)
     setNoteText(nextText)
     setMentionQuery(
       mentionsAllowed ? getMentionQuery(nextText, Math.min(event.target.selectionStart, nextText.length)) : null
@@ -1032,6 +1066,9 @@ function ForwardMessagePopup({
                     value={noteText}
                     maxLength={maxNoteLength}
                     onChange={handleNoteChange}
+                    onPaste={() => {
+                      notePastedRef.current = true
+                    }}
                     onKeyDown={handleNoteKeyDown}
                     onScroll={handleNoteScroll}
                     onSelect={handleNoteSelect}

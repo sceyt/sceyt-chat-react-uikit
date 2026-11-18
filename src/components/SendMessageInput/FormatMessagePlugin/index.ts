@@ -17,6 +17,7 @@ import { IMessage, IMember } from '../../../types'
 import { useCallback, useEffect } from 'react'
 import { $createMentionNode, isMentionTextUnchanged } from '../MentionNode'
 import { mergeRegister } from '../FloatingTextFormatToolbarPlugin'
+import { findMentionsInText } from '../../../helpers/mentions'
 
 interface FormattedSegment {
   text: string
@@ -182,7 +183,7 @@ function useFormatMessage(
 
       // Build contacts list - include contactsMap values if getFromContacts is true
       const contacts = [...activeChannelMembers]
-      const mentionPatterns: Array<{ pattern: string; contact: any }> = []
+      const mentionPatterns: Array<{ pattern: string; member: any }> = []
       contacts.forEach((contactOrMember: any) => {
         const contactFromMap = contactsMap[contactOrMember.id]
 
@@ -194,44 +195,17 @@ function useFormatMessage(
         if (fullDisplayName && fullDisplayName !== 'Deleted user') {
           mentionPatterns.push({
             pattern: `@${fullDisplayName}`,
-            contact: contactOrMember
+            member: contactOrMember
           })
         }
       })
 
-      mentionPatterns.sort((a, b) => b.pattern.length - a.pattern.length)
-
-      // Find all mention matches in the pasted text
-      const matches: Array<{ start: number; end: number; contact: any; pattern: string }> = []
-      const usedRanges: Array<{ start: number; end: number }> = []
-
-      mentionPatterns.forEach(({ pattern, contact }) => {
-        let searchIndex = 0
-        while (true) {
-          const index = pastedText.indexOf(pattern, searchIndex)
-          if (index === -1) break
-
-          const isOverlapping = usedRanges.some((range) => index < range.end && index + pattern.length > range.start)
-
-          if (!isOverlapping) {
-            const charBefore = index > 0 ? pastedText[index - 1] : undefined
-            const isValidStart =
-              charBefore === undefined || charBefore === ' ' || charBefore === '\n' || charBefore === '\r'
-
-            const charAfter = pastedText[index + pattern.length]
-            const isValidEnd = charAfter === undefined || charAfter === ' ' || charAfter === '\n' || charAfter === '\r'
-
-            if (isValidStart && isValidEnd) {
-              matches.push({ start: index, end: index + pattern.length, contact, pattern })
-              usedRanges.push({ start: index, end: index + pattern.length })
-            }
-          }
-          searchIndex = index + 1
-        }
-      })
-
-      // Sort matches by start position (ascending for left-to-right processing)
-      matches.sort((a, b) => a.start - b.start)
+      const matches = findMentionsInText(pastedText, mentionPatterns).map(({ start, end, pattern, member }) => ({
+        start,
+        end,
+        pattern,
+        contact: member
+      }))
 
       // Build nodes from the pasted text with mentions converted
       const nodes: any[] = []
