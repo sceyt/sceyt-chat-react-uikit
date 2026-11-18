@@ -228,11 +228,10 @@ describe('file-drop integration: MessageList, Redux and SendMessageInput', () =>
       imageWidth: 10,
       imageHeight: 10
     })
-    jest.spyOn(imagePreparation, 'resizeImage').mockImplementation(async (file: File) => ({
+    jest.spyOn(imagePreparation, 'prepareMediaImage').mockImplementation(async (file: File) => ({
       file,
-      blob: null,
-      newWidth: 10,
-      newHeight: 10
+      width: 10,
+      height: 10
     }))
     require('../../helpers/videoConversion').remuxVideoFileForUpload.mockImplementation((file: File) =>
       Promise.resolve(file)
@@ -333,17 +332,39 @@ describe('file-drop integration: MessageList, Redux and SendMessageInput', () =>
   it.each<[string, FileTransferProvider | undefined]>([
     ['the SDK upload', undefined],
     ['a custom uploader', { upload: jest.fn(), download: jest.fn(), cancel: jest.fn() }]
-  ])('a media image sent through %s is encoded once, as JPEG of quality 0.8', async (_name, transport) => {
+  ])('a media image sent through %s is prepared once and sent as the prepared JPEG', async (_name, transport) => {
     fileTransfer.configure({ provider: transport })
     expect(fileTransfer.hasCustomProvider).toBe(!!transport)
+    const prepared = new File(['jpeg'], 'screenshot.jpg', { type: 'image/jpeg' })
+    ;(imagePreparation.prepareMediaImage as jest.Mock).mockResolvedValue({ file: prepared, width: 1600, height: 1000 })
     try {
       const view = renderFileDropFlow()
-      const file = new File(['photo'], 'photo.jpg', { type: 'image/jpeg' })
+      const file = new File(['png'], 'screenshot.png', { type: 'image/png' })
       await view.drop([file], 'media')
       await view.send()
 
-      expect(imagePreparation.resizeImage).toHaveBeenCalledTimes(1)
-      expect(imagePreparation.resizeImage).toHaveBeenCalledWith(file, undefined, undefined, 0.8)
+      expect(imagePreparation.prepareMediaImage).toHaveBeenCalledTimes(1)
+      expect(imagePreparation.prepareMediaImage).toHaveBeenCalledWith(file)
+      expect(view.outgoing()[0].payload.message.attachments[0].data).toBe(prepared)
+      view.unmount()
+    } finally {
+      fileTransfer.configure()
+    }
+  })
+
+  it.each<[string, FileTransferProvider | undefined]>([
+    ['the SDK upload', undefined],
+    ['a custom uploader', { upload: jest.fn(), download: jest.fn(), cancel: jest.fn() }]
+  ])('a GIF sent as media through %s goes as it is', async (_name, transport) => {
+    fileTransfer.configure({ provider: transport })
+    try {
+      const view = renderFileDropFlow()
+      const file = new File(['gif'], 'funny.gif', { type: 'image/gif' })
+      await view.drop([file], 'media')
+      await view.send()
+
+      expect(imagePreparation.prepareMediaImage).not.toHaveBeenCalled()
+      expect(view.outgoing()[0].payload.message.attachments[0].data).toBe(file)
       view.unmount()
     } finally {
       fileTransfer.configure()
