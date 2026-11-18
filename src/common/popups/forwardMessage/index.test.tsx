@@ -609,6 +609,67 @@ describe('ForwardMessagePopup', () => {
     expect(alice).toHaveAttribute('data-presence-user-id', 'alice')
   })
 
+  describe('pasting into the note', () => {
+    const openGroupNote = () => {
+      const channels = [
+        makeChannel({
+          id: 'chan-1',
+          subject: 'Design Team',
+          type: DEFAULT_CHANNEL_TYPE.GROUP,
+          members: makeMentionMembers()
+        })
+      ]
+      const { handleForward } = renderPopup({ channels })
+      selectChannel('Design Team')
+      return { handleForward, textarea: screen.getByPlaceholderText('Write a message') as HTMLTextAreaElement }
+    }
+
+    const forwardedNote = (handleForward: jest.Mock) => {
+      fireEvent.click(screen.getByRole('button', { name: 'Forward' }))
+      return handleForward.mock.calls[0][1]
+    }
+
+    it('keeps a mention followed by a symbol when the note is cut and pasted back', () => {
+      const { handleForward, textarea } = openGroupNote()
+      fireEvent.change(textarea, { target: { value: '@ali', selectionStart: 4 } })
+      fireEvent.click(screen.getByText('Alice Anderson'))
+      fireEvent.change(textarea, { target: { value: '@Alice Anderson!' } })
+
+      // Cut, then paste back: a text box puts only the text on the clipboard.
+      fireEvent.change(textarea, { target: { value: '' } })
+      fireEvent.paste(textarea)
+      fireEvent.change(textarea, { target: { value: '@Alice Anderson!' } })
+
+      const note = forwardedNote(handleForward)
+      expect(note.bodyAttributes).toEqual([
+        { type: 'mention', metadata: 'alice', offset: 0, length: '@Alice Anderson'.length }
+      ])
+      expect(note.mentionedUsers.map((user: { id: string }) => user.id)).toEqual(['alice'])
+    })
+
+    it('makes mentions of members named in pasted text, after the text already there', () => {
+      const { handleForward, textarea } = openGroupNote()
+      fireEvent.change(textarea, { target: { value: 'hi ' } })
+
+      fireEvent.paste(textarea)
+      fireEvent.change(textarea, { target: { value: 'hi @Bob Baker, @Alice Anderson.' } })
+
+      const note = forwardedNote(handleForward)
+      expect(note.bodyAttributes).toEqual([
+        { type: 'mention', metadata: 'bob', offset: 3, length: '@Bob Baker'.length },
+        { type: 'mention', metadata: 'alice', offset: 15, length: '@Alice Anderson'.length }
+      ])
+    })
+
+    it('leaves a name typed by hand as plain text', () => {
+      const { handleForward, textarea } = openGroupNote()
+
+      fireEvent.change(textarea, { target: { value: '@Alice Anderson!' } })
+
+      expect(forwardedNote(handleForward).bodyAttributes || []).toEqual([])
+    })
+  })
+
   it('does not open the mention dropdown when more than one channel is selected', () => {
     const channels = [
       makeChannel({

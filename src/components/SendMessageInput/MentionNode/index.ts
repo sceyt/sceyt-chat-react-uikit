@@ -102,6 +102,11 @@ export class MentionNode extends TextNode {
   exportDOM(): DOMExportOutput {
     const element = document.createElement('span')
     element.setAttribute('data-lexical-mention', 'true')
+    // Copying or cutting an intact mention keeps its member, so that pasting it back makes the same
+    // mention (the paste handler reads `data-mention`). An edited or partly copied one is just text.
+    if (this.isUnchangedMention() && this.__mention?.id) {
+      element.setAttribute('data-mention', this.__mention.id)
+    }
     element.textContent = this.__text
     return { element }
   }
