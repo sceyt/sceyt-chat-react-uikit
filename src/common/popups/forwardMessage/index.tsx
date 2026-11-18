@@ -25,6 +25,7 @@ import Attachment from '../../../components/Attachment'
 import { attachmentTypes, DEFAULT_CHANNEL_TYPE, LOADING_STATE, USER_PRESENCE_STATUS } from '../../../helpers/constants'
 import { userLastActiveDateFormat } from '../../../helpers'
 import { makeUsername, trimMessageBodyWithAttributes } from '../../../helpers/message'
+import { findMentionsInText } from '../../../helpers/mentions'
 import { getReplyLinkPreviewImage, shouldShowLinkPreviewErrorFallback } from '../../../helpers/replyPreview'
 import { contactsMapSelector } from '../../../store/user/selector'
 import { getShowOnlyContactUsers } from '../../../helpers/contacts'
@@ -41,6 +42,7 @@ import PopupContainer from '../popupContainer'
 import { useColor, useUpdatedUser } from '../../../hooks'
 import useIsOnScreen from '../../../hooks/useIsOnScreen'
 import usePresenceSubscription from '../../../hooks/usePresenceSubscription'
+import useOnScreenUserIds from '../../../hooks/useOnScreenUserIds'
 import { activeChannelMembersMapSelector } from '../../../store/member/selector'
 import { getMembersAC } from '../../../store/member/actions'
 import { themeSelector } from 'store/theme/selector'
@@ -218,6 +220,51 @@ const ChannelMembersItem = ({
   )
 }
 
+const ForwardMentionCandidate = ({
+  member,
+  displayName,
+  isActive,
+  onHover,
+  onSelect
+}: {
+  member: IMember
+  displayName: string
+  isActive: boolean
+  onHover: () => void
+  onSelect: () => void
+}) => {
+  const {
+    [THEME_COLORS.TEXT_PRIMARY]: textPrimary,
+    [THEME_COLORS.TEXT_SECONDARY]: textSecondary,
+    [THEME_COLORS.BACKGROUND_HOVERED]: backgroundHovered
+  } = useColor()
+  const updatedMember = useUpdatedUser(member)
+  const presence = hideUserPresence && hideUserPresence(updatedMember) ? undefined : updatedMember.presence
+
+  return (
+    <ForwardMentionOption
+      type='button'
+      role='option'
+      aria-selected={isActive}
+      data-presence-user-id={member.id}
+      activeBackgroundColor={backgroundHovered}
+      isActive={isActive}
+      onMouseEnter={onHover}
+      onClick={onSelect}
+    >
+      <Avatar name={displayName} image={member.avatarUrl || ''} size={36} textSize={14} setDefaultAvatar />
+      <ForwardMentionInfo>
+        <ForwardMentionName color={textPrimary}>{displayName}</ForwardMentionName>
+        <ForwardMentionPresence color={textSecondary}>
+          {presence && presence.state === USER_PRESENCE_STATUS.ONLINE
+            ? 'Online'
+            : presence && presence.lastActiveAt && userLastActiveDateFormat(presence.lastActiveAt)}
+        </ForwardMentionPresence>
+      </ForwardMentionInfo>
+    </ForwardMentionOption>
+  )
+}
+
 function ForwardMessagePopup({
   title,
   togglePopup,
@@ -280,6 +327,8 @@ function ForwardMessagePopup({
   const [highlightedMentionIndex, setHighlightedMentionIndex] = useState(0)
   const popupRef = useRef<HTMLDivElement>(null)
   const noteInputRef = useRef<HTMLTextAreaElement>(null)
+  // Whether the next note change is a paste: the pasted text's mentions are made mentions again.
+  const notePastedRef = useRef(false)
   const noteHighlightRef = useRef<HTMLDivElement>(null)
   const noteContainerRef = useRef<HTMLDivElement>(null)
   const [noteContainerHeight, setNoteContainerHeight] = useState(0)
@@ -322,6 +371,12 @@ function ForwardMessagePopup({
       })
       .slice(0, 5)
   }, [contactsMap, getFromContacts, mentionCandidates, mentionQuery])
+
+  const mentionListRef = useRef<HTMLDivElement>(null)
+  useOnScreenUserIds(
+    mentionListRef,
+    visibleMentionCandidates.map((member) => member.id)
+  )
 
   const noteSegments = useMemo(() => buildMentionSegments(noteText, noteAttributes), [noteText, noteAttributes])
 
@@ -439,7 +494,7 @@ function ForwardMessagePopup({
     return match ? { start: selectionStart - match[2].length - 1, value: match[2] } : null
   }
 
-  const reconcileNoteAttributes = (previousText: string, nextText: string) => {
+  const reconcileNoteAttributes = (previousText: string, nextText: string, pasted: boolean) => {
     let changeStart = 0
     while (changeStart < previousText.length && previousText[changeStart] === nextText[changeStart]) changeStart += 1
 
@@ -465,16 +520,65 @@ function ForwardMessagePopup({
       // An edit across a mention turns it back into plain text, matching the composer behavior.
       return attributes
     }, [])
+
+    // A pasted `@Full Name` of a member is a mention, as in the chat input (a cut mention pasted back
+    // too: a text box copies only its text).
+    const pastedMentions = pasted
+      ? findMentionsInText(
+          nextText,
+          mentionCandidates.map((member) => ({
+            pattern: `@${makeUsername(contactsMap[member.id], member, getFromContacts)}`,
+            member
+          }))
+        ).filter(
+          (mention) =>
+            mention.start >= changeStart &&
+            mention.end <= nextEnd &&
+            mention.pattern !== '@Deleted user' &&
+            !nextAttributes.some((a) => mention.start < a.offset + a.length && mention.end > a.offset)
+        )
+      : []
+    pastedMentions.forEach(({ start, end, member }) => {
+      nextAttributes.push({ type: 'mention', metadata: member.id, offset: start, length: end - start })
+    })
+    nextAttributes.sort((a, b) => a.offset - b.offset)
+
     setNoteAttributes(nextAttributes)
-    setNoteMentionedUsers((members) => members.filter((member) => nextAttributes.some((a) => a.metadata === member.id)))
+    setNoteMentionedUsers((members) => {
+      const kept = members.filter((member) => nextAttributes.some((a) => a.metadata === member.id))
+      const added = pastedMentions
+        .map(({ member }) => member)
+        .filter((member, index, all) => !kept.some((m) => m.id === member.id) && all.indexOf(member) === index)
+      return [...kept, ...added]
+    })
   }
 
   const handleNoteChange = (event: ChangeEvent<HTMLTextAreaElement>) => {
     const nextText = event.target.value.slice(0, maxNoteLength)
-    reconcileNoteAttributes(noteText, nextText)
+    const pasted = notePastedRef.current
+    notePastedRef.current = false
+    reconcileNoteAttributes(noteText, nextText, pasted)
     setNoteText(nextText)
     setMentionQuery(
       mentionsAllowed ? getMentionQuery(nextText, Math.min(event.target.selectionStart, nextText.length)) : null
+    )
+  }
+
+  // The list follows the cursor, as in the chat input: shown while the cursor in the focused
+  // note is right after an @ query (also when it comes back there), hidden when it moves away.
+  const handleNoteSelect = (event: React.SyntheticEvent<HTMLTextAreaElement>) => {
+    const { value, selectionStart, selectionEnd } = event.currentTarget
+    const query = mentionsAllowed && selectionStart === selectionEnd ? getMentionQuery(value, selectionStart) : null
+    // The cursor right after a mention already inserted (e.g. "@Cher") is not a new query.
+    const nextQuery =
+      query && noteAttributes.some((attribute) => attribute.type === 'mention' && attribute.offset === query.start)
+        ? null
+        : query
+    // Kept when unchanged, so the highlighted candidate is not reset.
+    setMentionQuery((current) =>
+      current && nextQuery && current.start === nextQuery.start && current.value === nextQuery.value
+        ? current
+        : nextQuery
     )
   }
 
@@ -962,43 +1066,41 @@ function ForwardMessagePopup({
                     value={noteText}
                     maxLength={maxNoteLength}
                     onChange={handleNoteChange}
+                    onPaste={() => {
+                      notePastedRef.current = true
+                    }}
                     onKeyDown={handleNoteKeyDown}
                     onScroll={handleNoteScroll}
-                    onBlur={() => window.setTimeout(() => setMentionQuery(null), 150)}
+                    onSelect={handleNoteSelect}
+                    onBlur={() => setMentionQuery(null)}
                     placeholder='Write a message'
                     className={isNoteScrolling ? 'show-scrollbar' : ''}
                     onMouseEnter={() => setIsNoteScrolling(true)}
                     onMouseLeave={() => setIsNoteScrolling(false)}
                     thumbColor={surface2}
                   />
-                  {mentionQuery && visibleMentionCandidates.length > 0 && (
-                    <ForwardMentionList backgroundColor={backgroundSections}>
-                      {visibleMentionCandidates.map((member, index) => {
-                        const displayName = makeUsername(contactsMap[member.id], member, getFromContacts)
-                        return (
-                          <ForwardMentionOption
-                            key={member.id}
-                            type='button'
-                            isActive={index === highlightedMentionIndex}
-                            onMouseDown={(event: React.MouseEvent<HTMLButtonElement>) => event.preventDefault()}
-                            onMouseEnter={() => setHighlightedMentionIndex(index)}
-                            onClick={() => insertMention(member)}
-                            color={textPrimary}
-                          >
-                            <Avatar
-                              name={displayName}
-                              image={member.avatarUrl || ''}
-                              size={28}
-                              textSize={11}
-                              setDefaultAvatar
-                            />
-                            {displayName}
-                          </ForwardMentionOption>
-                        )
-                      })}
-                    </ForwardMentionList>
-                  )}
                 </ForwardNoteInputWrapper>
+                {mentionQuery && visibleMentionCandidates.length > 0 && (
+                  <ForwardMentionList
+                    ref={mentionListRef}
+                    role='listbox'
+                    backgroundColor={backgroundSections}
+                    $theme={theme}
+                    // Clicks on the list keep the note focused, so they do not hide it.
+                    onMouseDown={(event: React.MouseEvent<HTMLDivElement>) => event.preventDefault()}
+                  >
+                    {visibleMentionCandidates.map((member, index) => (
+                      <ForwardMentionCandidate
+                        key={member.id}
+                        member={member}
+                        displayName={makeUsername(contactsMap[member.id], member, getFromContacts)}
+                        isActive={index === highlightedMentionIndex}
+                        onHover={() => setHighlightedMentionIndex(index)}
+                        onSelect={() => insertMention(member)}
+                      />
+                    ))}
+                  </ForwardMentionList>
+                )}
                 <SendNoteButton
                   type='button'
                   iconColor={accentColor}
@@ -1172,6 +1274,7 @@ const ForwardPreviewDivider = styled.div<{ color: string }>`
 `
 
 const ForwardNoteInputRow = styled.div`
+  position: relative;
   display: flex;
   align-items: center;
   gap: 8px;
@@ -1274,35 +1377,60 @@ const SendNoteButton = styled.button<{ iconColor: string }>`
   }
 `
 
-const ForwardMentionList = styled.div<{ backgroundColor: string }>`
+const ForwardMentionList = styled.div<{ backgroundColor: string; $theme: ThemeMode }>`
   position: absolute;
   z-index: 10;
-  bottom: calc(100% + 4px);
+  bottom: 100%;
   left: 0;
-  width: 280px;
-  max-height: 180px;
+  width: 300px;
+  max-height: 276px;
   overflow-y: auto;
+  padding: 8px 0;
+  box-sizing: border-box;
   background: ${(props) => props.backgroundColor};
-  border-radius: 8px;
-  box-shadow: 0px 0px 24px 0px #11153929;
+  border-radius: 12px;
+  box-shadow: ${(props) =>
+    props.$theme === 'dark' ? '0px 0px 12px rgba(0, 0, 0, 0.5)' : '0px 0px 12px rgba(17, 21, 57, 0.16)'};
 `
 
-const ForwardMentionOption = styled.button<{ color: string; isActive?: boolean }>`
+const ForwardMentionOption = styled.button<{ activeBackgroundColor: string; isActive?: boolean }>`
   display: flex;
   align-items: center;
   width: 100%;
-  gap: 8px;
-  padding: 8px 10px;
+  height: 52px;
+  gap: 12px;
+  padding: 4px 16px;
+  box-sizing: border-box;
   border: 0;
-  background: ${(props) => (props.isActive ? 'rgba(127, 127, 127, 0.12)' : 'transparent')};
-  color: ${(props) => props.color};
+  background: ${(props) => (props.isActive ? props.activeBackgroundColor : 'transparent')};
   font: inherit;
   text-align: left;
   cursor: pointer;
+`
 
-  &:hover {
-    background: rgba(127, 127, 127, 0.12);
-  }
+const ForwardMentionInfo = styled.span`
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+`
+
+const ForwardMentionName = styled.span<{ color: string }>`
+  font-weight: 500;
+  font-size: 16px;
+  line-height: 22px;
+  color: ${(props) => props.color};
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+`
+
+const ForwardMentionPresence = styled.span<{ color: string }>`
+  font-size: 13px;
+  line-height: 16px;
+  color: ${(props) => props.color};
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 `
 
 const ChannelItem = styled.div<{ backgroundHover?: string; disabled?: boolean }>`

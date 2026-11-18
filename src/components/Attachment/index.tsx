@@ -157,11 +157,16 @@ const Attachment = ({
   const theme = useSelector(themeSelector)
   // const attachmentUploadProgress = useSelector(attachmentUploadProgressSelector) || {}
   const imageContRef = useRef<HTMLDivElement>(null)
+  // Small previews (the pinned banner, a reply's quote) draw the image at a few dozen
+  // pixels. Their compressed copy is kept under a key of their own: under the shared
+  // key it would replace the display copy the message and every later view read.
+  const displayCopyKey = isRepliedMessage ? `${attachment.url}_preview` : attachment.url
   const attachmentUrlFromMap = useSelector((store: any) => {
     const map = store.MessageReducer.attachmentUpdatedMap
     return (
       map[getAttachmentURLWithVersion(attachment?.metadata?.tmb || '')] ||
       map[getAttachmentURLWithVersion(attachment.url)] ||
+      map[getAttachmentURLWithVersion(displayCopyKey)] ||
       undefined
     )
   })
@@ -510,9 +515,9 @@ const Attachment = ({
       setSizeProgress(undefined)
       let downloadingUrl = url
       if (attachment.type === attachmentTypes.image) {
-        const compressedUrl = await compressAndCacheImage(url, attachment.url, renderWidth, renderHeight)
+        const compressedUrl = await compressAndCacheImage(url, displayCopyKey, renderWidth, renderHeight)
         if (compressedUrl) {
-          registerBlobUrl(getAttachmentURLWithVersion(attachment.url), compressedUrl)
+          registerBlobUrl(getAttachmentURLWithVersion(displayCopyKey), compressedUrl)
           downloadingUrl = compressedUrl
         }
         setAttachmentToCache(
@@ -785,11 +790,11 @@ const Attachment = ({
     })
       .then(async ({ objectUrl }) => {
         if (imageDownloadRequest !== imageDownloadRequestRef.current) return
-        const compressedUrl = await compressAndCacheImage(objectUrl, attachment.url, renderWidth, renderHeight)
+        const compressedUrl = await compressAndCacheImage(objectUrl, displayCopyKey, renderWidth, renderHeight)
         if (imageDownloadRequest !== imageDownloadRequestRef.current) return
         const displayedUrl = compressedUrl || objectUrl
         setAttachmentUrl(displayedUrl)
-        dispatch(setUpdateMessageAttachmentAC(attachment.url, displayedUrl))
+        dispatch(setUpdateMessageAttachmentAC(displayCopyKey, displayedUrl))
         dispatch(setUpdateMessageAttachmentAC(attachment.url + '_original_image_url', objectUrl))
         setIsCached(true)
         setDownloadIsCancelled(false)
@@ -879,7 +884,7 @@ const Attachment = ({
                     return
                   const compressedUrl = await compressAndCacheImage(
                     objectUrl,
-                    attachment.url,
+                    displayCopyKey,
                     renderWidth,
                     renderHeight
                   )
@@ -890,7 +895,7 @@ const Attachment = ({
                     return
                   const displayedUrl = compressedUrl || objectUrl
                   setAttachmentUrl(displayedUrl)
-                  dispatch(setUpdateMessageAttachmentAC(attachment.url, displayedUrl))
+                  dispatch(setUpdateMessageAttachmentAC(displayCopyKey, displayedUrl))
                   dispatch(setUpdateMessageAttachmentAC(attachment.url + '_original_image_url', objectUrl))
                   setIsCached(true)
                   setIsOriginalImageRestarting(false)
@@ -956,9 +961,9 @@ const Attachment = ({
             const url = URL.createObjectURL(Body)
             let downloadingUrl = url
             if (attachment.type === attachmentTypes.image) {
-              const compressedUrl = await compressAndCacheImage(url, attachment.url, renderWidth, renderHeight)
+              const compressedUrl = await compressAndCacheImage(url, displayCopyKey, renderWidth, renderHeight)
               if (compressedUrl) {
-                registerBlobUrl(getAttachmentURLWithVersion(attachment.url), compressedUrl)
+                registerBlobUrl(getAttachmentURLWithVersion(displayCopyKey), compressedUrl)
                 downloadingUrl = compressedUrl
               }
             } else {
