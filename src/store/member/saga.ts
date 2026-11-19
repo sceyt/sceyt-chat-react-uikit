@@ -93,17 +93,19 @@ function* getMembers(action: IAction): any {
 function* loadMoreMembers(action: IAction): any {
   const { payload } = action
   const { limit, channelId } = payload
+  const membersQuery = query.channelMembersQuery?.[channelId]
+  const loadMoreMembers = getCustomLoadMembersFunctions()?.loadMoreMembers
+  // Nothing to page: the first load of the channel's members failed before its query was made.
+  // Its loading state (FAILED shows a Retry) is left as it is.
+  if (!membersQuery && !loadMoreMembers) {
+    return
+  }
   try {
-    const { channelMembersQuery } = query
-    const membersQuery = channelMembersQuery?.[channelId]
-
     if (limit && membersQuery) {
       membersQuery.limit = limit
     }
 
     yield put(setMembersLoadingStateAC(LOADING_STATE.LOADING, channelId))
-    const customLoadMembersFunctions = getCustomLoadMembersFunctions()
-    const loadMoreMembers = customLoadMembersFunctions?.loadMoreMembers
     let channel: IChannel = getChannelFromMap(channelId)
     if (!channel) {
       channel = getChannelFromAllChannels(channelId) as IChannel
@@ -120,6 +122,7 @@ function* loadMoreMembers(action: IAction): any {
     const updateChannelData = yield call(updateActiveChannelMembersAdd, members, channelId) || {}
     yield put(updateChannelDataAC(channelId, updateChannelData))
   } catch (e) {
+    log.error('ERROR in load more members - ', e.message)
     if (e.code !== 10008) {
       // yield put(setErrorNotification(e.message))
     }
