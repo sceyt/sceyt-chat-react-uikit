@@ -393,6 +393,16 @@ describe('member saga', () => {
         })
       )
     })
+
+    it('does nothing when the first load of the members failed before its query was made', async () => {
+      setChannelInMap(makeChannel({ id: 'channel-1' }))
+
+      const dispatched = await runMemberSaga(__memberSagaTestables.loadMoreMembers, loadMoreMembersAC(15, 'channel-1'))
+
+      // No LOADING then LOADED: that would hide the Retry of the failed load and ask the mentions list
+      // to load more again.
+      expect(dispatched).toEqual([])
+    })
   })
 
   describe('addMembers', () => {

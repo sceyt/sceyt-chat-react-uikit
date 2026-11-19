@@ -71,7 +71,7 @@ import {
 } from '../../helpers/message'
 import { DropdownOptionLi, DropdownOptionsUl, TextInOneLine, UploadFile, ViewOnceToggleCont } from '../../UIHelper'
 import { THEME_COLORS } from '../../UIHelper/constants'
-import { createImageThumbnail, resizeImage } from '../../helpers/resizeImage'
+import { createImageThumbnail, prepareMediaImage } from '../../helpers/resizeImage'
 import { detectBrowser, detectOS } from '../../helpers'
 import { IMember, IMessage, IUser } from '../../types'
 import { getSendAttachmentsAsSeparateMessages } from '../../helpers/sendAttachments'
@@ -231,9 +231,6 @@ function onError(error: any) {
 
 let attachmentsUpdate: any = []
 const UNSUPPORTED_PASTED_FILE_MESSAGE = 'This file format is not supported.'
-// JPEG quality of an image sent as media. This is its only encode: uploaders
-// store the file as given.
-const MEDIA_IMAGE_QUALITY = 0.8
 const useComposerLayoutEffect = CAN_USE_DOM ? useLayoutEffect : useEffect
 
 export interface SendMessageProps {
@@ -1505,14 +1502,15 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
               const { thumbnail, imageWidth, imageHeight } = await createImageThumbnail(file)
               let preparedFile = file
               let metadata: any
+              // A media image is prepared once (see prepareMediaImage): uploaders store the file as given.
               if (customUploader) {
-                const resized = await resizeImage(file, undefined, undefined, MEDIA_IMAGE_QUALITY)
+                const prepared = isMediaAttachment && file.type !== 'image/gif' ? await prepareMediaImage(file) : null
                 const patch = {
-                  size: isMediaAttachment && resized?.blob ? resized.blob.size : file.size,
+                  size: file.size,
                   metadata: { szw: imageWidth, szh: imageHeight, tmb: thumbnail }
                 }
-                if (isMediaAttachment && resized?.blob) {
-                  preparedFile = new File([resized.blob], resized.file.name, { type: file.type })
+                if (prepared) {
+                  preparedFile = prepared.file
                   patch.size = preparedFile.size
                   updateAttachment({ ...patch, data: preparedFile })
                   setPendingAttachment(tid, { file: preparedFile })
@@ -1522,19 +1520,16 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
                 metadata = patch.metadata
                 handleAttachmentImageForCache({ ...attachment, ...patch })
               } else if (isMediaAttachment && file.type !== 'image/gif') {
-                const resizedFileData = await resizeImage(file, undefined, undefined, MEDIA_IMAGE_QUALITY)
-                // canvas.toBlob may return null (for example when memory is constrained).
-                // Keep the original file usable rather than failing the attachment flow.
-                const resizedFile = resizedFileData.blob
-                  ? new File([resizedFileData.blob], resizedFileData.file.name, { type: file.type })
-                  : file
+                // When the image cannot be prepared, the original file goes, in its own size.
+                const prepared = await prepareMediaImage(file)
+                const resizedFile = prepared.file
                 const patch = {
                   data: resizedFile,
                   size: resizedFile.size,
                   metadata: JSON.stringify({
                     tmb: thumbnail,
-                    szw: resizedFileData.newWidth,
-                    szh: resizedFileData.newHeight
+                    szw: prepared.width || imageWidth,
+                    szh: prepared.height || imageHeight
                   })
                 }
                 updateAttachment(patch)

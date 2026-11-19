@@ -3,16 +3,28 @@ import { act, render, screen } from '@testing-library/react'
 import { MentionTypeaheadOption, MentionsContainer, useMentionLookupService } from './index'
 import { createMessageListStore, renderWithSceytProvider } from '../../../testUtils/messageListHarness'
 import { LOADING_STATE } from '../../../helpers/constants'
-import { getMembersAC, loadMoreMembersAC, setMembersLoadingStateAC } from '../../../store/member/actions'
-import { updateUserStatusOnMapAC } from '../../../store/user/actions'
+import {
+  addMembersToListAC,
+  getMembersAC,
+  loadMoreMembersAC,
+  setMembersLoadingStateAC
+} from '../../../store/member/actions'
+import { setConnectionStatusAC, updateUserStatusOnMapAC } from '../../../store/user/actions'
+import { CONNECTION_STATUS } from '../../../store/user/constants'
 import { presenceRegistry } from '../../../helpers/presence/registry'
 import { makeMember, makeUser } from '../../../testUtils/messageFixtures'
 
 const channelId = 'channel-mentions'
 
-const renderContainer = (loadingState: number) => {
+const renderContainer = (
+  loadingState: number,
+  connectionStatus = CONNECTION_STATUS.CONNECTED,
+  loadedMembers = [makeMember(makeUser({ id: 'member-1' }))]
+) => {
   const store = createMessageListStore({
+    UserReducer: { connectionStatus },
     MembersReducer: {
+      channelsMembersMap: { [channelId]: loadedMembers },
       channelsMembersHasNextMap: { [channelId]: true },
       channelsMembersLoadingState: { [channelId]: loadingState }
     }
@@ -66,6 +78,68 @@ describe('MentionsContainer auto-load of members', () => {
 
   it('does not load more while a request is in flight', () => {
     expect(renderContainer(LOADING_STATE.LOADING).loadMoreCalls()).toEqual([])
+  })
+
+  // A load-more that fails (the network is changing) ends LOADED with no new member: asking again at
+  // once would fail again at once, without end, and the page would stop responding.
+  const failLoadMore = (store: ReturnType<typeof renderContainer>['store']) => {
+    act(() => {
+      store.dispatch(setMembersLoadingStateAC(LOADING_STATE.LOADING, channelId))
+    })
+    act(() => {
+      store.dispatch(setMembersLoadingStateAC(LOADING_STATE.LOADED, channelId))
+    })
+  }
+
+  it('does not ask again and again for more members when loading more fails', () => {
+    const result = renderContainer(LOADING_STATE.LOADED)
+    for (let i = 0; i < 3; i++) failLoadMore(result.store)
+
+    expect(result.loadMoreCalls()).toHaveLength(1)
+  })
+
+  it('goes on loading more members after a page of them arrives', () => {
+    const result = renderContainer(LOADING_STATE.LOADED)
+    act(() => {
+      result.store.dispatch(setMembersLoadingStateAC(LOADING_STATE.LOADING, channelId))
+    })
+    act(() => {
+      result.store.dispatch(addMembersToListAC([makeMember(makeUser({ id: 'member-2' }))], channelId))
+      result.store.dispatch(setMembersLoadingStateAC(LOADING_STATE.LOADED, channelId))
+    })
+
+    expect(result.loadMoreCalls()).toHaveLength(2)
+  })
+
+  it('does not load more while disconnected, and does once connected again', () => {
+    const result = renderContainer(LOADING_STATE.LOADED, CONNECTION_STATUS.DISCONNECTED)
+    expect(result.loadMoreCalls()).toEqual([])
+
+    act(() => {
+      result.store.dispatch(setConnectionStatusAC(CONNECTION_STATUS.CONNECTED))
+    })
+
+    expect(result.loadMoreCalls()).toHaveLength(1)
+  })
+
+  it('loads the members again, not more of them, when none were loaded: their first load failed offline', () => {
+    const result = renderContainer(LOADING_STATE.LOADED, CONNECTION_STATUS.CONNECTED, [])
+
+    expect(result.getMembersCalls()).toEqual([[getMembersAC(channelId)]])
+    expect(result.loadMoreCalls()).toEqual([])
+  })
+
+  it('tries loading more again after a reconnect, when it failed before', () => {
+    const result = renderContainer(LOADING_STATE.LOADED)
+    failLoadMore(result.store)
+    act(() => {
+      result.store.dispatch(setConnectionStatusAC(CONNECTION_STATUS.DISCONNECTED))
+    })
+    act(() => {
+      result.store.dispatch(setConnectionStatusAC(CONNECTION_STATUS.CONNECTED))
+    })
+
+    expect(result.loadMoreCalls()).toHaveLength(2)
   })
 })
 

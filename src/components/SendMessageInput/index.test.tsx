@@ -228,11 +228,10 @@ describe('file-drop integration: MessageList, Redux and SendMessageInput', () =>
       imageWidth: 10,
       imageHeight: 10
     })
-    jest.spyOn(imagePreparation, 'resizeImage').mockImplementation(async (file: File) => ({
+    jest.spyOn(imagePreparation, 'prepareMediaImage').mockImplementation(async (file: File) => ({
       file,
-      blob: null,
-      newWidth: 10,
-      newHeight: 10
+      width: 10,
+      height: 10
     }))
     require('../../helpers/videoConversion').remuxVideoFileForUpload.mockImplementation((file: File) =>
       Promise.resolve(file)
@@ -333,17 +332,39 @@ describe('file-drop integration: MessageList, Redux and SendMessageInput', () =>
   it.each<[string, FileTransferProvider | undefined]>([
     ['the SDK upload', undefined],
     ['a custom uploader', { upload: jest.fn(), download: jest.fn(), cancel: jest.fn() }]
-  ])('a media image sent through %s is encoded once, as JPEG of quality 0.8', async (_name, transport) => {
+  ])('a media image sent through %s is prepared once and sent as the prepared JPEG', async (_name, transport) => {
     fileTransfer.configure({ provider: transport })
     expect(fileTransfer.hasCustomProvider).toBe(!!transport)
+    const prepared = new File(['jpeg'], 'screenshot.jpg', { type: 'image/jpeg' })
+    ;(imagePreparation.prepareMediaImage as jest.Mock).mockResolvedValue({ file: prepared, width: 1600, height: 1000 })
     try {
       const view = renderFileDropFlow()
-      const file = new File(['photo'], 'photo.jpg', { type: 'image/jpeg' })
+      const file = new File(['png'], 'screenshot.png', { type: 'image/png' })
       await view.drop([file], 'media')
       await view.send()
 
-      expect(imagePreparation.resizeImage).toHaveBeenCalledTimes(1)
-      expect(imagePreparation.resizeImage).toHaveBeenCalledWith(file, undefined, undefined, 0.8)
+      expect(imagePreparation.prepareMediaImage).toHaveBeenCalledTimes(1)
+      expect(imagePreparation.prepareMediaImage).toHaveBeenCalledWith(file)
+      expect(view.outgoing()[0].payload.message.attachments[0].data).toBe(prepared)
+      view.unmount()
+    } finally {
+      fileTransfer.configure()
+    }
+  })
+
+  it.each<[string, FileTransferProvider | undefined]>([
+    ['the SDK upload', undefined],
+    ['a custom uploader', { upload: jest.fn(), download: jest.fn(), cancel: jest.fn() }]
+  ])('a GIF sent as media through %s goes as it is', async (_name, transport) => {
+    fileTransfer.configure({ provider: transport })
+    try {
+      const view = renderFileDropFlow()
+      const file = new File(['gif'], 'funny.gif', { type: 'image/gif' })
+      await view.drop([file], 'media')
+      await view.send()
+
+      expect(imagePreparation.prepareMediaImage).not.toHaveBeenCalled()
+      expect(view.outgoing()[0].payload.message.attachments[0].data).toBe(file)
       view.unmount()
     } finally {
       fileTransfer.configure()
@@ -451,18 +472,17 @@ describe('file-drop integration: MessageList, Redux and SendMessageInput', () =>
     ['installer.dmg', 'application/x-apple-diskimage'],
     ['report.pdf', 'application/pdf'],
     ['drawing.svg', 'image/svg+xml']
-  ])('rejects unsupported %s in the media target without losing the next valid drop', async (name, type) => {
+  ])('a Safari drag of unsupported %s offers only the file target and sends it as a file', async (name, type) => {
     const view = renderFileDropFlow({ allowedMediaExtensionsErrorMessage: 'Unsupported media format' })
-    await view.drop([new File(['file'], name, { type })], 'media', false)
-    expect(screen.getByText('Unsupported media format')).toBeVisible()
-    await view.send()
-    expect(view.outgoing()).toHaveLength(0)
-    expect(view.store.getState().ChannelReducer.draggedAttachments).toEqual([])
-    const valid = new File(['video'], 'next.mp4', { type: 'video/mp4' })
-    await view.drop([valid], 'media')
+    const file = new File(['file'], name, { type })
+    // Safari hides non-media files from `items` while dragging.
+    await view.drop([file], 'file', false)
+    expect(screen.queryByText('Drag & drop to send as media')).toBeNull()
+    expect(screen.queryByText('Unsupported media format')).toBeNull()
     await view.send()
     expect(view.outgoing()).toHaveLength(1)
-    expect(view.outgoing()[0].payload.message.attachments[0].data).toBe(valid)
+    expect(view.outgoing()[0].payload.message.attachments[0].data).toBe(file)
+    expect(view.outgoing()[0].payload.message.attachments[0].type).toBe(attachmentTypes.file)
     view.unmount()
   })
 
