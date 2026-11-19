@@ -22,7 +22,13 @@ import useUpdatedUser from '../../../hooks/useUpdatedUser'
 import { useSelector, useDispatch } from 'store/hooks'
 import { themeSelector } from 'store/theme/selector'
 import { getMembersAC, loadMoreMembersAC } from '../../../store/member/actions'
-import { channelsMembersLoadingStateSelector, channelsMembersHasNextMapSelector } from '../../../store/member/selector'
+import {
+  activeChannelMembersMapSelector,
+  channelsMembersLoadingStateSelector,
+  channelsMembersHasNextMapSelector
+} from '../../../store/member/selector'
+import { connectionStatusSelector } from '../../../store/user/selector'
+import { CONNECTION_STATUS } from '../../../store/user/constants'
 import { shallowEqual } from 'react-redux'
 import useOnScreenUserIds from '../../../hooks/useOnScreenUserIds'
 
@@ -234,6 +240,11 @@ export function MentionsContainer({
     [channelsMembersLoadingState?.[channelId]]
   )
   const membersHasNext = useMemo(() => channelsMembersHasNext?.[channelId], [channelsMembersHasNext?.[channelId]])
+  const loadedMembersCount: number = useSelector(
+    (state: any) => activeChannelMembersMapSelector(state)?.[channelId]?.length || 0
+  )
+  const connectionStatus = useSelector(connectionStatusSelector)
+  const isConnected = connectionStatus === CONNECTION_STATUS.CONNECTED
   const mentionsListRef = useRef<HTMLUListElement>(null)
   useOnScreenUserIds(
     mentionsListRef,
@@ -297,6 +308,14 @@ export function MentionsContainer({
 
   // Channel whose failed first members load was already retried from here (reset once a load succeeds)
   const retriedFailedLoadRef = useRef<string | null>(null)
+  // The channel and its loaded members count when more were last asked for. A load-more that fails
+  // (offline, the network changing) ends LOADED with no new member: asking again at once would fail
+  // again at once, without end, and the page would stop responding. Asked again once members arrive,
+  // or after a reconnect.
+  const loadMoreRequestedRef = useRef<string | null>(null)
+  useEffect(() => {
+    if (!isConnected) loadMoreRequestedRef.current = null
+  }, [isConnected])
 
   useEffect(() => {
     // The first load failed (Members tab shows Retry): retry it once so mentions don't stay empty.
@@ -311,10 +330,21 @@ export function MentionsContainer({
     if (membersLoadingState === LOADING_STATE.LOADED) {
       retriedFailedLoadRef.current = null
     }
-    if (options?.length < 20 && membersHasNext && membersLoadingState === LOADING_STATE.LOADED && channelId) {
-      dispatch(loadMoreMembersAC(15, channelId))
+    const request = `${channelId}:${loadedMembersCount}`
+    if (
+      options?.length < 20 &&
+      membersHasNext &&
+      membersLoadingState === LOADING_STATE.LOADED &&
+      channelId &&
+      isConnected &&
+      loadMoreRequestedRef.current !== request
+    ) {
+      loadMoreRequestedRef.current = request
+      // No member loaded yet: the first load failed with a network error (it ends LOADED, with no
+      // query to page), so it is made again.
+      dispatch(loadedMembersCount ? loadMoreMembersAC(15, channelId) : getMembersAC(channelId))
     }
-  }, [options?.length, membersHasNext, membersLoadingState, channelId, dispatch])
+  }, [options?.length, membersHasNext, membersLoadingState, channelId, dispatch, isConnected, loadedMembersCount])
 
   return (
     <MentionsContainerWrapper className='typeahead-popover mentions-menu' ref={contRef}>
