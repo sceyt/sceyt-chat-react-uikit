@@ -1,6 +1,6 @@
 import React from 'react'
 import { fireEvent, screen } from '@testing-library/react'
-import { OGMetadata } from './index'
+import { clearLinkPreviewImageStates, OGMetadata } from './index'
 import { attachmentTypes } from '../../../helpers/constants'
 import { createMessageListStore, renderWithSceytProvider } from '../../../testUtils/messageListHarness'
 
@@ -35,12 +35,22 @@ const renderPreview = (meta: Record<string, unknown> = {}) =>
     store: createMessageListStore()
   })
 
-const images = () => Array.from(document.querySelectorAll('img')).map((img) => img.getAttribute('src') || '')
-const failToLoad = (src: string) => {
+// The images shown (an image only checked, hidden, is not shown).
+const images = () =>
+  Array.from(document.querySelectorAll('img'))
+    .filter((img) => !img.hidden)
+    .map((img) => img.getAttribute('src') || '')
+const imageWith = (src: string) => {
   const img = Array.from(document.querySelectorAll('img')).find((element) => element.getAttribute('src') === src)
   if (!img) throw new Error(`no <img> with ${src}; shown: ${JSON.stringify(images())}`)
-  fireEvent.error(img)
+  return img
 }
+const failToLoad = (src: string) => fireEvent.error(imageWith(src))
+const load = (src: string) => fireEvent.load(imageWith(src))
+
+beforeEach(() => {
+  clearLinkPreviewImageStates()
+})
 
 describe('link preview whose image the browser cannot load', () => {
   it.each([
@@ -59,9 +69,56 @@ describe('link preview whose image the browser cannot load', () => {
   it('falls back to the favicon when only the image fails', () => {
     renderPreview()
 
+    load(FAVICON)
     failToLoad(IMAGE)
 
     expect(images()).toEqual([FAVICON])
+  })
+
+  it('goes straight to text when the image fails: no empty favicon box is shown and then removed', () => {
+    renderPreview()
+
+    failToLoad(IMAGE)
+    // The favicon is still being checked: the preview shows no box for it yet.
+    expect(images()).toEqual([])
+    failToLoad(FAVICON)
+
+    expect(images()).toEqual([])
+    expect(screen.getByText('How the team does code review')).toBeInTheDocument()
+  })
+
+  it('shows the favicon once it loads, after the image failed', () => {
+    renderPreview()
+
+    failToLoad(IMAGE)
+    load(FAVICON)
+
+    expect(images()).toEqual([FAVICON])
+  })
+
+  it('shows a preview whose image failed as text from the start when shown again, so it does not blink', () => {
+    const first = renderPreview()
+    failToLoad(IMAGE)
+    failToLoad(FAVICON)
+    first.unmount()
+
+    renderPreview()
+
+    // Not an image box that is then removed: no image is even requested.
+    expect(document.querySelectorAll('img')).toHaveLength(0)
+    expect(screen.getByText('How the team does code review')).toBeInTheDocument()
+  })
+
+  it('tries the image again when it is shown again after failing while offline', () => {
+    const onLine = jest.spyOn(window.navigator, 'onLine', 'get').mockReturnValue(false)
+    const first = renderPreview()
+    failToLoad(IMAGE)
+    first.unmount()
+    onLine.mockRestore()
+
+    renderPreview()
+
+    expect(images()).toEqual([IMAGE])
   })
 
   it('shows the image when it loads', () => {

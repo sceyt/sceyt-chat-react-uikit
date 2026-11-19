@@ -60,6 +60,23 @@ const useCachedOGImage = (url: string | undefined) => {
   return { src, onImageLoad }
 }
 
+// Whether a link preview's image or favicon loaded, by URL, for the whole session. A preview
+// shown again (the chat reopened, the message scrolled back into view) starts from what is
+// known, so an image the browser cannot load is not shown as an empty box and then removed
+// each time: the preview would blink.
+const imageLoadStates = new Map<string, 'loaded' | 'failed'>()
+
+const rememberImageLoad = (url: string | undefined, loaded: boolean) => {
+  if (!url) return
+  // An image that failed while offline may load once the network is back.
+  if (!loaded && typeof navigator !== 'undefined' && navigator.onLine === false) return
+  imageLoadStates.set(url, loaded ? 'loaded' : 'failed')
+}
+
+const loadStateOf = (url: string | undefined) => (url ? imageLoadStates.get(url) : undefined)
+
+export const clearLinkPreviewImageStates = () => imageLoadStates.clear()
+
 const validateUrl = (url: string) => {
   try {
     const urlObj = new URL(url)
@@ -155,17 +172,28 @@ const OGMetadata = ({
     return loadFromMetadata(attachment)
   }, [attachment])
 
-  const [imageLoadError, setImageLoadError] = useState(false)
+  const imageUrl: string | undefined = metadata?.og?.image?.[0]?.url
+  const faviconOriginalUrl: string | undefined = metadata?.og?.favicon?.url
   // A site may refuse to serve its images to other sites (Cross-Origin-Resource-Policy), so
   // the browser cannot load them: the preview is then shown without them, never broken.
-  const [faviconLoadError, setFaviconLoadError] = useState(false)
-  const { src: cachedImageSrc, onImageLoad } = useCachedOGImage(metadata?.og?.image?.[0]?.url)
-  const { src: cachedFaviconSrc, onImageLoad: onFaviconLoad } = useCachedOGImage(metadata?.og?.favicon?.url)
+  const [imageLoadError, setImageLoadError] = useState(() => loadStateOf(imageUrl) === 'failed')
+  const [faviconLoadState, setFaviconLoadState] = useState(() => loadStateOf(faviconOriginalUrl))
+  const { src: cachedImageSrc, onImageLoad } = useCachedOGImage(imageUrl)
+  const { src: cachedFaviconSrc, onImageLoad: onFaviconLoad } = useCachedOGImage(faviconOriginalUrl)
 
   useEffect(() => {
-    setImageLoadError(false)
-    setFaviconLoadError(false)
+    setImageLoadError(loadStateOf(imageUrl) === 'failed')
+    setFaviconLoadState(loadStateOf(faviconOriginalUrl))
   }, [attachment?.url])
+
+  const onImageError = () => {
+    rememberImageLoad(imageUrl, false)
+    setImageLoadError(true)
+  }
+  const onFaviconResult = (loaded: boolean) => {
+    rememberImageLoad(faviconOriginalUrl, loaded)
+    setFaviconLoadState(loaded ? 'loaded' : 'failed')
+  }
 
   useEffect(() => {
     if (cachedImageSrc?.startsWith('blob:')) {
@@ -239,9 +267,10 @@ const OGMetadata = ({
       return cachedImageSrc || metadata?.og?.image?.[0]?.url
     }
 
-    return ogShowFavicon && !hasImage && metadata?.og?.favicon?.url && !faviconLoadError
-      ? cachedFaviconSrc || metadata?.og?.favicon?.url
-      : ''
+    // In place of an image that could not be loaded, the favicon is shown only once it is
+    // known to load, so the preview does not show an empty icon and then remove it as well.
+    const showFavicon = faviconLoadState === 'loaded' || (!faviconLoadState && !imageUrl)
+    return ogShowFavicon && !hasImage && faviconOriginalUrl && showFavicon ? cachedFaviconSrc || faviconOriginalUrl : ''
   }, [
     metadata?.og?.favicon?.url,
     metadata?.faviconLoaded,
@@ -249,7 +278,7 @@ const OGMetadata = ({
     hasImage,
     cachedImageSrc,
     cachedFaviconSrc,
-    faviconLoadError,
+    faviconLoadState,
     isSmallImage
   ])
   const resolvedOrder = useMemo(() => order || { image: 1, title: 2, description: 3, link: 4 }, [order])
@@ -274,10 +303,11 @@ const OGMetadata = ({
                   <Img
                     src={cachedImageSrc}
                     alt='OG image'
-                    onLoad={onImageLoad}
-                    onError={() => {
-                      setImageLoadError(true)
+                    onLoad={() => {
+                      rememberImageLoad(imageUrl, true)
+                      onImageLoad()
                     }}
+                    onError={onImageError}
                     bgColor={background}
                   />
                 </ImageContainer>
@@ -365,9 +395,16 @@ const OGMetadata = ({
               alt=''
               loading='lazy'
               decoding='async'
-              onLoad={onFaviconLoad}
+              onLoad={() => {
+                if (hasImage) {
+                  rememberImageLoad(imageUrl, true)
+                } else {
+                  onFaviconResult(true)
+                  onFaviconLoad()
+                }
+              }}
               // The small image shown as the icon, or the favicon itself, could not be loaded.
-              onError={() => (hasImage ? setImageLoadError(true) : setFaviconLoadError(true))}
+              onError={() => (hasImage ? onImageError() : onFaviconResult(false))}
             />
           </FaviconContainer>
         </OGRow>
@@ -431,7 +468,18 @@ const OGMetadata = ({
             const { naturalWidth, naturalHeight } = event.currentTarget
             if (naturalWidth && naturalHeight) setMeasuredSize({ width: naturalWidth, height: naturalHeight })
           }}
-          onError={() => setImageLoadError(true)}
+          onError={onImageError}
+        />
+      )}
+      {ogShowFavicon && imageUrl && faviconOriginalUrl && !faviconLoadState && (
+        // Checks the favicon along with the image: if the image cannot be loaded, the preview
+        // goes straight to its final look, with or without the favicon.
+        <img
+          hidden
+          alt=''
+          src={cachedFaviconSrc}
+          onLoad={() => onFaviconResult(true)}
+          onError={() => onFaviconResult(false)}
         />
       )}
     </OGMetadataContainer>
