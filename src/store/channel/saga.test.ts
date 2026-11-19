@@ -31,6 +31,8 @@ import {
   switchChannelActionAC,
   leaveChannelAC,
   resendPendingChannelReadsAC,
+  sendRecordingAC,
+  sendTypingAC,
   setChannelsAC,
   setChannelsLoadingStateAC,
   setChannelsLoadFailedAC,
@@ -1648,5 +1650,59 @@ describe('channel saga getChannels latest-message snapshots', () => {
 
     expect(getMessagesFromMap(channelId)[cached.id].deliveryStatus).toBe(MESSAGE_DELIVERY_STATUS.READ)
     expect(dispatched.some((action) => action.type === patchMessagesAC([]).type)).toBe(false)
+  })
+})
+
+// A typing or recording indicator sent while the client is not connected makes the SDK
+// close the connection it is setting up, and the chat does not reconnect.
+describe('typing and recording indicators', () => {
+  const makeIndicatorChannel = () => {
+    const channel = makeChannel({ id: 'indicator-channel' }) as any
+    channel.startTyping = jest.fn()
+    channel.stopTyping = jest.fn()
+    channel.startRecording = jest.fn()
+    channel.stopRecording = jest.fn()
+    setChannelInMap(channel)
+    setActiveChannelId(channel.id)
+    return channel
+  }
+
+  beforeEach(() => {
+    mockStore.getState.mockReturnValue(mockStoreState)
+    destroyChannelsMap()
+  })
+
+  afterEach(() => {
+    mockStoreState.UserReducer.connectionStatus = CONNECTION_STATUS.CONNECTED
+    setActiveChannelId('')
+    destroyChannelsMap()
+  })
+
+  it.each([CONNECTION_STATUS.CONNECTING, CONNECTION_STATUS.DISCONNECTED, 'Reconnecting'])(
+    'sends no typing or recording indicator while the connection is %s',
+    async (connectionStatus) => {
+      const channel = makeIndicatorChannel()
+      mockStoreState.UserReducer.connectionStatus = connectionStatus
+
+      await runChannelSaga(__channelSagaTestables.sendTyping, sendTypingAC(true))
+      await runChannelSaga(__channelSagaTestables.sendTyping, sendTypingAC(false))
+      await runChannelSaga(__channelSagaTestables.sendRecording, sendRecordingAC(true, channel.id))
+      await runChannelSaga(__channelSagaTestables.sendRecording, sendRecordingAC(false, channel.id))
+
+      expect(channel.startTyping).not.toHaveBeenCalled()
+      expect(channel.stopTyping).not.toHaveBeenCalled()
+      expect(channel.startRecording).not.toHaveBeenCalled()
+      expect(channel.stopRecording).not.toHaveBeenCalled()
+    }
+  )
+
+  it('sends typing and recording indicators once connected', async () => {
+    const channel = makeIndicatorChannel()
+
+    await runChannelSaga(__channelSagaTestables.sendTyping, sendTypingAC(true))
+    await runChannelSaga(__channelSagaTestables.sendRecording, sendRecordingAC(true, channel.id))
+
+    expect(channel.startTyping).toHaveBeenCalledTimes(1)
+    expect(channel.startRecording).toHaveBeenCalledTimes(1)
   })
 })

@@ -8,7 +8,7 @@ import {
   renderWithSceytProvider,
   resetMessageListFixtureIds
 } from '../../../testUtils/messageListHarness'
-import { attachmentTypes, DEFAULT_CHANNEL_TYPE, LOADING_STATE } from '../../../helpers/constants'
+import { attachmentTypes, DEFAULT_CHANNEL_TYPE, LOADING_STATE, USER_PRESENCE_STATUS } from '../../../helpers/constants'
 import { IAttachment, IChannel, IContactsMap } from '../../../types'
 import { setShowOnlyContactUsers } from '../../../helpers/contacts'
 import { setActiveChannelAC, switchChannelActionAC } from '../../../store/channel/actions'
@@ -568,6 +568,108 @@ describe('ForwardMessagePopup', () => {
     expect(mentionSpan).toBeInTheDocument()
   })
 
+  it('shows each mention candidate with its online status, laid out as in the chat input mention list', () => {
+    const lastActiveAt = new Date(Date.now() - 5 * 60 * 1000)
+    const channels = [
+      makeChannel({
+        id: 'chan-1',
+        subject: 'Design Team',
+        type: DEFAULT_CHANNEL_TYPE.GROUP,
+        members: [
+          { ...makeUser({ id: 'current-user' }), role: 'owner' },
+          {
+            ...makeUser({ id: 'alice', firstName: 'Alice', lastName: 'Anderson' }),
+            presence: { state: USER_PRESENCE_STATUS.ONLINE, status: '', lastActiveAt: new Date() },
+            role: 'member'
+          },
+          {
+            ...makeUser({ id: 'bob', firstName: 'Bob', lastName: 'Baker' }),
+            presence: { state: USER_PRESENCE_STATUS.OFFLINE, status: '', lastActiveAt },
+            role: 'member'
+          }
+        ] as any
+      })
+    ]
+    renderPopup({ channels })
+
+    selectChannel('Design Team')
+    fireEvent.change(screen.getByPlaceholderText('Write a message'), { target: { value: '@', selectionStart: 1 } })
+
+    const alice = screen.getByRole('option', { name: /Alice Anderson/ })
+    const bob = screen.getByRole('option', { name: /Bob Baker/ })
+    expect(alice).toHaveTextContent('Online')
+    expect(bob).toHaveTextContent('Last seen 5 minutes ago')
+
+    // Design: a 300px list with 8px vertical padding, 52px rows, 36px avatars, 16px names.
+    const list = screen.getByRole('listbox')
+    expect(getComputedStyle(list)).toMatchObject({ width: '300px', paddingTop: '8px', paddingBottom: '8px' })
+    expect(getComputedStyle(alice).height).toBe('52px')
+    expect(getComputedStyle(screen.getByText('Alice Anderson')).fontSize).toBe('16px')
+    // Rows are tagged so presence is subscribed only for the users on screen.
+    expect(alice).toHaveAttribute('data-presence-user-id', 'alice')
+  })
+
+  describe('pasting into the note', () => {
+    const openGroupNote = () => {
+      const channels = [
+        makeChannel({
+          id: 'chan-1',
+          subject: 'Design Team',
+          type: DEFAULT_CHANNEL_TYPE.GROUP,
+          members: makeMentionMembers()
+        })
+      ]
+      const { handleForward } = renderPopup({ channels })
+      selectChannel('Design Team')
+      return { handleForward, textarea: screen.getByPlaceholderText('Write a message') as HTMLTextAreaElement }
+    }
+
+    const forwardedNote = (handleForward: jest.Mock) => {
+      fireEvent.click(screen.getByRole('button', { name: 'Forward' }))
+      return handleForward.mock.calls[0][1]
+    }
+
+    it('keeps a mention followed by a symbol when the note is cut and pasted back', () => {
+      const { handleForward, textarea } = openGroupNote()
+      fireEvent.change(textarea, { target: { value: '@ali', selectionStart: 4 } })
+      fireEvent.click(screen.getByText('Alice Anderson'))
+      fireEvent.change(textarea, { target: { value: '@Alice Anderson!' } })
+
+      // Cut, then paste back: a text box puts only the text on the clipboard.
+      fireEvent.change(textarea, { target: { value: '' } })
+      fireEvent.paste(textarea)
+      fireEvent.change(textarea, { target: { value: '@Alice Anderson!' } })
+
+      const note = forwardedNote(handleForward)
+      expect(note.bodyAttributes).toEqual([
+        { type: 'mention', metadata: 'alice', offset: 0, length: '@Alice Anderson'.length }
+      ])
+      expect(note.mentionedUsers.map((user: { id: string }) => user.id)).toEqual(['alice'])
+    })
+
+    it('makes mentions of members named in pasted text, after the text already there', () => {
+      const { handleForward, textarea } = openGroupNote()
+      fireEvent.change(textarea, { target: { value: 'hi ' } })
+
+      fireEvent.paste(textarea)
+      fireEvent.change(textarea, { target: { value: 'hi @Bob Baker, @Alice Anderson.' } })
+
+      const note = forwardedNote(handleForward)
+      expect(note.bodyAttributes).toEqual([
+        { type: 'mention', metadata: 'bob', offset: 3, length: '@Bob Baker'.length },
+        { type: 'mention', metadata: 'alice', offset: 15, length: '@Alice Anderson'.length }
+      ])
+    })
+
+    it('leaves a name typed by hand as plain text', () => {
+      const { handleForward, textarea } = openGroupNote()
+
+      fireEvent.change(textarea, { target: { value: '@Alice Anderson!' } })
+
+      expect(forwardedNote(handleForward).bodyAttributes || []).toEqual([])
+    })
+  })
+
   it('does not open the mention dropdown when more than one channel is selected', () => {
     const channels = [
       makeChannel({
@@ -612,6 +714,90 @@ describe('ForwardMessagePopup', () => {
 
     expect(textarea).toHaveValue('@Bob Baker')
     expect(handleForward).not.toHaveBeenCalled()
+  })
+
+  describe('mention list and the note field focus', () => {
+    // Puts the cursor at `position` in the focused note, as a click or an arrow key does.
+    const moveCursor = (textarea: HTMLTextAreaElement, position: number) => {
+      textarea.setSelectionRange(position, position)
+      fireEvent.mouseUp(textarea)
+    }
+
+    const typeMentionQuery = () => {
+      renderPopup({
+        channels: [
+          makeChannel({
+            id: 'chan-1',
+            subject: 'Design Team',
+            type: DEFAULT_CHANNEL_TYPE.GROUP,
+            members: makeMentionMembers()
+          })
+        ]
+      })
+      selectChannel('Design Team')
+      const textarea = screen.getByPlaceholderText('Write a message') as HTMLTextAreaElement
+      act(() => textarea.focus())
+      fireEvent.change(textarea, { target: { value: 'hi @ali', selectionStart: 7 } })
+      textarea.setSelectionRange(7, 7)
+      expect(screen.getByText('Alice Anderson')).toBeInTheDocument()
+      return textarea
+    }
+
+    it('hides the mention list when the note field loses focus', () => {
+      const textarea = typeMentionQuery()
+
+      act(() => textarea.blur())
+
+      expect(screen.queryByText('Alice Anderson')).not.toBeInTheDocument()
+    })
+
+    it('shows the mention list again when the cursor is back in the note right after the @ query', () => {
+      const textarea = typeMentionQuery()
+      act(() => textarea.blur())
+      expect(screen.queryByText('Alice Anderson')).not.toBeInTheDocument()
+
+      act(() => textarea.focus())
+      moveCursor(textarea, 7)
+
+      expect(screen.getByText('Alice Anderson')).toBeInTheDocument()
+    })
+
+    it('hides the mention list when the cursor moves away from the @ query', () => {
+      const textarea = typeMentionQuery()
+
+      moveCursor(textarea, 2)
+      expect(screen.queryByText('Alice Anderson')).not.toBeInTheDocument()
+
+      moveCursor(textarea, 7)
+      expect(screen.getByText('Alice Anderson')).toBeInTheDocument()
+    })
+
+    it('does not reopen the mention list for a mention already inserted', () => {
+      renderPopup({
+        channels: [
+          makeChannel({
+            id: 'chan-1',
+            subject: 'Design Team',
+            type: DEFAULT_CHANNEL_TYPE.GROUP,
+            // A one-word name: the cursor right after the inserted "@Cher" looks like an @ query.
+            members: [
+              ...makeMentionMembers(),
+              { ...makeUser({ id: 'cher', firstName: 'Cher' }), lastName: '', role: 'member' }
+            ] as any
+          })
+        ]
+      })
+      selectChannel('Design Team')
+      const textarea = screen.getByPlaceholderText('Write a message') as HTMLTextAreaElement
+      act(() => textarea.focus())
+      fireEvent.change(textarea, { target: { value: '@che', selectionStart: 4 } })
+      fireEvent.click(screen.getByText('Cher'))
+      expect(textarea).toHaveValue('@Cher')
+
+      moveCursor(textarea, 5)
+
+      expect(screen.queryByRole('listbox')).not.toBeInTheDocument()
+    })
   })
 
   it('does not open the mention dropdown for a direct channel', () => {
